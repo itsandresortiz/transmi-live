@@ -9,3 +9,4 @@ export * from "./transit/vehicle";
 export * from "./transit/fleet";
 export * from "./transit/prediction";
 export * from "./transit/network";
+export * from "./transit/path";

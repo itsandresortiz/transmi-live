@@ -91,7 +91,7 @@ export function App() {
       return { colorMode: u.colorMode, motion: u.motion, system: u.tab === "buses" || u.tab === "rutas" ? u.system : null, routeId: u.tab === "rutas" ? u.routeId : null, visible: u.layers.buses };
     }, () => thRef.current);
     br.current = r;
-    (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r };
+    (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData };
     let stopped = false;
     void m.ready.then(() => { if (!stopped) { r.start(); m.setToggles(uiRef.current.layers); } });
 

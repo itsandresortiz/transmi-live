@@ -139,3 +139,20 @@ describe("avisos", () => {
     expect(text).toBe("Línea HF615: Br. Las Acacias → Br. Villa del Río");
   });
 });
+
+import { RoadPath, lockToRoute } from "../src";
+describe("RoadPath", () => {
+  // una calle en «L»: 1 km al este y luego 1 km al norte
+  const L = new RoadPath([{ lat: 4.65, lon: -74.1 }, { lat: 4.65, lon: -74.0910 }, { lat: 4.6590, lon: -74.0910 }]);
+  it("avanza por la esquina y no en línea recta", () => {
+    const start = L.pointAt(900), after = L.pointAt(1300);
+    expect(after.y).toBeLessThan(start.y);            // sube (norte = y menor)
+    expect(Math.abs(after.x - L.pointAt(1000).x)).toBeLessThan(1e-6);
+  });
+  it("encuentra el trazado cercano en el sentido del bus", () => {
+    const p = L.pointAt(500);
+    expect(lockToRoute([L], p, { ux: 1, uy: 0 })).not.toBeNull();
+    expect(lockToRoute([L], p, { ux: -1, uy: 0 })).toBeNull();
+    expect(lockToRoute([L], { x: p.x, y: p.y + 0.001 }, { ux: 1, uy: 0 })).toBeNull(); // muy lejos
+  });
+});

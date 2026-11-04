@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 import type { TransitState } from "@transmi/application";
-import { type GeoPoint, type SystemType, type WorldPoint, distanceMeters, predictPosition, toGeo } from "@transmi/domain";
+import { type GeoPoint, type RouteLock, RoadPath, type SystemType, type Vehicle, type WorldPoint, DEFAULT_PREDICTION, distanceMeters, lockToRoute, motionSeconds, predictPosition, toGeo } from "@transmi/domain";
 import type { MapController } from "./MapController";
 import type { MapTheme } from "./theme";
 
@@ -27,6 +27,10 @@ export class BusRenderer {
   private last = 0;
   private lastPrune = 0;
   private followId: string | null = null;
+  private paths = new Map<string, RoadPath[]>();
+  private pathsFor: object | null = null;
+  /** Por bus: a qué trazado quedó pegado con su último reporte (se recalcula solo cuando llega un reporte nuevo). */
+  private locks = new Map<string, { at: number; lock: RouteLock | null }>();
 
   constructor(
     private readonly state: TransitState,
@@ -73,6 +77,32 @@ export class BusRenderer {
     return s;
   }
 
+  private pathsOf(routeId: string): RoadPath[] {
+    const net = this.state.network;
+    if (this.pathsFor !== net) { this.paths = new Map(); this.locks.clear(); this.pathsFor = net; }
+    let list = this.paths.get(routeId);
+    if (!list) {
+      list = (net.shapes.get(routeId) ?? []).filter((sh) => sh.points.length > 1).map((sh) => new RoadPath(sh.points));
+      this.paths.set(routeId, list);
+    }
+    return list;
+  }
+
+  /** Avanza al bus por el trazado de su ruta (curvas incluidas); si no va por ella, en línea recta. */
+  private predict(v: Vehicle, nowSec: number, snap: boolean): WorldPoint {
+    const vel = v.velocity;
+    if (!snap || !vel || vel.speedMps < DEFAULT_PREDICTION.minSpeedMps) return predictPosition(v, nowSec);
+    let c = this.locks.get(v.id);
+    if (!c || c.at !== v.reportedAt) {
+      const paths = this.pathsOf(v.routeId);
+      c = { at: v.reportedAt, lock: paths.length ? lockToRoute(paths, v.world, vel) : null };
+      this.locks.set(v.id, c);
+    }
+    if (!c.lock) return predictPosition(v, nowSec);
+    const meters = vel.speedMps * motionSeconds(nowSec - v.reportedAt);
+    return c.lock.path.pointAt(c.lock.s + meters);
+  }
+
   private tick() {
     const o = this.options(), th = this.theme();
     if (!o.visible) { this.mapc.setBuses(EMPTY); return; }
@@ -88,7 +118,7 @@ export class BusRenderer {
     for (const v of this.state.fleet.values()) {
       if (o.system && v.system !== o.system) continue;
       if (o.routeId && v.routeId !== o.routeId) continue;
-      const target = o.motion === "predict" ? predictPosition(v, nowSec) : v.world;
+      const target = o.motion === "predict" ? this.predict(v, nowSec, cull) : v.world;
       const w = this.step(v.id, target, nowMs, tau);
       const g = toGeo(w);
       if (bounds && (g.lon < bounds.getWest() - padLng || g.lon > bounds.getEast() + padLng || g.lat < bounds.getSouth() - padLat || g.lat > bounds.getNorth() + padLat)) continue;
@@ -111,7 +141,7 @@ export class BusRenderer {
     }
     if (nowMs - this.lastPrune > 30_000) {
       this.lastPrune = nowMs;
-      for (const id of this.shown.keys()) if (!this.state.fleet.get(id)) this.shown.delete(id);
+      for (const id of this.shown.keys()) if (!this.state.fleet.get(id)) { this.shown.delete(id); this.locks.delete(id); }
     }
   }
 
