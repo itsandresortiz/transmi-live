@@ -1,28 +1,26 @@
 name: Datos en vivo
 on:
   schedule:
-    - cron: "*/5 * * * *"   # GitHub no permite menos de 5 minutos
+    - cron: "*/5 * * * *"   # respaldo: GitHub retrasa o salta estos horarios
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: live-data
   cancel-in-progress: false
 jobs:
-  fetch:
+  loop:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 9
     steps:
       - uses: actions/checkout@v4
-      - name: Descargar posiciones, llegadas y alertas
-        run: |
-          mkdir out
-          for f in positions.pb tripupdates.pb alerts.pb; do
-            curl -fsSL --retry 3 --max-time 60 -A "Mozilla/5.0 (transmi-live)" \
-              -o "out/$f" "https://gtfs.transmilenio.gov.co/$f" || { echo "no se pudo bajar $f"; rm -f "out/$f"; }
-          done
-          ls out | grep -q . || { echo "No se descargó nada"; exit 1; }
-      - name: Publicar en la rama live-data
+      - name: Refrescar cada ~30 s durante ~5 min
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/publish.sh out
+        run: bash scripts/live_loop.sh
+      - name: Relanzar para seguir sin pausa
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run live-data.yml --repo "$GITHUB_REPOSITORY" --ref main || true
