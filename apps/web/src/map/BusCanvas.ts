@@ -29,7 +29,7 @@ export class BusCanvas {
 
   constructor(private readonly map: MLMap) {
     this.cv = document.createElement("canvas");
-    this.cv.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1";
+    this.cv.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0";
     map.getCanvasContainer().appendChild(this.cv);
     this.ctx = this.cv.getContext("2d")!;
     this.resize();

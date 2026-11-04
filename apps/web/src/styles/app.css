@@ -208,3 +208,6 @@ button.stat:active{transform:scale(.97)}
   .toast{bottom:24px;left:calc(50% + 212px)}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* los globos y la ubicación van por encima de los buses dibujados en canvas */
+.maplibregl-popup,.maplibregl-marker{z-index:5}
