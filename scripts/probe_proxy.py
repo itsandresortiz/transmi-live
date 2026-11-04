@@ -39,16 +39,23 @@ def get(path, gz=False):
         r = urllib.request.urlopen(urllib.request.Request(BASE + path, headers=h), timeout=40)
         body = r.read(); dt = time.time() - t
         if r.headers.get("content-encoding") == "gzip": body = gzip.decompress(body)
-        return r.status, dict(r.headers), body, dt
+        return r.status, {k.lower():v for k,v in r.headers.items()}, body, dt
     except urllib.error.HTTPError as e:
-        return e.code, dict(e.headers), e.read(), time.time() - t
+        return e.code, {k.lower():v for k,v in e.headers.items()}, e.read(), time.time() - t
 
-print("== meta x6 (cada 6 s)")
+print("== preflight (lo que hace el navegador antes del GET con cache:no-store)")
+rq = urllib.request.Request(BASE + "/meta", method="OPTIONS", headers={"Origin": "https://itsandresortiz.github.io", "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "cache-control,pragma", "User-Agent": "probe"})
+try:
+    r = urllib.request.urlopen(rq, timeout=30)
+    print("OPTIONS", r.status, {k.lower(): v for k, v in r.headers.items() if k.lower().startswith("access-control")})
+except urllib.error.HTTPError as e:
+    print("OPTIONS", e.code, e.read()[:200])
+print("== meta x3 (cada 6 s)")
 last = None
-for i in range(6):
+for i in range(3):
     st, h, body, dt = get("/meta")
     print(f"{time.strftime('%H:%M:%S')} HTTP {st} {dt:.2f}s  {body[:140].decode(errors='replace')}")
-    if i == 0: print("   CORS:", h.get("access-control-allow-origin"), "| content-type:", h.get("content-type"))
+    if i == 0: print("   GET CORS:", h.get("access-control-allow-origin"), "| content-type:", h.get("content-type"))
     time.sleep(6)
 
 print("== positions")
