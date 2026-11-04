@@ -802,6 +802,7 @@ summary{cursor:pointer;color:var(--muted);padding:4px 0}
 .stl span{position:absolute;left:0;top:0;white-space:nowrap;font:600 10.5px/1 system-ui,sans-serif;letter-spacing:.02em;color:var(--muted);text-shadow:0 0 3px var(--mapbg),0 0 3px var(--mapbg),0 0 3px var(--mapbg)}
 .stl.cM span{font-size:11.5px;font-weight:700;color:var(--fg);opacity:.85}
 .stl.st span{font-size:10.5px;font-weight:700;color:var(--troncal)}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -833,6 +834,7 @@ summary{cursor:pointer;color:var(--muted);padding:4px 0}
     <button class="chip" id="tStreets" aria-pressed="true"><i style="background:var(--roadM)"></i>Calles</button>
     <button class="chip" id="tNet" aria-pressed="true"><i style="background:var(--troncal)"></i>Red completa</button>
     <button class="chip" id="tColor"><i style="background:var(--alimentador)"></i><span id="tColorT">Color: sistema</span></button>
+    <button class="chip" id="tSpeed" hidden title="Cámara rápida: los buses se mueven más rápido que en la realidad para que el movimiento se note"><i style="background:var(--zonal)"></i><span id="tSpeedT">Cámara rápida ×30</span></button>
     <button class="chip" id="tBuses" aria-pressed="true"><i style="background:var(--alimentador)"></i>Buses</button>
   </div>
 </div>
@@ -852,7 +854,7 @@ const KP=["troncal","dual","alimentador","zonal"];
 const tv=t=>`var(--${TYPES[t]?t:"otro"})`;
 const tcol=t=>css("--"+(TYPES[t]?t:"otro"));
 
-const S={showStreets:true,tu:new Map(),alerts:[],alByRoute:new Map(),alByStop:new Map(),arr:new Map(),colorBy:"tipo",alOpen:null,last:null,qa:"",zip:null,stops:new Map(),routes:new Map(),trips:new Map(),tripsByRoute:new Map(),shapes:new Map(),reps:null,repStops:null,
+const S={speedMul:30,selT0:0,showStreets:true,tu:new Map(),alerts:[],alByRoute:new Map(),alByStop:new Map(),arr:new Map(),colorBy:"tipo",alOpen:null,last:null,qa:"",zip:null,stops:new Map(),routes:new Map(),trips:new Map(),tripsByRoute:new Map(),shapes:new Map(),reps:null,repStops:null,
   vehicles:new Map(),markers:new Map(),sel:null,dir:"0",tab:"rutas",q:"",qs:"",qb:"",typeOn:new Set(Object.keys(TYPES)),
   mode:"demo",timer:null,follow:null,hasData:false,showStops:true,showNet:true,showBuses:true,stamp:null};
 
@@ -1052,8 +1054,8 @@ async function stopRoutes(s){
 /* ---------- Selección de ruta ---------- */
 async function selectRoute(rid,{fit=true}={}){
   S.sel=rid;S.follow=null;S.xs=null;gRoute.clearLayers();drawNet();
-  for(const v of S.vehicles.values()){v._ex=null;v._bt0=null;}
-  if(!rid){syncBuses();renderAll();return;}
+  for(const v of S.vehicles.values()){v._ex=null;v._bt0=null;v._cyc=null;}
+  if(!rid){speedChip();syncBuses();renderAll();return;}
   const r=S.routes.get(rid);if(!r)return;
   const by=S.reps?.get(rid)||new Map();
   if(![...by.keys()].includes(S.dir))S.dir=[...by.keys()][0]||"0";
@@ -1062,9 +1064,10 @@ async function selectRoute(rid,{fit=true}={}){
   drawRouteLayer(fit);
   S.xs=S.shapes.size?buildXS(rid):null;
   for(const v of S.vehicles.values())if(v.routeId===rid)setupExtrap(v);
+  S.selT0=performance.now();speedChip();
   syncBuses();
   if(fit&&!(S.reps?.get(rid)?.size)){const pts=[...S.vehicles.values()].filter(v=>v.routeId===rid).map(v=>[v.lat,v.lon]);if(pts.length)map.fitBounds(L.latLngBounds(pts).pad(.25),{maxZoom:15});}
-  {const n=[...S.vehicles.values()].filter(v=>v.routeId===rid&&v._ex).length;renderAll();setNote(`<b>${esc(r.short)}</b> · ${esc(r.long)}${n?` · <b>${n}</b> buses con movimiento estimado sobre el trazado`:""}`);}
+  {const n=[...S.vehicles.values()].filter(v=>v.routeId===rid&&v._ex).length;renderAll();setNote(`<b>${esc(r.short)}</b> · ${esc(r.long)}${n?` · <b>${n}</b> buses con movimiento estimado${S.speedMul>1?` · <b>cámara rápida ×${S.speedMul}</b>`:""}`:""}`);}
 }
 function drawRouteLayer(fit){
   gRoute.clearLayers();const r=S.routes.get(S.sel);if(!r)return;
@@ -1096,7 +1099,7 @@ function busPopup(v){
   const r=v.route,u=v.tripId&&S.tu.get(v.tripId),nx=u?.stops?.[0],nst=S.stops.get(nx?.stopId||v.stopId);
   const nextTxt=(nst?nst.name:(nx?.stopId||v.stopId)?"Parada "+(nx?.stopId||v.stopId):"—")+(nx?.time?" · "+fmtT(nx.time):"");
   const na=(S.alByRoute.get(v.routeId)||[]).length;
-  const rows=[v.head?["Hacia",esc(v.head)]:null,["Ruta",esc(r&&!r.virtual?r.short:v.routeId||"—")],["Placa",esc(v.plate||"—")],["Interno",esc(v.label||v.vid||"—")],["Puntualidad",esc(delayText(delayOf(v)))],["Próxima parada",esc(nextTxt)],isFinite(v.speed)?["Velocidad",Math.round(v.speed*3.6)+" km/h"]:null,["Reporte",fmtT(v.ts)+(S.sel&&v._ex?" · posición estimada":"")],na?["Alertas",`⚠ ${na} en esta ruta`]:null].filter(Boolean);
+  const rows=[v.head?["Hacia",esc(v.head)]:null,["Ruta",esc(r&&!r.virtual?r.short:v.routeId||"—")],["Placa",esc(v.plate||"—")],["Interno",esc(v.label||v.vid||"—")],["Puntualidad",esc(delayText(delayOf(v)))],["Próxima parada",esc(nextTxt)],isFinite(v.speed)?["Velocidad",Math.round(v.speed*3.6)+" km/h"]:null,["Reporte",fmtT(v.ts)+(S.sel&&v._ex?" · posición estimada"+(S.speedMul>1?" (cámara rápida ×"+S.speedMul+")":""):"")],na?["Alertas",`⚠ ${na} en esta ruta`]:null].filter(Boolean);
   return `<div class="pt"><span class="badge" style="background:${r?.color||tv(r?.type)}">${esc(r?.short||v.routeId||"?")}</span><span>${esc(r&&r.type!=="otro"?TYPES[r.type]+(r.virtual?" (inferido)":""):"Vehículo")}</span></div>${r&&!r.virtual?`<div style="margin-bottom:6px">${esc(r.long)}</div>`:""}<table>${rows.map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</table><div class="rowbtns" style="margin-top:8px">${v.routeId?`<button class="btn primary" data-act="route" data-id="${esc(v.routeId)}">Ver ruta</button>`:""}<button class="btn" data-act="follow" data-id="${esc(v.key)}">${S.follow===v.key?"Dejar de seguir":"Seguir"}</button></div>`;
 }
 const lerp=(a,b,u)=>a+(b-a)*u;
@@ -1120,6 +1123,7 @@ function snapOn(sh,x,y,lo,hi,ref){
     if(!best||sc<best.sc)best={d,s:ss,sc};}
   return best;
 }
+function speedChip(){const any=S.sel&&[...S.vehicles.values()].some(v=>v.routeId===S.sel&&v._ex);const el=document.getElementById("tSpeed");el.hidden=!any;document.getElementById("tSpeedT").textContent=S.speedMul>1?"Cámara rápida ×"+S.speedMul:"Velocidad real";}
 function setupExtrap(v){
   v._ex=null;v._exDone=false;
   if(!S.xs||!S.xs.length||v.routeId!==S.sel)return;
@@ -1132,18 +1136,21 @@ function setupExtrap(v){
   v._ex={sh:bsh,s0:b.s,end:bsh.cum[bsh.n-1]};
 }
 function exW(v,now){
-  const e=v._ex,age=Math.min(420,Math.max(0,Date.now()/1000-(v.ts||Date.now()/1000))),spd=v._spd||4.2,s=Math.min(e.end,e.s0+spd*age),c=e.sh.cum;
-  if(age>=420||s>=e.end)v._exDone=true;
+  const e=v._ex,wall=Date.now()/1000,age=Math.min(420,Math.max(0,wall-(v.ts||wall))),spd=v._spd||4.2,mul=S.speedMul||1;
+  const el=(now-S.selT0)/1000,tsel=mul>1?el%60:0,cyc=mul>1?Math.floor(el/60):0;
+  const s=Math.min(e.end,e.s0+spd*(age+tsel*mul)),c=e.sh.cum;
+  v._exDone=mul===1&&(age>=420||s>=e.end);
   let lo=0,hi=e.sh.n-1;while(hi-lo>1){const m=(lo+hi)>>1;if(c[m]<=s)lo=m;else hi=m;}
   const L=c[hi]-c[lo]||1,u=Math.min(1,Math.max(0,(s-c[lo])/L)),ax=e.sh.w[2*lo],ay=e.sh.w[2*lo+1],bx=e.sh.w[2*hi],by=e.sh.w[2*hi+1];
   v.bearing=(Math.atan2(bx-ax,-(by-ay))*180/Math.PI+360)%360;
+  if(mul>1){if(v._cyc!=null&&v._cyc!==cyc&&v._lx!=null){v._bfx=v._lx;v._bfy=v._ly;v._bt0=now;}v._cyc=cyc;}else v._cyc=null;
   return[ax+(bx-ax)*u,ay+(by-ay)*u];
 }
 function curW(v,now){
   if(S.sel&&v._ex&&v.routeId===S.sel){
-    const w=exW(v,now);
-    if(v._bt0!=null){const u=Math.min(1,(now-v._bt0)/3500);if(u<1)return[v._bfx+(w[0]-v._bfx)*u,v._bfy+(w[1]-v._bfy)*u];}
-    return w;
+    let w=exW(v,now);
+    if(v._bt0!=null){const u=Math.min(1,(now-v._bt0)/3500);if(u<1)w=[v._bfx+(w[0]-v._bfx)*u,v._bfy+(w[1]-v._bfy)*u];}
+    v._lx=w[0];v._ly=w[1];return w;
   }
   const u=v._fx==null?1:Math.min(1,(now-v._t0)/v._d);return u>=1?[v._wx,v._wy]:[v._fx+(v._wx-v._fx)*u,v._fy+(v._wy-v._fy)*u];
 }
@@ -1527,6 +1534,7 @@ document.addEventListener("change",async e=>{
 });
 for(const [id,key,fn] of [["tStops","showStops",()=>{applyZoom();if(!S.showStops)map.removeLayer(gStops);}],["tStreets","showStreets",drawStreets],["tNet","showNet",drawNet],["tBuses","showBuses",syncBuses]])
   $(id).onclick=()=>{S[key]=!S[key];$(id).setAttribute("aria-pressed",S[key]);fn();};
+$("tSpeed").onclick=()=>{const o=[30,80,1],i=o.indexOf(S.speedMul);S.speedMul=o[(i+1)%o.length];S.selT0=performance.now();for(const v of S.vehicles.values())if(v._ex&&v._lx!=null){v._bfx=v._lx;v._bfy=v._ly;v._bt0=performance.now();v._cyc=null;}speedChip();syncBuses();if(S.sel){const r=S.routes.get(S.sel);setNote(`<b>${esc(r.short)}</b> · ${S.speedMul>1?`cámara rápida ×${S.speedMul}: los buses van ${S.speedMul} veces más rápido que en la realidad`:"velocidad real"}`);}};
 $("tColor").onclick=()=>{S.colorBy=S.colorBy==="tipo"?"retraso":"tipo";$("tColorT").textContent=S.colorBy==="tipo"?"Color: sistema":"Color: puntualidad";renderLegend();syncBuses();};
 
 function init(){drawBase();drawStreets();map.fitBounds(URBAN,{padding:[10,10]});applyZoom();renderLegend();setPill();startAuto();loadGtfsLite();go("rutas");}
