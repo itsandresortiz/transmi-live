@@ -1,0 +1,11 @@
+{
+  "name": "@transmi/infrastructure",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+}
