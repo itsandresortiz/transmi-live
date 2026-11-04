@@ -1,31 +1,43 @@
-# Bogotá en Vivo
+# TransMi LIVE
 
-Mapa en vivo de TransMilenio, duales, alimentadores y SITP: buses en el mapa, retrasos,
-próximas llegadas, alertas de servicio, calles, estaciones y localidades.
+Mapa en vivo de TransMilenio, duales, alimentadores y SITP en Bogotá: dónde está cada bus, qué tan
+puntual va, próximas llegadas, avisos de servicio, calles, estaciones y localidades.
 
-Es una sola página (`index.html`) sin servidor ni proceso de compilación.
+Diseñado primero para el celular (hoja inferior deslizable, instalable como app) y adaptado a escritorio.
 
-## Cómo se actualizan los datos
+## Estructura
 
-1. La página intenta leer `positions.pb`, `tripupdates.pb` y `alerts.pb` **directo de
-   `gtfs.transmilenio.gov.co`** cada 21 s (estado «EN VIVO»).
-2. Si el navegador no puede (CORS), usa la **copia de la rama `live-data`**, que el workflow
-   `live-data.yml` refresca cada ~5 min (estado «DATOS hh:mm»).
-3. El workflow `gtfs-daily.yml` descarga cada día el `GTFS.zip` (116 MB), lo reduce con
-   `scripts/slim_gtfs.py` a `gtfs-lite.zip` y lo publica también en `live-data`. Con eso la app
-   muestra nombres de ruta, destinos, recorridos y paradas.
+| Archivo | Qué es |
+| --- | --- |
+| `index.html` | Marco de la página (liviano). |
+| `style.css` | Sistema de diseño: colores, vidrio, hoja inferior, tarjetas, modo claro/oscuro. |
+| `app.js` | Motor: lectura de datos, mapa, dibujo de buses y predicción entre reportes. |
+| `ui.js` | Interfaz: pestañas, listas, detalle de ruta, avisos, ajustes. |
+| `assets/` | Datos pesados con caché propia: vías y nombres de calles de OSM, localidades, troncales y estaciones. |
+| `supabase/functions/tm` | Intermediario que lee TransMilenio con CORS (ver abajo). |
+| `scripts/` y `.github/workflows/` | Copia de respaldo de los datos y GTFS reducido. |
 
-La rama `live-data` se reescribe con un solo commit en cada ejecución, así el historial no crece.
+## De dónde salen los datos
+
+1. **Intermediario (principal).** Una función de Supabase lee `positions.pb`, `tripupdates.pb` y
+   `alerts.pb` de TransMilenio y los entrega con CORS y una huella por archivo. La página consulta la
+   huella cada ~3 s y descarga solo lo que cambió. Los datos llegan con 5–15 s de antigüedad.
+2. **Copia de respaldo.** El workflow `Datos en vivo` guarda lo mismo en la rama `live-data`
+   (GitHub la cachea ~5 min, por eso solo es respaldo).
+3. **GTFS.** El workflow `GTFS diario` reduce el `GTFS.zip` (116 MB) a `gtfs-lite.zip` en `live-data`,
+   con nombres de ruta, trazados y paradas.
+
+## Movimiento de los buses
+
+Predicción calibrada con datos reales: la velocidad se mide con ≥28 s de base y el bus avanza en línea
+recta desde que su dato tiene 15 s y hasta 75 s. En 16 lotes reales redujo el error 5–17 % frente a
+dejar cada bus quieto. Se puede cambiar a «Reportado» o «Acelerado» en los ajustes.
 
 ## Publicar
 
-En **Settings → Pages**: *Source* = *Deploy from a branch*, rama `main`, carpeta `/ (root)`.
-Después, en **Actions**, ejecuta una vez *Datos en vivo* y *GTFS diario* con *Run workflow*.
+**Settings → Pages**: *Deploy from a branch*, rama `main`, carpeta `/ (root)`.
 
-## Datos y créditos
+## Créditos
 
-- Tiempo real y GTFS: [TransMilenio](https://gtfs.transmilenio.gov.co/)
-- Vías: © colaboradores de OpenStreetMap
-- Localidades: [decolector/bta-geodata](https://github.com/decolector/bta-geodata)
-- Troncales y estaciones: datos abiertos de TransMilenio
-- Mapa: [Leaflet](https://leafletjs.com/) y [JSZip](https://stuk.github.io/jszip/)
+Tiempo real y GTFS: TransMilenio · Vías: © colaboradores de OpenStreetMap · Localidades:
+[decolector/bta-geodata](https://github.com/decolector/bta-geodata) · Mapa: Leaflet y JSZip.
