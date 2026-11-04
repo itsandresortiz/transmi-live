@@ -1321,6 +1321,7 @@ function applyPb(b){
 }
 const API="https://gtfs.transmilenio.gov.co/";
 const RAW="https://raw.githubusercontent.com/itsandresortiz/transmi-live/live-data/";
+const PROXY="https://kmefztxxhipjowgcfxds.supabase.co/functions/v1/rapid-responder"; // intermediario: lee TransMilenio con CORS y sin la cache de 5 min de GitHub raw
 const FEEDS={pos:"positions.pb",tu:"tripupdates.pb",al:"alerts.pb"};
 let liveTick=0,apiOk=true,apiRetry=0,busy=false;
 const SIG={pos:null,tu:null,al:null};let lastApi=0;
@@ -1338,7 +1339,19 @@ async function refreshLive(first){
       }catch(e){}
       if(!viaApi){apiOk=false;apiRetry=Date.now()+10*60e3;}
     }
+    let viaProxy=false;
     if(!viaApi){
+      try{
+        const r=await fetch(PROXY+"/meta",{cache:"no-store"});
+        if(r.ok){const m=await r.json();
+          if(m&&m.pos){viaProxy=true;
+            if(m.pos!==SIG.pos){applyPb(await pbGet(PROXY+"/"+FEEDS.pos.replace(".pb","")+"?v="+m.pos));SIG.pos=m.pos;fresh=true;}
+            if(m.tu&&m.tu!==SIG.tu){try{applyPb(await pbGet(PROXY+"/"+FEEDS.tu.replace(".pb","")+"?v="+m.tu));SIG.tu=m.tu;}catch(e){}}
+            if(m.al&&m.al!==SIG.al){try{applyPb(await pbGet(PROXY+"/"+FEEDS.al.replace(".pb","")+"?v="+m.al));SIG.al=m.al;}catch(e){}}
+          }}
+      }catch(e){}
+    }
+    if(!viaApi&&!viaProxy){
       let m=null;try{const r=await fetch(RAW+"meta.json?t="+Math.floor(Date.now()/3000),{cache:"no-store"});if(r.ok)m=await r.json();}catch(e){}
       if(m){
         if(m.pos&&m.pos!==SIG.pos){applyPb(await pbGet(RAW+FEEDS.pos+"?v="+m.pos));SIG.pos=m.pos;fresh=true;}
@@ -1349,8 +1362,8 @@ async function refreshLive(first){
     }
     if(fresh||first){
       if(S.demo){S.demo=false;S.vehicles.clear();}
-      S.mode=viaApi?"live":"snap";setPill();syncBuses();renderAll();
-      setNote(`<b>${S.vehicles.size.toLocaleString("es-CO")}</b> vehículos · ${viaApi?"directo de TransMilenio":"copia del repositorio"} · dato de las ${fmtT(S.stamp/1000)} · hace <b id="age">${ageStr()}</b>${S.hasData?"":" · sin nombres de ruta todavía (falta el GTFS)"}`);
+      S.mode=(viaApi||viaProxy)?"live":"snap";setPill();syncBuses();renderAll();
+      setNote(`<b>${S.vehicles.size.toLocaleString("es-CO")}</b> vehículos · ${viaApi?"directo de TransMilenio":viaProxy?"vía intermediario":"copia del repositorio (con retraso)"} · dato de las ${fmtT(S.stamp/1000)} · hace <b id="age">${ageStr()}</b>${S.hasData?"":" · sin nombres de ruta todavía (falta el GTFS)"}`);
     }
   }catch(e){setNote("No se pudieron leer los datos: "+esc(e.message),true);}
   busy=false;
