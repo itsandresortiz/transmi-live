@@ -834,7 +834,7 @@ summary{cursor:pointer;color:var(--muted);padding:4px 0}
     <button class="chip" id="tStreets" aria-pressed="true"><i style="background:var(--roadM)"></i>Calles</button>
     <button class="chip" id="tNet" aria-pressed="true"><i style="background:var(--troncal)"></i>Red completa</button>
     <button class="chip" id="tColor"><i style="background:var(--alimentador)"></i><span id="tColorT">Color: sistema</span></button>
-    <button class="chip" id="tSpeed" hidden title="Movimiento real: cada bus se desliza entre sus dos últimos reportes. Cámara rápida: efecto de video acelerado sobre la ruta"><i style="background:var(--zonal)"></i><span id="tSpeedT">Movimiento real</span></button>
+    <button class="chip" id="tSpeed" hidden title="Posición enviada: cada bus va hacia la última posición reportada. Estimado: sigue su ruta entre reportes. Cámara rápida: video acelerado"><i style="background:var(--zonal)"></i><span id="tSpeedT">Posición enviada</span></button>
     <button class="chip" id="tBuses" aria-pressed="true"><i style="background:var(--alimentador)"></i>Buses</button>
   </div>
 </div>
@@ -854,7 +854,7 @@ const KP=["troncal","dual","alimentador","zonal"];
 const tv=t=>`var(--${TYPES[t]?t:"otro"})`;
 const tcol=t=>css("--"+(TYPES[t]?t:"otro"));
 
-const S={xsMap:new Map(),exZoom:false,speedMul:1,selT0:0,showStreets:true,tu:new Map(),alerts:[],alByRoute:new Map(),alByStop:new Map(),arr:new Map(),colorBy:"tipo",alOpen:null,last:null,qa:"",zip:null,stops:new Map(),routes:new Map(),trips:new Map(),tripsByRoute:new Map(),shapes:new Map(),reps:null,repStops:null,
+const S={gaps:[],lastBts:0,glide:34000,est:false,lastChangeAt:0,xsMap:new Map(),exZoom:false,speedMul:1,selT0:0,showStreets:true,tu:new Map(),alerts:[],alByRoute:new Map(),alByStop:new Map(),arr:new Map(),colorBy:"tipo",alOpen:null,last:null,qa:"",zip:null,stops:new Map(),routes:new Map(),trips:new Map(),tripsByRoute:new Map(),shapes:new Map(),reps:null,repStops:null,
   vehicles:new Map(),markers:new Map(),sel:null,dir:"0",tab:"rutas",q:"",qs:"",qb:"",typeOn:new Set(Object.keys(TYPES)),
   mode:"demo",timer:null,follow:null,hasData:false,showStops:true,showNet:true,showBuses:true,stamp:null};
 
@@ -1064,7 +1064,7 @@ async function selectRoute(rid,{fit=true}={}){
   renderAll();syncBuses();
   if(!S.demo)await ensureRepStops();
   drawRouteLayer(fit);
-  if(S.speedMul>1)for(const v of S.vehicles.values())if(v.routeId===rid&&!v._ex)setupExtrap(v);
+  if(S.speedMul>1||S.est)for(const v of S.vehicles.values())if(v.routeId===rid&&!v._ex)setupExtrap(v);
   S.selT0=performance.now();speedChip();
   syncBuses();
   if(fit&&!(S.reps?.get(rid)?.size)){const pts=[...S.vehicles.values()].filter(v=>v.routeId===rid).map(v=>[v.lat,v.lon]);if(pts.length)map.fitBounds(L.latLngBounds(pts).pad(.25),{maxZoom:15});}
@@ -1124,7 +1124,7 @@ function snapOn(sh,x,y,lo,hi,ref){
     if(!best||sc<best.sc)best={d,s:ss,sc};}
   return best;
 }
-function speedChip(){const el=document.getElementById("tSpeed");el.hidden=!S.hasData;document.getElementById("tSpeedT").textContent=S.speedMul>1?"Cámara rápida ×"+S.speedMul:"Movimiento real";}
+function speedChip(){const el=document.getElementById("tSpeed");el.hidden=!S.hasData;document.getElementById("tSpeedT").textContent=S.speedMul>1?"Cámara rápida ×"+S.speedMul:S.est?"Estimado entre reportes":"Posición enviada";}
 function xsFor(rid){let x=S.xsMap.get(rid);if(!x){x=buildXS(rid);S.xsMap.set(rid,x);}return x;}
 function setupExtrap(v){
   v._ex=null;v._exDone=false;
@@ -1138,7 +1138,7 @@ function setupExtrap(v){
   if(!b||b.d>220)return;
   v._ex={sh:bsh,s0:b.s,end:bsh.cum[bsh.n-1]};
 }
-function exOn(v){return S.speedMul>1&&v._ex&&(S.sel?v.routeId===S.sel:(S.exZoom||v.key===S.follow));}
+function exOn(v){return (S.speedMul>1||S.est)&&v._ex&&(S.sel?v.routeId===S.sel:(S.exZoom||S.est||v.key===S.follow));}
 setInterval(()=>{if(!S.follow)return;const v=S.vehicles.get(S.follow);if(!v||!v._vis)return;const c=curPos(v,performance.now());map.panTo([c.lat,c.lon],{animate:true,duration:.4,easeLinearity:1,noMoveStart:true});},450);
 function exW(v,now){
   const e=v._ex,wall=Date.now()/1000,age=Math.min(420,Math.max(0,wall-(v.ts||wall))),spd=v._spd||4.2,mul=S.speedMul||1;
@@ -1221,6 +1221,10 @@ let mvT=0;map.on("mousemove",e=>{const n=performance.now();if(n-mvT<70)return;mv
 function refreshPills(){}
 function inferType(e){if((e.tripId||"").startsWith("TTBD"))return"troncal";if(/^Z\d/.test(e.label||e.vid||""))return"zonal";return"otro";}
 function ingest(list){
+  {let bts=0;for(const e of list)if((e.ts||0)>bts)bts=e.ts;
+   if(bts&&S.lastBts&&bts>S.lastBts){const g=bts-S.lastBts;if(g>=8&&g<=120){S.gaps.push(g);if(S.gaps.length>6)S.gaps.shift();}}
+   if(bts)S.lastBts=Math.max(S.lastBts||0,bts);
+   const med=S.gaps.length?[...S.gaps].sort((a,b)=>a-b)[S.gaps.length>>1]:21;S.glide=Math.max(30,Math.min(60,1.6*med))*1000;}
   S.last=list;const seen=new Set();const vote=new Map();const now=performance.now();
   for(const e of list){
     const key=e.vid||e.id||e.plate||e.tripId||(e.lat+","+e.lon),trip=S.trips.get(e.tripId),routeId=e.routeId||trip?.route||"";
@@ -1236,11 +1240,11 @@ function ingest(list){
       const dl=Math.abs(prev.lat-e.lat)+Math.abs(prev.lon-e.lon);
       nv._spd=prev._spd;
       if(e.ts!=null&&e.ts===prev.ts){nv._fx=prev._fx;nv._fy=prev._fy;nv._t0=prev._t0;nv._d=prev._d;nv._ex=prev._ex;nv._exDone=prev._exDone;nv._bfx=prev._bfx;nv._bfy=prev._bfy;nv._bt0=prev._bt0;nv.bearing=prev.bearing;nv.lat=prev.lat;nv.lon=prev.lon;nv._wx=prev._wx;nv._wy=prev._wy;}   // sin reporte nuevo
-      else if(dl>1e-6&&dl<.0075){const cur=curW(prev,now);const dt=(e.ts||0)-(prev.ts||0);if(dt>0){const sp=Math.hypot(nv._wx-prev._wx,nv._wy-prev._wy)*MPW/dt;if(sp>.6)nv._spd=Math.min(12,Math.max(2,sp));}nv._bfx=cur[0];nv._bfy=cur[1];nv._bt0=now;nv._fx=cur[0];nv._fy=cur[1];nv._t0=now;nv._d=Math.max(3000,Math.min(90000,1.3*(((e.ts||0)-(prev.ts||0))*1000||21000)));}
+      else if(dl>1e-6&&dl<.0075){const cur=curW(prev,now);const dt=(e.ts||0)-(prev.ts||0);if(dt>0){const sp=Math.hypot(nv._wx-prev._wx,nv._wy-prev._wy)*MPW/dt;if(sp>.6)nv._spd=Math.min(12,Math.max(2,sp));}nv._bfx=cur[0];nv._bfy=cur[1];nv._bt0=now;nv._fx=cur[0];nv._fy=cur[1];nv._t0=now;nv._d=S.glide;}
     }
-    if(S.speedMul>1&&S.shapes.size&&(!nv._ex||(prev&&e.ts!==prev.ts)))setupExtrap(nv);
-    S.vehicles.set(key,nv);seen.add(key);}
-  for(const k of [...S.vehicles.keys()])if(!seen.has(k))S.vehicles.delete(k);
+    if((S.speedMul>1||S.est)&&S.shapes.size&&(!nv._ex||(prev&&e.ts!==prev.ts)))setupExtrap(nv);
+    nv._seen=now;S.vehicles.set(key,nv);seen.add(key);}
+  for(const [k,v] of [...S.vehicles])if(!seen.has(k)&&now-(v._seen||0)>90000)S.vehicles.delete(k);
   for(const [rid,m] of vote){const r=S.routes.get(rid);if(r)r.type=Object.entries(m).sort((a,b)=>b[1]-a[1])[0][0];}
   syncBuses();renderKPIs();softRender();
 }
@@ -1249,7 +1253,7 @@ function setTU(list){
   for(const u of list){if(u.delay==null&&u.stops[0]?.d!=null)u.delay=u.stops[0].d;S.tu.set(u.tripId,u);
     const s=u.stops[0];if(s?.stopId){let a=S.arr.get(s.stopId);if(!a)S.arr.set(s.stopId,a=[]);a.push({routeId:u.routeId,t:s.time,delay:u.delay,plate:u.plate});}}
   S.tuStamp=Math.max(0,...list.map(u=>u.ts||0));
-  if(S.speedMul>1&&S.shapes.size)for(const v of S.vehicles.values())if(!v._ex)setupExtrap(v);
+  if((S.speedMul>1||S.est)&&S.shapes.size)for(const v of S.vehicles.values())if(!v._ex)setupExtrap(v);
   syncBuses();renderKPIs();renderPane();
 }
 function setAlerts(list){
@@ -1314,7 +1318,7 @@ function sniff(b){for(const v of entsOf(b))for(const [f] of pbFields(b,v[0],v[1]
 function applyPb(b){
   if(b[0]===0x7b||b[0]===0x5b){if(S.demo){S.demo=false;stopTimer();S.vehicles.clear();}ingest(decodeJSON(JSON.parse(dec.decode(b))));return"pos";}
   const k=sniff(b);
-  if(k==="pos"){if(S.demo){S.demo=false;stopTimer();S.vehicles.clear();resetStatic();S.hasData=false;}const l=decodeFeed(b);ingest(l);S.stamp=new Date(Math.max(0,...l.map(p=>p.ts||0))*1000);}
+  if(k==="pos"){if(S.demo){S.demo=false;stopTimer();S.vehicles.clear();resetStatic();S.hasData=false;}const l=decodeFeed(b);if(S.vehicles.size>500&&l.length<.6*S.vehicles.size)throw new Error("lote incompleto ("+l.length+" vehículos); se descarta y se reintenta");ingest(l);S.stamp=new Date(Math.max(0,...l.map(p=>p.ts||0))*1000);}
   else if(k==="tu")setTU(decodeTU(b));
   else if(k==="al")setAlerts(decodeAlerts(b));
   return k;
@@ -1327,7 +1331,9 @@ let liveTick=0,apiOk=true,apiRetry=0,busy=false;
 const SIG={pos:null,tu:null,al:null};let lastApi=0;
 async function pbGet(url){const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw new Error(url.split("/").pop().split("?")[0]+": HTTP "+r.status);return new Uint8Array(await r.arrayBuffer());}
 async function refreshLive(first){
-  if(busy)return;busy=true;liveTick++;
+  if(busy)return;
+  if(!first&&S.lastChangeAt&&Date.now()-S.lastChangeAt<9000)return;
+  busy=true;liveTick++;
   try{
     const useApi=apiOk||Date.now()>apiRetry;let viaApi=false,fresh=false;
     if(useApi){
@@ -1345,11 +1351,11 @@ async function refreshLive(first){
         const r=await fetch(PROXY+"/meta",{cache:"no-store"});
         if(r.ok){const m=await r.json();
           if(m&&m.pos){viaProxy=true;
-            if(m.pos!==SIG.pos){applyPb(await pbGet(PROXY+"/"+FEEDS.pos.replace(".pb","")+"?v="+m.pos));SIG.pos=m.pos;fresh=true;}
+            if(m.pos!==SIG.pos){applyPb(await pbGet(PROXY+"/"+FEEDS.pos.replace(".pb","")+"?v="+m.pos));SIG.pos=m.pos;fresh=true;S.lastChangeAt=Date.now();}
             if(m.tu&&m.tu!==SIG.tu){try{applyPb(await pbGet(PROXY+"/"+FEEDS.tu.replace(".pb","")+"?v="+m.tu));SIG.tu=m.tu;}catch(e){}}
             if(m.al&&m.al!==SIG.al){try{applyPb(await pbGet(PROXY+"/"+FEEDS.al.replace(".pb","")+"?v="+m.al));SIG.al=m.al;}catch(e){}}
           }}
-      }catch(e){}
+      }catch(e){if(viaProxy)setNote("Lote descartado: "+esc(e.message)+" · reintentando",true);}
     }
     if(!viaApi&&!viaProxy){
       let m=null;try{const r=await fetch(RAW+"meta.json?t="+Math.floor(Date.now()/3000),{cache:"no-store"});if(r.ok)m=await r.json();}catch(e){}
@@ -1363,14 +1369,14 @@ async function refreshLive(first){
     if(fresh||first){
       if(S.demo){S.demo=false;S.vehicles.clear();}
       S.mode=(viaApi||viaProxy)?"live":"snap";setPill();syncBuses();renderAll();
-      setNote(`<b>${S.vehicles.size.toLocaleString("es-CO")}</b> vehículos · ${viaApi?"directo de TransMilenio":viaProxy?"vía intermediario":"copia del repositorio (con retraso)"} · dato de las ${fmtT(S.stamp/1000)} · hace <b id="age">${ageStr()}</b>${S.hasData?"":" · sin nombres de ruta todavía (falta el GTFS)"}`);
+      setNote(`<b>${S.vehicles.size.toLocaleString("es-CO")}</b> vehículos · ${viaApi?"directo de TransMilenio":viaProxy?"vía intermediario":"copia del repositorio (con retraso)"} · dato de las ${fmtT(S.stamp/1000)} · hace <b id="age">${ageStr()}</b><span id="stall"></span>${S.hasData?"":" · sin nombres de ruta todavía (falta el GTFS)"}`);
     }
   }catch(e){setNote("No se pudieron leer los datos: "+esc(e.message),true);}
   busy=false;
 }
 function ageStr(){if(!S.stamp)return"—";let t=Math.max(0,Math.round(Date.now()/1000-S.stamp/1000));const h=Math.floor(t/3600),m=Math.floor(t%3600/60),sec=t%60,p=n=>String(n).padStart(2,"0");return(h?h+":"+p(m):m)+":"+p(sec);}
-setInterval(()=>{const el=document.getElementById("age");if(!el||!S.stamp)return;el.textContent=ageStr();el.style.color=(Date.now()/1000-S.stamp/1000)>180?"var(--troncal)":"";},1000);
-function startAuto(){stopTimer();refreshLive(true);S.timer=setInterval(()=>{if(!document.hidden)refreshLive();},6000);}
+setInterval(()=>{const el=document.getElementById("age");if(!el||!S.stamp)return;el.textContent=ageStr();const a=Date.now()/1000-S.stamp/1000;el.style.color=a>180?"var(--troncal)":a>40?"#f5a524":"";const st=document.getElementById("stall");if(st){st.textContent=a>40&&a<=180?" · esperando un lote nuevo de TransMilenio":a>180?" · sin datos nuevos":"";st.style.color=a>180?"var(--troncal)":"#f5a524";}},1000);
+function startAuto(){stopTimer();refreshLive(true);S.timer=setInterval(()=>{if(!document.hidden)refreshLive();},3000);}
 async function loadGtfsLite(){
   try{const r=await fetch(RAW+"gtfs-lite.zip?t="+Math.floor(Date.now()/3600000));if(!r.ok)return;await loadGTFS(await r.arrayBuffer());}catch(e){}
 }
@@ -1563,7 +1569,7 @@ document.addEventListener("change",async e=>{
 });
 for(const [id,key,fn] of [["tStops","showStops",()=>{applyZoom();if(!S.showStops)map.removeLayer(gStops);}],["tStreets","showStreets",drawStreets],["tNet","showNet",drawNet],["tBuses","showBuses",syncBuses]])
   $(id).onclick=()=>{S[key]=!S[key];$(id).setAttribute("aria-pressed",S[key]);fn();};
-$("tSpeed").onclick=()=>{const o=[1,30,80],i=o.indexOf(S.speedMul);S.speedMul=o[(i+1)%o.length];S.selT0=performance.now();if(S.speedMul>1)for(const v of S.vehicles.values())if(!v._ex)setupExtrap(v);for(const v of S.vehicles.values())if(v._ex&&v._lx!=null){v._bfx=v._lx;v._bfy=v._ly;v._bt0=performance.now();v._cyc=null;}speedChip();syncBuses();if(S.sel){const r=S.routes.get(S.sel);setNote(`<b>${esc(r.short)}</b> · ${S.speedMul>1?`cámara rápida ×${S.speedMul}: efecto de video, los buses van ${S.speedMul} veces más rápido que en la realidad`:"movimiento real: cada bus se desliza entre sus dos últimos reportes"}`);}};
+$("tSpeed").onclick=()=>{const o=[[1,false],[1,true],[30,false],[80,false]],i=Math.max(0,o.findIndex(x=>x[0]===S.speedMul&&x[1]===S.est)),nx=o[(i+1)%o.length];S.speedMul=nx[0];S.est=nx[1];S.selT0=performance.now();if(S.speedMul>1||S.est)for(const v of S.vehicles.values())if(!v._ex)setupExtrap(v);for(const v of S.vehicles.values())if(v._ex&&v._lx!=null){v._bfx=v._lx;v._bfy=v._ly;v._bt0=performance.now();v._cyc=null;}speedChip();syncBuses();if(S.sel){const r=S.routes.get(S.sel);setNote(`<b>${esc(r.short)}</b> · ${S.speedMul>1?`cámara rápida ×${S.speedMul}: efecto de video, los buses van ${S.speedMul} veces más rápido que en la realidad`:S.est?"estimado: los buses siguen su ruta entre reportes (posición calculada, no enviada)":"posición enviada: cada bus se desliza hacia la última posición que reportó TransMilenio"}`);}};
 $("tColor").onclick=()=>{S.colorBy=S.colorBy==="tipo"?"retraso":"tipo";$("tColorT").textContent=S.colorBy==="tipo"?"Color: sistema":"Color: puntualidad";renderLegend();syncBuses();};
 
 function init(){drawBase();drawStreets();map.fitBounds(URBAN,{padding:[10,10]});applyZoom();renderLegend();setPill();startAuto();loadGtfsLite();go("rutas");}
