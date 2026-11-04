@@ -15,7 +15,7 @@ export interface LayerToggles { streets: boolean; stops: boolean; network: boole
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const FONT = ["Noto Sans Regular"];
 const STREET_LAYERS = ["street-0", "street-2", "street-3", "street-4"];
-const BUS_LAYERS = ["bus-dots", "bus-icons", "bus-labels"];
+const BUS_LAYERS = ["bus-dots"];
 const BOGOTA: [number, number] = [-74.075, 4.65];
 
 const zoomWidth = (...pairs: [number, number][]): ExpressionSpecification =>
@@ -29,6 +29,8 @@ export class MapController {
   private popup: Popup | null = null;
   private me: maplibregl.Marker | null = null;
   private networkLoaded = false;
+  /** Lo asigna quien dibuja los buses en canvas: devuelve el bus bajo ese punto de la pantalla. */
+  busHit: ((pt: { x: number; y: number }) => string | null) | null = null;
 
   constructor(container: HTMLElement, scheme: Scheme, private readonly events: MapEvents) {
     this.theme = themeOf(scheme);
@@ -142,18 +144,6 @@ export class MapController {
       id: "bus-dots", type: "circle", source: "buses", maxzoom: 13,
       paint: { "circle-radius": zoomWidth([9, 2.2], [13, 4.2]), "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 },
     });
-    m.addLayer({
-      id: "bus-icons", type: "symbol", source: "buses", minzoom: 13,
-      layout: {
-        "icon-image": ["get", "icon"], "icon-size": zoomWidth([13, 0.5], [15, 0.8], [17, 1], [19, 1.25]),
-        "icon-allow-overlap": true, "icon-ignore-placement": true, "icon-pitch-alignment": "viewport",
-      },
-    });
-    m.addLayer({
-      id: "bus-labels", type: "symbol", source: "buses", minzoom: 16,
-      layout: { "text-field": ["get", "label"], "text-font": FONT, "text-size": 11.5, "text-offset": [0, -1.5], "text-allow-overlap": false },
-      paint: { "text-color": t.labelStrong, "text-halo-color": t.halo, "text-halo-width": 1.8 },
-    });
   }
 
   /** Datos que vienen incluidos en la app: se cargan en segundo plano. */
@@ -172,21 +162,22 @@ export class MapController {
       m.on("mouseenter", id, () => (m.getCanvas().style.cursor = "pointer"));
       m.on("mouseleave", id, () => (m.getCanvas().style.cursor = ""));
     };
-    for (const id of ["bus-icons", "bus-dots"]) {
-      pointer(id);
-      m.on("click", id, (e) => { const f = e.features?.[0]; if (f) { e.originalEvent.cancelBubble = true; this.events.onBusClick(String(f.properties?.id)); } });
-    }
+    pointer("bus-dots");
+    m.on("click", "bus-dots", (e) => { const f = e.features?.[0]; if (f) { e.originalEvent.cancelBubble = true; this.events.onBusClick(String(f.properties?.id)); } });
+    // los buses dibujados en canvas (zoom ≥ 13) tienen prioridad sobre paradas y estaciones
+    m.on("click", (e) => { const id = this.busHit?.(e.point); if (id) this.events.onBusClick(id); });
+    m.on("mousemove", (e) => { if (this.busHit?.(e.point)) m.getCanvas().style.cursor = "pointer"; else if (!m.queryRenderedFeatures(e.point, { layers: ["stops-circles", "estaciones-circles", "route-stops", "bus-dots"].filter((l) => m.getLayer(l)) }).length) m.getCanvas().style.cursor = ""; });
     for (const id of ["stops-circles", "route-stops"]) {
       pointer(id);
       m.on("click", id, (e) => {
-        if (e.originalEvent.cancelBubble) return;
+        if (e.originalEvent.cancelBubble || this.busHit?.(e.point)) return;
         const f = e.features?.[0];
         if (f) { e.originalEvent.cancelBubble = true; this.events.onStopClick(String(f.properties?.id)); }
       });
     }
     pointer("estaciones-circles");
     m.on("click", "estaciones-circles", (e) => {
-      if (e.originalEvent.cancelBubble) return;
+      if (e.originalEvent.cancelBubble || this.busHit?.(e.point)) return;
       const f = e.features?.[0];
       if (f && typeof f.id === "number") this.events.onStationClick(f.id);
     });
@@ -213,8 +204,6 @@ export class MapController {
     m.setPaintProperty("stops-circles", "circle-color", t.surface);
     m.setPaintProperty("stops-circles", "circle-stroke-color", t.label);
     m.setPaintProperty("route-stops", "circle-color", t.surface);
-    m.setPaintProperty("bus-labels", "text-color", t.labelStrong);
-    m.setPaintProperty("bus-labels", "text-halo-color", t.halo);
   }
 
   setToggles(t: LayerToggles) {
@@ -223,12 +212,6 @@ export class MapController {
     vis(STREET_LAYERS, t.streets); vis(["stops-circles"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
   }
 
-  /** Registra (si falta) el ícono de un bus de este color y devuelve su nombre. */
-  busIcon(color: string, left: boolean): string {
-    const name = `bus-${color}-${left ? "l" : "r"}`;
-    if (!this.map.hasImage(name)) this.map.addImage(name, busSprite(color, left), { pixelRatio: 2 });
-    return name;
-  }
   setBuses(data: FeatureCollection<Point>) { (this.map.getSource("buses") as GeoJSONSource | undefined)?.setData(data); }
 
   /** Dibuja la red de rutas y las paradas del GTFS. */

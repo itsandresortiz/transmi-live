@@ -1,6 +1,7 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 import type { TransitState } from "@transmi/application";
-import { type GeoPoint, type RouteLock, RoadPath, type SystemType, type Vehicle, type WorldPoint, DEFAULT_PREDICTION, distanceMeters, lockToRoute, motionSeconds, predictPosition, toGeo } from "@transmi/domain";
+import { type GeoPoint, type RouteLock, RoadPath, type SystemType, type Vehicle, type WorldPoint, DEFAULT_PREDICTION, METERS_PER_WORLD_UNIT, distanceMeters, toWorld, lockToRoute, motionSeconds, predictPosition, toGeo } from "@transmi/domain";
+import { type BusDraw, BusCanvas } from "./BusCanvas";
 import type { MapController } from "./MapController";
 import type { MapTheme } from "./theme";
 
@@ -25,6 +26,8 @@ export class BusRenderer {
   private shown = new Map<string, Shown>();
   private raf = 0;
   private last = 0;
+  private items: BusDraw[] = [];
+  private readonly canvas: BusCanvas;
   private lastPrune = 0;
   private followId: string | null = null;
   private paths = new Map<string, RoadPath[]>();
@@ -37,28 +40,19 @@ export class BusRenderer {
     private readonly mapc: MapController,
     private readonly options: () => BusViewOptions,
     private readonly theme: () => MapTheme,
-  ) {}
+  ) { this.canvas = new BusCanvas(mapc.map); }
 
   start() {
-    const loop = (t: number) => {
-      this.raf = requestAnimationFrame(loop);
-      if (t - this.last < this.interval()) return;
-      this.last = t;
-      this.tick();
-    };
+    this.mapc.busHit = (pt) => this.canvas.hitTest(pt);
+    // al mover o acercar el mapa se redibuja en el mismo cuadro, sin desfase
+    this.mapc.map.on("move", () => { if (this.canvasOn) this.canvas.draw(this.items); });
+    const loop = (t: number) => { this.raf = requestAnimationFrame(loop); this.frame(t); };
     this.raf = requestAnimationFrame(loop);
   }
   stop() { cancelAnimationFrame(this.raf); }
   /** Pide dibujar en el próximo cuadro (por ejemplo, tras cambiar un filtro). */
-  refresh() { this.last = 0; }
-  setFollow(id: string | null) { this.followId = id; this.last = 0; }
-
-  /** Con el mapa lejano los buses casi no se mueven en pantalla: se actualiza menos y se ahorra batería. */
-  private interval(): number {
-    if (this.followId) return 150;
-    const z = this.mapc.zoom;
-    return z < 13 ? 1500 : z < 15.5 ? 500 : 150;
-  }
+  refresh() { this.last = 0; this.lastDots = 0; }
+  setFollow(id: string | null) { this.followId = id; }
 
   position(id: string): GeoPoint | null {
     const s = this.shown.get(id);
@@ -103,42 +97,52 @@ export class BusRenderer {
     return c.lock.path.pointAt(c.lock.s + meters);
   }
 
-  private tick() {
+  private lastDots = 0;
+  private canvasOn = false;
+
+  private frame(t: number) {
     const o = this.options(), th = this.theme();
-    if (!o.visible) { this.mapc.setBuses(EMPTY); return; }
-    const nowMs = Date.now(), nowSec = nowMs / 1000, zoom = this.mapc.zoom;
-    const cull = zoom >= 13;
-    const bounds = cull ? this.mapc.map.getBounds() : null;
-    const padLng = bounds ? (bounds.getEast() - bounds.getWest()) * 0.25 : 0;
-    const padLat = bounds ? (bounds.getNorth() - bounds.getSouth()) * 0.25 : 0;
-    const icons = zoom >= 12.5;
-    const features: Feature<Point>[] = [];
+    const zoom = this.mapc.zoom, nowMs = Date.now(), nowSec = nowMs / 1000;
+    if (!o.visible) { if (this.canvasOn) { this.canvas.clear(); this.canvasOn = false; } this.mapc.setBuses(EMPTY); this.lastDots = t; return; }
     const tau = o.motion === "predict" ? TAU_PREDICT_MS : TAU_REPORTED_MS;
 
+    if (zoom < 13) {
+      // vista lejana: puntos simples, pocas veces por segundo
+      if (this.canvasOn) { this.canvas.clear(); this.canvasOn = false; this.lastDots = 0; }
+      if (t - this.lastDots < 1500 && this.last) return;
+      this.last = 1; this.lastDots = t;
+      const features: Feature<Point>[] = [];
+      for (const v of this.state.fleet.values()) {
+        if (o.system && v.system !== o.system) continue;
+        if (o.routeId && v.routeId !== o.routeId) continue;
+        const w = this.step(v.id, o.motion === "predict" ? this.predict(v, nowSec, false) : v.world, nowMs, tau);
+        const g = toGeo(w);
+        features.push({ type: "Feature", properties: { id: v.id, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th) }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
+      }
+      this.mapc.setBuses({ type: "FeatureCollection", features });
+      return;
+    }
+
+    // vista cercana: canvas, un cuadro tras otro
+    if (!this.canvasOn) { this.mapc.setBuses(EMPTY); this.canvasOn = true; }
+    const b = this.mapc.map.getBounds();
+    const sw = toWorld({ lat: b.getSouth(), lon: b.getWest() }), ne = toWorld({ lat: b.getNorth(), lon: b.getEast() });
+    const pad = 1800 / METERS_PER_WORLD_UNIT;   // un bus fuera de pantalla puede entrar en lo que dura la estimación
+    const x0 = sw.x - pad, x1 = ne.x + pad, y0 = ne.y - pad, y1 = sw.y + pad;
+    const items: BusDraw[] = [];
     for (const v of this.state.fleet.values()) {
+      if (v.world.x < x0 || v.world.x > x1 || v.world.y < y0 || v.world.y > y1) continue;
       if (o.system && v.system !== o.system) continue;
       if (o.routeId && v.routeId !== o.routeId) continue;
-      const target = o.motion === "predict" ? this.predict(v, nowSec, cull) : v.world;
-      const w = this.step(v.id, target, nowMs, tau);
+      const w = this.step(v.id, o.motion === "predict" ? this.predict(v, nowSec, true) : v.world, nowMs, tau);
       const g = toGeo(w);
-      if (bounds && (g.lon < bounds.getWest() - padLng || g.lon > bounds.getEast() + padLng || g.lat < bounds.getSouth() - padLat || g.lat > bounds.getNorth() + padLat)) continue;
-      const color = o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th);
-      features.push({
-        type: "Feature",
-        properties: {
-          id: v.id, color,
-          icon: icons ? this.mapc.busIcon(color, v.bearing != null && v.bearing > 180) : "",
-          label: this.state.routeOf(v)?.shortName ?? v.routeId,
-        },
-        geometry: { type: "Point", coordinates: [g.lon, g.lat] },
-      });
+      items.push({ id: v.id, lon: g.lon, lat: g.lat, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th),
+        left: v.bearing != null && v.bearing > 180, label: this.state.routeOf(v)?.shortName ?? v.routeId });
     }
-    this.mapc.setBuses({ type: "FeatureCollection", features });
-
-    if (this.followId) {
-      const p = this.position(this.followId);
-      if (p) this.mapc.follow(p);
-    }
+    this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
+    this.items = items;
+    this.canvas.draw(items);
+    if (this.followId) { const p = this.position(this.followId); if (p) this.mapc.follow(p); }
     if (nowMs - this.lastPrune > 30_000) {
       this.lastPrune = nowMs;
       for (const id of this.shown.keys()) if (!this.state.fleet.get(id)) { this.shown.delete(id); this.locks.delete(id); }
