@@ -980,7 +980,7 @@ async function loadGTFS(buf){
   if(S.demo)stopTimer(); setNote("Leyendo GTFS…"); await tick();
   S.zip=await JSZip.loadAsync(buf); resetStatic();
   for(const r of csvRows(await zipText("routes.txt")||""))
-    S.routes.set(r.route_id,{id:r.route_id,short:r.route_short_name||r.route_id,long:r.route_long_name||"",type:classify(r),color:r.route_color?"#"+r.route_color:null});
+    S.routes.set(r.route_id,{id:r.route_id,short:r.route_short_name||r.route_id,long:r.route_long_name||"",type:classify(r),color:null});
   const tt=await zipText("trips.txt");
   if(tt)for(const t of csvRows(tt)){const o={id:t.trip_id,route:t.route_id,head:t.trip_headsign||"",dir:t.direction_id||"0",shape:t.shape_id||""};S.trips.set(t.trip_id,o);let a=S.tripsByRoute.get(t.route_id);if(!a)S.tripsByRoute.set(t.route_id,a=[]);a.push(o);}
   for(const s of csvRows(await zipText("stops.txt")||"")){const lat=+s.stop_lat,lon=+s.stop_lon;if(!isFinite(lat)||!lat)continue;S.stops.set(s.stop_id,{id:s.stop_id,code:s.stop_code||"",name:s.stop_name||s.stop_id,lat,lon,desc:s.stop_desc||""});}
@@ -1095,7 +1095,11 @@ function busPopup(v){
   const rows=[v.head?["Hacia",esc(v.head)]:null,["Ruta",esc(r&&!r.virtual?r.short:v.routeId||"—")],["Placa",esc(v.plate||"—")],["Interno",esc(v.label||v.vid||"—")],["Puntualidad",esc(delayText(delayOf(v)))],["Próxima parada",esc(nextTxt)],isFinite(v.speed)?["Velocidad",Math.round(v.speed*3.6)+" km/h"]:null,["Reporte",fmtT(v.ts)],na?["Alertas",`⚠ ${na} en esta ruta`]:null].filter(Boolean);
   return `<div class="pt"><span class="badge" style="background:${r?.color||tv(r?.type)}">${esc(r?.short||v.routeId||"?")}</span><span>${esc(r&&r.type!=="otro"?TYPES[r.type]+(r.virtual?" (inferido)":""):"Vehículo")}</span></div>${r&&!r.virtual?`<div style="margin-bottom:6px">${esc(r.long)}</div>`:""}<table>${rows.map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</table><div class="rowbtns" style="margin-top:8px">${v.routeId?`<button class="btn primary" data-act="route" data-id="${esc(v.routeId)}">Ver ruta</button>`:""}<button class="btn" data-act="follow" data-id="${esc(v.key)}">${S.follow===v.key?"Dejar de seguir":"Seguir"}</button></div>`;
 }
-function openBus(k){const v=S.vehicles.get(k);if(!v)return;L.popup({offset:[0,-4]}).setLatLng([v.lat,v.lon]).setContent(busPopup(v)).openOn(map);}
+const lerp=(a,b,u)=>a+(b-a)*u;
+function wc(lat,lon){return[(lon+180)/360,.5-Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))/(2*Math.PI)];}
+function curW(v,now){const u=v._fx==null?1:Math.min(1,(now-v._t0)/v._d);return u>=1?[v._wx,v._wy]:[v._fx+(v._wx-v._fx)*u,v._fy+(v._wy-v._fy)*u];}
+function curPos(v,now){const w=curW(v,now);return{lon:w[0]*360-180,lat:(2*Math.atan(Math.exp((.5-w[1])*2*Math.PI))-Math.PI/2)*180/Math.PI};}
+function openBus(k){const v=S.vehicles.get(k);if(!v)return;L.popup({offset:[0,-4]}).setLatLng(((c)=>[c.lat,c.lon])(curPos(v,performance.now()))).setContent(busPopup(v)).openOn(map);}
 function visible(v){
   if(!S.showBuses)return false;const t=v.route?.type||"otro";if(!S.typeOn.has(t))return false;
   if(S.sel&&v.routeId!==S.sel)return false;return true;
@@ -1130,24 +1134,33 @@ const BusLayer=L.Layer.extend({
   redraw(){
     if(!this._map||!this._b)return;L.DomUtil.setTransform(this._c,this._b.min,1);
     const m=this._map,c=this._ctx,b=this._b,z=m.getZoom(),dot=z<12.5,k=Math.round(Math.max(.5,Math.min(1.25,(z-11.2)/4.2))*10)/10,sz=b.getSize();
-    c.clearRect(b.min.x,b.min.y,sz.x,sz.y);let lab=0;
+    c.clearRect(b.min.x,b.min.y,sz.x,sz.y);let lab=0,moving=false;const now=performance.now(),t0=now,sc=256*Math.pow(2,z),org=m.getPixelOrigin();
     const fg=z>=16?css("--fg"):null,bg=z>=16?css("--mapbg"):null;if(fg){c.font="700 11px system-ui,sans-serif";c.textAlign="center";c.lineWidth=3;c.lineJoin="round";}
     for(const v of S.vehicles.values()){
-      if(!v._vis)continue;const p=m.latLngToLayerPoint([v.lat,v.lon]);
+      if(v._fx!=null&&now-v._t0<v._d)moving=true;
+      if(!v._vis)continue;const w=curW(v,now),p={x:w[0]*sc-org.x,y:w[1]*sc-org.y};
       if(p.x<b.min.x-20||p.x>b.max.x+20||p.y<b.min.y-20||p.y>b.max.y+20)continue;
       const sp=busSprite(v._col,isFinite(v.bearing)&&v.bearing>180,k,dot);c.drawImage(sp.cv,p.x-sp.W/2,p.y-sp.H/2,sp.W,sp.H);
       if(fg&&lab<400){const t=v.route?.short||v.routeId||"";if(t){lab++;c.strokeStyle=bg;c.strokeText(t,p.x,p.y-12*k);c.fillStyle=fg;c.fillText(t,p.x,p.y-12*k);}}
     }
+    this._cost=performance.now()-t0;
+    if(moving&&!this._raf)this._raf=requestAnimationFrame(()=>this._loop());
+  },
+  _loop(){
+    this._raf=0;if(!this._map)return;
+    const n=performance.now(),z=this._map.getZoom(),gap=Math.max(z<13.5?130:z<15?66:33,(this._cost||0)*2.2);
+    if(document.hidden||this._map._animatingZoom||n-(this._last||0)<gap){this._raf=requestAnimationFrame(()=>this._loop());return;}
+    this._last=n;this.redraw();
   }
 });
 const busLayer=new BusLayer().addTo(map);
-function nearestBus(pt,maxPx){let best=null,bd=maxPx*maxPx;for(const [k,v] of S.vehicles){if(!v._vis)continue;const q=map.latLngToContainerPoint([v.lat,v.lon]),dx=q.x-pt.x,dy=q.y-pt.y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=k;}}return best;}
+function nearestBus(pt,maxPx){let best=null,bd=maxPx*maxPx;for(const [k,v] of S.vehicles){if(!v._vis)continue;const cp=curPos(v,performance.now()),q=map.latLngToContainerPoint([cp.lat,cp.lon]),dx=q.x-pt.x,dy=q.y-pt.y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=k;}}return best;}
 map.on("click",e=>{const k=nearestBus(e.containerPoint,13);if(k)openBus(k);});
 let mvT=0;map.on("mousemove",e=>{const n=performance.now();if(n-mvT<70)return;mvT=n;map.getContainer().style.cursor=S.showBuses&&nearestBus(e.containerPoint,12)?"pointer":"";});
 function refreshPills(){}
 function inferType(e){if((e.tripId||"").startsWith("TTBD"))return"troncal";if(/^Z\d/.test(e.label||e.vid||""))return"zonal";return"otro";}
 function ingest(list){
-  S.last=list;const seen=new Set();const vote=new Map();
+  S.last=list;const seen=new Set();const vote=new Map();const now=performance.now();
   for(const e of list){
     const key=e.vid||e.id||e.plate||e.tripId||(e.lat+","+e.lon),trip=S.trips.get(e.tripId),routeId=e.routeId||trip?.route||"";
     let route=S.routes.get(routeId);
@@ -1156,7 +1169,14 @@ function ingest(list){
     const prev=S.vehicles.get(key);let bearing=e.bearing;
     if(bearing==null&&prev&&(Math.abs(prev.lat-e.lat)+Math.abs(prev.lon-e.lon))>3e-5)bearing=(Math.atan2((e.lon-prev.lon)*Math.cos(e.lat*Math.PI/180),e.lat-prev.lat)*180/Math.PI+360)%360;
     else if(bearing==null&&prev)bearing=prev.bearing;
-    S.vehicles.set(key,{key,...e,bearing,routeId,route,head:trip?.head||e.head||"",dir:e.dir??trip?.dir});seen.add(key);}
+    const nv={key,...e,bearing,routeId,route,head:trip?.head||e.head||"",dir:e.dir??trip?.dir};
+    {const w=wc(e.lat,e.lon);nv._wx=w[0];nv._wy=w[1];}
+    if(prev){
+      const dl=Math.abs(prev.lat-e.lat)+Math.abs(prev.lon-e.lon);
+      if(e.ts!=null&&e.ts===prev.ts){nv._fx=prev._fx;nv._fy=prev._fy;nv._t0=prev._t0;nv._d=prev._d;}   // sin reporte nuevo: sigue la animación en curso
+      else if(dl>1e-6&&dl<.03){const cur=curW(prev,now);nv._fx=cur[0];nv._fy=cur[1];nv._t0=now;nv._d=Math.max(3000,Math.min(30000,((e.ts||0)-(prev.ts||0))*1000||21000));}
+    }
+    S.vehicles.set(key,nv);seen.add(key);}
   for(const k of [...S.vehicles.keys()])if(!seen.has(k))S.vehicles.delete(k);
   for(const [rid,m] of vote){const r=S.routes.get(rid);if(r)r.type=Object.entries(m).sort((a,b)=>b[1]-a[1])[0][0];}
   syncBuses();renderKPIs();softRender();
