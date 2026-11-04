@@ -21,6 +21,7 @@ for i in $(seq 1 "$N"); do
     fi
   done
   if [ "$changed" = 1 ]; then
+    printf '{"pos":"%s","tu":"%s","al":"%s","at":%s}\n' "$(sha1sum positions.pb | cut -c1-12)" "$(sha1sum tripupdates.pb | cut -c1-12)" "$(sha1sum alerts.pb | cut -c1-12)" "$(date +%s)" > meta.json
     git checkout -q --orphan "s$i"
     git add -A
     git commit -q -m "datos $(date -u +%Y-%m-%dT%H:%M:%SZ)"
