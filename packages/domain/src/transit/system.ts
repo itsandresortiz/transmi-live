@@ -16,6 +16,8 @@ export interface RouteDescriptor {
   description?: string;
   agencyId?: string;
   routeType?: string;
+  /** Color oficial de la ruta en el GTFS (hex sin #): rojo = troncal, verde = alimentador/dual, azul = zonal. */
+  routeColor?: string;
 }
 
 const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -23,6 +25,12 @@ const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerC
 /** Clasifica una ruta del GTFS por su nombre y descripción. */
 export function classifyRoute(r: RouteDescriptor): SystemType {
   const sn = r.shortName.trim().toUpperCase();
+  // 1) lo que dice el propio GTFS: el color y el tipo oficiales de cada ruta (el nombre solo no basta: hay rutas «7» troncales y zonales)
+  if (r.routeType === "6") return "otro";                       // cable aéreo
+  const color = (r.routeColor ?? "").toLowerCase().replace("#", "");
+  if (color === "ff0000") return "troncal";
+  if (color === "0000ff") return "zonal";
+  if (color === "00ff00") return /^\d{1,2}-\d{1,2}$/.test(sn) ? "alimentador" : "dual";
   const txt = strip([r.longName, r.description ?? "", r.agencyId ?? ""].join(" "));
   if (/alimentador/.test(txt) || /^\d{1,2}-\d{1,2}$/.test(sn)) return "alimentador";
   if (/\bdual\b/.test(txt)) return "dual";

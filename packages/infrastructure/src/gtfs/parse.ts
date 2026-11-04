@@ -4,7 +4,7 @@ import { csvRows } from "./csv";
 
 /** La red ya procesada, en objetos simples (para poder cruzar el límite de un Web Worker). */
 export interface NetworkDto {
-  routes: { id: string; shortName: string; longName: string; description: string; routeType: string; agencyId: string }[];
+  routes: { id: string; shortName: string; longName: string; description: string; routeType: string; agencyId: string; color?: string }[];
   stops: { id: string; code: string; name: string; lat: number; lon: number }[];
   headsigns: Record<string, string[]>;
   shapes: { routeId: string; direction: string; headsign: string; pts: number[]; stopIds: string[] }[];
@@ -25,7 +25,7 @@ export async function parseGtfsLite(data: ArrayBuffer | Uint8Array): Promise<Net
   for (const r of csvRows((await entry(zip, "routes.txt")) ?? "")) {
     dto.routes.push({
       id: r.route_id!, shortName: r.route_short_name || r.route_id!, longName: r.route_long_name ?? "",
-      description: r.route_desc ?? "", routeType: r.route_type ?? "", agencyId: r.agency_id ?? "",
+      description: r.route_desc ?? "", routeType: r.route_type ?? "", agencyId: r.agency_id ?? "", color: r.route_color ?? "",
     });
   }
 
@@ -93,7 +93,7 @@ export function buildNetwork(dto: NetworkDto): TransitNetwork {
   for (const r of dto.routes) {
     net.routes.set(r.id, {
       id: r.id, shortName: r.shortName, longName: r.longName,
-      system: classifyRoute({ shortName: r.shortName, longName: r.longName, description: r.description, agencyId: r.agencyId, routeType: r.routeType }),
+      system: classifyRoute({ shortName: r.shortName, longName: r.longName, description: r.description, agencyId: r.agencyId, routeType: r.routeType, routeColor: r.color }),
     });
   }
   for (const s of dto.stops) net.stops.set(s.id, { id: s.id, code: s.code, name: s.name, position: { lat: s.lat, lon: s.lon } });
