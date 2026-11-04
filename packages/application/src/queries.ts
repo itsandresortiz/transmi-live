@@ -108,3 +108,74 @@ export function routeDetail(state: TransitState, routeId: string): RouteDetail |
     alerts: (state.alertsByRoute.get(routeId) ?? []).map((i) => ({ alert: state.alerts[i]!, index: i })),
   };
 }
+
+/* ---------- próximos buses en una parada ---------- */
+
+export interface UpcomingBus {
+  vehicle: Vehicle;
+  /** Hora de llegada a la parada (segundos desde 1970). */
+  etaAt: number;
+  /** `true` si es la hora oficial de TransMilenio (el bus va hacia esa parada); si no, es un cálculo. */
+  official: boolean;
+  /** Paradas que le faltan hasta llegar (1 = la siguiente). */
+  stopsAway: number;
+}
+export interface UpcomingRoute { route: Route; headsign: string; direction: string; buses: UpcomingBus[] }
+
+/** Tiempo medio por parada (frenar, subir/bajar gente y arrancar), medido con lotes reales de cada sistema. */
+export const SECONDS_PER_STOP: Record<SystemType, number> = { troncal: 58, dual: 58, alimentador: 62, zonal: 50, otro: 55 };
+const CRUISE_MPS = 18;        // velocidad entre paradas: casi no pesa frente al tiempo en cada parada
+const DETOUR_FACTOR = 1.15;   // la calle es más larga que la línea recta entre paradas
+
+function hav(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** Estima cuántos segundos tarda un bus en ir de la parada `from` a la parada `to` de su recorrido.
+ *  Se calibró con lotes reales: el tiempo lo domina el número de paradas, no la distancia ni la velocidad del momento. */
+export function estimateTravelSeconds(state: TransitState, v: Vehicle, stopIds: readonly string[], from: number, to: number): number {
+  let meters = 0;
+  for (let i = from; i < to; i++) {
+    const a = state.stopById(stopIds[i]), b = state.stopById(stopIds[i + 1]);
+    if (a && b) meters += hav(a.position, b.position) * DETOUR_FACTOR;
+  }
+  return meters / CRUISE_MPS + (to - from) * SECONDS_PER_STOP[v.system];
+}
+
+/** Para cada ruta que pasa por la parada: los próximos buses que vienen hacia ella, con su hora de llegada. */
+export function upcomingAtStop(state: TransitState, stopId: string, nowSec: number, perRoute = 3): UpcomingRoute[] {
+  const out: UpcomingRoute[] = [];
+  const byRoute = new Map<string, Vehicle[]>();
+  for (const v of state.fleet.values()) { const l = byRoute.get(v.routeId); l ? l.push(v) : byRoute.set(v.routeId, [v]); }
+  for (const [routeId, shapes] of state.network.shapes) {
+    const route = state.routeById(routeId);
+    const vehicles = byRoute.get(routeId);
+    if (!route || !vehicles) continue;
+    for (const shape of shapes) {
+      const j = shape.stopIds.indexOf(stopId);
+      if (j < 0) continue;
+      const buses: UpcomingBus[] = [];
+      for (const v of vehicles) {
+        if (!v.nextStopId) continue;
+        const k = shape.stopIds.indexOf(v.nextStopId);
+        if (k < 0 || k > j) continue;
+        const tu = v.tripId ? state.tripUpdates.get(v.tripId) : undefined;
+        const nextAt = tu?.nextStop?.stopId === v.nextStopId && tu.nextStop.arrivalAt ? tu.nextStop.arrivalAt : undefined;
+        if (k === j) {
+          if (nextAt == null) continue;
+          buses.push({ vehicle: v, etaAt: nextAt, official: true, stopsAway: 1 });
+        } else {
+          const base = nextAt ?? nowSec + 20;
+          buses.push({ vehicle: v, etaAt: Math.max(base, nowSec) + estimateTravelSeconds(state, v, shape.stopIds, k, j), official: false, stopsAway: j - k + 1 });
+        }
+      }
+      if (!buses.length) continue;
+      buses.sort((a, b) => a.etaAt - b.etaAt);
+      out.push({ route, headsign: shape.headsign, direction: shape.direction, buses: buses.slice(0, perRoute) });
+    }
+  }
+  return out.sort((a, b) => a.buses[0]!.etaAt - b.buses[0]!.etaAt);
+}

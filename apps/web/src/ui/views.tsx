@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  arrivalsAt, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStops,
+  upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStops,
 } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
@@ -13,7 +13,7 @@ import type { MapTheme } from "../map/theme";
 
 export interface Actions {
   openRoute(id: string): void;
-  focusBus(id: string): void;
+  focusBus(id: string, keepTarget?: boolean): void;
   focusStop(id: string): void;
   focusStation(i: number): void;
   focusAlert(i: number): void;
@@ -227,10 +227,16 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
   useTransitVersion();
   const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v);
   const color = sysColor(th, v.system);
+  const target = useUi((u) => u.targetStopId);
+  const toTarget = target ? upcomingAtStop(transit, target, nowSec, 40).flatMap((x) => x.buses).find((b) => b.vehicle.id === v.id) : undefined;
   return (
     <div className="pc">
       <div className="ph"><span className="rb" style={{ ["--c" as string]: color }}>{r?.shortName ?? v.routeId}</span><div><h4>{SYSTEM_LABEL[v.system]}</h4><small>{r?.longName}</small></div></div>
       <div className="plate"><span>{v.plate || v.label || v.id}</span><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></div>
+      {target && toTarget && (
+        <div className="tgt"><b>{toTarget.official ? "" : "~"}{eta(toTarget.etaAt, nowSec)}</b> para llegar a <b>{transit.stopById(target)?.name}</b>
+          <small>{toTarget.stopsAway <= 1 ? "es su próxima parada" : `le faltan ${toTarget.stopsAway - 1} ${toTarget.stopsAway - 1 === 1 ? "parada" : "paradas"} antes`}</small></div>
+      )}
       <dl>
         <dt>Próxima parada</dt><dd>{ns?.stop?.name ?? "—"}</dd>
         <dt>Llega</dt><dd>{untilText(ns?.arrivalAt, nowSec)}</dd>
@@ -241,21 +247,41 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
   );
 }
 
-export function StopPopup({ stopId, th, onRoute }: { stopId: string; th: MapTheme; onRoute(id: string): void }) {
+const away = (n: number) => (n <= 1 ? "su próxima parada" : `a ${n - 1} ${n - 1 === 1 ? "parada" : "paradas"}`);
+const eta = (at: number, nowSec: number) => {
+  const s = Math.round(at - nowSec);
+  return s <= 15 ? "llegando" : s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
+};
+
+/** Parada: rutas que pasan y en cuánto llegan sus próximos buses. Tocar un bus lo muestra en el mapa. */
+export function StopPopup({ stopId, th, onRoute, onBus }: { stopId: string; th: MapTheme; onRoute(id: string): void; onBus(id: string): void }) {
   useTransitVersion();
   const nowSec = useNow() / 1000;
   const s = transit.stopById(stopId);
-  const arr = arrivalsAt(transit, stopId, 6);
-  const routes = routesAtStop(transit, stopId).slice(0, 24);
+  const rows = upcomingAtStop(transit, stopId, nowSec, 2).slice(0, 6);
   return (
     <div className="pc">
-      <div className="ph"><div><h4>{s?.name ?? "Parada"}</h4><small>{s?.code}</small></div></div>
-      {arr.length > 0 ? (
-        <table><tbody>{arr.map((a, i) => { const r = transit.routeById(a.routeId); return <tr key={i}><td><b>{r?.shortName ?? a.routeId}</b></td><td>{untilText(a.arrivalAt, nowSec)}</td></tr>; })}</tbody></table>
-      ) : <p className="cs" style={{ margin: "10px 0 0", color: "var(--muted)" }}>Sin próximas llegadas reportadas.</p>}
-      {routes.length > 0 && <div className="rbs" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-        {routes.map((r) => <button key={r.id} className="rb sm" style={{ ["--c" as string]: sysColor(th, r.system) }} onClick={() => onRoute(r.id)}>{r.shortName}</button>)}
-      </div>}
+      <div className="ph"><div><h4>{s?.name ?? "Parada"}</h4><small>Próximos buses</small></div></div>
+      {rows.length === 0 && <p className="cs" style={{ margin: "12px 0 0", color: "var(--muted)" }}>Ningún bus viene hacia esta parada en este momento.</p>}
+      <div className="ups">
+        {rows.map((r) => (
+          <div key={r.route.id + r.direction} className="up">
+            <button className="rb sm" style={{ ["--c" as string]: th.system[r.route.system] }} onClick={() => onRoute(r.route.id)}>{r.route.shortName}</button>
+            <div className="upm">
+              <span className="rs">{r.headsign ? `Hacia ${r.headsign}` : r.route.longName}</span>
+              <div className="etas">
+                {r.buses.map((b) => (
+                  <button key={b.vehicle.id} className={`eta${b.official ? "" : " est"}`} onClick={() => onBus(b.vehicle.id)}
+                    title={b.official ? "Hora oficial de TransMilenio" : "Tiempo calculado"}>
+                    {b.official ? "" : "~"}{eta(b.etaAt, nowSec)}<small>{away(b.stopsAway)}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {rows.some((r) => r.buses.some((b) => !b.official)) && <p className="note">El «~» es un cálculo; sin «~» es la hora oficial.</p>}
     </div>
   );
 }

@@ -48,19 +48,21 @@ export function App() {
       openRoute(id) {
         closePopup(); s().setFollow(null); s().setRoute(id); s().setTab("rutas"); s().setRoute(id);
       },
-      focusBus(id) {
+      focusBus(id, keepTarget = false) {
+        if (!keepTarget) s().setTargetStop(null);
         const v = transit.fleet.get(id), m = mc.current; if (!v || !m) return;
         const p = br.current?.position(id) ?? v.position;
         s().setSheet("peek");
-        m.flyTo(p, Math.max(m.zoom, 16), mapPadding());
+        m.flyTo(p, Math.max(m.zoom, 16), { ...mapPadding(), top: 300 });
         popup(p, <BusPopup v={v} th={thRef.current} following={s().followId === id}
           onFollow={() => { const f = s().followId === id ? null : id; s().setFollow(f); closePopup(); s().showToast(f ? "Siguiendo este bus" : "Dejaste de seguirlo"); }}
           onRoute={() => a.openRoute(v.routeId)} />);
       },
       focusStop(id) {
         const st = transit.stopById(id), m = mc.current; if (!st || !m) return;
-        m.flyTo(st.position, Math.max(m.zoom, 16.5), mapPadding());
-        popup(st.position, <StopPopup stopId={id} th={thRef.current} onRoute={a.openRoute} />);
+        s().setTargetStop(id);
+        m.flyTo(st.position, Math.max(m.zoom, 16), { ...mapPadding(), top: 410 });
+        popup(st.position, <StopPopup stopId={id} th={thRef.current} onRoute={a.openRoute} onBus={(bid) => a.focusBus(bid, true)} />);
       },
       focusStation(i) {
         const e = (estaciones as [number, number, string, string, string][])[i], m = mc.current; if (!e || !m) return;
@@ -91,7 +93,7 @@ export function App() {
       return { colorMode: u.colorMode, motion: u.motion, system: u.tab === "buses" || u.tab === "rutas" ? u.system : null, routeId: u.tab === "rutas" ? u.routeId : null, visible: u.layers.buses };
     }, () => thRef.current);
     br.current = r;
-    (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData };
+    (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData, act };
     let stopped = false;
     void m.ready.then(() => { if (!stopped) { r.start(); m.setToggles(uiRef.current.layers); } });
 

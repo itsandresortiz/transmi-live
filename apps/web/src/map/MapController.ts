@@ -280,7 +280,7 @@ export class MapController {
 
   showPopup(p: GeoPoint, content: HTMLElement, onClose?: () => void): Popup {
     this.popup?.remove();
-    const pop = new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: "320px", offset: 14, className: "tl-popup" })
+    const pop = new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: "320px", offset: 14, anchor: "bottom", className: "tl-popup" })
       .setLngLat([p.lon, p.lat]).setDOMContent(content).addTo(this.map);
     pop.on("close", () => { if (this.popup === pop) this.popup = null; onClose?.(); });
     this.popup = pop;
