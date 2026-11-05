@@ -341,10 +341,10 @@ export class MapController {
   }
 
   /** Velocidad de los buses en las calles (cada tramo con su banda de color). */
-  setTraffic(segs: readonly { a: GeoPoint; b: GeoPoint; speed: number }[]) {
+  setTraffic(segs: readonly { a: GeoPoint; b: GeoPoint; speed: number; line?: GeoPoint[] }[]) {
     (this.map.getSource("trafico") as GeoJSONSource | undefined)?.setData({
       type: "FeatureCollection",
-      features: segs.map((x) => ({ type: "Feature", properties: { b: trafficBand(x.speed) }, geometry: { type: "LineString", coordinates: [[x.a.lon, x.a.lat], [x.b.lon, x.b.lat]] } })),
+      features: segs.map((x) => ({ type: "Feature", properties: { b: trafficBand(x.speed) }, geometry: { type: "LineString", coordinates: (x.line ?? [x.a, x.b]).map((p) => [p.lon, p.lat]) } })),
     });
   }
   private signalsLoaded = false;

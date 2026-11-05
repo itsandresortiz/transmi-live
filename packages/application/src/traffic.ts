@@ -1,12 +1,20 @@
-import { type GeoPoint, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo } from "@transmi/domain";
+import { type GeoPoint, type WorldPoint, METERS_PER_WORLD_UNIT, RoadPath, distanceMeters, toGeo } from "@transmi/domain";
 import type { TransitState } from "./transit-state";
 
 /** Un tramo de calle con la velocidad a la que lo recorrió un bus. */
-export interface TrafficSegment { a: GeoPoint; b: GeoPoint; /** m/s */ speed: number }
+export interface TrafficSegment { a: GeoPoint; b: GeoPoint; /** m/s */ speed: number; /** recorrido por la calle entre a y b (sigue las curvas de la ruta) */ line?: GeoPoint[] }
 
 /** Banda de velocidad para pintar: 0 casi detenido, 1 lento, 2 normal, 3 fluido. */
 export function trafficBand(speedMps: number): 0 | 1 | 2 | 3 {
   return speedMps < 1.5 ? 0 : speedMps < 4 ? 1 : speedMps < 7.5 ? 2 : 3;
+}
+
+const pathCache = new WeakMap<object, Map<string, RoadPath[]>>();
+function pathsOf(state: TransitState, routeId: string): RoadPath[] {
+  let m = pathCache.get(state.network); if (!m) { m = new Map(); pathCache.set(state.network, m); }
+  let l = m.get(routeId);
+  if (!l) { l = (state.network.shapes.get(routeId) ?? []).filter((sh) => sh.points.length > 1).map((sh) => new RoadPath(sh.points)); m.set(routeId, l); }
+  return l;
 }
 
 const CELL = 0.0004;                           // ~44 m
@@ -39,7 +47,15 @@ export function trafficSegments(state: TransitState, nowSec: number): TrafficSeg
       // casi quieto: un trazo corto en el sentido en que iba, para que se vea el tramo detenido
       const ang = ((v.bearing ?? 90) * Math.PI) / 180, k = 6 / METERS_PER_WORLD_UNIT;
       out.push({ a: toGeo({ x: p1.x - Math.sin(ang) * k, y: p1.y + Math.cos(ang) * k }), b: toGeo({ x: p1.x + Math.sin(ang) * k, y: p1.y - Math.cos(ang) * k }), speed });
-    } else out.push({ a: toGeo(p0), b, speed });
+    } else {
+      // si los dos puntos caen sobre el recorrido de su ruta, el tramo sigue la calle (con sus curvas) en vez de cortar en línea recta
+      let line: GeoPoint[] | undefined;
+      for (const path of pathsOf(state, v.routeId)) {
+        const h0 = path.project(p0, 0, 0, 40), h1 = path.project(p1, 0, 0, 40);
+        if (h0 && h1 && h1.s > h0.s && h1.s - h0.s < meters * 1.6 + 30) { line = path.slice(h0.s, h1.s); break; }
+      }
+      out.push({ a: toGeo(p0), b, speed, line: line && line.length > 1 ? line : undefined });
+    }
   }
   return out;
 }
