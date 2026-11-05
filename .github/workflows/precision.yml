@@ -1,0 +1,14 @@
+name: Medir precisión de los buses
+# Prueba puntual (se lanza a mano): compara dónde dibuja la app a cada bus con lo que TransMilenio informa después.
+on: { workflow_dispatch: {} }
+permissions: { contents: read }
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx --yes tsx tools/precision.ts 270 8
