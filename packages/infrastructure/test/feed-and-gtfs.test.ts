@@ -103,3 +103,23 @@ describe("reloj del servidor", () => {
     expect(offsets[0]!).toBeLessThan(92_000);
   });
 });
+
+describe("parseLiveFrames", async () => {
+  const { parseLiveFrames } = await import("../src/feed/proxy-live-feed");
+  const frame = (head: unknown, ...bodies: number[][]) => {
+    const h = new TextEncoder().encode(JSON.stringify(head));
+    const out = new Uint8Array(4 + h.length + bodies.flat().length);
+    new DataView(out.buffer).setUint32(0, h.length);
+    out.set(h, 4);
+    out.set(bodies.flat(), 4 + h.length);
+    return out;
+  };
+  it("separa las partes por largo", () => {
+    const r = parseLiveFrames(frame({ at: 1_800_000_000, parts: [{ k: "pos", sig: "a", len: 2 }, { k: "al", sig: "b", len: 1 }] }, [1, 2], [9]));
+    expect(r?.parts.map((p) => [p.k, [...p.body]])).toEqual([["pos", [1, 2]], ["al", [9]]]);
+  });
+  it("rechaza respuestas que no son del formato (función antigua)", () => {
+    expect(parseLiveFrames(new TextEncoder().encode('{"ok":true,"endpoints":[]}'))).toBeNull();
+    expect(parseLiveFrames(frame({ at: 1, parts: [{ k: "pos", sig: "a", len: 5 }] }, [1]))).toBeNull();
+  });
+});

@@ -124,6 +124,7 @@ export function App() {
     void m.ready.then(() => { if (!stopped) { r.start(); m.setToggles(uiRef.current.layers); } });
 
     const poll = async () => {
+      if (document.hidden || navigator.onLine === false) return; // pantalla apagada o sin red: no se gasta servidor ni batería
       try { await liveData.refresh(); } catch { /* el estado de conexión lo muestra */ }
     };
     void poll();

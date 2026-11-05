@@ -14,7 +14,7 @@ const feedFetch = makeCachedFetch({ onlyOffline: true });
 
 /** Los datos en vivo se descargan y decodifican en un Web Worker (si el navegador lo permite) para no congelar el mapa. */
 function makeFeed() {
-  const cfg = { primaryBase: CONFIG.proxyUrl, fallbackBase: CONFIG.dataBase, fetchFn: feedFetch, onClock: updateClockOffset };
+  const cfg = { primaryBase: CONFIG.proxyUrl, fallbackBase: CONFIG.dataBase, fetchFn: feedFetch, onClock: updateClockOffset, waitSeconds: 20 };
   try { if (typeof Worker !== "undefined") return new WorkerLiveFeed(new Worker(new URL("./feed.worker.ts", import.meta.url), { type: "module" }), updateClockOffset); }
   catch { /* sin soporte de workers: se hace en el hilo principal */ }
   return new ProxyLiveFeed(cfg);
