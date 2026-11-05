@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { connectionStatus, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
+import { connectionStatus, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, networkSource, transit } from "./composition-root";
 import { BusRenderer } from "./map/BusRenderer";
+import { buildStationGeometry } from "./map/stations";
 import { MapController } from "./map/MapController";
 import { currentScheme, themeOf, type Scheme } from "./map/theme";
 import estaciones from "./data/estaciones.json";
@@ -100,6 +101,7 @@ export function App() {
       onBusClick: (id) => act.focusBus(id),
       onStopClick: (id) => act.focusStop(id),
       onStationClick: (i) => act.focusStation(i),
+      onGroupClick: (ids) => act.openGroup(ids),
       onPointerHold: (h) => br.current?.setHold(h),
       // como en las apps de mapas: tocar el mapa baja el panel para verlo completo (en celular)
       onMapTap: () => {
@@ -116,7 +118,7 @@ export function App() {
       return { colorMode: u.colorMode, motion: u.motion, system: !u.stopRoute && (u.tab === "buses" || u.tab === "rutas") ? u.system : null, routeId: u.stopRoute?.routeId ?? (u.tab === "rutas" ? u.routeId : null), visible: u.layers.buses };
     }, () => thRef.current);
     br.current = r;
-    (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData, act };
+    (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData, act, ui: useUi };
     let stopped = false;
     void m.ready.then(() => { if (!stopped) { r.start(); m.setToggles(uiRef.current.layers); } });
 
@@ -131,7 +133,7 @@ export function App() {
     void networkSource.load().then((n) => {
       if (stopped) return;
       transit.setNetwork(n);
-      void m.ready.then(() => { m.setNetwork(n); setNet((x) => x + 1); });
+      void m.ready.then(() => { m.setStations(buildStationGeometry(transit, trunkStations(transit))); m.setNetwork(n); setNet((x) => x + 1); });
     }).catch(() => uiRef.current.showToast("No pudimos cargar las rutas; los buses siguen en vivo"));
 
     const mq = matchMedia("(prefers-color-scheme: dark)");
@@ -161,6 +163,20 @@ export function App() {
       m.showRoute(shapes, dir, thRef.current.system[route?.system ?? "otro"], (sid) => transit.stopById(sid)?.position);
     });
   }, [ui.routeId, ui.direction, ui.followId, ui.stopId, net, scheme]);
+
+  /* estaciones de la troncal: se iluminan los vagones donde para la ruta que se está viendo y se marca el de la parada abierta */
+  useEffect(() => {
+    const m = mc.current; if (!m) return;
+    void m.ready.then(() => {
+      const fv = ui.followId ? transit.fleet.get(ui.followId) : undefined;
+      const rid = ui.stopRoute?.routeId ?? ui.routeId ?? fv?.routeId ?? null;
+      const shapes = rid ? transit.network.shapes.get(rid) : undefined;
+      const want = ui.stopRoute?.direction ?? (ui.routeId ? ui.direction : undefined);
+      const shape = shapes?.find((x) => x.direction === want) ?? (fv && shapes ? shapes.find((x) => fv.lastStopId && x.stopIds.includes(fv.lastStopId)) : undefined) ?? shapes?.[0];
+      const color = thRef.current.system[(rid ? transit.routeById(rid)?.system : null) ?? "troncal"];
+      m.setStationState(new Set(shape?.stopIds ?? []), color, ui.stopId);
+    });
+  }, [ui.routeId, ui.direction, ui.stopRoute, ui.stopId, ui.followId, net, scheme]);
 
   /* parada abierta: se marca en el mapa y, si hay una ruta elegida, solo por donde vienen sus buses */
   useEffect(() => {

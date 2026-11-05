@@ -237,3 +237,17 @@ export function routeIdsAtStops(state: TransitState, stopIds: readonly string[])
   for (const [rid, shapes] of state.network.shapes) if (shapes.some((s) => s.stopIds.some((id) => want.has(id)))) out.add(rid);
   return out;
 }
+
+
+/** Estación de la troncal: sus vagones agrupados. Se calcula una vez por red cargada. */
+export interface Station { title: string; stops: Stop[] }
+const stationCache = new WeakMap<object, Station[]>();
+export function trunkStations(state: TransitState): Station[] {
+  let out = stationCache.get(state.network);
+  if (!out) {
+    const wagonStops = [...state.network.stops.values()].filter((s) => state.isServed(s.id) && state.labelOf(s).wagon);
+    out = clusterStops(state, wagonStops).map((stops) => { const sorted = sortStationStops(state, stops); return { title: state.labelOf(sorted[0]!).title, stops: sorted }; });
+    stationCache.set(state.network, out);
+  }
+  return out;
+}

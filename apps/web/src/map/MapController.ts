@@ -3,12 +3,15 @@ import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
+import type { StationGeometry } from "./stations";
 import { type MapTheme, type Scheme, themeOf } from "./theme";
 
 export interface MapEvents {
   onBusClick(id: string): void;
   onStopClick(id: string): void;
   onStationClick(index: number): void;
+  /** Toque en la píldora de una estación de la troncal (vista media): abre la estación con todos sus vagones. */
+  onGroupClick?(stopIds: string[]): void;
   onUserDrag?(): void;
   /** El dedo o el mouse está sobre el mapa (true) o se soltó (false). */
   onPointerHold?(hold: boolean): void;
@@ -71,7 +74,7 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-pills"); this.src("station-wagons"); this.src("station-wagon-labels");
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
     m.addLayer({ id: "localidades-line", type: "line", source: "localidades", paint: { "line-color": t.landLine, "line-width": 1.2 } });
@@ -124,13 +127,29 @@ export class MapController {
       m.addLayer({ id, type: "symbol", source: "street-labels", minzoom, filter: filter as never, layout: streetLayout([...size]) as never, paint: streetPaint }));
 
     m.addLayer({
-      id: "estaciones-circles", type: "circle", source: "estaciones", minzoom: 11,
+      id: "estaciones-circles", type: "circle", source: "estaciones", minzoom: 11, maxzoom: 14.5,
       paint: { "circle-radius": zoomWidth([11, 2], [15, 4.2], [18, 6]), "circle-color": t.surface, "circle-stroke-color": t.troncal, "circle-stroke-width": 2 },
     });
     m.addLayer({
       id: "estaciones-labels", type: "symbol", source: "estaciones", minzoom: 14.5,
       layout: { "text-field": ["get", "name"], "text-font": FONT, "text-size": 11, "text-offset": [0, 1.1], "text-anchor": "top", "text-optional": true },
       paint: { "text-color": t.troncal, "text-halo-color": t.halo, "text-halo-width": 1.6 },
+    });
+    // estaciones de la troncal: píldora (vista media) y un rectángulo por vagón (vista cercana)
+    m.addLayer({ id: "station-pills-fill", type: "fill", source: "station-pills", minzoom: 14.5, maxzoom: 16.3, paint: { "fill-color": t.troncal, "fill-opacity": 0.16 } });
+    m.addLayer({ id: "station-pills-line", type: "line", source: "station-pills", minzoom: 14.5, maxzoom: 16.3, paint: { "line-color": t.troncal, "line-width": 1.6, "line-opacity": 0.85 } });
+    m.addLayer({
+      id: "station-wagons-fill", type: "fill", source: "station-wagons", minzoom: 16,
+      paint: { "fill-color": ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.surface], "fill-opacity": 0.96 },
+    });
+    m.addLayer({
+      id: "station-wagons-line", type: "line", source: "station-wagons", minzoom: 16,
+      paint: { "line-color": ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.troncal], "line-width": ["case", ["==", ["get", "sel"], true], 3, 1.5] },
+    });
+    m.addLayer({
+      id: "station-wagon-labels", type: "symbol", source: "station-wagon-labels", minzoom: 16.8,
+      layout: { "text-field": ["get", "w"], "text-font": FONT, "text-size": 11, "text-allow-overlap": true, "text-ignore-placement": true },
+      paint: { "text-color": ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.troncal] },
     });
     m.addLayer({
       id: "stops-circles", type: "circle", source: "stops", minzoom: 13.5,
@@ -178,21 +197,27 @@ export class MapController {
     // Un solo manejador de toques, con tolerancia para el dedo: primero el bus que se toca (dibujado encima de todo);
     // si no, la parada o estación más cercana dentro de ~14 px; si no hay nada, es un toque al mapa vacío.
     const TOUCH_PAD = 14;
-    const pick = (pt: { x: number; y: number }): { kind: "bus" | "stop" | "station"; id: string | number } | null => {
+    type Hit = { kind: "bus" | "stop" | "station" | "group"; id: string | number };
+    const pick = (pt: { x: number; y: number }): Hit | null => {
       const bus = this.busHit?.(pt);
       if (bus) return { kind: "bus", id: bus };
-      const layers = ["route-stops", "stops-circles", "estaciones-circles", "bus-dots"].filter((l) => m.getLayer(l));
+      const layers = ["route-stops", "station-wagons-fill", "station-pills-fill", "stops-circles", "estaciones-circles", "bus-dots"].filter((l) => m.getLayer(l));
       const feats = m.queryRenderedFeatures([[pt.x - TOUCH_PAD, pt.y - TOUCH_PAD], [pt.x + TOUCH_PAD, pt.y + TOUCH_PAD]], { layers });
-      let best: { kind: "bus" | "stop" | "station"; id: string | number } | null = null, bd = Infinity;
+      let best: Hit | null = null, bd = Infinity;
       for (const f of feats) {
-        if (f.geometry.type !== "Point") continue;
-        const [lon, lat] = f.geometry.coordinates as [number, number];
+        let lon: number, lat: number;
+        if (f.geometry.type === "Point") [lon, lat] = f.geometry.coordinates as [number, number];
+        else if (f.geometry.type === "Polygon") {                       // vagón o píldora: se mide al centro del dibujo
+          const ring = f.geometry.coordinates[0]!.slice(0, -1);
+          lon = ring.reduce((a, c) => a + c[0]!, 0) / ring.length; lat = ring.reduce((a, c) => a + c[1]!, 0) / ring.length;
+        } else continue;
         const q = m.project([lon, lat]);
         // a igual distancia gana la parada de una ruta resaltada, luego la parada, luego la estación
-        const rank = f.layer.id === "route-stops" ? 0 : f.layer.id === "stops-circles" ? 1 : 2;
+        const rank = f.layer.id === "route-stops" || f.layer.id === "station-wagons-fill" ? 0 : f.layer.id === "stops-circles" ? 1 : f.layer.id === "station-pills-fill" ? 4 : 2;
         const d = Math.hypot(q.x - pt.x, q.y - pt.y) + rank * 3;
         if (d >= bd) continue;
         if (f.layer.id === "bus-dots") { bd = d; best = { kind: "bus", id: String(f.properties?.id) }; }
+        else if (f.layer.id === "station-pills-fill") { bd = d; best = { kind: "group", id: String(f.properties?.ids) }; }
         else if (f.layer.id === "estaciones-circles") { if (typeof f.id === "number") { bd = d; best = { kind: "station", id: f.id }; } }
         else { bd = d; best = { kind: "stop", id: String(f.properties?.id) }; }
       }
@@ -203,6 +228,7 @@ export class MapController {
       if (!hit) { this.events.onMapTap?.(); return; }
       if (hit.kind === "bus") this.events.onBusClick(String(hit.id));
       else if (hit.kind === "stop") this.events.onStopClick(String(hit.id));
+      else if (hit.kind === "group") this.events.onGroupClick?.(String(hit.id).split(","));
       else this.events.onStationClick(Number(hit.id));
     });
     m.on("mousemove", (e) => { m.getCanvas().style.cursor = pick(e.point) ? "pointer" : ""; });
@@ -224,6 +250,11 @@ export class MapController {
     for (const id of STREET_LAYERS) { m.setPaintProperty(id, "text-color", t.label); m.setPaintProperty(id, "text-halo-color", t.halo); }
     m.setPaintProperty("estaciones-circles", "circle-color", t.surface);
     m.setPaintProperty("estaciones-circles", "circle-stroke-color", t.troncal);
+    m.setPaintProperty("station-pills-fill", "fill-color", t.troncal);
+    m.setPaintProperty("station-pills-line", "line-color", t.troncal);
+    m.setPaintProperty("station-wagons-fill", "fill-color", ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.surface]);
+    m.setPaintProperty("station-wagons-line", "line-color", ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.troncal]);
+    m.setPaintProperty("station-wagon-labels", "text-color", ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.troncal]);
     m.setPaintProperty("estaciones-labels", "text-color", t.troncal);
     m.setPaintProperty("estaciones-labels", "text-halo-color", t.halo);
     m.setPaintProperty("stops-circles", "circle-color", t.surface);
@@ -234,7 +265,30 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis(["stops-circles"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-pills-fill", "station-pills-line", "station-wagons-fill", "station-wagons-line", "station-wagon-labels"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
+  }
+
+  private wagonStopIds = new Set<string>();
+  private stationBase: StationGeometry | null = null;
+  private stationState = { hl: new Set<string>(), color: "#e11d2e", sel: null as string | null };
+
+  /** Dibuja las estaciones de la troncal. Llamar antes de `setNetwork` (para no repetir sus paradas como puntico). */
+  setStations(g: StationGeometry) {
+    this.stationBase = g; this.wagonStopIds = g.stopIds;
+    (this.map.getSource("station-pills") as GeoJSONSource | undefined)?.setData(g.pills);
+    this.paintStations();
+  }
+  /** Ilumina los vagones donde se detiene la ruta elegida y marca el vagón de la parada abierta. */
+  setStationState(hl: ReadonlySet<string>, color: string, sel: string | null) {
+    this.stationState = { hl: new Set(hl), color, sel };
+    this.paintStations();
+  }
+  private paintStations() {
+    const g = this.stationBase; if (!g) return;
+    const { hl, color, sel } = this.stationState;
+    const mark = <T extends { properties: Record<string, unknown> | null }>(f: T): T => ({ ...f, properties: { ...f.properties, hl: hl.has(String(f.properties?.id)), hlColor: color, sel: f.properties?.id === sel } });
+    (this.map.getSource("station-wagons") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: g.wagons.features.map(mark) });
+    (this.map.getSource("station-wagon-labels") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: g.labels.features.map(mark) });
   }
 
   setBuses(data: FeatureCollection<Point>) { (this.map.getSource("buses") as GeoJSONSource | undefined)?.setData(data); }
@@ -252,7 +306,7 @@ export class MapController {
     (this.map.getSource("network") as GeoJSONSource).setData({ type: "FeatureCollection", features: lines });
     const stops: Feature<Point>[] = [];
     for (const s of net.stops.values())
-      stops.push({ type: "Feature", properties: { id: s.id }, geometry: { type: "Point", coordinates: [s.position.lon, s.position.lat] } });
+      if (!this.wagonStopIds.has(s.id)) stops.push({ type: "Feature", properties: { id: s.id }, geometry: { type: "Point", coordinates: [s.position.lon, s.position.lat] } });
     (this.map.getSource("stops") as GeoJSONSource).setData({ type: "FeatureCollection", features: stops });
     this.networkLoaded = true;
     this.map.setLayoutProperty("troncales-lines", "visibility", "none");

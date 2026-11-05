@@ -41,6 +41,16 @@ export class RoadPath {
     return dist <= maxMeters ? { s: bs, dist, forward: bdot >= 0 } : null;
   }
 
+  /** Dirección (vector unitario en coordenadas de mundo) del trazado a `s` metros del inicio. */
+  tangentAt(s: number): { ux: number; uy: number } {
+    const n = this.size;
+    if (n < 2) return { ux: 0, uy: -1 };
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (this.cum[mid]! <= s) lo = mid; else hi = mid; }
+    const dx = this.xs[hi]! - this.xs[lo]!, dy = this.ys[hi]! - this.ys[lo]!, h = Math.hypot(dx, dy) || 1;
+    return { ux: dx / h, uy: dy / h };
+  }
+
   /** Tramo del trazado entre `s0` y `s1` metros desde el inicio. */
   slice(s0: number, s1: number): GeoPoint[] {
     const a = Math.max(0, Math.min(s0, s1)), b = Math.min(this.length, Math.max(s0, s1));
