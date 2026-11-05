@@ -1,4 +1,4 @@
-/* TransMi LIVE: guarda la app en el dispositivo para que abra rápido y funcione sin internet.
+/* TransMi Go: guarda la app en el dispositivo para que abra rápido y funcione sin internet.
    Los datos en vivo NO pasan por aquí (la app guarda su propia última copia). */
 const VERSION = "tm-shell-v1";
 self.addEventListener("install", () => self.skipWaiting());

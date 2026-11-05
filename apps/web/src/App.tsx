@@ -300,7 +300,7 @@ export function App() {
       <header className="top">
         <div className="brand glass">
           <div className="mark"><Mark /></div>
-          <div className="bt"><b>TransMi <i>LIVE</i></b><Status /></div>
+          <div className="bt"><b>TransMi <i>Go</i></b><Status /></div>
         </div>
         <div className="tools">
           {Math.abs(bearing) > 0.5 && <button className="fab glass" aria-label="Volver a poner el norte arriba" title="Norte arriba" onClick={() => mc.current?.resetNorth()}><span style={{ display: "grid", transform: `rotate(${-bearing}deg)` }}><Compass /></span></button>}

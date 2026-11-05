@@ -1,4 +1,4 @@
-# TransMi LIVE
+# TransMi Go
 
 Mapa en vivo de TransMilenio, duales, alimentadores y SITP en Bogotá: dónde está cada bus, qué tan puntual
 va, en cuánto llega a tu parada, avisos de servicio y calles. Pensado primero para el celular (instalable,

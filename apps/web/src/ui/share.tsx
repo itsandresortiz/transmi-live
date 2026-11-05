@@ -6,7 +6,7 @@ export function ShareButton({ target, title }: { target: Target; title: string }
   const go = async () => {
     const url = shareUrl(target);
     try {
-      if (navigator.share) { await navigator.share({ title, text: `${title} en TransMi LIVE`, url }); return; }
+      if (navigator.share) { await navigator.share({ title, text: `${title} en TransMi Go`, url }); return; }
     } catch (e) { if ((e as Error).name === "AbortError") return; }
     try { await navigator.clipboard.writeText(url); useUi.getState().showToast("Enlace copiado"); }
     catch { useUi.getState().showToast("No pudimos copiar el enlace"); }
