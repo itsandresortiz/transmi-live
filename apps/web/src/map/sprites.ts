@@ -25,13 +25,13 @@ function rounded(c: CanvasRenderingContext2D, x: number, y: number, w: number, h
 }
 
 /** Etiqueta de estación: fondo redondeado que se estira según el nombre, con un cuadro rojo con el bus a la izquierda. */
-export function stationChipImage(dark: boolean): { image: ImageData; options: { pixelRatio: number; stretchX: [number, number][]; stretchY: [number, number][]; content: [number, number, number, number] } } {
+export function stationChipImage(dark: boolean, color = "#e11d2e"): { image: ImageData; options: { pixelRatio: number; stretchX: [number, number][]; stretchY: [number, number][]; content: [number, number, number, number] } } {
   const W = 120, H = 48;
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const g = c.getContext("2d")!;
   g.fillStyle = dark ? "#1c1c1e" : "#ffffff"; g.strokeStyle = dark ? "rgba(255,255,255,.22)" : "rgba(60,70,90,.35)"; g.lineWidth = 2;
   rounded(g, 1, 1, W - 2, H - 2, 12); g.fill(); g.stroke();
-  g.fillStyle = "#e11d2e"; rounded(g, 4, 4, 40, 40, 9); g.fill();
+  g.fillStyle = color; rounded(g, 4, 4, 40, 40, 9); g.fill();
   // bus de frente, en blanco
   g.strokeStyle = "#fff"; g.fillStyle = "#fff"; g.lineWidth = 2.4; g.lineCap = "round"; g.lineJoin = "round";
   rounded(g, 13, 11, 22, 20, 5); g.stroke();

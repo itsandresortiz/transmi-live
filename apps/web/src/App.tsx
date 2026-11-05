@@ -7,7 +7,7 @@ import { nowSec } from "./clock";
 import { BusRenderer } from "./map/BusRenderer";
 import { buildStationGeometry } from "./map/stations";
 import { MapController } from "./map/MapController";
-import { currentScheme, themeOf, type Scheme } from "./map/theme";
+import { currentScheme, routeBadgeColor, themeOf, type Scheme } from "./map/theme";
 import estaciones from "./data/estaciones.json";
 import { FollowBar } from "./ui/FollowBar";
 import { Settings } from "./ui/Settings";
@@ -162,7 +162,7 @@ export function App() {
       const own = !ui.routeId && fv ? shapes.find((sh) => fv.lastStopId && sh.stopIds.includes(fv.lastStopId))?.direction : undefined;
       const want = own ?? ui.direction;
       const dir = shapes.find((s) => s.direction === want) ? want : shapes[0]!.direction;
-      m.showRoute(shapes, dir, thRef.current.system[route?.system ?? "otro"], (sid) => transit.stopById(sid)?.position);
+      m.showRoute(shapes, dir, routeBadgeColor(thRef.current, route), (sid) => transit.stopById(sid)?.position);
     });
   }, [ui.routeId, ui.direction, ui.followId, ui.stopId, net, scheme]);
 
@@ -175,7 +175,7 @@ export function App() {
       const shapes = rid ? transit.network.shapes.get(rid) : undefined;
       const want = ui.stopRoute?.direction ?? (ui.routeId ? ui.direction : undefined);
       const shape = shapes?.find((x) => x.direction === want) ?? (fv && shapes ? shapes.find((x) => fv.lastStopId && x.stopIds.includes(fv.lastStopId)) : undefined) ?? shapes?.[0];
-      const color = thRef.current.system[(rid ? transit.routeById(rid)?.system : null) ?? "troncal"];
+      const color = routeBadgeColor(thRef.current, rid ? transit.routeById(rid) : undefined, "troncal");
       m.setStationState(new Set(shape?.stopIds ?? []), color, ui.stopId);
     });
   }, [ui.routeId, ui.direction, ui.stopRoute, ui.stopId, ui.followId, net, scheme]);
@@ -195,7 +195,7 @@ export function App() {
       }
       const { routeId, direction } = ui.stopRoute;
       const shape = transit.network.shapes.get(routeId)?.find((x) => x.direction === direction);
-      const color = thRef.current.system[transit.routeById(routeId)?.system ?? "otro"];
+      const color = routeBadgeColor(thRef.current, transit.routeById(routeId));
       if (!shape || shape.points.length < 2) { m.showRoute(null, "0", "", () => undefined); m.flyTo(st.position, 16, pad); return; }
       const path = new RoadPath(shape.points);
       const end = path.project(toWorld(st.position), 0, 0, 250)?.s ?? path.length;

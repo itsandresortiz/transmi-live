@@ -10,3 +10,4 @@ export * from "./transit/fleet";
 export * from "./transit/prediction";
 export * from "./transit/network";
 export * from "./transit/path";
+export * from "./transit/trunk-lines";

@@ -24,14 +24,21 @@ export function localidadLabels(l: Localidad[]) {
     type: "Feature", properties: { name: x.n.toUpperCase() }, geometry: { type: "Point", coordinates: [x.c[1], x.c[0]] },
   })));
 }
+/** Línea de la troncal (letra) de cada corredor, para pintar estaciones y portales con su color. */
+const LINE_OF_CORRIDOR: Record<string, string> = {
+  "carrera 10": "L", "americas": "F", "nqs sur": "G", "calle 26": "K", "eje ambiental": "J", "caracas sur": "H",
+  "autopista norte": "B", "suba": "C", "nqs central": "E", "calle 80": "D", "caracas": "A", "carrera 7": "M",
+};
+export const lineOfCorridor = (name: string): string => LINE_OF_CORRIDOR[name.trim().toLowerCase()] ?? "X";
+
 export function troncalLines(t: Troncal[]) {
   return fc<LineString>(t.map((x) => ({
-    type: "Feature", properties: { name: x.n }, geometry: { type: "LineString", coordinates: x.p.map(([lat, lon]) => [lon, lat]) },
+    type: "Feature", properties: { name: x.n, l: x.l.trim() }, geometry: { type: "LineString", coordinates: x.p.map(([lat, lon]) => [lon, lat]) },
   })));
 }
 export function estacionPoints(e: Estacion[]) {
   return fc<Point>(e.map((x, i) => ({
-    type: "Feature", id: i, properties: { name: x[2], place: x[3], troncal: x[4] }, geometry: { type: "Point", coordinates: [x[1], x[0]] },
+    type: "Feature", id: i, properties: { name: x[2], place: x[3], troncal: x[4], l: lineOfCorridor(x[4]) }, geometry: { type: "Point", coordinates: [x[1], x[0]] },
   })));
 }
 

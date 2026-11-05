@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { SYSTEM_LABEL, type Vehicle } from "@transmi/domain";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
+import { routeBadgeColor } from "../map/theme";
 import { useNow, useTransitVersion } from "./hooks";
 import { Close } from "./icons";
 import { nowMs } from "../clock";
@@ -26,7 +27,7 @@ export function FollowBar({ th, onResume }: { th: MapTheme; onResume(): void }) 
   const silent = !live || nowSec - v.reportedAt > STALE_SECONDS;
   return (
     <div className="followbar glass" role="status" aria-live="polite">
-      <span className="rb sm" style={{ ["--c" as string]: th.system[v.system] }}>{r?.shortName ?? v.routeId}</span>
+      <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r, v.system) }}>{r?.shortName ?? v.routeId}</span>
       <div className="fm">
         <b>{r?.longName || SYSTEM_LABEL[v.system]}</b>
         <span>

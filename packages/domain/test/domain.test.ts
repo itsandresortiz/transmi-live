@@ -193,3 +193,16 @@ describe("nombres de paradas de la troncal", () => {
     expect(parseStopName("AK 30 - CL 72")).toEqual({ title: "AK 30 - CL 72" });
   });
 });
+
+import { TRUNK_LINES, trunkLetterOf } from "../src";
+describe("líneas de la troncal", () => {
+  it("la letra de la ruta es su línea", () => {
+    expect(trunkLetterOf("B10")).toBe("B");
+    expect(trunkLetterOf("h17")).toBe("H");
+    expect(trunkLetterOf("M86-K86")).toBe("M");
+    expect(trunkLetterOf("7")).toBeNull();
+    expect(trunkLetterOf("HB608")).toBeNull();
+    expect(trunkLetterOf("6-5")).toBeNull();
+    expect(Object.keys(TRUNK_LINES)).toHaveLength(15);
+  });
+});

@@ -1,5 +1,5 @@
 import type { Feature, FeatureCollection, LineString, Point, Polygon } from "geojson";
-import { type RoadPath, type RouteShape, METERS_PER_WORLD_UNIT, RoadPath as Path, toGeo, toWorld } from "@transmi/domain";
+import { type RoadPath, type RouteShape, METERS_PER_WORLD_UNIT, RoadPath as Path, toGeo, toWorld, trunkLetterOf } from "@transmi/domain";
 import { type Station, type TransitState } from "@transmi/application";
 
 /** Medidas típicas (m) con las que se dibuja una estación. El archivo solo da un punto por parada, no la forma real. */
@@ -55,6 +55,18 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
     for (const sh of shapes) for (const id of sh.stopIds) if (!index.has(id)) index.set(id, sh);
   }
   const cache = new Map<RouteShape, RoadPath>();
+  // línea de cada parada: la letra que más se repite entre las rutas troncales que se detienen ahí
+  const letters = new Map<string, Map<string, number>>();
+  for (const [rid, shapes] of state.network.shapes) {
+    const r = state.network.routes.get(rid), l = r ? trunkLetterOf(r.shortName) : null;
+    if (!l) continue;
+    for (const sh of shapes) for (const id of sh.stopIds) { const c = letters.get(id) ?? letters.set(id, new Map()).get(id)!; c.set(l, (c.get(l) ?? 0) + 1); }
+  }
+  const lineOf = (ids: string[]): string => {
+    const tot = new Map<string, number>();
+    for (const id of ids) for (const [l, n] of letters.get(id) ?? []) tot.set(l, (tot.get(l) ?? 0) + n);
+    return [...tot.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "X";
+  };
   const m = 1 / METERS_PER_WORLD_UNIT;
   const empty = <G extends Polygon | LineString | Point>(): FeatureCollection<G> => ({ type: "FeatureCollection", features: [] });
   const out: StationGeometry = { bases: empty(), capsules: empty(), doors: empty(), labels: empty(), links: empty(), chips: empty() };
@@ -85,6 +97,7 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
     const axis = known.length ? meanAxis(known) : { ux: 0, uy: -1 };
     const nx = -axis.uy, ny = axis.ux;
     const all = st.stops.map((s) => s.id).join(",");
+    const line = lineOf(st.stops.map((s) => s.id));
     // coordenadas de la estación en metros: u a lo largo de la troncal, v a lo ancho
     const uv = (w: { x: number; y: number }) => ({ u: (w.x * axis.ux + w.y * axis.uy) * METERS_PER_WORLD_UNIT, v: (w.x * nx + w.y * ny) * METERS_PER_WORLD_UNIT });
 
@@ -101,26 +114,26 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
     for (const w of wagons) {
       u0 = Math.min(u0, w.u); u1 = Math.max(u1, w.u); v0 = Math.min(v0, w.v); v1 = Math.max(v1, w.v);
       const ring = rounded(w.u, w.v, CAPSULE_LENGTH / 2, CAPSULE_WIDTH / 2, CAPSULE_WIDTH / 2, axis);
-      const props = { ids: w.ids.join(","), all, w: w.n, text: String(w.n) };
+      const props = { ids: w.ids.join(","), all, w: w.n, text: String(w.n), l: line };
       out.capsules.features.push({ type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [ring] } } as Feature<Polygon>);
       const c = point(w.u, w.v, nx, ny, axis);
       out.labels.features.push({ type: "Feature", properties: props, geometry: { type: "Point", coordinates: c } });
       for (const k of [-0.3, -0.1, 0.1, 0.3]) {
         const du = k * CAPSULE_LENGTH, dv = CAPSULE_WIDTH / 2 - 1.2;
-        out.doors.features.push({ type: "Feature", properties: { ids: w.ids.join(",") }, geometry: { type: "LineString", coordinates: [point(w.u + du, w.v - dv, nx, ny, axis), point(w.u + du, w.v + dv, nx, ny, axis)] } });
+        out.doors.features.push({ type: "Feature", properties: { ids: w.ids.join(","), l: line }, geometry: { type: "LineString", coordinates: [point(w.u + du, w.v - dv, nx, ny, axis), point(w.u + du, w.v + dv, nx, ny, axis)] } });
       }
     }
     if (wagons.length > 1) {
       // pasillo continuo de un vagón al otro, por el centro de la estación
       const vMid = (v0 + v1) / 2;
-      out.links.features.push({ type: "Feature", properties: { all }, geometry: { type: "Polygon", coordinates: [rounded((u0 + u1) / 2, vMid, (u1 - u0) / 2, LINK_WIDTH / 2, LINK_WIDTH / 2, axis)] } });
+      out.links.features.push({ type: "Feature", properties: { all, l: line }, geometry: { type: "Polygon", coordinates: [rounded((u0 + u1) / 2, vMid, (u1 - u0) / 2, LINK_WIDTH / 2, LINK_WIDTH / 2, axis)] } });
     }
     const hl = (u1 - u0) / 2 + CAPSULE_LENGTH / 2 + BASE_MARGIN_ALONG, hw = (v1 - v0) / 2 + CAPSULE_WIDTH / 2 + BASE_MARGIN_ACROSS;
     const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
-    out.bases.features.push({ type: "Feature", properties: { title: st.title, all }, geometry: { type: "Polygon", coordinates: [rounded(cu, cv, hl, hw, BASE_RADIUS, axis)] } });
+    out.bases.features.push({ type: "Feature", properties: { title: st.title, all, l: line }, geometry: { type: "Polygon", coordinates: [rounded(cu, cv, hl, hw, BASE_RADIUS, axis)] } });
     // etiqueta con el nombre: sobre la estación (hacia arriba en la pantalla)
     const up = ny <= 0 ? 1 : -1;
-    out.chips.features.push({ type: "Feature", properties: { title: st.title, all }, geometry: { type: "Point", coordinates: point(cu, cv + up * (hw + 2), nx, ny, axis) } });
+    out.chips.features.push({ type: "Feature", properties: { title: st.title, all, l: line }, geometry: { type: "Point", coordinates: point(cu, cv + up * (hw + 2), nx, ny, axis) } });
   }
   return out;
 }

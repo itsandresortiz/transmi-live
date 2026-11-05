@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { nearestStops, upcomingAtStop } from "@transmi/application";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
+import { routeBadgeColor } from "../map/theme";
 import { Bus, Chevron, Locate } from "./icons";
 import { nowSec as serverNowSec } from "../clock";
 import { etaText } from "./format";
@@ -44,7 +45,7 @@ export function StopCard({ stopId, th, act, meters }: { stopId: string; th: MapT
         <div className="scr">
           {rows.slice(0, 3).map((r) => (
             <span key={r.route.id + r.direction} className="scc">
-              <i className="rb sm" style={{ ["--c" as string]: th.system[r.route.system] }}>{r.route.shortName}</i>
+              <i className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r.route) }}>{r.route.shortName}</i>
               <em>{etaText(r.buses[0]!.etaAt, nowSec)}</em>
             </span>
           ))}
@@ -64,7 +65,7 @@ export function FavoritesSection({ th, act }: { th: MapTheme; act: Actions }) {
       {stops.map((id) => <StopCard key={id} stopId={id} th={th} act={act} />)}
       {routes.length > 0 && (
         <div className="rbs" style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "2px 0 10px" }}>
-          {routes.map((id) => { const r = transit.routeById(id); return r ? <button key={id} className="rb" style={{ ["--c" as string]: th.system[r.system] }} onClick={() => act.openRoute(id)}>{r.shortName}</button> : null; })}
+          {routes.map((id) => { const r = transit.routeById(id); return r ? <button key={id} className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r) }} onClick={() => act.openRoute(id)}>{r.shortName}</button> : null; })}
         </div>
       )}
     </div>

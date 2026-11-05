@@ -1,6 +1,7 @@
 import { SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
+import { routeBadgeColor } from "../map/theme";
 import { Back, Bus, Chevron } from "./icons";
 import { StarButton, useUpcoming } from "./mine";
 import { nowMs } from "../clock";
@@ -44,7 +45,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
               const first = r.buses[0]!, next = r.buses[1];
               return (
                 <button key={r.route.id + r.direction} className="row stoprow" onClick={() => setStopRoute({ routeId: r.route.id, direction: r.direction })}>
-                  <span className="rb" style={{ ["--c" as string]: th.system[r.route.system] }}>{r.route.shortName}</span>
+                  <span className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r.route) }}>{r.route.shortName}</span>
                   <span className="rm">
                     <span className="rt">{r.headsign ? `Hacia ${r.headsign}` : r.route.longName}</span>
                     <span className="rs">{first.official ? "" : "aprox. "}{stopsAwayText(first.stopsAway)}{next ? ` · luego ${etaText(next.etaAt, nowSec)}` : ""}{(first.vehicle && transit.serviceOf(first.vehicle)?.isLast) || (next && transit.serviceOf(next.vehicle)?.isLast) ? " · " : ""}{first.vehicle && transit.serviceOf(first.vehicle)?.isLast ? <LastBadge mark={transit.serviceOf(first.vehicle)} /> : next && transit.serviceOf(next.vehicle)?.isLast ? <><LastBadge mark={transit.serviceOf(next.vehicle)} /></> : null}</span>
@@ -106,7 +107,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
   const stop = transit.stopById(stopId);
   const row = all.find((r) => r.route.id === stopRoute.routeId && r.direction === stopRoute.direction);
   const route = transit.routeById(stopRoute.routeId);
-  const color = th.system[route?.system ?? "otro"];
+  const color = routeBadgeColor(th, route);
   const shape = transit.network.shapes.get(stopRoute.routeId)?.find((s) => s.direction === stopRoute.direction);
   const j = shape ? shape.stopIds.indexOf(stopId) : -1;
   const hero = row?.buses[0];

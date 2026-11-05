@@ -41,6 +41,10 @@ const ROAD_CLASSES: { id: string; key: RoadKey; filter: unknown[]; minzoom: numb
 ];
 const casingWidth = (z: number) => (z < 12 ? 0.4 : z < 16 ? 0.4 + (z - 12) * 0.2 : 1.2 + Math.min(z - 16, 3) * 0.25);
 
+/** Color según la línea de la troncal (propiedad `l` de cada elemento). */
+const lineMatch = (t: MapTheme, fallback: string): ExpressionSpecification =>
+  ["match", ["get", "l"], ...Object.entries(t.lines).flat(), fallback] as unknown as ExpressionSpecification;
+
 const zoomWidth = (...pairs: [number, number][]): ExpressionSpecification =>
   ["interpolate", ["linear"], ["zoom"], ...pairs.flat()] as ExpressionSpecification;
 
@@ -112,7 +116,7 @@ export class MapController {
     });
     m.addLayer({
       id: "troncales-lines", type: "line", source: "troncales", layout: lineLayout,
-      paint: { "line-color": t.troncal, "line-opacity": 0.85, "line-width": zoomWidth([9, 1.5], [14, 3.4], [18, 6]) },
+      paint: { "line-color": lineMatch(t, t.troncal), "line-opacity": 0.9, "line-width": zoomWidth([9, 1.5], [14, 3.4], [18, 6]) },
     });
     m.addLayer({
       id: "route-sel-line", type: "line", source: "route-sel", layout: lineLayout,
@@ -139,26 +143,26 @@ export class MapController {
 
     m.addLayer({
       id: "estaciones-circles", type: "circle", source: "estaciones", minzoom: 11,
-      paint: { "circle-radius": zoomWidth([11, 2], [15, 4.2], [18, 6]), "circle-color": t.surface, "circle-stroke-color": t.troncal, "circle-stroke-width": 2 },
+      paint: { "circle-radius": zoomWidth([11, 2], [15, 4.2], [18, 6]), "circle-color": t.surface, "circle-stroke-color": lineMatch(t, t.troncal), "circle-stroke-width": 2 },
     });
     // portales y estaciones que no se dibujan completas: puntico con su nombre (como antes)
     m.addLayer({
       id: "estaciones-labels", type: "symbol", source: "estaciones", minzoom: 13.5,
       layout: { "text-field": ["get", "name"], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 13.5, 10.5, 17, 12.5], "text-offset": [0, 1.1], "text-anchor": "top", "text-optional": true },
-      paint: { "text-color": t.troncal, "text-halo-color": t.halo, "text-halo-width": 1.8 },
+      paint: { "text-color": lineMatch(t, t.troncal), "text-halo-color": t.halo, "text-halo-width": 1.8 },
     });
     // estaciones de la troncal: la estación completa (base), sus vagones (cápsulas, con puertas y número) y su nombre
     m.addLayer({ id: "station-base-fill", type: "fill", source: "station-bases", minzoom: 14.5, paint: { "fill-color": t.stationBase, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] } });
-    m.addLayer({ id: "station-base-line", type: "line", source: "station-bases", minzoom: 14.5, paint: { "line-color": t.stationEdge, "line-width": ["interpolate", ["linear"], ["zoom"], 14.5, 1, 18, 2] } });
+    m.addLayer({ id: "station-base-line", type: "line", source: "station-bases", minzoom: 14.5, paint: { "line-color": lineMatch(t, t.stationEdge), "line-width": ["interpolate", ["linear"], ["zoom"], 14.5, 1.4, 18, 2.6] } });
     m.addLayer({ id: "station-links-fill", type: "fill", source: "station-links", minzoom: 15.6, paint: { "fill-color": t.stationLink } });
-    m.addLayer({ id: "station-links-line", type: "line", source: "station-links", minzoom: 15.6, paint: { "line-color": t.capsuleEdge, "line-width": 1, "line-opacity": 0.6 } });
+    m.addLayer({ id: "station-links-line", type: "line", source: "station-links", minzoom: 15.6, paint: { "line-color": lineMatch(t, t.capsuleEdge), "line-width": 1, "line-opacity": 0.75 } });
     m.addLayer({
       id: "station-capsule-fill", type: "fill", source: "station-capsules", minzoom: 15.6,
-      paint: { "fill-color": ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule], "fill-opacity": 0.98 },
+      paint: { "fill-color": ["case", ["==", ["get", "sel"], true], lineMatch(t, t.troncal), ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule], "fill-opacity": 0.98 },
     });
     m.addLayer({
       id: "station-capsule-line", type: "line", source: "station-capsules", minzoom: 15.6,
-      paint: { "line-color": ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsuleEdge], "line-width": ["case", ["==", ["get", "sel"], true], 3, 1.6] },
+      paint: { "line-color": ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], lineMatch(t, t.capsuleEdge)], "line-width": ["case", ["==", ["get", "sel"], true], 3, 1.8] },
     });
     m.addLayer({ id: "station-doors", type: "line", source: "station-doors", minzoom: 17, paint: { "line-color": t.capsuleEdge, "line-width": 1, "line-opacity": 0.55 } });
     m.addLayer({
@@ -169,7 +173,7 @@ export class MapController {
     m.addLayer({
       id: "station-chips", type: "symbol", source: "station-chips", minzoom: 14.5,
       layout: {
-        "icon-image": this.chipName(), "icon-text-fit": "both", "icon-text-fit-padding": [3, 9, 3, 30], "icon-allow-overlap": false,
+        "icon-image": this.chipImage(), "icon-text-fit": "both", "icon-text-fit-padding": [3, 9, 3, 30], "icon-allow-overlap": false,
         "text-field": ["get", "title"], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 14.5, 11, 18, 14],
         "text-anchor": "bottom", "text-offset": [0, -0.45], "text-optional": false, "text-max-width": 14,
       },
@@ -271,25 +275,25 @@ export class MapController {
       m.setPaintProperty(`${cl.id}-fill`, "line-color", t.roads[cl.key]);
       if (cl.casing) m.setPaintProperty(`${cl.id}-casing`, "line-color", cl.major ? t.roads.casingMajor : t.roads.casing);
     }
-    m.setPaintProperty("troncales-lines", "line-color", t.troncal);
+    m.setPaintProperty("troncales-lines", "line-color", lineMatch(t, t.troncal));
     m.setPaintProperty("localidad-names", "text-color", t.label);
     m.setPaintProperty("localidad-names", "text-halo-color", t.land);
     for (const id of STREET_LAYERS) { m.setPaintProperty(id, "text-color", t.label); m.setPaintProperty(id, "text-halo-color", t.halo); }
     m.setPaintProperty("estaciones-circles", "circle-color", t.surface);
-    m.setPaintProperty("estaciones-circles", "circle-stroke-color", t.troncal);
-    m.setPaintProperty("estaciones-labels", "text-color", t.troncal);
+    m.setPaintProperty("estaciones-circles", "circle-stroke-color", lineMatch(t, t.troncal));
+    m.setPaintProperty("estaciones-labels", "text-color", lineMatch(t, t.troncal));
     m.setPaintProperty("estaciones-labels", "text-halo-color", t.halo);
     m.setPaintProperty("station-base-fill", "fill-color", t.stationBase);
-    m.setPaintProperty("station-base-line", "line-color", t.stationEdge);
-    m.setPaintProperty("station-capsule-fill", "fill-color", ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule]);
-    m.setPaintProperty("station-capsule-line", "line-color", ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsuleEdge]);
+    m.setPaintProperty("station-base-line", "line-color", lineMatch(t, t.stationEdge));
+    m.setPaintProperty("station-capsule-fill", "fill-color", ["case", ["==", ["get", "sel"], true], lineMatch(t, t.troncal), ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule]);
+    m.setPaintProperty("station-capsule-line", "line-color", ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], lineMatch(t, t.capsuleEdge)]);
     m.setPaintProperty("station-doors", "line-color", t.capsuleEdge);
     m.setPaintProperty("station-links-fill", "fill-color", t.stationLink);
-    m.setPaintProperty("station-links-line", "line-color", t.capsuleEdge);
+    m.setPaintProperty("station-links-line", "line-color", lineMatch(t, t.capsuleEdge));
     m.setPaintProperty("station-capsule-labels", "text-color", ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.labelStrong]);
     m.setPaintProperty("station-chips", "text-color", t.labelStrong);
     this.registerChip();
-    m.setLayoutProperty("station-chips", "icon-image", this.chipName());
+    m.setLayoutProperty("station-chips", "icon-image", this.chipImage());
     m.setPaintProperty("stops-circles", "circle-color", t.surface);
     m.setPaintProperty("stops-circles", "circle-stroke-color", t.label);
     m.setPaintProperty("route-stops", "circle-color", t.surface);
@@ -313,14 +317,19 @@ export class MapController {
   }
   private stationState = { hl: new Set<string>(), color: "#e11d2e", sel: null as string | null };
 
-  private chipName() { return this.scheme === "dark" ? "station-chip-dark" : "station-chip-light"; }
-  /** La etiqueta de cada estación: un fondo que se estira según el nombre, con el ícono de bus a la izquierda. */
+  private chipImage(): ExpressionSpecification {
+    return ["concat", "station-chip-", ["get", "l"], this.scheme === "dark" ? "-dark" : "-light"] as unknown as ExpressionSpecification;
+  }
+  /** La etiqueta de cada estación: un fondo que se estira según el nombre, con el ícono de bus en el color de su línea. */
   private registerChip() {
-    for (const name of ["station-chip-light", "station-chip-dark"]) if (this.map.hasImage(name)) this.map.removeImage(name);
-    for (const dark of [false, true]) {
-      const { image, options } = stationChipImage(dark);
-      this.map.addImage(dark ? "station-chip-dark" : "station-chip-light", image, options);
-    }
+    const colors: Record<string, string> = { ...this.theme.lines, X: this.theme.troncal };
+    for (const [letter, color] of Object.entries(colors))
+      for (const dark of [false, true]) {
+        const name = `station-chip-${letter}${dark ? "-dark" : "-light"}`;
+        if (this.map.hasImage(name)) this.map.removeImage(name);
+        const { image, options } = stationChipImage(dark, color);
+        this.map.addImage(name, image, options);
+      }
   }
 
   /** Dibuja las estaciones de la troncal. */

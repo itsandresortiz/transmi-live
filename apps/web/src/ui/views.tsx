@@ -18,7 +18,7 @@ import { useUi } from "./store";
 import { delayClass, delayText, etaText, stopsAwayText, untilText } from "./format";
 import { useEffect, useRef } from "react";
 import { useNow, useTransitVersion } from "./hooks";
-import type { MapTheme } from "../map/theme";
+import { routeBadgeColor, type MapTheme } from "../map/theme";
 
 export interface Actions {
   openRoute(id: string, busId?: string): void;
@@ -88,7 +88,7 @@ export function RoutesView({ th, act }: Props) {
         <div className="list">
           {page.map((r) => (
             <button key={r.id} className="row" onClick={() => act.openRoute(r.id)}>
-              <span className="rb" style={{ ["--c" as string]: sysColor(th, r.system) }}>{r.shortName}</span>
+              <span className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r.shortName}</span>
               <span className="rm"><span className="rt">{r.longName || SYSTEM_LABEL[r.system]}</span><span className="rs">{SYSTEM_LABEL[r.system]}</span></span>
               <span className="rr">{counts.get(r.id) ?? 0} <Bus /></span>
               <span className="chev"><Chevron /></span>
@@ -105,7 +105,7 @@ function BusRow({ v, th, act }: { v: Vehicle } & Props) {
   const r = transit.routeOf(v), d = transit.delayOf(v);
   return (
     <button className="row" onClick={() => act.focusBus(v.id)}>
-      <span className="rb sm" style={{ ["--c" as string]: sysColor(th, v.system) }}>{r?.shortName ?? v.routeId}</span>
+      <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r, v.system) }}>{r?.shortName ?? v.routeId}</span>
       <span className="rm"><span className="rt">{v.plate || v.label || v.id}</span><span className="rs">{r?.longName || SYSTEM_LABEL[v.system]}</span></span>
       <span className={`pill ${delayClass(d)}`}>{delayText(d)}</span>
     </button>
@@ -206,7 +206,7 @@ export function AlertsView({ th, act }: Props) {
             <div className="rbs">
               {alert.routeIds.slice(0, openAlert === index ? 99 : 12).map((id) => {
                 const r = transit.routeById(id);
-                return <button key={id} className="rb sm" style={{ ["--c" as string]: sysColor(th, r?.system ?? "otro") }} onClick={() => r && act.openRoute(id)}>{r?.shortName ?? id}</button>;
+                return <button key={id} className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r) }} onClick={() => r && act.openRoute(id)}>{r?.shortName ?? id}</button>;
               })}
               {alert.routeIds.length > 12 && openAlert !== index && <button className="chip" onClick={() => setOpenAlert(index)}>+{alert.routeIds.length - 12}</button>}
             </div>
@@ -241,7 +241,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
   }, [k, cur?.direction]);
   if (!d) return <Empty title="Ruta no encontrada" text="Ya no aparece en el servicio." />;
   const route: Route = d.route;
-  const color = sysColor(th, route.system);
+  const color = routeBadgeColor(th, route);
   const avg = d.averageDelaySeconds;
   return (
     <>
@@ -292,7 +292,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
   const nowSec = useNow() / 1000;
   useTransitVersion();
   const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
-  const color = sysColor(th, v.system);
+  const color = routeBadgeColor(th, r, v.system);
   const target = useUi((u) => u.targetStopId);
   const mark = transit.serviceOf(v);
   const toTarget = target ? upcomingAtStop(transit, target, nowSec, 40).flatMap((x) => x.buses).find((b) => b.vehicle.id === v.id) : undefined;
