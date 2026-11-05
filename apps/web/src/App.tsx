@@ -14,7 +14,7 @@ import { Locate, Mark, Sliders } from "./ui/icons";
 import { ago } from "./ui/format";
 import { useNow, useTransitVersion } from "./ui/hooks";
 import { mapPadding } from "./ui/layout";
-import { useLocation } from "./ui/location";
+import { hadLocationPermission, useLocation } from "./ui/location";
 import { useUi } from "./ui/store";
 import { StopRouteView, StopView } from "./ui/stopViews";
 import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
@@ -101,7 +101,7 @@ export function App() {
         if (uiRef.current.sheet !== "peek") uiRef.current.setSheet("peek");
         if (uiRef.current.settingsOpen) uiRef.current.setSettingsOpen(false);
       },
-      onUserDrag: () => { if (uiRef.current.followId) uiRef.current.setFollowPaused(true); },
+      onUserDrag: () => { if (uiRef.current.followId) uiRef.current.setFollowPaused(true); if (useLocation.getState().following) useLocation.getState().setFollowing(false); },
     });
     mc.current = m;
     const r = new BusRenderer(transit, m, () => {
@@ -196,10 +196,27 @@ export function App() {
   useEffect(() => { if (ui.toast) { const t = setTimeout(() => setToastOn(false), 2800); setToastOn(true); return () => clearTimeout(t); } }, [ui.toast]);
   const [toastOn, setToastOn] = useState(false);
 
+  /* tu ubicación en tiempo real: el punto se mueve contigo y, si pulsaste el botón, el mapa te acompaña */
+  const me = useLocation((l) => l.me), following = useLocation((l) => l.following);
+  const flewAt = useRef(0);
+  useEffect(() => { if (hadLocationPermission()) void useLocation.getState().locate(); }, []);
+  useEffect(() => {
+    const m = mc.current; if (!me || !m) return;
+    void m.ready.then(() => {
+      m.showMe(me);
+      // (no se interrumpe el vuelo que acaba de empezar al pulsar el botón)
+      if (useLocation.getState().following && Date.now() - flewAt.current > 1500) m.map.easeTo({ center: [me.lon, me.lat], duration: 900, easing: (t) => t });
+    });
+  }, [me]);
+
   const locate = async () => {
-    const g = await useLocation.getState().locate();
+    const st = useLocation.getState();
+    const g = await st.locate();
     if (!g) return ui.showToast("No pudimos obtener tu ubicación. Revisa el permiso del navegador.");
-    mc.current?.showMe(g); mc.current?.flyTo(g, 15.5, mapPadding());
+    uiRef.current.setFollow(null);                      // seguir un bus y seguirte a ti son cosas distintas
+    st.setFollowing(true);
+    flewAt.current = Date.now();
+    mc.current?.showMe(g); mc.current?.flyTo(g, Math.max(mc.current.zoom, 16), mapPadding());
   };
 
   return (
@@ -211,7 +228,7 @@ export function App() {
           <div className="bt"><b>TransMi <i>LIVE</i></b><Status /></div>
         </div>
         <div className="tools">
-          <button className="fab glass" aria-label="Mi ubicación" onClick={() => void locate()}><Locate /></button>
+          <button className="fab glass" aria-label="Mi ubicación" aria-pressed={following} onClick={() => void locate()}><Locate /></button>
           <button className="fab glass" aria-label="Ajustes del mapa" aria-pressed={ui.settingsOpen} onClick={() => ui.setSettingsOpen(true)}><Sliders /></button>
         </div>
       </header>

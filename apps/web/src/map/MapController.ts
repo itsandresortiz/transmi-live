@@ -165,10 +165,6 @@ export class MapController {
 
   private bindEvents() {
     const m = this.map;
-    const pointer = (id: string) => {
-      m.on("mouseenter", id, () => (m.getCanvas().style.cursor = "pointer"));
-      m.on("mouseleave", id, () => (m.getCanvas().style.cursor = ""));
-    };
     // arrastrar el mapa con el dedo o el mouse pausa el seguimiento (se detecta en el lienzo, antes de que MapLibre procese el gesto)
     const cv = m.getCanvas();
     let down: { x: number; y: number } | null = null, fired = false;
@@ -179,30 +175,37 @@ export class MapController {
     });
     const up = () => { down = null; this.events.onPointerHold?.(false); };
     window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);   // en la ventana: el dedo puede soltarse fuera del mapa
-    pointer("bus-dots");
-    m.on("click", "bus-dots", (e) => { const f = e.features?.[0]; if (f) { e.originalEvent.cancelBubble = true; this.events.onBusClick(String(f.properties?.id)); } });
-    // los buses dibujados en canvas (zoom ≥ 13) tienen prioridad sobre paradas y estaciones
+    // Un solo manejador de toques, con tolerancia para el dedo: primero el bus que se toca (dibujado encima de todo);
+    // si no, la parada o estación más cercana dentro de ~14 px; si no hay nada, es un toque al mapa vacío.
+    const TOUCH_PAD = 14;
+    const pick = (pt: { x: number; y: number }): { kind: "bus" | "stop" | "station"; id: string | number } | null => {
+      const bus = this.busHit?.(pt);
+      if (bus) return { kind: "bus", id: bus };
+      const layers = ["route-stops", "stops-circles", "estaciones-circles", "bus-dots"].filter((l) => m.getLayer(l));
+      const feats = m.queryRenderedFeatures([[pt.x - TOUCH_PAD, pt.y - TOUCH_PAD], [pt.x + TOUCH_PAD, pt.y + TOUCH_PAD]], { layers });
+      let best: { kind: "bus" | "stop" | "station"; id: string | number } | null = null, bd = Infinity;
+      for (const f of feats) {
+        if (f.geometry.type !== "Point") continue;
+        const [lon, lat] = f.geometry.coordinates as [number, number];
+        const q = m.project([lon, lat]);
+        // a igual distancia gana la parada de una ruta resaltada, luego la parada, luego la estación
+        const rank = f.layer.id === "route-stops" ? 0 : f.layer.id === "stops-circles" ? 1 : 2;
+        const d = Math.hypot(q.x - pt.x, q.y - pt.y) + rank * 3;
+        if (d >= bd) continue;
+        if (f.layer.id === "bus-dots") { bd = d; best = { kind: "bus", id: String(f.properties?.id) }; }
+        else if (f.layer.id === "estaciones-circles") { if (typeof f.id === "number") { bd = d; best = { kind: "station", id: f.id }; } }
+        else { bd = d; best = { kind: "stop", id: String(f.properties?.id) }; }
+      }
+      return best;
+    };
     m.on("click", (e) => {
-      const id = this.busHit?.(e.point);
-      if (id) { this.events.onBusClick(id); return; }
-      const layers = ["stops-circles", "estaciones-circles", "route-stops", "bus-dots"].filter((l) => m.getLayer(l));
-      if (!m.queryRenderedFeatures(e.point, { layers }).length) this.events.onMapTap?.();
+      const hit = pick(e.point);
+      if (!hit) { this.events.onMapTap?.(); return; }
+      if (hit.kind === "bus") this.events.onBusClick(String(hit.id));
+      else if (hit.kind === "stop") this.events.onStopClick(String(hit.id));
+      else this.events.onStationClick(Number(hit.id));
     });
-    m.on("mousemove", (e) => { if (this.busHit?.(e.point)) m.getCanvas().style.cursor = "pointer"; else if (!m.queryRenderedFeatures(e.point, { layers: ["stops-circles", "estaciones-circles", "route-stops", "bus-dots"].filter((l) => m.getLayer(l)) }).length) m.getCanvas().style.cursor = ""; });
-    for (const id of ["stops-circles", "route-stops"]) {
-      pointer(id);
-      m.on("click", id, (e) => {
-        if (e.originalEvent.cancelBubble || this.busHit?.(e.point)) return;
-        const f = e.features?.[0];
-        if (f) { e.originalEvent.cancelBubble = true; this.events.onStopClick(String(f.properties?.id)); }
-      });
-    }
-    pointer("estaciones-circles");
-    m.on("click", "estaciones-circles", (e) => {
-      if (e.originalEvent.cancelBubble || this.busHit?.(e.point)) return;
-      const f = e.features?.[0];
-      if (f && typeof f.id === "number") this.events.onStationClick(f.id);
-    });
+    m.on("mousemove", (e) => { m.getCanvas().style.cursor = pick(e.point) ? "pointer" : ""; });
   }
 
   /* ---------- operaciones ---------- */

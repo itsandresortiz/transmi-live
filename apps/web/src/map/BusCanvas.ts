@@ -71,13 +71,15 @@ export class BusCanvas {
       this.hits.push({ id: b.id, x: p.x, y: p.y });
     }
   }
-  /** Bus bajo el dedo/cursor (el de arriba si hay varios). */
+  /** Bus bajo el dedo/cursor: se toca el dibujo del bus (con un margen para el dedo), no un círculo grande a su alrededor. */
   hitTest(pt: { x: number; y: number }): string | null {
-    const r = Math.max(14, 11 * iconScale(this.map.getZoom()) + 6);
-    let best: string | null = null, bd = r * r;
+    const k = iconScale(this.map.getZoom()), hw = 13 * k + 5, hh = 8 * k + 5;
+    let best: string | null = null, bd = Infinity;
     for (let i = this.hits.length - 1; i >= 0; i--) {
-      const h = this.hits[i]!, d = (h.x - pt.x) ** 2 + (h.y - pt.y) ** 2;
-      if (d <= bd) { bd = d; best = h.id; }
+      const h = this.hits[i]!, dx = Math.abs(h.x - pt.x), dy = Math.abs(h.y - pt.y);
+      if (dx > hw || dy > hh) continue;
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = h.id; }
     }
     return best;
   }
