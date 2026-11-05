@@ -23,6 +23,8 @@ import { StationView, StopRouteView, StopView } from "./ui/stopViews";
 import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
 
 const POLL_MS = 2500;
+/** Enlace con el que se abrió la página (se lee una sola vez, antes de que la app toque la dirección). */
+const INITIAL_LINK = parseHash(location.hash);
 
 export function App() {
   const mapEl = useRef<HTMLDivElement>(null);
@@ -220,16 +222,17 @@ export function App() {
     m.fit(cur.points, mapPadding(), 15);
   }, [ui.routeId, ui.direction]);
 
+  const linked = useRef(false);
   /* enlaces: la dirección refleja lo que se está viendo y, al abrir un enlace, se llega directo a eso */
   useEffect(() => {
     const t: Target | null = ui.stopId ? { kind: "parada", id: ui.stopId } : ui.groupIds ? { kind: "estacion", ids: ui.groupIds } : ui.routeId && ui.tab === "rutas" ? { kind: "ruta", id: ui.routeId, direction: ui.direction } : null;
+    if (!linked.current) return;                  // primero se abre el enlace con el que se llegó; recién después la dirección sigue a la pantalla
     const h = t ? formatHash(t) : "";
     if (location.hash !== h && (h || parseHash(location.hash))) history.replaceState(null, "", h || location.pathname + location.search);
-  }, [ui.stopId, ui.groupIds, ui.routeId, ui.tab, ui.direction]);
-  const linked = useRef(false);
+  }, [ui.stopId, ui.groupIds, ui.routeId, ui.tab, ui.direction, net]);
   useEffect(() => {
     if (linked.current || !net) return;
-    const t = parseHash(location.hash); linked.current = true;
+    const t = INITIAL_LINK; linked.current = true;
     if (!t) return;
     if (t.kind === "ruta") { if (!transit.routeById(t.id)) return uiRef.current.showToast("Esa ruta ya no aparece en el servicio"); act.openRoute(t.id); if (t.direction) uiRef.current.setDirection(t.direction); uiRef.current.setSheet("half"); }
     else if (t.kind === "parada") { if (!transit.stopById(t.id)) return uiRef.current.showToast("No encontramos esa parada"); act.openStop(t.id); }
