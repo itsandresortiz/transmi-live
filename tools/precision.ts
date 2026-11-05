@@ -49,7 +49,7 @@ async function main() {
     const b = batches[k]!;
     if (k > 0) {
       for (const r of b.reports) {
-        const h = hist.get(r.vehicleId), prev = st.fleet.get(r.vehicleId);
+        const h = hist.get(r.id), prev = st.fleet.get(r.id);
         if (!h || !prev || r.reportedAt === prev.reportedAt) continue;
         const rw = toWorld(r.position);
         if (distanceMeters(prev.world, rw) < 15) continue;       // parado: no mide el movimiento
