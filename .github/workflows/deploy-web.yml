@@ -1,6 +1,9 @@
 name: Publicar app web
-# Manual hasta que Settings > Pages > Source esté en "GitHub Actions".
+# Publica la app en GitHub Pages cada vez que cambia el código (Settings > Pages > Source = "GitHub Actions").
 on:
+  push:
+    branches: [main]
+    paths: ["apps/**", "packages/**", "package.json", "package-lock.json", "tsconfig*.json", ".github/workflows/deploy-web.yml"]
   workflow_dispatch:
 permissions:
   contents: read

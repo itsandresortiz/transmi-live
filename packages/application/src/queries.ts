@@ -122,8 +122,8 @@ export interface UpcomingBus {
 }
 export interface UpcomingRoute { route: Route; headsign: string; direction: string; buses: UpcomingBus[] }
 
-/** Tiempo medio por parada (frenar, subir/bajar gente y arrancar), medido con lotes reales de cada sistema. */
-export const SECONDS_PER_STOP: Record<SystemType, number> = { troncal: 58, dual: 58, alimentador: 62, zonal: 50, otro: 55 };
+import { DEFAULT_SECONDS_PER_STOP } from "./travel-times";
+export const SECONDS_PER_STOP = DEFAULT_SECONDS_PER_STOP;
 const CRUISE_MPS = 18;        // velocidad entre paradas: casi no pesa frente al tiempo en cada parada
 const DETOUR_FACTOR = 1.15;   // la calle es más larga que la línea recta entre paradas
 
@@ -136,13 +136,13 @@ function hav(a: { lat: number; lon: number }, b: { lat: number; lon: number }): 
 
 /** Estima cuántos segundos tarda un bus en ir de la parada `from` a la parada `to` de su recorrido.
  *  Se calibró con lotes reales: el tiempo lo domina el número de paradas, no la distancia ni la velocidad del momento. */
-export function estimateTravelSeconds(state: TransitState, v: Vehicle, stopIds: readonly string[], from: number, to: number): number {
+export function estimateTravelSeconds(state: TransitState, v: Vehicle, stopIds: readonly string[], from: number, to: number, nowMs = Date.now()): number {
   let meters = 0;
   for (let i = from; i < to; i++) {
     const a = state.stopById(stopIds[i]), b = state.stopById(stopIds[i + 1]);
     if (a && b) meters += hav(a.position, b.position) * DETOUR_FACTOR;
   }
-  return meters / CRUISE_MPS + (to - from) * SECONDS_PER_STOP[v.system];
+  return meters / CRUISE_MPS + (to - from) * state.travelTimes.secondsPerStop(v.routeId, v.system, nowMs);
 }
 
 /** Para cada ruta que pasa por la parada: los próximos buses que vienen hacia ella, con su hora de llegada. */
@@ -178,4 +178,34 @@ export function upcomingAtStop(state: TransitState, stopId: string, nowSec: numb
     }
   }
   return out.sort((a, b) => a.buses[0]!.etaAt - b.buses[0]!.etaAt);
+}
+
+/* ---------- cerca de mí y avisos que te importan ---------- */
+
+export interface NearbyStop { stop: Stop; meters: number }
+/** Paradas más cercanas a un punto (una por nombre: la más próxima). */
+export function nearestStops(state: TransitState, p: { lat: number; lon: number }, count = 6, maxMeters = 1200): NearbyStop[] {
+  const out: NearbyStop[] = [];
+  for (const stop of state.network.stops.values()) {
+    const dLat = Math.abs(stop.position.lat - p.lat);
+    if (dLat > maxMeters / 111_000) continue;
+    const m = hav(stop.position, p);
+    if (m <= maxMeters) out.push({ stop, meters: m });
+  }
+  out.sort((a, b) => a.meters - b.meters);
+  const seen = new Set<string>(), res: NearbyStop[] = [];
+  for (const n of out) { const k = normalize(n.stop.name); if (seen.has(k)) continue; seen.add(k); res.push(n); if (res.length >= count) break; }
+  return res;
+}
+
+/** Avisos que tocan alguna de estas rutas o paradas. */
+export function alertsFor(state: TransitState, routeIds: ReadonlySet<string>, stopIds: ReadonlySet<string>): { alert: ServiceAlert; index: number }[] {
+  return searchAlerts(state).filter(({ alert }) => alert.routeIds.some((r) => routeIds.has(r)) || alert.stopIds.some((s) => stopIds.has(s)));
+}
+
+/** Rutas que pasan por alguna de estas paradas. */
+export function routeIdsAtStops(state: TransitState, stopIds: readonly string[]): Set<string> {
+  const want = new Set(stopIds), out = new Set<string>();
+  for (const [rid, shapes] of state.network.shapes) if (shapes.some((s) => s.stopIds.some((id) => want.has(id)))) out.add(rid);
+  return out;
 }

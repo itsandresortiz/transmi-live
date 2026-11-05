@@ -270,3 +270,17 @@ button.stat:active{transform:scale(.97)}
 .tgt{padding:8px 12px;font-size:13.5px}
 .followbar .fm em{font-style:normal;font-size:11px;color:var(--faint);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .followbar .fm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- favoritos y cerca de ti ---------- */
+.star{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:20px;color:var(--faint);background:var(--hover);align-self:flex-start}
+.star svg{fill:none;stroke:currentColor}
+.star.on{color:#f5a623}.star.on svg{fill:#f5a623}
+.stopcard{margin:0 0 8px;padding:12px 14px}
+.stopcard .sct{display:flex;align-items:center;gap:10px}
+.stopcard .sct b{flex:1;min-width:0;font-size:15.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stopcard .sct span{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.scr{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:8px}
+.scc{display:inline-flex;align-items:center;gap:6px}
+.scc .rb{font-style:normal;min-width:42px;height:26px;font-size:12px}
+.scc em{font-style:normal;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+.btn[disabled]{opacity:.6}

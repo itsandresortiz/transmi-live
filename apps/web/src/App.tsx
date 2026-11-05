@@ -14,6 +14,7 @@ import { Locate, Mark, Sliders } from "./ui/icons";
 import { ago } from "./ui/format";
 import { useNow, useTransitVersion } from "./ui/hooks";
 import { mapPadding } from "./ui/layout";
+import { useLocation } from "./ui/location";
 import { useUi } from "./ui/store";
 import { StopRouteView, StopView } from "./ui/stopViews";
 import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
@@ -188,13 +189,10 @@ export function App() {
   useEffect(() => { if (ui.toast) { const t = setTimeout(() => setToastOn(false), 2800); setToastOn(true); return () => clearTimeout(t); } }, [ui.toast]);
   const [toastOn, setToastOn] = useState(false);
 
-  const locate = () => {
-    if (!navigator.geolocation) return ui.showToast("Tu navegador no permite ubicarte");
-    navigator.geolocation.getCurrentPosition(
-      (p) => { const g = { lat: p.coords.latitude, lon: p.coords.longitude }; mc.current?.showMe(g); mc.current?.flyTo(g, 15.5, mapPadding()); },
-      () => ui.showToast("No pudimos obtener tu ubicación. Revisa el permiso del navegador."),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+  const locate = async () => {
+    const g = await useLocation.getState().locate();
+    if (!g) return ui.showToast("No pudimos obtener tu ubicación. Revisa el permiso del navegador.");
+    mc.current?.showMe(g); mc.current?.flyTo(g, 15.5, mapPadding());
   };
 
   return (
@@ -206,7 +204,7 @@ export function App() {
           <div className="bt"><b>TransMi <i>LIVE</i></b><Status /></div>
         </div>
         <div className="tools">
-          <button className="fab glass" aria-label="Mi ubicación" onClick={locate}><Locate /></button>
+          <button className="fab glass" aria-label="Mi ubicación" onClick={() => void locate()}><Locate /></button>
           <button className="fab glass" aria-label="Ajustes del mapa" aria-pressed={ui.settingsOpen} onClick={() => ui.setSettingsOpen(true)}><Sliders /></button>
         </div>
       </header>
@@ -225,13 +223,25 @@ export function App() {
   );
 }
 
+function useOnline(): boolean {
+  const [on, setOn] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const f = () => setOn(navigator.onLine);
+    window.addEventListener("online", f); window.addEventListener("offline", f);
+    return () => { window.removeEventListener("online", f); window.removeEventListener("offline", f); };
+  }, []);
+  return on;
+}
+
 function Status() {
   useTransitVersion();
   const now = useNow();
+  const online = useOnline();
   const st: ConnectionStatus = connectionStatus(transit, now);
   const cls = st.connection === "live" ? "live" : st.connection === "waiting" ? "warn" : st.connection === "stale" ? "bad" : "";
   const text =
-    st.connection === "connecting" ? "Conectando…"
+    !online ? (st.ageSeconds != null ? `Sin internet · último dato hace ${ago(st.ageSeconds)}` : "Sin internet")
+    : st.connection === "connecting" ? "Conectando…"
     : st.connection === "live" ? `En vivo · hace ${ago(st.ageSeconds!)}`
     : st.connection === "waiting" ? `Actualizando · hace ${ago(st.ageSeconds!)}`
     : `Sin señal · hace ${ago(st.ageSeconds!)}`;

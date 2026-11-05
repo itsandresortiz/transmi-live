@@ -2,6 +2,7 @@ import {
   Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle,
   type VehicleReport, TransitNetwork, delayFromSeconds, inferSystemFromReport,
 } from "@transmi/domain";
+import { TravelTimes } from "./travel-times";
 import type { FeedSource } from "./ports";
 
 export interface Arrival { routeId: string; tripId: string; arrivalAt?: number; delaySeconds: number | null }
@@ -19,6 +20,8 @@ export class TransitState {
   lastBatchAt: number | null = null;
   source: FeedSource | null = null;
   version = 0;
+  /** Lo que se ha aprendido de cuánto tarda cada ruta por parada. */
+  readonly travelTimes = new TravelTimes();
   private provisional = new Map<string, Route>();
   private listeners = new Set<() => void>();
 
@@ -44,6 +47,7 @@ export class TransitState {
     for (const r of reports) if (r.reportedAt > latest) latest = r.reportedAt;
     if (latest) this.lastBatchAt = latest;
     this.resolveSystems();
+    this.travelTimes.observe(this);
     this.touch();
   }
 

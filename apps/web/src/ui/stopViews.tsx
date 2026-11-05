@@ -1,10 +1,9 @@
-import { upcomingAtStop } from "@transmi/application";
 import { SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { Back, Bus, Chevron } from "./icons";
+import { StarButton, useUpcoming } from "./mine";
 import { etaText, stopsAwayText } from "./format";
-import { useNow, useTransitVersion } from "./hooks";
 import { useUi } from "./store";
 import type { Actions } from "./views";
 
@@ -12,15 +11,13 @@ const Empty = ({ title, text }: { title: string; text: string }) => <div classNa
 
 /** Parada abierta: las rutas que vienen hacia ella y en cuánto llega el próximo bus de cada una. */
 export function StopView({ th }: { th: MapTheme }) {
-  useTransitVersion();
-  const nowSec = useNow() / 1000;
   const { stopId, openStop, setStopRoute } = useUi();
   const stop = transit.stopById(stopId ?? undefined);
-  const rows = stopId ? upcomingAtStop(transit, stopId, nowSec, 3) : [];
+  const { rows, nowSec } = useUpcoming(stopId, 3);
   return (
     <>
       <button className="back" onClick={() => openStop(null)}><Back /> Atrás</button>
-      <div className="dcard"><div><h2>{stop?.name ?? "Parada"}</h2><p>{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : "Parada"}</p></div></div>
+      <div className="dcard"><div style={{ flex: 1, minWidth: 0 }}><h2>{stop?.name ?? "Parada"}</h2><p>{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : "Parada"}</p></div>{stopId && <StarButton kind="stop" id={stopId} />}</div>
       {rows.length === 0 ? <Empty title="Ningún bus viene ahora" text="Cuando un bus se acerque a esta parada aparecerá aquí." /> : (
         <>
           <div className="sec">Toca una ruta para ver de dónde viene</div>
@@ -48,12 +45,11 @@ export function StopView({ th }: { th: MapTheme }) {
 
 /** Una ruta de la parada: de dónde viene el próximo bus y los siguientes. */
 export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
-  useTransitVersion();
-  const nowSec = useNow() / 1000;
   const { stopId, stopRoute, setStopRoute } = useUi();
+  const { rows: all, nowSec } = useUpcoming(stopId, 6);
   if (!stopId || !stopRoute) return null;
   const stop = transit.stopById(stopId);
-  const row = upcomingAtStop(transit, stopId, nowSec, 6).find((r) => r.route.id === stopRoute.routeId && r.direction === stopRoute.direction);
+  const row = all.find((r) => r.route.id === stopRoute.routeId && r.direction === stopRoute.direction);
   const route = transit.routeById(stopRoute.routeId);
   const color = th.system[route?.system ?? "otro"];
   const shape = transit.network.shapes.get(stopRoute.routeId)?.find((s) => s.direction === stopRoute.direction);

@@ -6,6 +6,11 @@ import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType,
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
+import { FavoritesSection, NearbySection, StarButton } from "./mine";
+import { useFavs } from "./favorites";
+import { useLocation } from "./location";
+import { alertsFor, nearestStops, routeIdsAtStops } from "@transmi/application";
+import { useState } from "react";
 import { useUi } from "./store";
 import { delayClass, delayText, etaText, stopsAwayText, untilText } from "./format";
 import { useEffect, useRef } from "react";
@@ -72,6 +77,7 @@ export function RoutesView({ th, act }: Props) {
   const page = list.slice(0, limit);
   return (
     <>
+      <FavoritesSection th={th} act={act} />
       <Home th={th} act={act} />
       <Chips th={th} />
       {!list.length ? <Empty title="Sin resultados" text="Prueba con otro número de ruta o destino." /> : (
@@ -128,7 +134,7 @@ export function StopsView({ th, act }: Props) {
   const seen = new Set<string>();
   const uniq = stations.filter(({ e }) => !seen.has(e[2]) && !!seen.add(e[2]));
   const stops = searchStops(transit, query, limit);
-  if (!q) return <Empty title="Busca una parada o estación" text="Escribe el nombre arriba, por ejemplo «Portal Norte» o «Calle 100»." />;
+  if (!q) return <><FavoritesSection th={th} act={act} /><NearbySection th={th} act={act} /><p className="hint" style={{ margin: "16px 2px" }}>O escribe arriba el nombre de una parada o estación, por ejemplo «Portal Norte».</p></>;
   if (!uniq.length && !stops.length) return <Empty title="Sin resultados" text={transit.network.stops.size ? "No encontramos esa parada." : "Cargando las paradas de la ciudad…"} />;
   return (
     <div className="list">
@@ -151,11 +157,33 @@ export function StopsView({ th, act }: Props) {
 export function AlertsView({ th, act }: Props) {
   useTransitVersion();
   const { query, openAlert, setOpenAlert } = useUi();
-  const list = searchAlerts(transit, query);
-  if (!list.length) return <Empty title="Sin avisos" text="No hay novedades del servicio en este momento." />;
+  const [scope, setScope] = useState<"all" | "mine" | "near">("all");
+  const favStops = useFavs((f) => f.stops), favRoutes = useFavs((f) => f.routes);
+  const me = useLocation((l) => l.me);
+  const all = searchAlerts(transit, query);
+  const mine = useMemo(() => {
+    if (!favStops.length && !favRoutes.length) return [];
+    const routes = new Set([...favRoutes, ...routeIdsAtStops(transit, favStops)]);
+    return alertsFor(transit, routes, new Set(favStops));
+  }, [favStops, favRoutes, transit.alerts, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const near = useMemo(() => {
+    if (!me) return [];
+    const ids = nearestStops(transit, me, 12, 800).map((n) => n.stop.id);
+    return alertsFor(transit, routeIdsAtStops(transit, ids), new Set(ids));
+  }, [me, transit.alerts, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const hasMine = favStops.length + favRoutes.length > 0;
+  const base = scope === "mine" ? mine : scope === "near" ? near : all;
+  const q = normalize(query.trim());
+  const list = q ? base.filter((x) => all.some((y) => y.index === x.index)) : base;
   return (
     <>
-      {list.map(({ alert, index }) => (
+      <div className="chips" role="group" aria-label="Qué avisos ver">
+        <button className="chip" aria-pressed={scope === "all"} onClick={() => setScope("all")}>Todos ({all.length})</button>
+        {hasMine && <button className="chip" aria-pressed={scope === "mine"} onClick={() => setScope("mine")}>De mis favoritos ({mine.length})</button>}
+        {me && <button className="chip" aria-pressed={scope === "near"} onClick={() => setScope("near")}>Cerca de mí ({near.length})</button>}
+      </div>
+      {!hasMine && !me && <p className="hint" style={{ margin: "0 2px 10px" }}>Guarda paradas o rutas con ⭐, o activa tu ubicación, para ver solo los avisos que te afectan.</p>}
+      {!list.length ? <Empty title="Sin avisos" text={scope === "all" ? "No hay novedades del servicio en este momento." : "Nada que te afecte por ahora."} /> : list.map(({ alert, index }) => (
         <div key={index} className="card" role="group">
           <span className={`pill ${alert.effect === "noService" ? "bad" : alert.effect === "additional" ? "ok" : "warn"}`}>{ALERT_EFFECT_LABEL[alert.effect]}</span>
           <div className="ct">{alert.headline || describeAlert(alert)}</div>
@@ -208,8 +236,9 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
       <button className="back" onClick={() => setRoute(null)}><Back /> {bus ? "Atrás" : "Rutas"}</button>
       <div className="dcard">
         <span className="rb big" style={{ ["--c" as string]: color }}>{route.shortName}</span>
-        <div><h2>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName || SYSTEM_LABEL[route.system]}</h2>
+        <div style={{ flex: 1, minWidth: 0 }}><h2>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName || SYSTEM_LABEL[route.system]}</h2>
           <p>{SYSTEM_LABEL[route.system]}{bus ? ` · bus ${bus.plate || bus.label || bus.id}` : ` · ${d.vehicles.length} ${d.vehicles.length === 1 ? "bus" : "buses"}`}{!bus && avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
+        <StarButton kind="route" id={id} />
       </div>
       {!bus && shapes.length > 1 && (
         <div className="seg" role="group" aria-label="Sentido">

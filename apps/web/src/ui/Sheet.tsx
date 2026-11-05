@@ -65,7 +65,7 @@ export function Sheet({ children }: { children: ReactNode }) {
         </label>
         <div className="tabs" role="tablist">
           {TABS.map(([t, l]) => (
-            <button key={t} className="tab" role="tab" aria-selected={tab === t} onClick={() => { setTab(t); useUi.getState().setRoute(null); }}>
+            <button key={t} className="tab" role="tab" aria-selected={tab === t} onClick={() => { setTab(t); useUi.getState().setRoute(null); if (useUi.getState().sheet === "peek") setSheet("half"); }}>
               {l}{t === "avisos" && alerts > 0 && <span className="n">{alerts}</span>}
             </button>
           ))}

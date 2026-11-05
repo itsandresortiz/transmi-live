@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { SYSTEMS, SYSTEM_LABEL } from "@transmi/domain";
 import type { MapTheme } from "../map/theme";
 import { Close } from "./icons";
@@ -8,8 +9,17 @@ const Switch = ({ label, on, set }: { label: string; on: boolean; set(v: boolean
 const Seg = <T extends string>({ value, set, opts }: { value: T; set(v: T): void; opts: [T, string][] }) =>
   <div className="seg" style={{ margin: 0 }}>{opts.map(([v, l]) => <button key={v} aria-pressed={value === v} onClick={() => set(v)}>{l}</button>)}</div>;
 
+interface InstallEvent extends Event { prompt(): Promise<void> }
 export function Settings({ th }: { th: MapTheme }) {
   const u = useUi();
+  const [ev, setEv] = useState<InstallEvent | null>(null);
+  useEffect(() => {
+    const f = (e: Event) => { e.preventDefault(); setEv(e as InstallEvent); };
+    window.addEventListener("beforeinstallprompt", f);
+    return () => window.removeEventListener("beforeinstallprompt", f);
+  }, []);
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   return (
     <>
       <div className={`scrim${u.settingsOpen ? " on" : ""}`} onClick={() => u.setSettingsOpen(false)} />
@@ -33,6 +43,12 @@ export function Settings({ th }: { th: MapTheme }) {
           <Seg value={u.motion} set={u.setMotion} opts={[["predict", "Suave (estimado)"], ["reported", "Solo reportado"]]} />
           <p className="hint">{u.motion === "predict" ? "Entre un reporte y otro, el bus sigue avanzando con la velocidad que traía, y se corrige en cuanto llega la posición real." : "El bus se mueve solo cuando TransMilenio informa una posición nueva."}</p>
         </div>
+        {!standalone && (ev || ios) && (
+          <div className="grp"><h3>Instalar</h3>
+            {ev ? <button className="btn primary" onClick={() => void ev.prompt()}>Instalar TransMi LIVE en tu celular</button>
+              : <p className="hint">En iPhone: toca el botón Compartir y luego «Añadir a pantalla de inicio».</p>}
+          </div>
+        )}
         <p className="credits">Datos en tiempo real de TransMilenio (GTFS-realtime). Mapa: © OpenStreetMap contributors.</p>
       </section>
     </>

@@ -5,5 +5,5 @@ import { App } from "./App";
 
 createRoot(document.getElementById("root")!).render(<App />);
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  /* sin service worker por ahora: los datos son en vivo y no se cachean */
+  window.addEventListener("load", () => { navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => { /* sin soporte: la app funciona igual */ }); });
 }
