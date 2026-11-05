@@ -17,6 +17,8 @@ export class TransitState {
   alertsByStop = new Map<string, number[]>();
   /** Hora del último lote de posiciones (segundos desde 1970). */
   lastBatchAt: number | null = null;
+  /** Última vez (ms) que la fuente respondió bien, haya traído datos nuevos o no. */
+  lastPollOkAt: number | null = null;
   source: FeedSource | null = null;
   version = 0;
   /** Lo que se ha aprendido de cuánto tarda cada ruta por parada. */

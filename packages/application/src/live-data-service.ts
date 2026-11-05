@@ -2,14 +2,16 @@ import type { Clock, FeedSignature, LiveFeedPort } from "./ports";
 import { systemClock } from "./ports";
 import type { TransitState } from "./transit-state";
 
-export type Connection = "connecting" | "live" | "waiting" | "stale";
+/** `idle`: la fuente responde pero no está publicando buses (típico de madrugada, cuando termina el servicio). */
+export type Connection = "connecting" | "live" | "waiting" | "stale" | "idle";
 export interface ConnectionStatus { connection: Connection; ageSeconds: number | null }
 
 /** Qué tan fresco es el último lote, para mostrárselo al usuario. */
 export function connectionStatus(state: TransitState, nowMs: number): ConnectionStatus {
-  if (state.lastBatchAt == null) return { connection: "connecting", ageSeconds: null };
+  const answering = state.lastPollOkAt != null && nowMs - state.lastPollOkAt < 90_000;     // el servidor contestó hace poco
+  if (state.lastBatchAt == null) return { connection: state.lastPollOkAt != null && answering ? "idle" : "connecting", ageSeconds: null };
   const age = Math.max(0, nowMs / 1000 - state.lastBatchAt);
-  return { connection: age <= 45 ? "live" : age <= 180 ? "waiting" : "stale", ageSeconds: age };
+  return { connection: age <= 45 ? "live" : age <= 180 ? "waiting" : answering ? "idle" : "stale", ageSeconds: age };
 }
 
 /** Caso de uso: pedir a la fuente lo nuevo y aplicarlo al estado. */
@@ -31,6 +33,7 @@ export class LiveDataService {
     try {
       const poll = await this.feed.poll(this.signature);
       this.failures = 0;
+      this.state.lastPollOkAt = this.clock.now();
       if (!poll) return false;
       const { batch, signature, source } = poll;
       const now = this.clock.now();

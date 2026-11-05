@@ -105,6 +105,16 @@ describe("servicio de datos en vivo", () => {
     expect(connectionStatus(s, 1_100_000).connection).toBe("waiting");
     expect(connectionStatus(s, 1_400_000).connection).toBe("stale");
   });
+  it("de madrugada (la fuente responde pero no publica buses) no dice «conectando» ni «sin señal»", () => {
+    const s = new TransitState();
+    s.lastPollOkAt = 1_000_000;
+    expect(connectionStatus(s, 1_030_000).connection).toBe("idle");        // nunca llegó un bus, pero el servidor contesta
+    expect(connectionStatus(s, 1_200_000).connection).toBe("connecting");  // y si dejó de contestar, vuelve a conectando
+    s.applyPositions([rep("a", "1", 1000)], 0);
+    s.lastPollOkAt = 1_400_000;
+    expect(connectionStatus(s, 1_410_000).connection).toBe("idle");        // último bus hace rato, servidor activo
+    expect(connectionStatus(s, 1_600_000).connection).toBe("stale");       // servidor sin contestar
+  });
 });
 
 describe("lotes incompletos", () => {
