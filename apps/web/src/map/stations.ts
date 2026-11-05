@@ -88,6 +88,18 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
     for (const id of ids) for (const l of nearLetters(id)) tot.set(l, (tot.get(l) ?? 0) + 2);
     return [...tot.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "X";
   };
+  // líneas de los corredores en coordenadas de mundo: se usan para centrar cada estación en la mediana de su avenida
+  const medians = corridors.map((c) => c.p.map(([la, lo]) => toWorld({ lat: la, lon: lo })));
+  const nearestMedian = (w: { x: number; y: number }): { x: number; y: number; dist: number } | null => {
+    let best: { x: number; y: number; dist: number } | null = null;
+    for (const pts of medians) for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i]!, b = pts[i + 1]!, dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy || 1e-18;
+      const t = Math.max(0, Math.min(1, ((w.x - a.x) * dx + (w.y - a.y) * dy) / len2));
+      const px = a.x + t * dx, py = a.y + t * dy, d = Math.hypot(px - w.x, py - w.y) * METERS_PER_WORLD_UNIT;
+      if (!best || d < best.dist) best = { x: px, y: py, dist: d };
+    }
+    return best;
+  };
   const m = 1 / METERS_PER_WORLD_UNIT;
   const empty = <G extends Polygon | LineString | Point>(): FeatureCollection<G> => ({ type: "FeatureCollection", features: [] });
   const out: StationGeometry = { bases: empty(), capsules: empty(), doors: empty(), labels: empty(), links: empty(), chips: empty() };
@@ -131,6 +143,17 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
       else wagons.push({ n: it.n, u: p.u, v: p.v, ids: [it.stop.id], count: 1 });
     }
 
+    // Las coordenadas de las paradas del GTFS suelen quedar pegadas a un carril: la estación se centra lateralmente sobre la línea de su corredor
+    // (la mediana de la avenida), si esa línea está cerca y el ajuste es razonable.
+    {
+      const vMid0 = wagons.reduce((a, w) => a + w.v, 0) / wagons.length, uMid0 = wagons.reduce((a, w) => a + w.u, 0) / wagons.length;
+      const cw = { x: (uMid0 * axis.ux + vMid0 * nx) * m, y: (uMid0 * axis.uy + vMid0 * ny) * m };
+      const nm = nearestMedian(cw);
+      if (nm && nm.dist <= 35) {
+        const dv = uv(nm).v - vMid0;
+        if (Math.abs(dv) >= 1.5 && Math.abs(dv) <= 28) for (const w of wagons) w.v += dv;
+      }
+    }
     let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
     for (const w of wagons) {
       u0 = Math.min(u0, w.u); u1 = Math.max(u1, w.u); v0 = Math.min(v0, w.v); v1 = Math.max(v1, w.v);
