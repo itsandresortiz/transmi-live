@@ -7,6 +7,8 @@ export class FeedDecodeError extends Error {
 export type Range = readonly [start: number, end: number];
 export interface Field { field: number; wire: number; num: number; range: Range }
 
+const DECODER = new TextDecoder();
+
 export class Reader {
   private readonly view: DataView;
   constructor(readonly buf: Uint8Array) {
@@ -61,5 +63,14 @@ export class Reader {
     }
   }
 
-  text(r: Range): string { return new TextDecoder().decode(this.buf.subarray(r[0], r[1])); }
+  text(r: Range): string {
+    const n = r[1] - r[0];
+    if (n <= 40) {
+      // casi todo son identificadores ASCII cortos: se arman a mano (TextDecoder es mucho más lento por llamada)
+      let s = "";
+      for (let i = r[0]; i < r[1]; i++) { const c = this.buf[i]!; if (c > 127) return DECODER.decode(this.buf.subarray(r[0], r[1])); s += String.fromCharCode(c); }
+      return s;
+    }
+    return DECODER.decode(this.buf.subarray(r[0], r[1]));
+  }
 }

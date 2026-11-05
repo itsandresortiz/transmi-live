@@ -10,7 +10,8 @@ export interface VehicleReport {
   readonly label?: string;
   readonly routeId: string;
   readonly tripId?: string;
-  readonly nextStopId?: string;
+  /** Última parada a la que llegó el bus (el feed informa la parada donde ya estuvo, no la que sigue). */
+  readonly lastStopId?: string;
   readonly position: GeoPoint;
   /** Hora del lote (segundos desde 1970). Es la misma para todos los buses de un lote. */
   readonly reportedAt: number;
@@ -39,7 +40,8 @@ export class Vehicle {
   label?: string;
   routeId: string;
   tripId?: string;
-  nextStopId?: string;
+  /** Última parada a la que llegó (ver `VehicleReport.lastStopId`). */
+  lastStopId?: string;
   position: GeoPoint;
   world: WorldPoint;
   reportedAt: number;
@@ -57,7 +59,7 @@ export class Vehicle {
     this.label = r.label;
     this.routeId = r.routeId;
     this.tripId = r.tripId;
-    this.nextStopId = r.nextStopId;
+    this.lastStopId = r.lastStopId;
     this.position = r.position;
     this.world = toWorld(r.position);
     this.reportedAt = r.reportedAt;
@@ -72,7 +74,7 @@ export class Vehicle {
     this.label = r.label ?? this.label;
     this.routeId = r.routeId || this.routeId;
     this.tripId = r.tripId ?? this.tripId;
-    this.nextStopId = r.nextStopId ?? this.nextStopId;
+    this.lastStopId = r.lastStopId ?? this.lastStopId;
     if (r.reportedAt === this.reportedAt) return false;
 
     const next = toWorld(r.position);

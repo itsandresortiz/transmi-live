@@ -55,9 +55,10 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
   const shape = transit.network.shapes.get(stopRoute.routeId)?.find((s) => s.direction === stopRoute.direction);
   const j = shape ? shape.stopIds.indexOf(stopId) : -1;
   const hero = row?.buses[0];
-  const heroNext = hero ? transit.stopById(hero.vehicle.nextStopId) : undefined;
+  const heroNext = hero ? transit.nextStopOf(hero.vehicle)?.stop : undefined;
   // paradas por las que vienen los buses, de la más lejana a la elegida
-  const ks = row && shape ? row.buses.map((b) => shape.stopIds.indexOf(b.vehicle.nextStopId ?? "")).filter((k) => k >= 0) : [];
+  const nextIdx = (b: { vehicle: { lastStopId?: string } }) => (shape ? shape.stopIds.indexOf(b.vehicle.lastStopId ?? "") + 1 : -1);   // la parada que sigue a la última
+  const ks = row && shape ? row.buses.map(nextIdx).filter((k) => k > 0) : [];
   const kmin = ks.length ? Math.min(...ks) : j;
   const path = shape && j >= 0 ? shape.stopIds.slice(Math.max(0, kmin), j + 1) : [];
   return (
@@ -98,7 +99,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
               <div className="sec">Recorrido hasta tu parada</div>
               <ul className="tl" style={{ ["--rc" as string]: color }}>
                 {path.map((sid, i) => {
-                  const at = row.buses.filter((b) => b.vehicle.nextStopId === sid);
+                  const at = row.buses.filter((b) => shape?.stopIds[nextIdx(b)] === sid);
                   const last = i === path.length - 1;
                   return (
                     <li key={sid} className={`${at.length ? "here" : ""}${last ? " goal" : ""}`} onClick={() => act.focusStop(sid)}>

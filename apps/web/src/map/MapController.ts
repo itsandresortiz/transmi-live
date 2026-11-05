@@ -12,6 +12,8 @@ export interface MapEvents {
   onUserDrag?(): void;
   /** El dedo o el mouse está sobre el mapa (true) o se soltó (false). */
   onPointerHold?(hold: boolean): void;
+  /** Toque en una parte vacía del mapa (no sobre un bus, parada ni estación). */
+  onMapTap?(): void;
 }
 export interface LayerToggles { streets: boolean; stops: boolean; network: boolean; buses: boolean }
 
@@ -180,7 +182,12 @@ export class MapController {
     pointer("bus-dots");
     m.on("click", "bus-dots", (e) => { const f = e.features?.[0]; if (f) { e.originalEvent.cancelBubble = true; this.events.onBusClick(String(f.properties?.id)); } });
     // los buses dibujados en canvas (zoom ≥ 13) tienen prioridad sobre paradas y estaciones
-    m.on("click", (e) => { const id = this.busHit?.(e.point); if (id) this.events.onBusClick(id); });
+    m.on("click", (e) => {
+      const id = this.busHit?.(e.point);
+      if (id) { this.events.onBusClick(id); return; }
+      const layers = ["stops-circles", "estaciones-circles", "route-stops", "bus-dots"].filter((l) => m.getLayer(l));
+      if (!m.queryRenderedFeatures(e.point, { layers }).length) this.events.onMapTap?.();
+    });
     m.on("mousemove", (e) => { if (this.busHit?.(e.point)) m.getCanvas().style.cursor = "pointer"; else if (!m.queryRenderedFeatures(e.point, { layers: ["stops-circles", "estaciones-circles", "route-stops", "bus-dots"].filter((l) => m.getLayer(l)) }).length) m.getCanvas().style.cursor = ""; });
     for (const id of ["stops-circles", "route-stops"]) {
       pointer(id);

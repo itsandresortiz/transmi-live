@@ -4,3 +4,4 @@ export * from "./queries";
 export * from "./live-data-service";
 export * from "./travel-times";
 export * from "./motion";
+export * from "./eta";

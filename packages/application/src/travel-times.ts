@@ -44,7 +44,7 @@ export class TravelTimes {
   /** Revisa la flota tras un lote nuevo: si la próxima parada de un bus avanzó una posición, midió un tramo. */
   observe(state: TransitState): void {
     for (const v of state.fleet.values()) {
-      const stop = v.nextStopId;
+      const stop = v.lastStopId;
       if (!stop) continue;
       const prev = this.seen.get(v.id);
       if (!prev) { this.seen.set(v.id, { stop, since: v.reportedAt, known: false }); continue; }

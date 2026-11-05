@@ -1,15 +1,11 @@
 /** Raíz de composición: aquí (y solo aquí) se conectan los puertos con sus adaptadores. */
 import { LiveDataService, TransitState } from "@transmi/application";
-import { GtfsLiteNetworkSource, ProxyLiveFeed } from "@transmi/infrastructure";
+import { GtfsLiteNetworkSource, ProxyLiveFeed, WorkerLiveFeed } from "@transmi/infrastructure";
+import { CONFIG } from "./config";
 import { makeCachedFetch } from "./offline-cache";
 import { safeStorage } from "./storage";
 
-export const CONFIG = {
-  /** Función de Supabase que lee TransMilenio con CORS (ver supabase/functions/tm). */
-  proxyUrl: "https://kmefztxxhipjowgcfxds.supabase.co/functions/v1/rapid-responder",
-  /** Copia de respaldo y GTFS reducido, publicados por GitHub Actions en la rama live-data. */
-  dataBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/live-data/",
-} as const;
+export { CONFIG };
 
 export const transit = new TransitState();
 
@@ -22,7 +18,14 @@ transit.subscribe(() => { const now = Date.now(); if (now - ttSaved > 60_000) { 
 const cachedFetch = makeCachedFetch();
 const feedFetch = makeCachedFetch({ onlyOffline: true });
 
-const feed = new ProxyLiveFeed({ primaryBase: CONFIG.proxyUrl, fallbackBase: CONFIG.dataBase, fetchFn: feedFetch });
+/** Los datos en vivo se descargan y decodifican en un Web Worker (si el navegador lo permite) para no congelar el mapa. */
+function makeFeed() {
+  const cfg = { primaryBase: CONFIG.proxyUrl, fallbackBase: CONFIG.dataBase, fetchFn: feedFetch };
+  try { if (typeof Worker !== "undefined") return new WorkerLiveFeed(new Worker(new URL("./feed.worker.ts", import.meta.url), { type: "module" })); }
+  catch { /* sin soporte de workers: se hace en el hilo principal */ }
+  return new ProxyLiveFeed(cfg);
+}
+const feed = makeFeed();
 export const liveData = new LiveDataService(feed, transit);
 
 export const networkSource = new GtfsLiteNetworkSource({

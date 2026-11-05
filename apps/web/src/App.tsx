@@ -94,6 +94,13 @@ export function App() {
       onStopClick: (id) => act.focusStop(id),
       onStationClick: (i) => act.focusStation(i),
       onPointerHold: (h) => br.current?.setHold(h),
+      // como en las apps de mapas: tocar el mapa baja el panel para verlo completo (en celular)
+      onMapTap: () => {
+        if (window.matchMedia("(min-width:900px)").matches) return;
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        if (uiRef.current.sheet !== "peek") uiRef.current.setSheet("peek");
+        if (uiRef.current.settingsOpen) uiRef.current.setSettingsOpen(false);
+      },
       onUserDrag: () => { if (uiRef.current.followId) uiRef.current.setFollowPaused(true); },
     });
     mc.current = m;
@@ -141,7 +148,7 @@ export function App() {
       const id = ui.routeId ?? fv?.routeId ?? null, shapes = id ? transit.network.shapes.get(id) : undefined;
       if (!id || !shapes) { m.showRoute(null, "0", "", () => undefined); return; }
       const route = transit.routeById(id);
-      const own = !ui.routeId && fv ? shapes.find((sh) => fv.nextStopId && sh.stopIds.includes(fv.nextStopId))?.direction : undefined;
+      const own = !ui.routeId && fv ? shapes.find((sh) => fv.lastStopId && sh.stopIds.includes(fv.lastStopId))?.direction : undefined;
       const want = own ?? ui.direction;
       const dir = shapes.find((s) => s.direction === want) ? want : shapes[0]!.direction;
       m.showRoute(shapes, dir, thRef.current.system[route?.system ?? "otro"], (sid) => transit.stopById(sid)?.position);
@@ -171,7 +178,7 @@ export function App() {
       const hits = (row?.buses ?? []).map((b) => path.project(b.vehicle.world, 0, 0, 150)?.s).filter((x): x is number => x != null && x <= end);
       const start = Math.max(0, (hits.length ? Math.min(...hits) : end - 1200) - 120);
       const j = shape.stopIds.indexOf(ui.stopId);
-      const ks = (row?.buses ?? []).map((b) => shape.stopIds.indexOf(b.vehicle.nextStopId ?? "")).filter((k) => k >= 0);
+      const ks = (row?.buses ?? []).map((b) => shape.stopIds.indexOf(b.vehicle.lastStopId ?? "") + 1).filter((k) => k > 0);
       const kmin = ks.length ? Math.min(...ks) : Math.max(0, j - 6);
       const stops = shape.stopIds.slice(Math.max(0, kmin), j + 1).flatMap((id) => { const p = transit.stopById(id)?.position; return p ? [{ id, p }] : []; });
       const pts = path.slice(start, end);

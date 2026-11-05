@@ -48,11 +48,15 @@ interface Track {
   bx: number; by: number;
   /** Desfase visual (mundo) respecto a la posición «real» del modelo; se disipa solo. */
   ox: number; oy: number;
+  /** Velocidad de referencia del bus (m/s): la medida, o una deducida de su ruta y su próxima parada si aún no hay historial. */
+  speed: number;
   /** Velocidad mostrada (m/s) a lo largo del trazado, o vector (m/s) sin trazado. */
   u: number; ux: number; uy: number;
   lastT: number;
 }
 
+/** Velocidad típica entre paradas (m/s) cuando no hay nada mejor. */
+const TYPICAL_SPEED_MPS: Record<string, number> = { troncal: 6, dual: 5, alimentador: 4, zonal: 4, otro: 4 };
 const STALE_SECONDS = 5;
 const MAX_STEP = 0.25;
 
@@ -87,20 +91,18 @@ export class MotionEngine {
     const p = this.params;
     let t = this.tracks.get(v.id);
     const vel = v.velocity;
-    const speed = vel ? vel.speedMps : 0;
-    /** Ritmo al que avanza lo esperado: la velocidad medida por la fracción calibrada (los buses frenan y esperan). */
-    const rate = speed * p.rateGain;
 
     // 1) reporte nuevo (o bus que no se miraba): se vuelve a pegar a su ruta
     if (!t || nowSec - t.lastT > STALE_SECONDS || t.reportedAt !== v.reportedAt) {
-      const paths = this.pathsOf(v.routeId);
-      const lock = paths.length && vel ? lockToRoute(paths, v.world, vel, p.lockMeters, t?.lock?.path) : null;
+      const { lock, speed: sp } = this.resolve(v, nowSec, t?.lock?.path);
       if (!t || nowSec - t.lastT > STALE_SECONDS) {
-        const target = this.target(v, nowSec, lock);
-        t = { reportedAt: v.reportedAt, lock, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: rate, ux: (vel?.ux ?? 0) * rate, uy: (vel?.uy ?? 0) * rate, lastT: nowSec };
+        const r0 = sp * p.rateGain;
+        const target = this.target(v, nowSec, lock, sp);
+        t = { reportedAt: v.reportedAt, lock, speed: sp, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: r0, ux: (vel?.ux ?? 0) * r0, uy: (vel?.uy ?? 0) * r0, lastT: nowSec };
         this.tracks.set(v.id, t);
         return { x: t.x, y: t.y };
       }
+      t.speed = sp;
       if (lock && t.lock && lock.path === t.lock.path) { t.lock = lock; t.s0 = lock.s; t.sStop = this.stopS(v, lock); }
       else if (lock) {
         // cambió de trazado (u otro sentido): se continúa desde donde se está dibujado, si cae sobre el nuevo
@@ -110,11 +112,12 @@ export class MotionEngine {
       } else { t.lock = null; t.sStop = Infinity; }
       t.reportedAt = v.reportedAt;
     }
+    const rate = t.speed * p.rateGain;
 
     const dt = Math.min(MAX_STEP, Math.max(0, nowSec - t.lastT));
     t.lastT = nowSec;
     if (dt <= 0) return { x: t.x, y: t.y };
-    const tgt = this.target(v, nowSec, t.lock);
+    const tgt = this.target(v, nowSec, t.lock, t.speed);
     if (t.lock && p.stopClamp && t.sStop !== Infinity) tgt.s = Math.min(tgt.s, Math.max(t.s0, t.sStop + p.stopSlackMeters));
 
     if (t.lock) {
@@ -157,20 +160,48 @@ export class MotionEngine {
     return { x: t.x, y: t.y };
   }
 
+  /** Trazado y velocidad de referencia de un bus. Con historial: lo medido. Sin historial (recién abierta la página o bus nuevo):
+   *  se deduce de su ruta y su próxima parada, para que se mueva desde el primer cuadro y no espere dos o tres lotes. */
+  private resolve(v: Vehicle, nowSec: number, prefer?: RoadPath): { lock: RouteLock | null; speed: number } {
+    const paths = this.pathsOf(v.routeId);
+    if (!paths.length) return { lock: null, speed: v.velocity?.speedMps ?? 0 };
+    const vel = v.velocity;
+    if (vel) return { lock: lockToRoute(paths, v.world, vel, this.params.lockMeters, prefer), speed: vel.speedMps };
+    const next = this.state.nextStopOf(v, nowSec * 1000);     // la parada que sigue a la última que informó el bus
+    const stop = next?.stop;
+    if (!next || !stop) return { lock: null, speed: 0 };
+    const sw = toWorld(stop.position);
+    let best: { lock: RouteLock; sStop: number } | null = null, bestDist = Infinity;
+    for (const path of paths) {
+      const hit = path.project(v.world, 0, 0, this.params.lockMeters);
+      const st = hit && path.project(sw, 0, 0, 40);
+      // sirve el trazado en cuyo sentido la próxima parada queda por delante
+      if (hit && st && st.s >= hit.s - 15 && hit.dist < bestDist) { bestDist = hit.dist; best = { lock: { path, s: hit.s, sign: 1 }, sStop: st.s }; }
+    }
+    if (!best) return { lock: null, speed: 0 };
+    const left = best.sStop - best.lock.s;
+    if (left < 20) return { lock: best.lock, speed: 0 };            // ya está en la parada: espera su reporte
+    const eta = next.arrivalAt;
+    const speed = eta && eta - nowSec > 5 && eta - nowSec < 900
+      ? Math.min(12, Math.max(1, left / (eta - nowSec)))              // lo que necesita para llegar a la hora oficial
+      : TYPICAL_SPEED_MPS[v.system];
+    return { lock: best.lock, speed };
+  }
+
   /** Distancia de la próxima parada del bus sobre su trazado; `Infinity` si no se conoce o queda atrás. */
   private stopS(v: Vehicle, lock: RouteLock | null): number {
-    if (!lock || !v.nextStopId) return Infinity;
-    const stop = this.state.stopById(v.nextStopId);
+    if (!lock || !v.lastStopId) return Infinity;
+    const stop = this.state.nextStopOf(v)?.stop;
     if (!stop) return Infinity;
     const hit = lock.path.project(toWorld(stop.position), 0, 0, 40);
     return hit && hit.s >= lock.s - 25 ? hit.s : Infinity;
   }
 
   /** Dónde se espera que esté el bus ahora: su último reporte más lo que habrá avanzado, con la política calibrada. */
-  private target(v: Vehicle, nowSec: number, lock: RouteLock | null): { s: number; world: WorldPoint } {
+  private target(v: Vehicle, nowSec: number, lock: RouteLock | null, speed: number): { s: number; world: WorldPoint } {
     const age = nowSec - v.reportedAt;
-    if (lock && v.velocity) {
-      const s = lock.s + v.velocity.speedMps * motionSeconds(age, DEFAULT_PREDICTION);
+    if (lock) {
+      const s = lock.s + speed * motionSeconds(age, DEFAULT_PREDICTION);
       return { s, world: lock.path.pointAt(s) };
     }
     return { s: 0, world: predictPosition(v, nowSec) };

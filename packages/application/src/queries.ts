@@ -1,5 +1,6 @@
 import { type Route, type SystemType, type Vehicle, type ServiceAlert, type Stop, alertSeverity } from "@transmi/domain";
-import type { Arrival, TransitState } from "./transit-state";
+import { arrivalAtIndex, hav } from "./eta";
+import type { TransitState } from "./transit-state";
 
 export const normalize = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -22,6 +23,12 @@ export function vehiclesByRoute(state: TransitState): Map<string, number> {
   return m;
 }
 
+const collator = new Intl.Collator("es", { numeric: true });
+const routeText = new WeakMap<Route, string>();
+const textOf = (r: Route): string => { let t = routeText.get(r); if (t === undefined) { t = normalize(`${r.shortName} ${r.longName}`); routeText.set(r, t); } return t; };
+const headsignText = new WeakMap<string[], string[]>();
+const headsignsOf = (hs: string[]): string[] => { let t = headsignText.get(hs); if (!t) { t = hs.map(normalize); headsignText.set(hs, t); } return t; };
+
 /** Rutas ordenadas por cantidad de buses; busca por nombre y por destino. */
 export function searchRoutes(state: TransitState, o: { query?: string; system?: SystemType | null } = {}): Route[] {
   const q = normalize((o.query ?? "").trim());
@@ -30,10 +37,11 @@ export function searchRoutes(state: TransitState, o: { query?: string; system?: 
     .filter((r) => {
       if (o.system && r.system !== o.system) return false;
       if (!q) return true;
-      if (normalize(`${r.shortName} ${r.longName}`).includes(q)) return true;
-      return (state.network.headsigns.get(r.id) ?? []).some((h) => normalize(h).includes(q));
+      if (textOf(r).includes(q)) return true;
+      const hs = state.network.headsigns.get(r.id);
+      return !!hs && headsignsOf(hs).some((h) => h.includes(q));
     })
-    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || a.shortName.localeCompare(b.shortName, "es", { numeric: true }));
+    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || collator.compare(a.shortName, b.shortName));
 }
 
 /** Retraso en segundos para ordenar (los desconocidos al final). */
@@ -69,10 +77,6 @@ export function searchStops(state: TransitState, query: string, limit = 60): Sto
     if (normalize(`${s.name} ${s.code}`).includes(q)) { out.push(s); if (out.length >= limit) break; }
   }
   return out;
-}
-
-export function arrivalsAt(state: TransitState, stopId: string, limit = 6): Arrival[] {
-  return (state.arrivalsByStop.get(stopId) ?? []).slice().sort((a, b) => (a.arrivalAt ?? 0) - (b.arrivalAt ?? 0)).slice(0, limit);
 }
 
 export function routesAtStop(state: TransitState, stopId: string): Route[] {
@@ -122,30 +126,8 @@ export interface UpcomingBus {
 }
 export interface UpcomingRoute { route: Route; headsign: string; direction: string; buses: UpcomingBus[] }
 
-import { DEFAULT_SECONDS_PER_STOP } from "./travel-times";
-export const SECONDS_PER_STOP = DEFAULT_SECONDS_PER_STOP;
-const CRUISE_MPS = 18;        // velocidad entre paradas: casi no pesa frente al tiempo en cada parada
-const DETOUR_FACTOR = 1.15;   // la calle es más larga que la línea recta entre paradas
-
-function hav(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
-  const R = 6371000, rad = Math.PI / 180;
-  const dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-/** Estima cuántos segundos tarda un bus en ir de la parada `from` a la parada `to` de su recorrido.
- *  Se calibró con lotes reales: el tiempo lo domina el número de paradas, no la distancia ni la velocidad del momento. */
-export function estimateTravelSeconds(state: TransitState, v: Vehicle, stopIds: readonly string[], from: number, to: number, nowMs = Date.now()): number {
-  let meters = 0;
-  for (let i = from; i < to; i++) {
-    const a = state.stopById(stopIds[i]), b = state.stopById(stopIds[i + 1]);
-    if (a && b) meters += hav(a.position, b.position) * DETOUR_FACTOR;
-  }
-  return meters / CRUISE_MPS + (to - from) * state.travelTimes.secondsPerStop(v.routeId, v.system, nowMs);
-}
-
-/** Para cada ruta que pasa por la parada: los próximos buses que vienen hacia ella, con su hora de llegada. */
+/** Para cada ruta que pasa por la parada: los próximos buses que vienen hacia ella, con su hora estimada de llegada.
+ *  Un bus «viene» si su última parada queda antes que ésta en su recorrido (si ya la pasó, no cuenta). */
 export function upcomingAtStop(state: TransitState, stopId: string, nowSec: number, perRoute = 3): UpcomingRoute[] {
   const out: UpcomingRoute[] = [];
   const byRoute = new Map<string, Vehicle[]>();
@@ -159,18 +141,10 @@ export function upcomingAtStop(state: TransitState, stopId: string, nowSec: numb
       if (j < 0) continue;
       const buses: UpcomingBus[] = [];
       for (const v of vehicles) {
-        if (!v.nextStopId) continue;
-        const k = shape.stopIds.indexOf(v.nextStopId);
-        if (k < 0 || k > j) continue;
-        const tu = v.tripId ? state.tripUpdates.get(v.tripId) : undefined;
-        const nextAt = tu?.nextStop?.stopId === v.nextStopId && tu.nextStop.arrivalAt ? tu.nextStop.arrivalAt : undefined;
-        if (k === j) {
-          if (nextAt == null) continue;
-          buses.push({ vehicle: v, etaAt: nextAt, official: true, stopsAway: 1 });
-        } else {
-          const base = nextAt ?? nowSec + 20;
-          buses.push({ vehicle: v, etaAt: Math.max(base, nowSec) + estimateTravelSeconds(state, v, shape.stopIds, k, j), official: false, stopsAway: j - k + 1 });
-        }
+        if (!v.lastStopId) continue;
+        const k = shape.stopIds.indexOf(v.lastStopId);
+        if (k < 0 || k >= j) continue;                       // ya la pasó (o está en ella) o va por otro sentido
+        buses.push({ vehicle: v, etaAt: arrivalAtIndex(state, v, shape.stopIds, k, j, nowSec * 1000), official: false, stopsAway: j - k });
       }
       if (!buses.length) continue;
       buses.sort((a, b) => a.etaAt - b.etaAt);

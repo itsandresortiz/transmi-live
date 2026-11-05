@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  estimateTravelSeconds, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStops,
+  arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStops,
 } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
@@ -213,9 +213,9 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
   const bus = routeBusId ? transit.fleet.get(routeBusId) : undefined;
   const shapes = transit.network.shapes.get(id) ?? [];
   // si se abrió desde un bus, se muestra el sentido en el que va ese bus
-  const busShape = bus?.nextStopId ? shapes.find((sh) => sh.stopIds.includes(bus.nextStopId!)) : undefined;
+  const busShape = bus?.lastStopId ? shapes.find((sh) => sh.stopIds.includes(bus.lastStopId!)) : undefined;
   const cur = busShape ?? shapes.find((s) => s.direction === direction) ?? shapes[0];
-  const k = bus && cur ? cur.stopIds.indexOf(bus.nextStopId ?? "") : -1;
+  const k = bus && cur ? cur.stopIds.indexOf(bus.lastStopId ?? "") : -1;      // última parada a la que llegó; la que sigue es k + 1
   useEffect(() => {
     const el = nextRef.current, box = el?.closest(".view") as HTMLElement | null;
     if (!el || !box) return;
@@ -229,8 +229,6 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
   const route: Route = d.route;
   const color = sysColor(th, route.system);
   const avg = d.averageDelaySeconds;
-  const tu = bus?.tripId ? transit.tripUpdates.get(bus.tripId) : undefined;
-  const base = tu?.nextStop?.arrivalAt ?? nowSec + 20;
   return (
     <>
       <button className="back" onClick={() => setRoute(null)}><Back /> {bus ? "Atrás" : "Rutas"}</button>
@@ -252,15 +250,15 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
           <ul className="tl" style={{ ["--rc" as string]: color }}>
             {cur.stopIds.map((sid, i) => {
               const s = transit.stopById(sid);
-              const isNext = bus && i === k, passed = bus && k >= 0 && i < k;
-              const tag = !bus || k < 0 || i < k ? null
-                : i === k ? `Próxima parada · ${tu?.nextStop?.arrivalAt ? etaText(tu.nextStop.arrivalAt, nowSec) : "en camino"}`
-                : i - k <= 6 ? `aprox. ${etaText(base + estimateTravelSeconds(transit, bus, cur.stopIds, k, i), nowSec)}` : null;
-              const atHere = !bus ? d.vehicles.find((v) => v.nextStopId === sid) : undefined;
+              const isNext = !!bus && k >= 0 && i === k + 1, passed = !!bus && k >= 0 && i <= k;
+              const tag = !bus || k < 0 || i <= k ? null
+                : `${isNext ? "Próxima parada · " : "aprox. "}${etaText(arrivalAtIndex(transit, bus, cur.stopIds, k, i), nowSec)}`;
+              // vista general de la ruta: buses que van hacia esta parada (es la siguiente de cada uno)
+              const heading = !bus ? d.vehicles.filter((v) => { const q = transit.sequenceOf(v); return q?.shape === cur && q.index + 1 === i; }) : [];
               return (
-                <li key={sid} ref={isNext ? nextRef : undefined} className={`${isNext ? "next" : ""}${passed ? " passed" : ""}${atHere ? " here" : ""}`} onClick={() => act.openStop(sid)}>
+                <li key={sid} ref={isNext ? nextRef : undefined} className={`${isNext ? "next" : ""}${passed ? " passed" : ""}${heading.length ? " here" : ""}`} onClick={() => act.openStop(sid)}>
                   {s?.name ?? sid}{tag && <span className={`bx${isNext ? "" : " soft"}`}>{tag}</span>}
-                  {atHere && <span className="bx">bus · {untilText(transit.arrivalsByStop.get(sid)?.find((a) => a.routeId === id)?.arrivalAt, nowSec)}</span>}
+                  {heading.length > 0 && <span className="bx">{heading.length === 1 ? "1 bus va hacia aquí" : `${heading.length} buses van hacia aquí`}</span>}
                 </li>
               );
             })}

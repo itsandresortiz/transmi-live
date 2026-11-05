@@ -50,7 +50,8 @@ TransMilenio informa la posición de cada bus cada 9–78 s (y llega con 5–15 
 1. **Por su ruta:** cada bus se pega al trazado de su ruta (en su sentido) y avanza *por la calle*, curvas incluidas. Si cambia de variante o el dato salta, se desliza a su sitio en ~2 s, sin teletransportarse.
 2. **Estimación calibrada:** entre reportes avanza `velocidad medida × tiempo × 0,5` desde el primer segundo. La velocidad medida sobrestima (los buses frenan y esperan), y con 0,5 el error de posición baja 10–25 % frente a dejarlo quieto (medido con 16 lotes reales y unos 5.000 buses en movimiento).
 3. **Corrección suave, sin retroceder:** cuando llega un reporte, el bus acelera o frena poco a poco para ponerse al día (hasta 3× su ritmo), nunca se devuelve y nunca queda congelado por completo mientras debería ir andando.
-4. **Dibujo cuadro a cuadro** en un canvas (≈60 fps), solo de los buses que se ven.
+4. **Desde el primer cuadro:** recién abierta la página no hay historial para medir velocidad; entonces se deduce de la ruta y la parada que sigue (81 % de los buses ya se mueven con un solo lote).
+5. **Dibujo cuadro a cuadro** en un canvas (≈60 fps), solo de los buses que se ven.
 
 Medido en simulación con los 16 lotes reales (1.200 buses, 229 s), frente al método anterior (suavizado exponencial):
 
@@ -61,11 +62,14 @@ Medido en simulación con los 16 lotes reales (1.200 buses, 229 s), frente al m�
 | Tirones de velocidad | 1,10 m/s² | 0,39 m/s² |
 | Saltos al llegar un reporte (p99) | 14 m | 19 m |
 
+Los datos en vivo se descargan y decodifican en un Web Worker: al llegar un lote no se pierde ningún cuadro (peor cuadro 17 ms; antes hasta 133 ms).
+
 El error de posición no baja mucho porque los buses son impredecibles (semáforos, paradas): el objetivo es que *se vean* naturales, no adivinar más.
 
 ## Cuánto tarda un bus en llegar
-- El feed solo da la hora oficial hacia la **próxima** parada de cada bus. Para paradas más lejanas se calcula:
-  hora oficial + tiempo por parada (≈ 50–62 s según el sistema, medido con 16 lotes reales; error medio ≈ 40–60 s).
+- Comprobado con datos reales: la parada que TransMilenio informa de cada bus (en posiciones y en el viaje) es la **última a la que ya llegó**, con su hora real (en el 99,7 % de los casos queda atrás del bus, a una mediana de 188 m), no la que sigue. La app calcula la siguiente a partir del recorrido de la ruta.
+- No hay hora oficial para las paradas que faltan: se estima como *hora real en que llegó a su última parada + tiempo por parada*
+  (≈ 50–62 s según el sistema, medido con 16 lotes reales). Error mediano ≈ 40–56 s a 1–3 paradas; por eso todos los tiempos dicen «aprox.».
 - La app **aprende** el tiempo real de cada ruta por franja del día mientras está abierta y lo guarda en el dispositivo.
 
 ## Sin internet

@@ -10,7 +10,9 @@ function world(): TransitState {
   const net = new TransitNetwork();
   net.routes.set("R", { id: "R", shortName: "R1", longName: "Ruta", system: "troncal" });
   const pts = Array.from({ length: 81 }, (_, i) => ({ lat: 4.65, lon: lonAt(i * 100) }));
-  net.shapes.set("R", [{ routeId: "R", direction: "0", headsign: "x", points: pts, stopIds: [] }]);
+  net.stops.set("P0", { id: "P0", code: "P0", name: "Parada P0", position: { lat: 4.65, lon: lonAt(500) } });
+  net.stops.set("S", { id: "S", code: "S", name: "Parada S", position: { lat: 4.65, lon: lonAt(3000) } });
+  net.shapes.set("R", [{ routeId: "R", direction: "0", headsign: "x", points: pts, stopIds: ["P0", "S"] }]);
   st.setNetwork(net);
   return st;
 }
@@ -60,6 +62,22 @@ describe("movimiento de los buses", () => {
     for (let i = 1; i < xs.length; i++) maxStep = Math.max(maxStep, Math.abs(xs[i]! - xs[i - 1]!));
     expect(maxStep).toBeLessThan(60);                       // por cuadro; un salto real sería de 3 km
     expect(xs[xs.length - 1]!).toBeGreaterThan(3500);       // y llega a su sitio
+  });
+
+  it("recién abierta la página (un solo lote, sin historial) los buses ya se mueven hacia su próxima parada", () => {
+    const st = world(), eng = new MotionEngine(st);
+    st.applyTripUpdates([{ tripId: "T", routeId: "R", delaySeconds: 0, nextStop: { stopId: "P0", arrivalAt: -30 } }]);   // llegó a P0 hace 30 s
+    st.applyPositions([{ ...rep(0, 1000), lastStopId: "P0" }], 0);
+    expect(st.fleet.get("b")!.velocity).toBeNull();
+    const a = xOf(eng.step(st.fleet.get("b")!, 20)), b = xOf(eng.step(st.fleet.get("b")!, 40)), c = xOf(eng.step(st.fleet.get("b")!, 60));
+    expect(b).toBeGreaterThan(a + 20);        // avanza, no espera al siguiente lote
+    expect(c).toBeGreaterThan(b + 20);
+    expect(c).toBeLessThan(3050);             // y hacia su parada, sin pasarse mucho
+  });
+  it("sin historial y sin parada conocida se queda donde está (no inventa)", () => {
+    const st = world(), eng = new MotionEngine(st);
+    st.applyPositions([rep(0, 1000)], 0);
+    expect(xOf(eng.step(st.fleet.get("b")!, 30))).toBeCloseTo(1000, 0);
   });
 
   it("un bus fuera de pantalla que vuelve a mirarse no se arrastra desde donde estaba", () => {

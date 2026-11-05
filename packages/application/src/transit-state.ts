@@ -1,11 +1,10 @@
 import {
-  Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle,
+  Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle, type RouteShape,
   type VehicleReport, TransitNetwork, delayFromSeconds, inferSystemFromReport,
 } from "@transmi/domain";
+import { arrivalAtIndex } from "./eta";
 import { TravelTimes } from "./travel-times";
 import type { FeedSource } from "./ports";
-
-export interface Arrival { routeId: string; tripId: string; arrivalAt?: number; delaySeconds: number | null }
 
 /** Estado vivo de todo lo que sabe la aplicación: flota, red, retrasos y avisos. */
 export class TransitState {
@@ -15,7 +14,6 @@ export class TransitState {
   alerts: ServiceAlert[] = [];
   alertsByRoute = new Map<string, number[]>();
   alertsByStop = new Map<string, number[]>();
-  arrivalsByStop = new Map<string, Arrival[]>();
   /** Hora del último lote de posiciones (segundos desde 1970). */
   lastBatchAt: number | null = null;
   source: FeedSource | null = null;
@@ -23,6 +21,7 @@ export class TransitState {
   /** Lo que se ha aprendido de cuánto tarda cada ruta por parada. */
   readonly travelTimes = new TravelTimes();
   private provisional = new Map<string, Route>();
+  private seq = new Map<string, { shape: RouteShape; index: number } | null>();
   private listeners = new Set<() => void>();
 
   subscribe(fn: () => void): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -35,10 +34,27 @@ export class TransitState {
   stopById(id: string | undefined): Stop | undefined { return id ? this.network.stops.get(id) : undefined; }
 
   delayOf(v: Vehicle): Delay { return delayFromSeconds(v.tripId ? this.tripUpdates.get(v.tripId)?.delaySeconds : null); }
-  nextStopOf(v: Vehicle): { stopId: string; stop?: Stop; arrivalAt?: number } | undefined {
-    const tu = v.tripId ? this.tripUpdates.get(v.tripId) : undefined;
-    const stopId = tu?.nextStop?.stopId ?? v.nextStopId;
-    return stopId ? { stopId, stop: this.stopById(stopId), arrivalAt: tu?.nextStop?.arrivalAt } : undefined;
+  /** Dónde va el bus dentro del recorrido de su ruta: su última parada, la lista de paradas y su posición en ella. */
+  sequenceOf(v: Vehicle): { shape: RouteShape; index: number } | undefined {
+    if (!v.lastStopId) return undefined;
+    const key = `${v.routeId}|${v.lastStopId}`;
+    let hit = this.seq.get(key);
+    if (hit === undefined) {
+      hit = null;
+      for (const shape of this.network.shapes.get(v.routeId) ?? []) {
+        const index = shape.stopIds.indexOf(v.lastStopId);
+        if (index >= 0) { hit = { shape, index }; break; }
+      }
+      this.seq.set(key, hit);
+    }
+    return hit ?? undefined;
+  }
+  /** La parada que sigue (la última que informa TransMilenio ya la pasó) y la hora estimada de llegada, en segundos desde 1970. */
+  nextStopOf(v: Vehicle, nowMs = Date.now()): { stopId: string; stop?: Stop; arrivalAt?: number } | undefined {
+    const seq = this.sequenceOf(v);
+    const stopId = seq?.shape.stopIds[seq.index + 1];
+    if (!seq || !stopId) return undefined;
+    return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape.stopIds, seq.index, seq.index + 1, nowMs) };
   }
 
   applyPositions(reports: readonly VehicleReport[], nowMs: number): void {
@@ -53,15 +69,6 @@ export class TransitState {
 
   applyTripUpdates(updates: readonly TripUpdate[]): void {
     this.tripUpdates = new Map(updates.map((u) => [u.tripId, u]));
-    const arrivals = new Map<string, Arrival[]>();
-    for (const u of updates) {
-      const s = u.nextStop;
-      if (!s) continue;
-      const list = arrivals.get(s.stopId) ?? [];
-      list.push({ routeId: u.routeId ?? "", tripId: u.tripId, arrivalAt: s.arrivalAt, delaySeconds: u.delaySeconds });
-      arrivals.set(s.stopId, list);
-    }
-    this.arrivalsByStop = arrivals;
     this.touch();
   }
 
@@ -78,6 +85,7 @@ export class TransitState {
 
   setNetwork(network: TransitNetwork): void {
     this.network = network;
+    this.seq.clear();
     this.resolveSystems();
     this.touch();
   }

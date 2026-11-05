@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  LiveDataService, TransitState, connectionStatus, kpis, listVehicles, searchRoutes, arrivalsAt, routeDetail,
+  LiveDataService, TransitState, connectionStatus, kpis, listVehicles, searchRoutes, upcomingAtStop, routeDetail,
   type LiveFeedPort, type LivePoll,
 } from "@transmi/application";
 import { TransitNetwork, type VehicleReport } from "@transmi/domain";
@@ -43,12 +43,21 @@ describe("estado del tránsito", () => {
   });
   it("relaciona retrasos y llegadas con los buses", () => {
     const s = new TransitState();
-    s.applyPositions([rep("a", "100", 1000, { tripId: "T1" })], 0);
-    s.applyTripUpdates([{ tripId: "T1", routeId: "100", delaySeconds: 720, nextStop: { stopId: "S9", arrivalAt: 1100 } }]);
+    // TransMilenio informa la ÚLTIMA parada a la que llegó el bus (S9, con su hora real); la que sigue es S10
+    const net = new TransitNetwork();
+    net.routes.set("100", { id: "100", shortName: "B12", longName: "Calle 80", system: "troncal" });
+    net.stops.set("S9", { id: "S9", code: "S9", name: "Nueve", position: { lat: 4.65, lon: -74.07 } });
+    net.stops.set("S10", { id: "S10", code: "S10", name: "Diez", position: { lat: 4.651, lon: -74.07 } });
+    net.shapes.set("100", [{ routeId: "100", direction: "0", headsign: "x", points: [], stopIds: ["S8", "S9", "S10", "S11"] }]);
+    s.setNetwork(net);
+    s.applyPositions([rep("a", "100", 1000, { tripId: "T1", lastStopId: "S9" })], 0);
+    s.applyTripUpdates([{ tripId: "T1", routeId: "100", delaySeconds: 720, nextStop: { stopId: "S9", arrivalAt: 950 } }]);
     const v = s.fleet.get("a")!;
     expect(s.delayOf(v)).toMatchObject({ kind: "late", minutes: 12, severe: true });
-    expect(s.nextStopOf(v)?.stopId).toBe("S9");
-    expect(arrivalsAt(s, "S9")).toHaveLength(1);
+    expect(s.nextStopOf(v, 1_000_000)?.stopId).toBe("S10");
+    expect(s.nextStopOf(v, 1_000_000)?.arrivalAt).toBeGreaterThan(950);         // la hora de llegada a S9 más el tramo
+    expect(upcomingAtStop(s, "S11", 1000, 3)[0]?.buses[0]?.stopsAway).toBe(2);  // S11 está 2 paradas después de la última
+    expect(upcomingAtStop(s, "S8", 1000, 3)).toHaveLength(0);                   // S8 ya la pasó
     expect(kpis(s)).toMatchObject({ vehicles: 1, routes: 1, late: 1 });
   });
   it("busca rutas y buses, y arma el detalle de una ruta", () => {

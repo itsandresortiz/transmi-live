@@ -59,7 +59,7 @@ export function decodePositions(buf: Uint8Array): VehicleReport[] {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
     out.push({
       id: vid ?? (entityId || `${lat},${lon}`),
-      plate, label, routeId, tripId, nextStopId: stopId,
+      plate, label, routeId, tripId, lastStopId: stopId,
       position: { lat, lon }, reportedAt: ts,
     });
   }

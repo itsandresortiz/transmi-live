@@ -12,7 +12,7 @@ function world(): TransitState {
   st.setNetwork(net);
   return st;
 }
-const report = (t: number, next: string): VehicleReport => ({ id: "bus1", routeId: "R", tripId: "T", nextStopId: next, reportedAt: t, position: { lat: 4.6, lon: -74.07 } });
+const report = (t: number, next: string): VehicleReport => ({ id: "bus1", routeId: "R", tripId: "T", lastStopId: next, reportedAt: t, position: { lat: 4.6, lon: -74.07 } });
 
 describe("tiempos aprendidos", () => {
   it("aprende cuánto tarda una ruta por parada y lo usa", () => {
