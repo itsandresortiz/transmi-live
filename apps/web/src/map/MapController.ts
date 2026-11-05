@@ -1,6 +1,7 @@
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
+import { trafficBand } from "@transmi/application";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
@@ -19,7 +20,7 @@ export interface MapEvents {
   /** Toque en una parte vacía del mapa (no sobre un bus, parada ni estación). */
   onMapTap?(): void;
 }
-export interface LayerToggles { streets: boolean; stops: boolean; network: boolean; buses: boolean; signals: boolean }
+export interface LayerToggles { streets: boolean; stops: boolean; network: boolean; buses: boolean; signals: boolean; traffic: boolean }
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const FONT = ["Noto Sans Regular"];
@@ -96,7 +97,7 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico");
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
@@ -180,6 +181,14 @@ export class MapController {
         "text-anchor": "bottom", "text-offset": [0, -0.45], "text-optional": false, "text-max-width": 14,
       },
       paint: { "text-color": t.labelStrong },
+    });
+    m.addLayer({
+      id: "trafico-casing", type: "line", source: "trafico", minzoom: 11.5, layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#ffffff", "line-opacity": 0.55, "line-width": zoomWidth([11.5, 3], [16, 7.5], [18.5, 12]) },
+    });
+    m.addLayer({
+      id: "trafico-lines", type: "line", source: "trafico", minzoom: 11.5, layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": ["match", ["get", "b"], 0, "#e5484d", 1, "#f08a24", 2, "#f5c518", "#2fbf71"], "line-opacity": 0.92, "line-width": zoomWidth([11.5, 1.8], [16, 5], [18.5, 8.5]) },
     });
     m.addLayer({
       id: "semaforos-dots", type: "circle", source: "semaforos", minzoom: 13.2, maxzoom: 15.4,
@@ -328,9 +337,16 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["trafico-casing", "trafico-lines"], t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
   }
 
+  /** Velocidad de los buses en las calles (cada tramo con su banda de color). */
+  setTraffic(segs: readonly { a: GeoPoint; b: GeoPoint; speed: number }[]) {
+    (this.map.getSource("trafico") as GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: segs.map((x) => ({ type: "Feature", properties: { b: trafficBand(x.speed) }, geometry: { type: "LineString", coordinates: [[x.a.lon, x.a.lat], [x.b.lon, x.b.lat]] } })),
+    });
+  }
   private signalsLoaded = false;
   /** Pone los semáforos en el mapa (se llama la primera vez que el usuario enciende la capa). */
   setSignals(rows: readonly (readonly [number, number, string, string, string])[]) {

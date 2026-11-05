@@ -96,6 +96,14 @@ export class Vehicle {
     return true;
   }
 
+  /** Último tramo recorrido entre dos reportes distintos (para dibujar la velocidad en las calles). */
+  lastLeg(): { x0: number; y0: number; t0: number; x1: number; y1: number; t1: number } | null {
+    const h = this.history;
+    if (h.length < 2) return null;
+    const a = h[h.length - 2]!, b = h[h.length - 1]!;
+    return { x0: a.x, y0: a.y, t0: a.t, x1: b.x, y1: b.y, t1: b.t };
+  }
+
   /** Velocidad medida con una base de al menos 28 s: con base corta el ruido del GPS la desbarata. */
   private measureVelocity(): Velocity | null {
     const h = this.history;

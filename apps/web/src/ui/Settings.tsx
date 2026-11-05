@@ -30,8 +30,17 @@ export function Settings({ th }: { th: MapTheme }) {
           <Switch label="Nombres de calles" on={u.layers.streets} set={(v) => u.setLayer("streets", v)} />
           <Switch label="Paradas" on={u.layers.stops} set={(v) => u.setLayer("stops", v)} />
           <Switch label="Líneas de rutas" on={u.layers.network} set={(v) => u.setLayer("network", v)} />
+          <Switch label="Tráfico (velocidad de los buses)" on={u.layers.traffic} set={(v) => u.setLayer("traffic", v)} />
           <Switch label="Semáforos" on={u.layers.signals} set={(v) => u.setLayer("signals", v)} />
         </div></div>
+        {u.layers.traffic && (
+          <div className="grp"><h3>Tráfico</h3>
+            <div className="legend">
+              {([["#e5484d", "Casi detenido"], ["#f08a24", "Lento"], ["#f5c518", "Normal"], ["#2fbf71", "Fluido"]] as const).map(([c, l]) => <span key={l} style={{ ["--c" as string]: c }}><i />{l}</span>)}
+            </div>
+            <p className="hint">Se calcula con la velocidad real de los buses del SITP (no incluye los carriles exclusivos de la troncal) y se actualiza con cada dato nuevo. Es una referencia aproximada.</p>
+          </div>
+        )}
         <div className="grp"><h3>Color de los buses</h3>
           <Seg value={u.colorMode} set={u.setColorMode} opts={[["system", "Por sistema"], ["delay", "Por puntualidad"]]} />
           <div className="legend">

@@ -165,3 +165,20 @@ describe("día de servicio y estado de la ruta", () => {
     expect(e.routeStatus("Z", at("2026-03-04T17:00:00Z"), 0)).toBeUndefined();
   });
 });
+
+import { trafficBand, trafficSegments } from "@transmi/application";
+describe("tráfico en vivo", () => {
+  it("clasifica la velocidad en bandas", () => {
+    expect([0.5, 2, 5, 10].map(trafficBand)).toEqual([0, 1, 2, 3]);
+  });
+  it("pinta el último tramo de buses de calle y omite la troncal", () => {
+    const s = new TransitState();
+    const mk = (id: string, tripId: string, lon: number, at: number) => ({ id, routeId: "r-" + id, tripId, position: { lat: 4.65, lon }, reportedAt: at });
+    s.applyPositions([mk("a", "t1", -74.08, 1000), mk("b", "TTBD1", -74.08, 1000)], 1_000_000);
+    s.applyPositions([mk("a", "t1", -74.0786, 1030), mk("b", "TTBD1", -74.0786, 1030)], 1_030_000);
+    const segs = trafficSegments(s, 1031);
+    expect(segs.length).toBe(1);                                     // el bus «TTBD…» es troncal y no cuenta
+    expect(segs[0]!.speed).toBeGreaterThan(3);
+    expect(trafficSegments(s, 1200).length).toBe(0);                 // dato viejo
+  });
+});

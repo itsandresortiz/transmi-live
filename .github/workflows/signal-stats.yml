@@ -1,0 +1,24 @@
+name: Grabar comportamiento cerca de los semáforos
+# Acumula cuántos buses pasan y cuántos van detenidos cerca de cada semáforo, por hora y tipo de día (solo conteos) en la rama signal-stats.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: signal-stats
+  cancel-in-progress: false
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Grabar ~4,5 minutos
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx --yes tsx tools/signalstats.ts 270

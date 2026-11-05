@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { connectionStatus, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
+import { connectionStatus, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadServiceEnds, networkSource, transit } from "./composition-root";
 import { nowSec } from "./clock";
@@ -155,6 +155,15 @@ export function App() {
   /* ---------- estado de la interfaz → mapa ---------- */
   useEffect(() => { document.documentElement.dataset.scheme = scheme; void mc.current?.ready.then(() => { mc.current?.setScheme(scheme); if (transit.network.routes.size) mc.current?.recolorNetwork(transit.network); br.current?.refresh(); }); }, [scheme]);
   useEffect(() => { void mc.current?.ready.then(() => mc.current?.setToggles(ui.layers)); br.current?.refresh(); }, [ui.layers]);
+  /* tráfico: velocidad de los buses en las calles, recalculada con cada dato nuevo (máx. una vez cada 4 s) */
+  useEffect(() => {
+    const m = mc.current; if (!ui.layers.traffic || !m) { return; }
+    let last = 0, timer = 0;
+    const run = () => { last = Date.now(); timer = 0; void m.ready.then(() => m.setTraffic(trafficSegments(transit, nowSec()))); };
+    const off = transit.subscribe(() => { if (timer) return; const wait = Math.max(0, 4000 - (Date.now() - last)); timer = window.setTimeout(run, wait); });
+    run();
+    return () => { off(); if (timer) clearTimeout(timer); void m.ready.then(() => m.setTraffic([])); };
+  }, [ui.layers.traffic]);
   /* semáforos: el archivo se baja solo la primera vez que se enciende la capa */
   useEffect(() => {
     const m = mc.current; if (!ui.layers.signals || !m || m.hasSignals) return;
