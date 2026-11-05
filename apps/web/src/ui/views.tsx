@@ -310,7 +310,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
         <dt>Próxima parada</dt><dd>{stopText(ns?.stop, "—")}</dd>
         <dt>Llega</dt><dd>{untilText(ns?.arrivalAt, nowSec)}</dd>
         <dt>Puntualidad</dt><dd><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></dd>
-        {mark?.isLast && <><dt>Último servicio</dt><dd>salió a las {clockOfDay(mark.startSeconds)}</dd></>}
+        {mark?.isLast && <><dt>Salida programada</dt><dd>{clockOfDay(mark.startSeconds)}</dd></>}
         <dt>Último reporte</dt><dd>hace {Math.max(0, Math.round(nowSec - v.reportedAt))} s</dd>
       </dl>
       <div className="acts"><button className="btn primary" onClick={onFollow}>{following ? "Dejar de seguir" : "Seguir"}</button><button className="btn" onClick={onRoute}>Ver ruta</button></div>
