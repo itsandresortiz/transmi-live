@@ -126,7 +126,7 @@ export class BusRenderer {
       if (o.motion === "predict") this.shown.set(v.id, { x: w.x, y: w.y, t: nowMs });
       const g = toGeo(w);
       items.push({ id: v.id, lon: g.lon, lat: g.lat, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th),
-        left: v.bearing != null && v.bearing > 180, label: this.state.routeOf(v)?.shortName ?? v.routeId });
+        left: v.bearing != null && v.bearing > 180, label: this.state.routeOf(v)?.shortName ?? v.routeId, last: this.state.serviceOf(v)?.isLast });
     }
     this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
     this.items = items;

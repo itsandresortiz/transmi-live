@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { connectionStatus, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
-import { CONFIG, liveData, networkSource, transit } from "./composition-root";
+import { CONFIG, liveData, loadServiceEnds, networkSource, transit } from "./composition-root";
 import { nowSec } from "./clock";
 import { BusRenderer } from "./map/BusRenderer";
 import { buildStationGeometry } from "./map/stations";
@@ -131,6 +131,7 @@ export function App() {
     const vis = () => { if (!document.hidden) void liveData.refresh(true).catch(() => {}); };
     document.addEventListener("visibilitychange", vis);
 
+    void loadServiceEnds();
     void networkSource.load().then((n) => {
       if (stopped) return;
       transit.setNetwork(n);

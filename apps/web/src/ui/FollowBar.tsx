@@ -34,7 +34,7 @@ export function FollowBar({ th, onResume }: { th: MapTheme; onResume(): void }) 
             : ns?.stop ? `${delayText(d)} · próxima: ${stopText(ns.stop)}${ns.arrivalAt ? ` ${untilText(ns.arrivalAt, nowSec)}` : ""}`
             : `${delayText(d)} · siguiéndolo`}
         </span>
-        <em>{SYSTEM_LABEL[v.system]} · {v.plate || v.label || v.id}</em>
+        <em>{SYSTEM_LABEL[v.system]} · {v.plate || v.label || v.id}{transit.serviceOf(v)?.isLast ? " · " : ""}{transit.serviceOf(v)?.isLast && <b className="lasttxt">Último servicio</b>}</em>
       </div>
       {followPaused && !silent && <button className="btn primary sm" onClick={onResume}>Volver al bus</button>}
       <button className="fab sm" aria-label="Dejar de seguir" onClick={() => setFollow(null)}><Close /></button>

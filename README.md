@@ -13,6 +13,7 @@ funciona sin internet con lo último visto) y adaptado a escritorio.
 - Ver en qué **vagón** de la estación (o plataforma del portal) para cada ruta: en el GTFS la **letra** del nombre es el vagón (A = 1, B = 2…) y los números cambian entre sentidos; se comprobó con rutas conocidas (La Campiña: H15 vagón 3, 7 vagón 1).
 - Las **estaciones de la troncal** se dibujan completas: una base alargada con sus vagones adentro (cápsulas con puertas y número), el nombre sobre ella y las paradas encima; al elegir una ruta se iluminan los vagones donde para. Tamaño típico (30 × 10 m por vagón): el GTFS solo trae un punto por parada.
 - Mapa con jerarquía de vías (autopistas y avenidas anchas, con borde) construido con datos de OpenStreetMap incluidos en la app; las líneas de todas las rutas están apagadas por defecto (Ajustes → «Líneas de rutas»).
+- Los buses que hacen el **último servicio** de su ruta (el último viaje programado del día) se marcan con un aro ámbar en el mapa, una etiqueta en su tarjeta y un aviso en la parada: el GTFS trae el primer y último viaje de cada ruta por tipo de día y los viajes en vivo coinciden con él por su identificador.
 - Guardar **favoritos** (paradas y rutas) y ver **paradas cerca de ti**.
 - Ver solo los **avisos** que te afectan (tus favoritos o tu zona).
 

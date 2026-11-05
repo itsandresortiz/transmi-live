@@ -3,4 +3,6 @@ export const CONFIG = {
   proxyUrl: "https://kmefztxxhipjowgcfxds.supabase.co/functions/v1/rapid-responder",
   /** Copia de respaldo y GTFS reducido, publicados por GitHub Actions en la rama live-data. */
   dataBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/live-data/",
+  /** Horarios resumidos (primer y último viaje de cada ruta), publicados cada día por GitHub Actions. */
+  scheduleBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/schedule-data/",
 } as const;

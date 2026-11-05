@@ -1,7 +1,7 @@
 import type { Map as MLMap } from "maplibre-gl";
 import { busSprite } from "./sprites";
 
-export interface BusDraw { id: string; lon: number; lat: number; color: string; left: boolean; label: string }
+export interface BusDraw { id: string; lon: number; lat: number; color: string; left: boolean; label: string; /** último servicio de su ruta */ last?: boolean }
 
 const W = 34, H = 22;
 /** Tamaño del ícono según el zoom (igual que el que tenía la capa del mapa). */
@@ -66,6 +66,7 @@ export class BusCanvas {
     for (const b of items) {
       const p = this.map.project([b.lon, b.lat]);
       if (p.x < -w || p.y < -h || p.x > cw + w || p.y > ch + h) continue;
+      if (b.last) { ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(w, h) * 0.62, 0, Math.PI * 2); ctx.fillStyle = "rgba(245,158,11,.35)"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#f59e0b"; ctx.stroke(); ctx.fillStyle = this.textColor; ctx.lineWidth = 3.5; ctx.strokeStyle = this.haloColor; }
       ctx.drawImage(this.sprite(b.color, b.left), p.x - w / 2, p.y - h / 2, w, h);
       if (labels) { ctx.strokeText(b.label, p.x, p.y - h / 2 - 3); ctx.fillText(b.label, p.x, p.y - h / 2 - 3); }
       this.hits.push({ id: b.id, x: p.x, y: p.y });

@@ -4,6 +4,7 @@ import type { MapTheme } from "../map/theme";
 import { Back, Bus, Chevron } from "./icons";
 import { StarButton, useUpcoming } from "./mine";
 import { nowMs } from "../clock";
+import { LastBadge } from "./lastService";
 import { labelOf, stopKind, stopTag, stopText } from "./stopname";
 import { routesAtStop, siblingStops } from "@transmi/application";
 import { useMemo } from "react";
@@ -46,7 +47,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
                   <span className="rb" style={{ ["--c" as string]: th.system[r.route.system] }}>{r.route.shortName}</span>
                   <span className="rm">
                     <span className="rt">{r.headsign ? `Hacia ${r.headsign}` : r.route.longName}</span>
-                    <span className="rs">{first.official ? "" : "aprox. "}{stopsAwayText(first.stopsAway)}{next ? ` · luego ${etaText(next.etaAt, nowSec)}` : ""}</span>
+                    <span className="rs">{first.official ? "" : "aprox. "}{stopsAwayText(first.stopsAway)}{next ? ` · luego ${etaText(next.etaAt, nowSec)}` : ""}{(first.vehicle && transit.serviceOf(first.vehicle)?.isLast) || (next && transit.serviceOf(next.vehicle)?.isLast) ? " · " : ""}{first.vehicle && transit.serviceOf(first.vehicle)?.isLast ? <LastBadge mark={transit.serviceOf(first.vehicle)} /> : next && transit.serviceOf(next.vehicle)?.isLast ? <><LastBadge mark={transit.serviceOf(next.vehicle)} /></> : null}</span>
                   </span>
                   <span className={`etabig${first.etaAt - nowSec <= 60 ? " soon" : ""}`}>{etaText(first.etaAt, nowSec)}</span>
                   <span className="chev"><Chevron /></span>
@@ -124,6 +125,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
       </div>
       {!row || !hero ? <Empty title="Ningún bus viene ahora" text="Esta ruta no tiene buses acercándose a la parada en este momento." /> : (
         <>
+          {transit.serviceOf(hero.vehicle)?.isLast && <div className="lastnote"><LastBadge mark={transit.serviceOf(hero.vehicle)} long /><br />Es el último viaje programado de hoy en esta ruta: después de este no hay más buses.</div>}
           <div className="hero" style={{ ["--rc" as string]: color }}>
             <small>Próximo bus</small>
             <b>{etaText(hero.etaAt, nowSec)}{!hero.official && <i>aprox.</i>}</b>
@@ -141,7 +143,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
               <div className="list">
                 {row.buses.slice(1).map((b, i) => (
                   <button key={b.vehicle.id} className="row" onClick={() => act.focusBus(b.vehicle.id, true)}>
-                    <span className="rm"><span className="rt">{etaText(b.etaAt, nowSec)}{!b.official && <i className="apx"> aprox.</i>}</span><span className="rs">Bus {i + 2} · {stopsAwayText(b.stopsAway)}</span></span>
+                    <span className="rm"><span className="rt">{etaText(b.etaAt, nowSec)}{!b.official && <i className="apx"> aprox.</i>}{transit.serviceOf(b.vehicle)?.isLast && <> <LastBadge mark={transit.serviceOf(b.vehicle)} /></>}</span><span className="rs">Bus {i + 2} · {stopsAwayText(b.stopsAway)}</span></span>
                     <span className="chev"><Chevron /></span>
                   </button>
                 ))}

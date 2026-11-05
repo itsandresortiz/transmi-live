@@ -120,3 +120,15 @@ describe("lotes incompletos", () => {
     expect(state.lastBatchAt).toBe(1000);
   });
 });
+
+import { ServiceEnds } from "@transmi/application";
+describe("último servicio", () => {
+  it("marca el último y el primer viaje programado de cada ruta", () => {
+    const e = new ServiceEnds();
+    e.load({ v: 1, routes: { "11856": { wk: { first: ["T-0401", 14400], last: ["T-2245", 82500] }, sa: { first: ["S-0500", 18000], last: ["S-2300", 82800] } } } });
+    expect(e.markOf("T-2245")).toEqual({ isLast: true, isFirst: false, startSeconds: 82500 });
+    expect(e.markOf("S-0500")?.isFirst).toBe(true);
+    expect(e.markOf("T-1200")).toBeUndefined();
+    expect(e.markOf(undefined)).toBeUndefined();
+  });
+});

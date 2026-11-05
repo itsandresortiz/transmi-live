@@ -8,6 +8,7 @@ import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
 import { nowMs } from "../clock";
 import { stopKind, stopTag, stopText } from "./stopname";
+import { LastBadge, clockOfDay } from "./lastService";
 import { FavoritesSection, NearbySection, StarButton } from "./mine";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
@@ -293,12 +294,13 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
   const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
   const color = sysColor(th, v.system);
   const target = useUi((u) => u.targetStopId);
+  const mark = transit.serviceOf(v);
   const toTarget = target ? upcomingAtStop(transit, target, nowSec, 40).flatMap((x) => x.buses).find((b) => b.vehicle.id === v.id) : undefined;
   return (
     <div className="pc">
       <div className="ph">
         <span className="rb big" style={{ ["--c" as string]: color }}>{r?.shortName ?? v.routeId}</span>
-        <div><h4>{r?.longName || SYSTEM_LABEL[v.system]}</h4><small>{SYSTEM_LABEL[v.system]} · <span className="plate-s">{v.plate || v.label || v.id}</span></small></div>
+        <div><h4>{r?.longName || SYSTEM_LABEL[v.system]}</h4><small>{SYSTEM_LABEL[v.system]} · <span className="plate-s">{v.plate || v.label || v.id}</span></small>{mark?.isLast && <div style={{ marginTop: 6 }}><LastBadge mark={mark} long /></div>}</div>
       </div>
       {target && toTarget && (
         <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{etaText(toTarget.etaAt, nowSec)}</b> a <b>{stopText(transit.stopById(target))}</b>
@@ -308,6 +310,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
         <dt>Próxima parada</dt><dd>{stopText(ns?.stop, "—")}</dd>
         <dt>Llega</dt><dd>{untilText(ns?.arrivalAt, nowSec)}</dd>
         <dt>Puntualidad</dt><dd><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></dd>
+        {mark?.isLast && <><dt>Último servicio</dt><dd>salió a las {clockOfDay(mark.startSeconds)}</dd></>}
         <dt>Último reporte</dt><dd>hace {Math.max(0, Math.round(nowSec - v.reportedAt))} s</dd>
       </dl>
       <div className="acts"><button className="btn primary" onClick={onFollow}>{following ? "Dejar de seguir" : "Seguir"}</button><button className="btn" onClick={onRoute}>Ver ruta</button></div>

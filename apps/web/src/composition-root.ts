@@ -27,3 +27,14 @@ export const networkSource = new GtfsLiteNetworkSource({
   fetchFn: cachedFetch,
   createWorker: () => new Worker(new URL("../../../packages/infrastructure/src/gtfs/worker.ts", import.meta.url), { type: "module" }),
 });
+
+/** Carga el primer y último viaje de cada ruta para marcar el «último servicio». Si falla, la app sigue sin esa marca. */
+export async function loadServiceEnds(): Promise<void> {
+  try {
+    if (typeof DecompressionStream === "undefined") return;
+    const res = await cachedFetch(`${CONFIG.scheduleBase}service-ends.json.gz?t=${Math.floor(Date.now() / 3_600_000)}`);
+    if (!res.ok || !res.body) return;
+    const text = await new Response(res.body.pipeThrough(new DecompressionStream("gzip"))).text();
+    transit.setServiceEnds(JSON.parse(text));
+  } catch { /* sin conexión o archivo aún no publicado */ }
+}
