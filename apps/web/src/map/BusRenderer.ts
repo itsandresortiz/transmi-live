@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { MotionEngine, type TransitState } from "@transmi/application";
-import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, predictPosition, toGeo, toWorld } from "@transmi/domain";
+import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo, toWorld } from "@transmi/domain";
 import { type BusDraw, BusCanvas } from "./BusCanvas";
 import type { MapController } from "./MapController";
 import type { MapTheme } from "./theme";
@@ -101,7 +101,7 @@ export class BusRenderer {
       for (const v of this.state.fleet.values()) {
         if (o.system && v.system !== o.system) continue;
         if (o.routeId && v.routeId !== o.routeId) continue;
-        const w = this.step(v.id, o.motion === "predict" ? predictPosition(v, nowSec) : v.world, nowMs, tau);
+        const w = this.step(v.id, v.world, nowMs, tau);   // vista lejana: sin adelantar (en línea recta se saldrían de la calle)
         const g = toGeo(w);
         features.push({ type: "Feature", properties: { id: v.id, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th) }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
       }

@@ -1,6 +1,6 @@
 import {
   DEFAULT_PREDICTION, METERS_PER_WORLD_UNIT, RoadPath, type RouteLock, type Vehicle, type WorldPoint,
-  lockToRoute, motionSeconds, predictPosition, toWorld,
+  lockToRoute, motionSeconds, toWorld,
 } from "@transmi/domain";
 import type { TransitState } from "./transit-state";
 
@@ -30,7 +30,7 @@ export interface MotionParams {
 }
 export const DEFAULT_MOTION: MotionParams = {
   rateGain: 1, catchUp: 0.18, speedSmoothing: 1.5, maxRush: 3, rushMarginMps: 3,
-  snapMeters: 800, glideSeconds: 1.8, creep: 0.5, lockMeters: 45, stopClamp: false, stopSlackMeters: 12,
+  snapMeters: 800, glideSeconds: 1.8, creep: 0.5, lockMeters: 60, stopClamp: false, stopSlackMeters: 12,
 };
 
 interface Track {
@@ -98,7 +98,7 @@ export class MotionEngine {
       if (!t || nowSec - t.lastT > STALE_SECONDS) {
         const r0 = sp * p.rateGain;
         const target = this.target(v, nowSec, lock, sp);
-        t = { reportedAt: v.reportedAt, lock, speed: sp, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: r0, ux: (vel?.ux ?? 0) * r0, uy: (vel?.uy ?? 0) * r0, lastT: nowSec };
+        t = { reportedAt: v.reportedAt, lock, speed: sp, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: r0, ux: 0, uy: 0, lastT: nowSec };
         this.tracks.set(v.id, t);
         return { x: t.x, y: t.y };
       }
@@ -143,10 +143,9 @@ export class MotionEngine {
     } else {
       // 3) sin trazado: igual, pero en dos dimensiones
       const ex = (tgt.world.x - t.bx) * METERS_PER_WORLD_UNIT, ey = (tgt.world.y - t.by) * METERS_PER_WORLD_UNIT;
-      if (Math.hypot(ex, ey) > p.snapMeters) { t.ox += t.bx - tgt.world.x; t.oy += t.by - tgt.world.y; t.bx = tgt.world.x; t.by = tgt.world.y; t.ux = (vel?.ux ?? 0) * rate; t.uy = (vel?.uy ?? 0) * rate; }
+      if (Math.hypot(ex, ey) > p.snapMeters) { t.ox += t.bx - tgt.world.x; t.oy += t.by - tgt.world.y; t.bx = tgt.world.x; t.by = tgt.world.y; t.ux = 0; t.uy = 0; }
       else {
-        const vx = (vel?.ux ?? 0) * rate, vy = (vel?.uy ?? 0) * rate;
-        let wx = vx + p.catchUp * ex, wy = vy + p.catchUp * ey;
+        let wx = p.catchUp * ex, wy = p.catchUp * ey;      // el objetivo está quieto: solo se acerca a él con suavidad
         const cap = rate * p.maxRush + p.rushMarginMps, m = Math.hypot(wx, wy);
         if (m > cap) { wx *= cap / m; wy *= cap / m; }
         const a = 1 - Math.exp(-dt / p.speedSmoothing);
@@ -204,6 +203,7 @@ export class MotionEngine {
       const s = lock.s + speed * motionSeconds(age, DEFAULT_PREDICTION);
       return { s, world: lock.path.pointAt(s) };
     }
-    return { s: 0, world: predictPosition(v, nowSec) };
+    // sin trazado conocido NO se adelanta: en línea recta el bus se saldría de la calle y flotaría en el vacío mientras llega el siguiente dato
+    return { s: 0, world: v.world };
   }
 }

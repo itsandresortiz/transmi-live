@@ -80,6 +80,17 @@ describe("movimiento de los buses", () => {
     expect(xOf(eng.step(st.fleet.get("b")!, 30))).toBeCloseTo(1000, 0);
   });
 
+  it("un bus que no va por ninguna ruta conocida no se sale en línea recta mientras espera datos nuevos", () => {
+    const st = world(), eng = new MotionEngine(st);
+    // misma ruta, pero el bus reporta 400 m al norte de la calle: no se puede pegar a ella
+    st.applyPositions([rep(0, 1000, 4.6536)], 0); st.applyPositions([rep(30, 1300, 4.6536)], 30_000);
+    const v = st.fleet.get("b")!;
+    const a = eng.step(v, 30);
+    let far = 0;
+    for (let t = 31; t <= 150; t += 1) { const p = eng.step(v, t); far = Math.max(far, distanceMeters(a, p)); }
+    expect(far).toBeLessThan(5);      // 2 minutos sin datos y sigue en su sitio, no flota hacia ninguna parte
+  });
+
   it("un bus fuera de pantalla que vuelve a mirarse no se arrastra desde donde estaba", () => {
     const st = world(), eng = new MotionEngine(st);
     st.applyPositions([rep(0, 1000)], 0); st.applyPositions([rep(30, 1300)], 30_000);
