@@ -29,10 +29,11 @@ const BOGOTA: [number, number] = [-74.075, 4.65];
 
 /** Las líneas de todas las rutas van tenues para que se lea la jerarquía de las calles; al elegir una ruta se resalta sola. */
 const NETWORK_OPACITY = 0.2;
+const TRONCAL_OPACITY = 0.85;
 type RoadKey = "minor" | "tertiary" | "secondary" | "primary" | "trunk";
 /** Ancho (px) de cada tipo de vía según el zoom. Las autopistas y avenidas se ven anchas, como en Google Maps. */
 const ROAD_CLASSES: { id: string; key: RoadKey; filter: unknown[]; minzoom: number; casing: boolean; major: boolean; widths: [number, number][] }[] = [
-  { id: "road-0", key: "minor", filter: ["<=", ["get", "c"], 1], minzoom: 13, casing: false, major: false, widths: [[13, 0.5], [15, 2], [17, 7], [19, 16]] },
+  { id: "road-0", key: "minor", filter: ["<=", ["get", "c"], 1], minzoom: 12.5, casing: true, major: false, widths: [[12.5, 0.6], [14, 1.1], [15.5, 3], [17, 8], [19, 18]] },
   { id: "road-2", key: "tertiary", filter: ["==", ["get", "c"], 2], minzoom: 11.5, casing: true, major: false, widths: [[11.5, 0.5], [13, 1.4], [15, 4.5], [17, 10], [19, 22]] },
   { id: "road-3", key: "secondary", filter: ["==", ["get", "c"], 3], minzoom: 10.5, casing: true, major: false, widths: [[10.5, 0.6], [13, 2.2], [15, 6], [17, 13], [19, 28]] },
   { id: "road-4", key: "primary", filter: ["==", ["get", "c"], 4], minzoom: 9, casing: true, major: true, widths: [[9, 0.6], [12, 2.2], [14, 6], [16, 11], [18, 22], [19.5, 38]] },
@@ -137,8 +138,14 @@ export class MapController {
       m.addLayer({ id, type: "symbol", source: "street-labels", minzoom, filter: filter as never, layout: streetLayout([...size]) as never, paint: streetPaint }));
 
     m.addLayer({
-      id: "estaciones-circles", type: "circle", source: "estaciones", minzoom: 11, maxzoom: 14.5,
+      id: "estaciones-circles", type: "circle", source: "estaciones", minzoom: 11,
       paint: { "circle-radius": zoomWidth([11, 2], [15, 4.2], [18, 6]), "circle-color": t.surface, "circle-stroke-color": t.troncal, "circle-stroke-width": 2 },
+    });
+    // portales y estaciones que no se dibujan completas: puntico con su nombre (como antes)
+    m.addLayer({
+      id: "estaciones-labels", type: "symbol", source: "estaciones", minzoom: 13.5,
+      layout: { "text-field": ["get", "name"], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 13.5, 10.5, 17, 12.5], "text-offset": [0, 1.1], "text-anchor": "top", "text-optional": true },
+      paint: { "text-color": t.troncal, "text-halo-color": t.halo, "text-halo-width": 1.8 },
     });
     // estaciones de la troncal: la estación completa (base), sus vagones (cápsulas, con puertas y número) y su nombre
     m.addLayer({ id: "station-base-fill", type: "fill", source: "station-bases", minzoom: 14.5, paint: { "fill-color": t.stationBase, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] } });
@@ -194,7 +201,8 @@ export class MapController {
     const set = (id: string, data: FeatureCollection) => (this.map.getSource(id) as GeoJSONSource | undefined)?.setData(data);
     const [loc, tron, est] = await Promise.all([geo.loadLocalidades(), geo.loadTroncales(), geo.loadEstaciones()]);
     set("localidades", geo.localidadPolygons(loc)); set("localidad-labels", geo.localidadLabels(loc));
-    set("troncales", geo.troncalLines(tron)); set("estaciones", geo.estacionPoints(est));
+    set("troncales", geo.troncalLines(tron));
+    this.estacionesAll = geo.estacionPoints(est); this.applyEstaciones();
     set("roads", await geo.loadRoads());
     set("street-labels", await geo.loadStreetLabels());
   }
@@ -269,6 +277,8 @@ export class MapController {
     for (const id of STREET_LAYERS) { m.setPaintProperty(id, "text-color", t.label); m.setPaintProperty(id, "text-halo-color", t.halo); }
     m.setPaintProperty("estaciones-circles", "circle-color", t.surface);
     m.setPaintProperty("estaciones-circles", "circle-stroke-color", t.troncal);
+    m.setPaintProperty("estaciones-labels", "text-color", t.troncal);
+    m.setPaintProperty("estaciones-labels", "text-halo-color", t.halo);
     m.setPaintProperty("station-base-fill", "fill-color", t.stationBase);
     m.setPaintProperty("station-base-line", "line-color", t.stationEdge);
     m.setPaintProperty("station-capsule-fill", "fill-color", ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule]);
@@ -292,6 +302,15 @@ export class MapController {
   }
 
   private stationBase: StationGeometry | null = null;
+  private estacionesAll: FeatureCollection<Point> | null = null;
+  /** Los puniticos de estaciones del archivo propio se ocultan donde ya se dibuja la estación completa (a menos de 250 m de un vagón). */
+  private applyEstaciones() {
+    const all = this.estacionesAll; if (!all) return;
+    const centers = this.stationBase?.labels.features.map((f) => f.geometry.coordinates as [number, number]) ?? [];
+    const near = (lon: number, lat: number) => centers.some(([x, y]) => Math.abs(y - lat) < 0.0023 && Math.abs(x - lon) < 0.0023 && Math.hypot((y - lat) * 111_000, (x - lon) * 110_000) < 250);
+    const features = all.features.filter((f) => { const [lon, lat] = f.geometry.coordinates as [number, number]; return !near(lon, lat); });
+    (this.map.getSource("estaciones") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features });
+  }
   private stationState = { hl: new Set<string>(), color: "#e11d2e", sel: null as string | null };
 
   private chipName() { return this.scheme === "dark" ? "station-chip-dark" : "station-chip-light"; }
@@ -307,6 +326,7 @@ export class MapController {
   /** Dibuja las estaciones de la troncal. */
   setStations(g: StationGeometry) {
     this.stationBase = g;
+    this.applyEstaciones();
     (this.map.getSource("station-bases") as GeoJSONSource | undefined)?.setData(g.bases);
     (this.map.getSource("station-doors") as GeoJSONSource | undefined)?.setData(g.doors);
     (this.map.getSource("station-links") as GeoJSONSource | undefined)?.setData(g.links);
@@ -347,7 +367,6 @@ export class MapController {
       stops.push({ type: "Feature", properties: { id: s.id }, geometry: { type: "Point", coordinates: [s.position.lon, s.position.lat] } });
     (this.map.getSource("stops") as GeoJSONSource).setData({ type: "FeatureCollection", features: stops });
     this.networkLoaded = true;
-    this.map.setLayoutProperty("troncales-lines", "visibility", "none");
   }
   /** Colores de la red según el tema (al cambiar de claro a oscuro). */
   recolorNetwork(net: TransitNetwork) { if (this.networkLoaded) this.setNetwork(net); }
@@ -358,9 +377,11 @@ export class MapController {
     if (!shapes || !shapes.length) {
       sel.setData(EMPTY); stops.setData(EMPTY);
       this.map.setPaintProperty("network-lines", "line-opacity", NETWORK_OPACITY);
+      this.map.setPaintProperty("troncales-lines", "line-opacity", TRONCAL_OPACITY);
       return;
     }
     this.map.setPaintProperty("network-lines", "line-opacity", 0.1);
+    this.map.setPaintProperty("troncales-lines", "line-opacity", 0.3);
     sel.setData({
       type: "FeatureCollection",
       features: shapes.filter((s) => s.points.length > 1).map((s) => ({
@@ -386,6 +407,7 @@ export class MapController {
   showSegment(points: readonly GeoPoint[], color: string, stops: readonly { id: string; p: GeoPoint }[]) {
     const sel = this.map.getSource("route-sel") as GeoJSONSource, st = this.map.getSource("route-stops") as GeoJSONSource;
     this.map.setPaintProperty("network-lines", "line-opacity", 0.1);
+    this.map.setPaintProperty("troncales-lines", "line-opacity", 0.3);
     sel.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: { color, on: true }, geometry: { type: "LineString", coordinates: points.map((p) => [p.lon, p.lat]) } }] });
     st.setData({ type: "FeatureCollection", features: stops.map((s) => ({ type: "Feature", properties: { id: s.id, color }, geometry: { type: "Point", coordinates: [s.p.lon, s.p.lat] } })) });
   }

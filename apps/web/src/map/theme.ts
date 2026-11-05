@@ -15,7 +15,7 @@ export interface MapTheme {
 
 export const LIGHT: MapTheme = {
   mapbg: "#eef0f3", land: "#f7f8fa", landLine: "#c9ced6", road: "#dfe2e7", roadMajor: "#bcc3ce",
-  roads: { minor: "#e4e8ef", tertiary: "#dbe0e9", secondary: "#d2d9e4", primary: "#c8d0dd", trunk: "#bec7d6", casing: "#b4bece", casingMajor: "#a3aebf" },
+  roads: { minor: "#d6dce6", tertiary: "#ccd3df", secondary: "#c1cad8", primary: "#b6c0d1", trunk: "#abb6c9", casing: "#9ea9bc", casingMajor: "#8c99ae" },
   label: "#6c6c70", labelStrong: "#1c1c1e", halo: "#eef0f3", troncal: "#e11d2e", surface: "#ffffff",
   stationBase: "#dde2ea", stationEdge: "#a9b2c1", stationLink: "#c4ccd9", capsule: "#ffffff", capsuleEdge: "#6f7a8d",
   system: { troncal: "#e11d2e", dual: "#8a45d6", alimentador: "#12945f", zonal: "#1f6fd1", otro: "#8e8e93" },
@@ -23,7 +23,7 @@ export const LIGHT: MapTheme = {
 };
 export const DARK: MapTheme = {
   mapbg: "#090c12", land: "#0e141d", landLine: "#2a3850", road: "#1a2231", roadMajor: "#2f405b",
-  roads: { minor: "#1a2331", tertiary: "#212c3e", secondary: "#283550", primary: "#2f3e5b", trunk: "#364765", casing: "#3a4a68", casingMajor: "#4a5c80" },
+  roads: { minor: "#243044", tertiary: "#2c3a52", secondary: "#344460", primary: "#3d4f6e", trunk: "#475a7b", casing: "#4c5d7d", casingMajor: "#60769f" },
   label: "#a1a1a8", labelStrong: "#f5f5f7", halo: "#090c12", troncal: "#ff5a66", surface: "#1c1c1e",
   stationBase: "#242c3b", stationEdge: "#4a566e", stationLink: "#3d4a66", capsule: "#36425c", capsuleEdge: "#a3afc8",
   system: { troncal: "#ff5a66", dual: "#b88af2", alimentador: "#34d197", zonal: "#5aa2ff", otro: "#9a9aa5" },
