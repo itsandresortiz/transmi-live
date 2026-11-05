@@ -214,7 +214,7 @@ export function App() {
     const m = mc.current; if (!m) return;
     void m.ready.then(() => {
       const st = transit.stopById(ui.stopId ?? undefined);
-      m.setFocusStop(st ? st.position : null, thRef.current.troncal);
+      m.setFocusStop(st ? st.position : null, thRef.current.troncal, st?.id);
       if (!st || !ui.stopId) return;
       const pad = mapPadding();
       if (!ui.stopRoute) {

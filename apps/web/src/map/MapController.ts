@@ -40,6 +40,22 @@ const ROAD_CLASSES: { id: string; key: RoadKey; filter: unknown[]; minzoom: numb
   { id: "road-4", key: "primary", filter: ["==", ["get", "c"], 4], minzoom: 9, casing: true, major: true, widths: [[9, 0.6], [12, 2.2], [14, 6], [16, 11], [18, 22], [19.5, 38]] },
   { id: "road-5", key: "trunk", filter: ["==", ["get", "c"], 5], minzoom: 8, casing: true, major: true, widths: [[8, 0.6], [12, 3], [14, 7.5], [16, 14], [18, 28], [19.5, 48]] },
 ];
+/** Las paradas se dibujan a la derecha de la vía (donde para el bus), no en el eje. Ocho direcciones y un desplazamiento en píxeles según el zoom. */
+const SECTORS = 8;
+const SIDE_PX: [number, number][] = [[13.5, 0], [15, 2.5], [16, 4.2], [17, 7], [18, 11], [19, 16]];
+const sideVec = (k: number): [number, number] => [Math.cos((k * Math.PI) / 4), Math.sin((k * Math.PI) / 4)];
+const sideExpr = (k: number): ExpressionSpecification => {
+  const [ux, uy] = sideVec(k);
+  return ["interpolate", ["linear"], ["zoom"], ...SIDE_PX.flatMap(([z, px]) => [z, ["literal", [Math.round(ux * px * 100) / 100, Math.round(uy * px * 100) / 100]]])] as unknown as ExpressionSpecification;
+};
+/** Desplazamiento en pantalla (px) de una parada con dirección `k` al zoom `z` y giro `bearing` del mapa. */
+function sideScreen(k: number, z: number, bearing: number): [number, number] {
+  let px = SIDE_PX[SIDE_PX.length - 1]![1];
+  for (let i = 1; i < SIDE_PX.length; i++) if (z <= SIDE_PX[i]![0]) { const [z0, p0] = SIDE_PX[i - 1]!, [z1, p1] = SIDE_PX[i]!; px = z <= z0 ? p0 : p0 + ((p1 - p0) * (z - z0)) / (z1 - z0); break; }
+  const [ux, uy] = sideVec(k), a = (-bearing * Math.PI) / 180;      // el desplazamiento «de mapa» gira con el mapa
+  return [(ux * Math.cos(a) - uy * Math.sin(a)) * px, (ux * Math.sin(a) + uy * Math.cos(a)) * px];
+}
+const sidedIds = (id: string) => [id, ...Array.from({ length: SECTORS }, (_, k) => `${id}-${k}`)];
 const casingWidth = (z: number) => (z < 12 ? 0.4 : z < 16 ? 0.4 + (z - 12) * 0.2 : 1.2 + Math.min(z - 16, 3) * 0.25);
 
 /** Color según la línea de la troncal (propiedad `l` de cada elemento). */
@@ -86,6 +102,16 @@ export class MapController {
     this.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     this.ready = new Promise((res) => this.map.once("load", () => { this.addLayers(); this.bindEvents(); void this.loadStatic(); res(); }));
   }
+
+  /** Una capa de círculos y sus 8 variantes, cada una desplazada hacia el lado derecho de la vía en una dirección distinta. */
+  private addSided(def: { id: string; source: string; minzoom?: number; paint: Record<string, unknown> }) {
+    const base = { type: "circle", source: def.source, ...(def.minzoom != null ? { minzoom: def.minzoom } : {}) } as const;
+    this.map.addLayer({ ...base, id: def.id, filter: ["!", ["has", "k"]], paint: def.paint } as never);
+    for (let k = 0; k < SECTORS; k++)
+      this.map.addLayer({ ...base, id: `${def.id}-${k}`, filter: ["==", ["get", "k"], k], paint: { ...def.paint, "circle-translate": sideExpr(k), "circle-translate-anchor": "map" } } as never);
+  }
+  /** Dirección (0-7) hacia donde se corre cada parada para quedar a la derecha de la vía. */
+  private stopSector = new Map<string, number>();
 
   /* ---------- capas ---------- */
   private src(id: string, data: FeatureCollection = EMPTY, extra: Record<string, unknown> = {}) {
@@ -212,21 +238,17 @@ export class MapController {
       },
       paint: { "text-color": t.labelStrong },
     });
-    m.addLayer({
-      id: "stops-circles", type: "circle", source: "stops", minzoom: 13.5,
-      paint: { "circle-radius": zoomWidth([13.5, 2.2], [17, 4]), "circle-color": t.surface, "circle-stroke-color": t.label, "circle-stroke-width": 1 },
-    });
-    m.addLayer({
-      id: "route-stops", type: "circle", source: "route-stops",
-      paint: { "circle-radius": zoomWidth([10, 3], [15, 5.5], [18, 8]), "circle-color": t.surface, "circle-stroke-color": ["get", "color"], "circle-stroke-width": 2.5 },
-    });
+    this.addSided({ id: "stops-circles", source: "stops", minzoom: 13.5,
+      paint: { "circle-radius": zoomWidth([13.5, 2.2], [17, 4]), "circle-color": t.surface, "circle-stroke-color": t.label, "circle-stroke-width": 1 } });
+    this.addSided({ id: "route-stops", source: "route-stops",
+      paint: { "circle-radius": zoomWidth([10, 3], [15, 5.5], [18, 8]), "circle-color": t.surface, "circle-stroke-color": ["get", "color"], "circle-stroke-width": 2.5 } });
     m.addLayer({
       id: "alert-stops", type: "circle", source: "alert-stops",
       paint: { "circle-radius": 9, "circle-color": "#f59e0b", "circle-opacity": 0.4, "circle-stroke-color": "#f59e0b", "circle-stroke-width": 2.5 },
     });
 
-    m.addLayer({ id: "stop-focus-halo", type: "circle", source: "stop-focus", paint: { "circle-radius": 22, "circle-color": ["get", "color"], "circle-opacity": 0.2 } });
-    m.addLayer({ id: "stop-focus-dot", type: "circle", source: "stop-focus", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
+    this.addSided({ id: "stop-focus-halo", source: "stop-focus", paint: { "circle-radius": 22, "circle-color": ["get", "color"], "circle-opacity": 0.2 } });
+    this.addSided({ id: "stop-focus-dot", source: "stop-focus", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
     m.addLayer({
       id: "bus-dots", type: "circle", source: "buses", maxzoom: 13,
       paint: { "circle-radius": zoomWidth([9, 2.2], [13, 4.2]), "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 },
@@ -263,7 +285,7 @@ export class MapController {
     const pick = (pt: { x: number; y: number }): Hit | null => {
       const bus = this.busHit?.(pt);
       if (bus) return { kind: "bus", id: bus };
-      const layers = ["route-stops", "station-capsule-fill", "station-base-fill", "stops-circles", "estaciones-circles", "bus-dots"].filter((l) => m.getLayer(l));
+      const layers = [...sidedIds("route-stops"), "station-capsule-fill", "station-base-fill", ...sidedIds("stops-circles"), "estaciones-circles", "bus-dots"].filter((l) => m.getLayer(l));
       const feats = m.queryRenderedFeatures([[pt.x - TOUCH_PAD, pt.y - TOUCH_PAD], [pt.x + TOUCH_PAD, pt.y + TOUCH_PAD]], { layers });
       let best: Hit | null = null, bd = Infinity;
       for (const f of feats) {
@@ -274,8 +296,10 @@ export class MapController {
           lon = ring.reduce((a, c) => a + c[0]!, 0) / ring.length; lat = ring.reduce((a, c) => a + c[1]!, 0) / ring.length;
         } else continue;
         const q = m.project([lon, lat]);
+        const kk = f.properties?.k;
+        if ((f.layer.id.startsWith("route-stops") || f.layer.id.startsWith("stops-circles")) && typeof kk === "number") { const [ox, oy] = sideScreen(kk, m.getZoom(), m.getBearing()); q.x += ox; q.y += oy; }   // el punto está dibujado a un lado de la vía
         // a igual distancia gana la parada de una ruta resaltada, luego la parada, luego la estación
-        const rank = f.layer.id === "route-stops" ? 0 : f.layer.id === "stops-circles" ? 1 : f.layer.id === "station-capsule-fill" ? 5 : f.layer.id === "station-base-fill" ? 8 : 2;
+        const rank = f.layer.id.startsWith("route-stops") ? 0 : f.layer.id.startsWith("stops-circles") ? 1 : f.layer.id === "station-capsule-fill" ? 5 : f.layer.id === "station-base-fill" ? 8 : 2;
         const d = Math.hypot(q.x - pt.x, q.y - pt.y) + rank * 3;
         if (d >= bd) continue;
         if (f.layer.id === "bus-dots") { bd = d; best = { kind: "bus", id: String(f.properties?.id) }; }
@@ -329,15 +353,14 @@ export class MapController {
     this.registerChip();
     m.setLayoutProperty("station-chips", "icon-image", this.chipImage());
     m.setLayoutProperty("portal-chips", "icon-image", this.portalImage());
-    m.setPaintProperty("stops-circles", "circle-color", t.surface);
-    m.setPaintProperty("stops-circles", "circle-stroke-color", t.label);
-    m.setPaintProperty("route-stops", "circle-color", t.surface);
+    for (const id of sidedIds("stops-circles")) { m.setPaintProperty(id, "circle-color", t.surface); m.setPaintProperty(id, "circle-stroke-color", t.label); }
+    for (const id of sidedIds("route-stops")) m.setPaintProperty(id, "circle-color", t.surface);
   }
 
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["trafico-casing", "trafico-lines"], t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis([...sidedIds("stops-circles"), "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["trafico-casing", "trafico-lines"], t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
   }
 
   /** Velocidad de los buses en las calles (cada tramo con su banda de color). */
@@ -431,11 +454,38 @@ export class MapController {
           lines.push({ type: "Feature", properties: { rid, color: t.system[sys] }, geometry: { type: "LineString", coordinates: s.points.map((p) => [p.lon, p.lat]) } });
     }
     (this.map.getSource("network") as GeoJSONSource).setData({ type: "FeatureCollection", features: lines });
+    this.computeSectors(net);
     const stops: Feature<Point>[] = [];
-    for (const s of net.stops.values())
-      stops.push({ type: "Feature", properties: { id: s.id }, geometry: { type: "Point", coordinates: [s.position.lon, s.position.lat] } });
+    for (const s of net.stops.values()) {
+      const k = this.stopSector.get(s.id);
+      stops.push({ type: "Feature", properties: k == null ? { id: s.id } : { id: s.id, k }, geometry: { type: "Point", coordinates: [s.position.lon, s.position.lat] } });
+    }
     (this.map.getSource("stops") as GeoJSONSource).setData({ type: "FeatureCollection", features: stops });
     this.networkLoaded = true;
+  }
+  /** Para cada parada, hacia dónde queda la derecha de la vía según el sentido de la primera ruta que pasa por ella. */
+  private computeSectors(net: TransitNetwork) {
+    this.stopSector = new Map();
+    for (const shapes of net.shapes.values()) for (const sh of shapes) {
+      const pts = sh.points; if (pts.length < 2) continue;
+      let ptr = 0;
+      for (const id of sh.stopIds) {
+        if (this.stopSector.has(id)) continue;
+        const st = net.stops.get(id); if (!st) continue;
+        // los puntos del recorrido y las paradas van en el mismo orden: se avanza sin volver atrás
+        let best = ptr, bd = Infinity;
+        for (let i = ptr; i < Math.min(pts.length, ptr + 400); i++) {
+          const d = (pts[i]!.lon - st.position.lon) ** 2 + (pts[i]!.lat - st.position.lat) ** 2;
+          if (d < bd) { bd = d; best = i; }
+        }
+        ptr = best;
+        const a = pts[Math.max(0, best - 2)]!, b = pts[Math.min(pts.length - 1, best + 2)]!;
+        const dx = (b.lon - a.lon) * 0.997, dy = -(b.lat - a.lat);          // x al este, y hacia abajo (pantalla)
+        if (Math.hypot(dx, dy) < 1e-7) continue;
+        const nx = -dy, ny = dx;                                             // derecha de la marcha
+        this.stopSector.set(id, ((Math.round(Math.atan2(ny, nx) / (Math.PI / 4)) % SECTORS) + SECTORS) % SECTORS);
+      }
+    }
   }
   /** Colores de la red según el tema (al cambiar de claro a oscuro). */
   recolorNetwork(net: TransitNetwork) { if (this.networkLoaded) this.setNetwork(net); }
@@ -462,14 +512,19 @@ export class MapController {
     const feats: Feature<Point>[] = [];
     for (const id of cur.stopIds) {
       const p = stopsLookup(id);
-      if (p) feats.push({ type: "Feature", properties: { id, color }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } });
+      if (p) feats.push({ type: "Feature", properties: this.withSector({ id, color }, id), geometry: { type: "Point", coordinates: [p.lon, p.lat] } });
     }
     stops.setData({ type: "FeatureCollection", features: feats });
   }
 
+  private withSector<T extends Record<string, unknown>>(props: T, id?: string): T & { k?: number } {
+    const k = id ? this.stopSector.get(id) : undefined;
+    return k == null ? props : { ...props, k };
+  }
+
   /** Marca la parada elegida con un punto grande. */
-  setFocusStop(p: GeoPoint | null, color = "#e11d2e") {
-    (this.map.getSource("stop-focus") as GeoJSONSource | undefined)?.setData(!p ? EMPTY : { type: "FeatureCollection", features: [{ type: "Feature", properties: { color }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } }] });
+  setFocusStop(p: GeoPoint | null, color = "#e11d2e", stopId?: string) {
+    (this.map.getSource("stop-focus") as GeoJSONSource | undefined)?.setData(!p ? EMPTY : { type: "FeatureCollection", features: [{ type: "Feature", properties: this.withSector({ color }, stopId), geometry: { type: "Point", coordinates: [p.lon, p.lat] } }] });
   }
 
   /** Resalta solo un tramo de una ruta (por ejemplo, por donde vienen los buses hacia una parada). */
@@ -478,7 +533,7 @@ export class MapController {
     this.map.setPaintProperty("network-lines", "line-opacity", 0.1);
     this.map.setPaintProperty("troncales-lines", "line-opacity", 0.3);
     sel.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: { color, on: true }, geometry: { type: "LineString", coordinates: points.map((p) => [p.lon, p.lat]) } }] });
-    st.setData({ type: "FeatureCollection", features: stops.map((s) => ({ type: "Feature", properties: { id: s.id, color }, geometry: { type: "Point", coordinates: [s.p.lon, s.p.lat] } })) });
+    st.setData({ type: "FeatureCollection", features: stops.map((s) => ({ type: "Feature", properties: this.withSector({ id: s.id, color }, s.id), geometry: { type: "Point", coordinates: [s.p.lon, s.p.lat] } })) });
   }
 
   setAlertStops(points: readonly GeoPoint[] | null) {
