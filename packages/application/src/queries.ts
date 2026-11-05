@@ -76,7 +76,7 @@ const LINK_METERS = 200;
 const titleKeys = new WeakMap<Stop, string>();
 function keyOf(state: TransitState, stop: Stop): string {
   let k = titleKeys.get(stop);
-  if (k === undefined) { k = normalize(state.labelOf(stop).title); titleKeys.set(stop, k); }
+  if (k === undefined) { k = normalize(state.labelOf(stop).title).replace(/^(la|el|los|las)\s+/, ""); titleKeys.set(stop, k); }   // «Campiña» y «La Campiña» son la misma estación
   return k;
 }
 /** Ordena las paradas de una estación: vagón 1, 2, 3…, luego plataformas, luego el resto. */

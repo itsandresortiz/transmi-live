@@ -3,8 +3,11 @@ import { type RoadPath, type RouteShape, METERS_PER_WORLD_UNIT, RoadPath as Path
 import { type Station, type TransitState } from "@transmi/application";
 
 /** Medidas típicas (m) con las que se dibuja una estación. El archivo solo da un punto por parada, no la forma real. */
-const CAPSULE_LENGTH = 30, CAPSULE_WIDTH = 10;
-const BASE_MARGIN_ALONG = 11, BASE_MARGIN_ACROSS = 5, BASE_RADIUS = 9;
+const CAPSULE_LENGTH = 30, CAPSULE_WIDTH = 9;
+/** La base abraza a los vagones sin pasarse hacia las calzadas de las avenidas (la estación va en el separador). */
+const BASE_MARGIN_ALONG = 7, BASE_MARGIN_ACROSS = 1.6, BASE_RADIUS = 6;
+/** Pasillo que une los vagones de una misma estación. */
+const LINK_WIDTH = 4.5;
 /** Las paradas del mismo vagón (una por sentido) que están así de cerca (m) son el mismo vagón. */
 const MERGE_METERS = 45;
 
@@ -17,6 +20,8 @@ export interface StationGeometry {
   doors: FeatureCollection<LineString>;
   /** Centro de cada vagón, para su número. */
   labels: FeatureCollection<Point>;
+  /** El pasillo que une los vagones de cada estación. */
+  links: FeatureCollection<Polygon>;
   /** Una etiqueta con el nombre sobre cada estación. */
   chips: FeatureCollection<Point>;
 }
@@ -52,7 +57,7 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
   const cache = new Map<RouteShape, RoadPath>();
   const m = 1 / METERS_PER_WORLD_UNIT;
   const empty = <G extends Polygon | LineString | Point>(): FeatureCollection<G> => ({ type: "FeatureCollection", features: [] });
-  const out: StationGeometry = { bases: empty(), capsules: empty(), doors: empty(), labels: empty(), chips: empty() };
+  const out: StationGeometry = { bases: empty(), capsules: empty(), doors: empty(), labels: empty(), links: empty(), chips: empty() };
 
   /** Rectángulo redondeado en coordenadas de la estación (u a lo largo, v a lo ancho), llevado a longitud/latitud. */
   const rounded = (cu: number, cv: number, hl: number, hw: number, r: number, ax: Axis): number[][] => {
@@ -104,6 +109,11 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
         const du = k * CAPSULE_LENGTH, dv = CAPSULE_WIDTH / 2 - 1.2;
         out.doors.features.push({ type: "Feature", properties: { ids: w.ids.join(",") }, geometry: { type: "LineString", coordinates: [point(w.u + du, w.v - dv, nx, ny, axis), point(w.u + du, w.v + dv, nx, ny, axis)] } });
       }
+    }
+    if (wagons.length > 1) {
+      // pasillo continuo de un vagón al otro, por el centro de la estación
+      const vMid = (v0 + v1) / 2;
+      out.links.features.push({ type: "Feature", properties: { all }, geometry: { type: "Polygon", coordinates: [rounded((u0 + u1) / 2, vMid, (u1 - u0) / 2, LINK_WIDTH / 2, LINK_WIDTH / 2, axis)] } });
     }
     const hl = (u1 - u0) / 2 + CAPSULE_LENGTH / 2 + BASE_MARGIN_ALONG, hw = (v1 - v0) / 2 + CAPSULE_WIDTH / 2 + BASE_MARGIN_ACROSS;
     const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;

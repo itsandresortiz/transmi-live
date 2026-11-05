@@ -90,7 +90,7 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips");
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
     m.addLayer({ id: "localidades-line", type: "line", source: "localidades", paint: { "line-color": t.landLine, "line-width": 1.2 } });
@@ -143,6 +143,8 @@ export class MapController {
     // estaciones de la troncal: la estación completa (base), sus vagones (cápsulas, con puertas y número) y su nombre
     m.addLayer({ id: "station-base-fill", type: "fill", source: "station-bases", minzoom: 14.5, paint: { "fill-color": t.stationBase, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] } });
     m.addLayer({ id: "station-base-line", type: "line", source: "station-bases", minzoom: 14.5, paint: { "line-color": t.stationEdge, "line-width": ["interpolate", ["linear"], ["zoom"], 14.5, 1, 18, 2] } });
+    m.addLayer({ id: "station-links-fill", type: "fill", source: "station-links", minzoom: 15.6, paint: { "fill-color": t.stationLink } });
+    m.addLayer({ id: "station-links-line", type: "line", source: "station-links", minzoom: 15.6, paint: { "line-color": t.capsuleEdge, "line-width": 1, "line-opacity": 0.6 } });
     m.addLayer({
       id: "station-capsule-fill", type: "fill", source: "station-capsules", minzoom: 15.6,
       paint: { "fill-color": ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule], "fill-opacity": 0.98 },
@@ -272,6 +274,8 @@ export class MapController {
     m.setPaintProperty("station-capsule-fill", "fill-color", ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule]);
     m.setPaintProperty("station-capsule-line", "line-color", ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsuleEdge]);
     m.setPaintProperty("station-doors", "line-color", t.capsuleEdge);
+    m.setPaintProperty("station-links-fill", "fill-color", t.stationLink);
+    m.setPaintProperty("station-links-line", "line-color", t.capsuleEdge);
     m.setPaintProperty("station-capsule-labels", "text-color", ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.labelStrong]);
     m.setPaintProperty("station-chips", "text-color", t.labelStrong);
     this.registerChip();
@@ -284,7 +288,7 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
   }
 
   private stationBase: StationGeometry | null = null;
@@ -305,6 +309,7 @@ export class MapController {
     this.stationBase = g;
     (this.map.getSource("station-bases") as GeoJSONSource | undefined)?.setData(g.bases);
     (this.map.getSource("station-doors") as GeoJSONSource | undefined)?.setData(g.doors);
+    (this.map.getSource("station-links") as GeoJSONSource | undefined)?.setData(g.links);
     (this.map.getSource("station-chips") as GeoJSONSource | undefined)?.setData(g.chips);
     this.paintStations();
   }
