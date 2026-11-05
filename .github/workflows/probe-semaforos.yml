@@ -1,0 +1,19 @@
+name: Probar fuentes de semáforos
+# Prueba puntual (a mano): ¿responden las fuentes públicas de semáforos de Bogotá y cuántos puntos traen?
+on: { workflow_dispatch: {} }
+permissions: { contents: read }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Red semafórica oficial (SIMUR / Movilidad)
+        run: |
+          B="https://sig.simur.gov.co/arcgis/rest/services/DatosAbiertos/RedSemaforica/FeatureServer/0"
+          echo "== capa"; curl -sS -m 40 "$B?f=json" | head -c 1500; echo
+          echo "== total"; curl -sS -m 40 "$B/query?where=1%3D1&returnCountOnly=true&f=json"; echo
+          echo "== un ejemplo (WGS84)"; curl -sS -m 40 "$B/query?where=1%3D1&outFields=*&resultRecordCount=2&outSR=4326&f=geojson" | head -c 1800; echo
+      - name: OpenStreetMap (Overpass)
+        run: |
+          Q='[out:json][timeout:60];node["highway"="traffic_signals"](4.45,-74.30,4.85,-73.99);out count;'
+          curl -sS -m 90 --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter | head -c 600; echo
