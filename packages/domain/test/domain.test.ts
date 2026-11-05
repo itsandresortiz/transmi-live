@@ -144,7 +144,7 @@ describe("avisos", () => {
       id: 1, headline: "TM7 U DISTRI S1", effect: "detour", routeIds: [], stopIds: [],
       description: "Novedad en la operacion en linea HF615\\416A11_Br. Las Acacias\\064A09_Br. Villa del Río",
     });
-    expect(text).toBe("Línea HF615: Br. Las Acacias → Br. Villa del Río");
+    expect(text).toBe("La ruta HF615 se desvía entre Br. Las Acacias y Br. Villa del Río.");
   });
 });
 
@@ -204,5 +204,30 @@ describe("líneas de la troncal", () => {
     expect(trunkLetterOf("HB608")).toBeNull();
     expect(trunkLetterOf("6-5")).toBeNull();
     expect(Object.keys(TRUNK_LINES)).toHaveLength(15);
+  });
+});
+
+import { alertTitle, alertValidity, describeAlert as describe2, isAlertActive } from "../src";
+describe("avisos legibles y vigentes", () => {
+  const base = { id: 1, headline: "", description: "", effect: "detour" as const, routeIds: [], stopIds: [] };
+  it("traduce los códigos internos a un motivo", () => {
+    expect(alertTitle({ ...base, headline: "EMCONTRAVIACR20ACONCL72A" })).toBe("Emergencia en la vía");
+    expect(alertTitle({ ...base, headline: "PMTCIERRE1MAYOCONCRA11" })).toBe("Cierre de vía");
+    expect(alertTitle({ ...base, headline: "EMCAMBIODESENTIDOVIALVLTA" })).toBe("Cambio de sentido vial");
+    expect(alertTitle({ ...base, headline: "**TP-73 GAITAN FIJO**" })).toBe("Plan de tránsito");
+    expect(alertTitle({ ...base, headline: "xyz" })).toBe("Novedad en el recorrido");
+  });
+  it("describe el desvío con palabras", () => {
+    expect(describe2({ ...base, description: "Novedad en la operacion en linea T06\\313A00_Br. San Felipe\\678A00_Br. Colombia" })).toBe("La ruta T06 se desvía entre Br. San Felipe y Br. Colombia.");
+  });
+  it("solo muestra los vigentes", () => {
+    const now = 1_800_000_000;
+    expect(isAlertActive({ ...base, startsAt: now - 10, endsAt: now + 10 }, now)).toBe(true);
+    expect(isAlertActive({ ...base, endsAt: now - 1 }, now)).toBe(false);
+    expect(isAlertActive({ ...base, startsAt: now + 7200 }, now)).toBe(false);
+    expect(isAlertActive(base, now)).toBe(true);
+  });
+  it("muestra el periodo en hora de Bogotá", () => {
+    expect(alertValidity({ ...base, startsAt: Date.UTC(2026, 10, 5, 12) / 1000, endsAt: Date.UTC(2026, 10, 25, 12) / 1000 })).toMatch(/^Desde el 5 de nov.* · hasta el 25 de nov/);
   });
 });

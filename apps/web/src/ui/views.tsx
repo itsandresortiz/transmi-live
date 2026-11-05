@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import {
   arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStopGroups, siblingStops,
 } from "@transmi/application";
-import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, describeAlert } from "@transmi/domain";
+import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
@@ -201,8 +201,9 @@ export function AlertsView({ th, act }: Props) {
       {!list.length ? <Empty title="Sin avisos" text={scope === "all" ? "No hay novedades del servicio en este momento." : "Nada que te afecte por ahora."} /> : list.map(({ alert, index }) => (
         <div key={index} className="card" role="group">
           <span className={`pill ${alert.effect === "noService" ? "bad" : alert.effect === "additional" ? "ok" : "warn"}`}>{ALERT_EFFECT_LABEL[alert.effect]}</span>
-          <div className="ct">{alert.headline || describeAlert(alert)}</div>
+          <div className="ct">{alertTitle(alert)}</div>
           <div className="cs">{describeAlert(alert)}</div>
+          <div className="cs faint" style={{ fontSize: 12, marginTop: 4 }}>{[alertValidity(alert), alert.headline ? `Ref. ${alertReference(alert)}` : ""].filter(Boolean).join(" · ")}</div>
           {alert.routeIds.length > 0 && (
             <div className="rbs">
               {alert.routeIds.slice(0, openAlert === index ? 99 : 12).map((id) => {
@@ -260,7 +261,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
         </div>
       )}
       <RouteStatusNote routeId={id} nowMs={nowSec * 1000} />
-      {d.alerts.map(({ alert, index }) => <div key={index} className="card"><span className="pill warn">{ALERT_EFFECT_LABEL[alert.effect]}</span><div className="cs" style={{ marginTop: 8 }}>{describeAlert(alert)}</div></div>)}
+      {d.alerts.map(({ alert, index }) => <div key={index} className="card"><span className="pill warn">{ALERT_EFFECT_LABEL[alert.effect]}</span><div className="ct" style={{ marginTop: 8 }}>{alertTitle(alert)}</div><div className="cs">{describeAlert(alert)}</div>{alertValidity(alert) && <div className="cs" style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{alertValidity(alert)}</div>}</div>)}
       {cur && cur.stopIds.length > 0 && (
         <>
           <div className="sec">{bus ? "Por dónde va este bus" : "Paradas"}</div>

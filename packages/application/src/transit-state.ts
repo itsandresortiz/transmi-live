@@ -1,6 +1,6 @@
 import {
   Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle, type RouteShape,
-  type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, parseStopName,
+  type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, isAlertActive, parseStopName,
 } from "@transmi/domain";
 import { arrivalAtIndex } from "./eta";
 import { type RouteDayStatus, ServiceEnds, type ServiceMark } from "./service-ends";
@@ -115,8 +115,9 @@ export class TransitState {
     this.touch();
   }
 
-  applyAlerts(alerts: readonly ServiceAlert[]): void {
-    this.alerts = [...alerts];
+  applyAlerts(alerts: readonly ServiceAlert[], nowMs: number = Date.now()): void {
+    // solo los avisos vigentes: los vencidos (o que aún no empiezan) no le sirven a nadie
+    this.alerts = alerts.filter((a) => isAlertActive(a, nowMs / 1000));
     this.alertsByRoute = new Map();
     this.alertsByStop = new Map();
     this.alerts.forEach((a, i) => {

@@ -41,7 +41,7 @@ export class LiveDataService {
         throw new Error(`Lote incompleto (${batch.positions.length} buses)`);
       // retrasos y avisos primero, para que los buses nuevos ya tengan su retraso al aparecer
       if (batch.tripUpdates) this.state.applyTripUpdates(batch.tripUpdates);
-      if (batch.alerts) this.state.applyAlerts(batch.alerts);
+      if (batch.alerts) this.state.applyAlerts(batch.alerts, now);
       if (batch.positions) {
         // un lote que trae mucho menos que el anterior llegó cortado: se descarta y se reintenta
         if (this.state.fleet.size > 500 && batch.positions.length < 0.6 * this.state.fleet.size)

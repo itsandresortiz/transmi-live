@@ -1,0 +1,39 @@
+name: Vigilancia de datos
+# Revisa cada 30 minutos que el intermediario, la copia de respaldo, el GTFS y los horarios estén al día.
+# Si algo falla abre (o actualiza) un issue con la etiqueta «salud-datos»; cuando todo vuelve a la normalidad, lo cierra solo.
+on:
+  schedule:
+    - cron: "11,41 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency: { group: health, cancel-in-progress: false }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Revisar
+        run: bash scripts/health_check.sh problems.txt
+      - name: Abrir, actualizar o cerrar el issue
+        run: |
+          gh label create salud-datos --color B60205 --description "Los datos en vivo, el GTFS o los horarios están desactualizados" 2>/dev/null || true
+          N=$(gh issue list --label salud-datos --state open --json number --jq '.[0].number // empty')
+          if [ -s problems.txt ]; then
+            BODY=$(printf 'Se detectó esto en la revisión automática (%s UTC):\n\n%s\n\n_Se cierra solo cuando todo vuelve a estar al día._' "$(date -u +'%Y-%m-%d %H:%M')" "$(sed 's/^/- /' problems.txt)")
+            if [ -n "$N" ]; then
+              # solo se comenta si cambió la lista de problemas, para no llenar el issue
+              LAST=$(gh issue view "$N" --json comments --jq '.comments[-1].body // ""')
+              if [ "$(echo "$LAST" | sed -n '3,$p' | grep '^- ' | md5sum)" != "$(sed 's/^/- /' problems.txt | md5sum)" ]; then gh issue comment "$N" --body "$BODY"; fi
+            else
+              gh issue create --label salud-datos --title "Datos desactualizados o caídos" --body "$BODY"
+            fi
+          elif [ -n "$N" ]; then
+            gh issue comment "$N" --body "Todo volvió a la normalidad ($(date -u +'%Y-%m-%d %H:%M') UTC)."
+            gh issue close "$N" --reason completed
+          fi
