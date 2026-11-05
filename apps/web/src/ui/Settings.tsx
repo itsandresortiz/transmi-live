@@ -50,7 +50,7 @@ export function Settings({ th }: { th: MapTheme }) {
         </div>
         {!standalone && (ev || ios) && (
           <div className="grp"><h3>Instalar</h3>
-            {ev ? <button className="btn primary" onClick={() => void ev.prompt()}>Instalar TransMi Go en tu celular</button>
+            {ev ? <button className="btn primary" onClick={() => void ev.prompt()}>Instalar TransMi LIVE en tu celular</button>
               : <p className="hint">En iPhone: toca el botón Compartir y luego «Añadir a pantalla de inicio».</p>}
           </div>
         )}

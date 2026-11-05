@@ -1,6 +1,6 @@
 {
-  "name": "TransMi Go",
-  "short_name": "TransMi Go",
+  "name": "TransMi LIVE",
+  "short_name": "TransMi LIVE",
   "description": "Buses de TransMilenio y SITP en Bogotá en tiempo real.",
   "lang": "es",
   "start_url": "./",
