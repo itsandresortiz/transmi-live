@@ -9,6 +9,7 @@ import { nowMs } from "../clock";
 import { stopText } from "./stopname";
 import { useUi } from "./store";
 import { delayText, untilText } from "./format";
+import { Marquee } from "./Marquee";
 
 const STALE_SECONDS = 90;
 
@@ -29,12 +30,12 @@ export function FollowBar({ th, onResume }: { th: MapTheme; onResume(): void }) 
     <div className="followbar glass" role="status" aria-live="polite">
       <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r, v.system) }}>{r?.shortName ?? v.routeId}</span>
       <div className="fm">
-        <b>{r?.longName || SYSTEM_LABEL[v.system]}</b>
-        <span>
+        <b><Marquee>{r?.longName || SYSTEM_LABEL[v.system]}</Marquee></b>
+        <span><Marquee>
           {silent ? "Este bus dejó de reportar. Puede haber terminado su recorrido."
             : ns?.stop ? `${delayText(d)} · próxima: ${stopText(ns.stop)}${ns.arrivalAt ? ` ${untilText(ns.arrivalAt, nowSec)}` : ""}`
             : `${delayText(d)} · siguiéndolo`}
-        </span>
+        </Marquee></span>
         <em>{SYSTEM_LABEL[v.system]} · {v.plate || v.label || v.id}{transit.serviceOf(v)?.isLast ? " · " : ""}{transit.serviceOf(v)?.isLast && <b className="lasttxt">Último servicio</b>}</em>
       </div>
       {followPaused && !silent && <button className="btn primary sm" onClick={onResume}>Volver al bus</button>}
