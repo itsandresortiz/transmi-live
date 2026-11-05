@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: live-data
+  group: gtfs-daily
   cancel-in-progress: false
 jobs:
   gtfs:
@@ -25,4 +25,14 @@ jobs:
       - name: Publicar en la rama live-data
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/publish.sh out
+        run: |
+          # el bucle de datos en vivo también escribe en live-data: se repite hasta comprobar que los archivos quedaron
+          for i in 1 2 3 4 5; do
+            bash scripts/publish.sh out
+            sleep 45
+            git ls-remote --exit-code origin live-data >/dev/null
+            tmp="$(mktemp -d)"
+            git clone -q --depth 1 --branch live-data "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$tmp"
+            if [ -f "$tmp/schedule.json.gz" ] && [ -f "$tmp/gtfs-lite.zip" ]; then echo "verificado"; break; fi
+            echo "intento $i: faltan archivos, se repite"
+          done
