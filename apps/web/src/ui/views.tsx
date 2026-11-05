@@ -60,13 +60,13 @@ function More({ shown, total }: { shown: number; total: number }) {
 export function ServiceStats() {
   useTransitVersion();
   const k = kpis(transit);
-  const { setTab, setOnlyLate, setSettingsOpen, setSheet } = useUi();
+  const { setTab, setSettingsOpen, setSheet } = useUi();
   const go = (f: () => void) => () => { f(); setSettingsOpen(false); setSheet("half"); };
   return (
     <div className="stats">
       <div className="stat"><b>{k.vehicles.toLocaleString("es-CO")}</b><span>Buses en vivo</span></div>
       <div className="stat"><b>{k.routes}</b><span>Rutas activas</span></div>
-      <button className="stat late" onClick={go(() => { setOnlyLate(true); setTab("buses"); })}><b>{k.late}</b><span>Muy tarde</span></button>
+      <div className="stat late"><b>{k.late}</b><span>Muy tarde</span></div>
       <button className="stat" onClick={go(() => setTab("avisos"))}><b>{k.alerts}</b><span>Avisos</span></button>
     </div>
   );
@@ -116,13 +116,12 @@ function BusRow({ v, th, act }: { v: Vehicle } & Props) {
 
 export function BusesView({ th, act }: Props) {
   useTransitVersion();
-  const { query, system, limit, onlyLate, setOnlyLate } = useUi();
-  const list = listVehicles(transit, { query, system, lateOnly: onlyLate });
+  const { query, system, limit } = useUi();
+  const list = listVehicles(transit, { query, system });
   const page = list.slice(0, limit);
   return (
     <>
       <Chips th={th} />
-      <div className="chips"><button className="chip" aria-pressed={onlyLate} onClick={() => setOnlyLate(!onlyLate)}>Solo los que van muy tarde</button></div>
       {!list.length ? <Empty title="Sin buses" text={transit.fleet.size ? "Ningún bus coincide con el filtro." : "Esperando los primeros datos en vivo…"} /> : (
         <div className="list">{page.map((v) => <BusRow key={v.id} v={v} th={th} act={act} />)}<More shown={page.length} total={list.length} /></div>
       )}

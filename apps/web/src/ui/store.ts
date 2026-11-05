@@ -22,7 +22,6 @@ interface UiState {
   groupIds: string[] | null;
   stopRoute: { routeId: string; direction: string } | null;
   direction: string;
-  onlyLate: boolean;
   openAlert: number | null;
   followId: string | null;
   /** El usuario movió el mapa con el dedo: el seguimiento se pausa hasta que pida volver al bus. */
@@ -47,7 +46,6 @@ interface UiState {
   openGroup(ids: string[] | null): void;
   setStopRoute(r: { routeId: string; direction: string } | null): void;
   setDirection(d: string): void;
-  setOnlyLate(v: boolean): void;
   setOpenAlert(i: number | null): void;
   setFollow(id: string | null): void;
   setFollowPaused(v: boolean): void;
@@ -66,12 +64,12 @@ if (typeof document !== "undefined") document.documentElement.style.setProperty(
 
 const PAGE = 60;
 export const useUi = create<UiState>((set) => ({
-  tab: "rutas", query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, routeBusId: null, stopId: null, groupIds: null, stopRoute: null, direction: "0", onlyLate: false,
+  tab: "rutas", query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, routeBusId: null, stopId: null, groupIds: null, stopRoute: null, direction: "0",
   openAlert: null, followId: null, followPaused: false, targetStopId: null, settingsOpen: false,
   layers: { streets: true, stops: true, network: false, buses: true, signals: false, traffic: false },
   colorMode: "system", motion: "predict", toast: null, textScale: savedScale,
 
-  setTab: (tab) => set((s) => (s.tab === tab && !s.stopId ? s : { tab, stopId: null, groupIds: null, stopRoute: null, query: "", limit: PAGE, onlyLate: tab === "buses" ? s.onlyLate : false })),
+  setTab: (tab) => set((s) => (s.tab === tab && !s.stopId ? s : { tab, stopId: null, groupIds: null, stopRoute: null, query: "", limit: PAGE })),
   setQuery: (query) => set({ query, limit: PAGE }),
   setSystem: (system) => set({ system, limit: PAGE }),
   more: () => set((s) => ({ limit: s.limit + PAGE })),
@@ -81,7 +79,6 @@ export const useUi = create<UiState>((set) => ({
   openStop: (stopId) => set({ stopId, stopRoute: null, targetStopId: stopId, routeId: null, routeBusId: null }),
   setStopRoute: (stopRoute) => set({ stopRoute }),
   setDirection: (direction) => set({ direction }),
-  setOnlyLate: (onlyLate) => set({ onlyLate, limit: PAGE }),
   setOpenAlert: (openAlert) => set({ openAlert }),
   setFollow: (followId) => set({ followId, followPaused: false }),
   setFollowPaused: (followPaused) => set({ followPaused }),
