@@ -7,7 +7,7 @@ import { StarButton, useUpcoming } from "./mine";
 import { ShareButton } from "./share";
 import { nowMs } from "../clock";
 import { FirstBadge, LastBadge, clockOfDay } from "./lastService";
-import { labelOf, stopKind, stopTag, stopText } from "./stopname";
+import { labelOf, stopCode, stopKind, stopTag, stopText } from "./stopname";
 import { routesAtStop, siblingStops } from "@transmi/application";
 import { useMemo } from "react";
 import { useTransitVersion } from "./hooks";
@@ -32,8 +32,8 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
       {siblings.length > 1 && (
         <div className="chips" role="group" aria-label="Otros vagones de esta estación">
           {siblings.map(({ x, names }) => {
-            const t = stopTag(x) || x.code || "Parada";
-            const dup = siblings.filter((y) => (stopTag(y.x) || y.x.code) === t).length > 1;      // varias paradas del mismo vagón (una por sentido): se distinguen por sus rutas
+            const t = stopTag(x) || stopCode(x) || "Parada";
+            const dup = siblings.filter((y) => (stopTag(y.x) || stopCode(y.x)) === t).length > 1;      // varias paradas del mismo vagón (una por sentido): se distinguen por sus rutas
             return <button key={x.id} className="chip" aria-pressed={x.id === stopId} onClick={() => act.openStop(x.id)}>{dup && names ? `${t} · ${names}` : t}</button>;
           })}
         </div>

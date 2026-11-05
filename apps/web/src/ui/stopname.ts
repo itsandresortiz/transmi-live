@@ -15,3 +15,5 @@ export function stopKind(stop: Stop | undefined): "Estación" | "Portal" | "Para
   const l = labelOf(stop);
   return l?.wagon ? "Estación" : l?.platform ? "Portal" : "Parada";
 }
+/** Código de la parada sin el sufijo interno «_TM» («304B00_TM» → «304B00»). */
+export const stopCode = (stop: Stop | undefined): string => (stop?.code ?? "").replace(/_TM$/i, "");

@@ -7,7 +7,7 @@ import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
 import { nowMs } from "../clock";
-import { stopKind, stopTag, stopText } from "./stopname";
+import { stopCode, stopKind, stopTag, stopText } from "./stopname";
 import { FirstBadge, LastBadge, RouteStatusNote, clockOfDay } from "./lastService";
 import { FavoritesSection, NearbySection, StarButton } from "./mine";
 import { ShareButton } from "./share";
@@ -160,7 +160,7 @@ export function StopsView({ th, act }: Props) {
           : plats ? `${kind} · ${plats} plataformas` : `${kind} · ${g.stops.length} paradas`;
         return (
           <button key={g.stops[0]!.id} className="row" onClick={() => (g.stops.length === 1 ? act.openStop(g.stops[0]!.id) : act.openGroup(g.stops.map((s) => s.id)))}>
-            <span className="rb sm" style={{ ["--c" as string]: g.stops.length > 1 ? th.troncal : th.system.otro }}>{g.stops.length > 1 ? "TM" : (g.stops[0]!.code.slice(0, 5) || "·")}</span>
+            <span className="rb sm" style={{ ["--c" as string]: g.stops.length > 1 ? th.troncal : th.system.otro }}>{g.stops.length > 1 ? "TM" : (stopCode(g.stops[0]).slice(0, 5) || "·")}</span>
             <span className="rm"><span className="rt">{g.title}</span><span className="rs">{sub}</span></span><span className="chev"><Chevron /></span>
           </button>
         );
