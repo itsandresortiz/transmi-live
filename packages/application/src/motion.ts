@@ -53,6 +53,8 @@ interface Track {
   /** Velocidad mostrada (m/s) a lo largo del trazado, o vector (m/s) sin trazado. */
   u: number; ux: number; uy: number;
   lastT: number;
+  /** Rumbo mostrado (grados desde el norte, en el sentido del reloj), suavizado. */
+  h: number | null;
 }
 
 /** Velocidad típica entre paradas (m/s) cuando no hay nada mejor. */
@@ -82,6 +84,13 @@ export class MotionEngine {
 
   /** Posición mostrada actualmente de un bus (sin avanzar el tiempo). */
   peek(id: string): WorldPoint | undefined { const t = this.tracks.get(id); return t ? { x: t.x, y: t.y } : undefined; }
+  /** Hacia dónde apunta el bus ahora (grados desde el norte): el de su trazado en ese punto, o el último rumbo informado. */
+  heading(id: string): number | undefined { const h = this.tracks.get(id)?.h; return h == null ? undefined : h; }
+  private targetHeading(t: Track, v: Vehicle): number | null {
+    if (t.lock) { const { ux, uy } = t.lock.path.tangentAt(t.s); return ((Math.atan2(ux, -uy) * 180) / Math.PI + 360) % 360; }
+    if (Math.hypot(t.ux, t.uy) > 0.8) return ((Math.atan2(t.ux, -t.uy) * 180) / Math.PI + 360) % 360;
+    return v.bearing;
+  }
   forget(id: string): void { this.tracks.delete(id); }
   prune(): void { for (const id of this.tracks.keys()) if (!this.state.fleet.get(id)) this.tracks.delete(id); }
   get size(): number { return this.tracks.size; }
@@ -98,8 +107,9 @@ export class MotionEngine {
       if (!t || nowSec - t.lastT > STALE_SECONDS) {
         const r0 = sp * p.rateGain;
         const target = this.target(v, nowSec, lock, sp);
-        t = { reportedAt: v.reportedAt, lock, speed: sp, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: r0, ux: 0, uy: 0, lastT: nowSec };
+        t = { reportedAt: v.reportedAt, lock, speed: sp, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: r0, ux: 0, uy: 0, lastT: nowSec, h: null };
         this.tracks.set(v.id, t);
+        t.h = this.targetHeading(t, v);
         return { x: t.x, y: t.y };
       }
       t.speed = sp;
@@ -155,6 +165,12 @@ export class MotionEngine {
       const k = Math.exp(-dt / p.glideSeconds);
       t.ox *= k; t.oy *= k;
       t.x = t.bx + t.ox; t.y = t.by + t.oy;
+    }
+    const th = this.targetHeading(t, v);
+    if (th != null) {
+      // se gira poco a poco por el camino más corto (en las esquinas del trazado no da un latigazo)
+      if (t.h == null) t.h = th;
+      else { const d = ((th - t.h + 540) % 360) - 180; t.h = (t.h + d * (1 - Math.exp(-dt / 0.3)) + 360) % 360; }
     }
     return { x: t.x, y: t.y };
   }

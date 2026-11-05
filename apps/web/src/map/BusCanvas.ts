@@ -1,9 +1,9 @@
 import type { Map as MLMap } from "maplibre-gl";
-import { busSprite } from "./sprites";
+import { BUS_LONG_W, BUS_W, busSprite } from "./sprites";
 
-export interface BusDraw { id: string; lon: number; lat: number; color: string; left: boolean; label: string; /** último servicio de su ruta */ last?: boolean }
+export interface BusDraw { id: string; lon: number; lat: number; color: string; left: boolean; /** rumbo (grados desde el norte) o null si no se sabe */ angle?: number | null; /** vehículo articulado (troncal) */ long?: boolean; label: string; /** último servicio de su ruta */ last?: boolean }
 
-const W = 34, H = 22;
+const W = BUS_W, H = 22;
 /** Tamaño del ícono según el zoom (igual que el que tenía la capa del mapa). */
 function iconScale(z: number): number {
   const pts: [number, number][] = [[13, 0.5], [15, 0.8], [17, 1], [19, 1.25]];
@@ -21,7 +21,7 @@ export class BusCanvas {
   private readonly cv: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private sprites = new Map<string, HTMLCanvasElement>();
-  private hits: { id: string; x: number; y: number }[] = [];
+  private hits: { id: string; x: number; y: number; r: number }[] = [];
   private dpr = 1;
   private font = "600 11.5px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
   haloColor = "#000";
@@ -41,11 +41,11 @@ export class BusCanvas {
     this.cv.width = Math.round(c.clientWidth * this.dpr);
     this.cv.height = Math.round(c.clientHeight * this.dpr);
   }
-  private sprite(color: string, left: boolean): HTMLCanvasElement {
-    const key = `${color}|${left}`;
+  private sprite(color: string, left: boolean, long: boolean): HTMLCanvasElement {
+    const key = `${color}|${left}|${long}`;
     let s = this.sprites.get(key);
     if (!s) {
-      const img = busSprite(color, left, 2 * this.dpr > 3 ? 3 : 2);
+      const img = busSprite(color, left, 2 * this.dpr > 3 ? 3 : 2, long);
       s = document.createElement("canvas"); s.width = img.width; s.height = img.height;
       s.getContext("2d")!.putImageData(img, 0, 0);
       this.sprites.set(key, s);
@@ -65,21 +65,26 @@ export class BusCanvas {
     if (labels) { ctx.font = this.font; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.lineJoin = "round"; ctx.lineWidth = 3.5; ctx.strokeStyle = this.haloColor; ctx.fillStyle = this.textColor; }
     for (const b of items) {
       const p = this.map.project([b.lon, b.lat]);
-      if (p.x < -w || p.y < -h || p.x > cw + w || p.y > ch + h) continue;
-      if (b.last) { ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(w, h) * 0.62, 0, Math.PI * 2); ctx.fillStyle = "rgba(245,158,11,.35)"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#f59e0b"; ctx.stroke(); ctx.fillStyle = this.textColor; ctx.lineWidth = 3.5; ctx.strokeStyle = this.haloColor; }
-      ctx.drawImage(this.sprite(b.color, b.left), p.x - w / 2, p.y - h / 2, w, h);
-      if (labels) { ctx.strokeText(b.label, p.x, p.y - h / 2 - 3); ctx.fillText(b.label, p.x, p.y - h / 2 - 3); }
-      this.hits.push({ id: b.id, x: p.x, y: p.y });
+      const bw = b.long ? BUS_LONG_W * k : w;
+      if (p.x < -bw || p.y < -bw || p.x > cw + bw || p.y > ch + bw) continue;
+      if (b.last) { ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(bw, h) * 0.62, 0, Math.PI * 2); ctx.fillStyle = "rgba(245,158,11,.35)"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#f59e0b"; ctx.stroke(); ctx.fillStyle = this.textColor; ctx.lineWidth = 3.5; ctx.strokeStyle = this.haloColor; }
+      if (b.angle != null) {
+        // el bus apunta por donde va su ruta; nunca queda de cabeza (si va hacia la izquierda se dibuja espejado)
+        const a = (((b.angle - this.map.getBearing()) % 360) + 360) % 360, flip = a > 180;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(((flip ? a - 270 : a - 90) * Math.PI) / 180);
+        ctx.drawImage(this.sprite(b.color, flip, !!b.long), -bw / 2, -h / 2, bw, h);
+        ctx.restore();
+      } else ctx.drawImage(this.sprite(b.color, b.left, !!b.long), p.x - bw / 2, p.y - h / 2, bw, h);
+      if (labels) { ctx.strokeText(b.label, p.x, p.y - Math.max(h, b.angle != null ? bw * 0.5 : h) / 2 - 3); ctx.fillText(b.label, p.x, p.y - Math.max(h, b.angle != null ? bw * 0.5 : h) / 2 - 3); }
+      this.hits.push({ id: b.id, x: p.x, y: p.y, r: (b.long ? 20 : 13) * k + 5 });
     }
   }
   /** Bus bajo el dedo/cursor: se toca el dibujo del bus (con un margen para el dedo), no un círculo grande a su alrededor. */
   hitTest(pt: { x: number; y: number }): string | null {
-    const k = iconScale(this.map.getZoom()), hw = 13 * k + 5, hh = 8 * k + 5;
     let best: string | null = null, bd = Infinity;
     for (let i = this.hits.length - 1; i >= 0; i--) {
-      const h = this.hits[i]!, dx = Math.abs(h.x - pt.x), dy = Math.abs(h.y - pt.y);
-      if (dx > hw || dy > hh) continue;
-      const d = dx * dx + dy * dy;
+      const h = this.hits[i]!, dx = h.x - pt.x, dy = h.y - pt.y, d = dx * dx + dy * dy;
+      if (d > h.r * h.r) continue;
       if (d < bd) { bd = d; best = h.id; }
     }
     return best;
