@@ -27,7 +27,7 @@ export function localidadLabels(l: Localidad[]) {
 /** Línea de la troncal (letra) de cada corredor, para pintar estaciones y portales con su color. */
 const LINE_OF_CORRIDOR: Record<string, string> = {
   "carrera 10": "L", "americas": "F", "nqs sur": "G", "calle 26": "K", "eje ambiental": "J", "caracas sur": "H",
-  "autopista norte": "B", "suba": "C", "nqs central": "E", "calle 80": "D", "caracas": "A", "carrera 7": "M",
+  "cable aéreo": "CA", "autopista norte": "B", "suba": "C", "nqs central": "E", "calle 80": "D", "caracas": "A", "carrera 7": "M",
 };
 export const lineOfCorridor = (name: string): string => LINE_OF_CORRIDOR[name.trim().toLowerCase()] ?? "X";
 
