@@ -3,7 +3,7 @@ import {
   type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, parseStopName,
 } from "@transmi/domain";
 import { arrivalAtIndex } from "./eta";
-import { ServiceEnds, type ServiceMark } from "./service-ends";
+import { type RouteDayStatus, ServiceEnds, type ServiceMark } from "./service-ends";
 import { TravelTimes } from "./travel-times";
 import type { FeedSource } from "./ports";
 
@@ -42,6 +42,14 @@ export class TransitState {
   setServiceEnds(data: Parameters<ServiceEnds["load"]>[0]): void { this.serviceEnds.load(data); this.touch(); }
   /** ¿Este bus hace el último (o el primer) viaje programado de su ruta? */
   serviceOf(v: Vehicle): ServiceMark | undefined { return this.serviceEnds.markOf(v.tripId); }
+
+  /** Estado de la ruta hoy (antes del primer servicio, en servicio o terminada). Sin datos en vivo no se afirma nada. */
+  routeStatus(routeId: string, nowMs: number): RouteDayStatus | undefined {
+    if (this.fleet.size < 50) return undefined;
+    let n = 0;
+    for (const v of this.fleet.values()) if (v.routeId === routeId) n++;
+    return this.serviceEnds.routeStatus(routeId, nowMs, n);
+  }
 
   delayOf(v: Vehicle): Delay { return delayFromSeconds(v.tripId ? this.tripUpdates.get(v.tripId)?.delaySeconds : null); }
   /** La parada tiene al menos una ruta que se detiene en ella (hay paradas del archivo sin servicio). */

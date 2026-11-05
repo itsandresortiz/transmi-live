@@ -4,8 +4,9 @@ import type { MapTheme } from "../map/theme";
 import { routeBadgeColor } from "../map/theme";
 import { Back, Bus, Chevron } from "./icons";
 import { StarButton, useUpcoming } from "./mine";
+import { ShareButton } from "./share";
 import { nowMs } from "../clock";
-import { LastBadge } from "./lastService";
+import { FirstBadge, LastBadge, RouteStatusNote } from "./lastService";
 import { labelOf, stopKind, stopTag, stopText } from "./stopname";
 import { routesAtStop, siblingStops } from "@transmi/application";
 import { useMemo } from "react";
@@ -27,7 +28,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
     <>
       <button className="back" onClick={() => openStop(null)}><Back /> Atrás</button>
       <div className="dcard"><div style={{ flex: 1, minWidth: 0 }}><small className="kick">{stopKind(stop)}</small><h2>{label?.title ?? "Parada"}</h2>
-        <p>{tag && <b className="vtag">{tag}</b>}{tag ? " · " : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : "Sin buses acercándose"}</p></div>{stopId && <StarButton kind="stop" id={stopId} />}</div>
+        <p>{tag && <b className="vtag">{tag}</b>}{tag ? " · " : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : "Sin buses acercándose"}</p></div>{stopId && <ShareButton target={{ kind: "parada", id: stopId }} title={label?.title ?? "Parada"} />}{stopId && <StarButton kind="stop" id={stopId} />}</div>
       {siblings.length > 1 && (
         <div className="chips" role="group" aria-label="Otros vagones de esta estación">
           {siblings.map(({ x, names }) => {
@@ -37,7 +38,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
           })}
         </div>
       )}
-      {rows.length === 0 ? <Empty title="Ningún bus viene ahora" text="Cuando un bus se acerque a esta parada aparecerá aquí." /> : (
+      {rows.length === 0 ? <><Empty title="Ningún bus viene ahora" text="Cuando un bus se acerque a esta parada aparecerá aquí." />{stopId && <EndedRoutes stopId={stopId} nowMs={nowSec * 1000} />}</> : (
         <>
           <div className="sec">Toca una ruta para ver de dónde viene</div>
           <div className="list">
@@ -79,7 +80,7 @@ export function StationView({ th, act }: { th: MapTheme; act: Actions }) {
   return (
     <>
       <button className="back" onClick={() => openGroup(null)}><Back /> Atrás</button>
-      <div className="dcard"><div><small className="kick">{stops[0] ? stopKind(stops[0]) : "Estación"}</small><h2>{title}</h2><p>{wagons ? `${stops.length} paradas en ${new Set(stops.map((s) => labelOf(s)?.wagon)).size} vagones` : `${stops.length} paradas`} · toca una para ver sus buses</p></div></div>
+      <div className="dcard"><div><small className="kick">{stops[0] ? stopKind(stops[0]) : "Estación"}</small><h2>{title}</h2><p>{wagons ? `${stops.length} paradas en ${new Set(stops.map((s) => labelOf(s)?.wagon)).size} vagones` : `${stops.length} paradas`} · toca una para ver sus buses</p></div><ShareButton target={{ kind: "estacion", ids: stops.map((s) => s.id) }} title={title ?? "Estación"} /></div>
       <div className="list">
         {rows.map(({ s, names, towards }) => {
           const tag = stopTag(s);
@@ -124,8 +125,10 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
         <span className="rb big" style={{ ["--c" as string]: color }}>{route?.shortName}</span>
         <div><h2>{shape?.headsign ? `Hacia ${shape.headsign}` : route?.longName}</h2><p>{route ? SYSTEM_LABEL[route.system] : ""} · llega a {stopText(stop)}</p></div>
       </div>
+      {(!row || !hero) && <RouteStatusNote routeId={stopRoute.routeId} nowMs={nowSec * 1000} />}
       {!row || !hero ? <Empty title="Ningún bus viene ahora" text="Esta ruta no tiene buses acercándose a la parada en este momento." /> : (
         <>
+          {transit.serviceOf(hero.vehicle)?.isFirst && !transit.serviceOf(hero.vehicle)?.isLast && <div className="lastnote"><FirstBadge mark={transit.serviceOf(hero.vehicle)} /><br />Es el primer viaje programado de hoy en esta ruta.</div>}
           {transit.serviceOf(hero.vehicle)?.isLast && <div className="lastnote"><LastBadge mark={transit.serviceOf(hero.vehicle)} long /><br />Es el último viaje programado de hoy en esta ruta: después de este no hay más buses.</div>}
           <div className="hero" style={{ ["--rc" as string]: color }}>
             <small>Próximo bus</small>
@@ -173,4 +176,11 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
       )}
     </>
   );
+}
+
+/** En una parada sin buses: las rutas que paran ahí y que ya terminaron su servicio de hoy. */
+function EndedRoutes({ stopId, nowMs }: { stopId: string; nowMs: number }) {
+  const ended = [...new Set(routesAtStop(transit, stopId).filter((r) => transit.routeStatus(r.id, nowMs)?.state === "ended").map((r) => r.shortName))];
+  if (!ended.length) return null;
+  return <div className="lastnote" role="status"><b>Ya no hay más buses hoy</b> de {ended.slice(0, 8).join(", ")}{ended.length > 8 ? " y otras" : ""}.</div>;
 }

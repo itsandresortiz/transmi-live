@@ -8,8 +8,9 @@ import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
 import { nowMs } from "../clock";
 import { stopKind, stopTag, stopText } from "./stopname";
-import { LastBadge, clockOfDay } from "./lastService";
+import { FirstBadge, LastBadge, RouteStatusNote, clockOfDay } from "./lastService";
 import { FavoritesSection, NearbySection, StarButton } from "./mine";
+import { ShareButton } from "./share";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
 import { alertsFor, nearestStops, routeIdsAtStops } from "@transmi/application";
@@ -250,6 +251,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
         <span className="rb big" style={{ ["--c" as string]: color }}>{route.shortName}</span>
         <div style={{ flex: 1, minWidth: 0 }}><h2>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName || SYSTEM_LABEL[route.system]}</h2>
           <p>{SYSTEM_LABEL[route.system]}{bus ? ` · bus ${bus.plate || bus.label || bus.id}` : ` · ${d.vehicles.length} ${d.vehicles.length === 1 ? "bus" : "buses"}`}{!bus && avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
+        <ShareButton target={{ kind: "ruta", id, direction: cur?.direction }} title={`Ruta ${route.shortName}`} />
         <StarButton kind="route" id={id} />
       </div>
       {!bus && shapes.length > 1 && (
@@ -257,6 +259,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
           {shapes.map((s) => <button key={s.direction} aria-pressed={cur?.direction === s.direction} onClick={() => setDirection(s.direction)}>{s.headsign ? `Hacia ${s.headsign}` : `Sentido ${Number(s.direction) + 1}`}</button>)}
         </div>
       )}
+      <RouteStatusNote routeId={id} nowMs={nowSec * 1000} />
       {d.alerts.map(({ alert, index }) => <div key={index} className="card"><span className="pill warn">{ALERT_EFFECT_LABEL[alert.effect]}</span><div className="cs" style={{ marginTop: 8 }}>{describeAlert(alert)}</div></div>)}
       {cur && cur.stopIds.length > 0 && (
         <>
@@ -300,7 +303,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
     <div className="pc">
       <div className="ph">
         <span className="rb big" style={{ ["--c" as string]: color }}>{r?.shortName ?? v.routeId}</span>
-        <div><h4>{r?.longName || SYSTEM_LABEL[v.system]}</h4><small>{SYSTEM_LABEL[v.system]} · <span className="plate-s">{v.plate || v.label || v.id}</span></small>{mark?.isLast && <div style={{ marginTop: 6 }}><LastBadge mark={mark} long /></div>}</div>
+        <div><h4>{r?.longName || SYSTEM_LABEL[v.system]}</h4><small>{SYSTEM_LABEL[v.system]} · <span className="plate-s">{v.plate || v.label || v.id}</span></small>{(mark?.isLast || mark?.isFirst) && <div style={{ marginTop: 6 }}><LastBadge mark={mark} long /><FirstBadge mark={mark} /></div>}</div>
       </div>
       {target && toTarget && (
         <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{etaText(toTarget.etaAt, nowSec)}</b> a <b>{stopText(transit.stopById(target))}</b>
@@ -310,7 +313,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
         <dt>Próxima parada</dt><dd>{stopText(ns?.stop, "—")}</dd>
         <dt>Llega</dt><dd>{untilText(ns?.arrivalAt, nowSec)}</dd>
         <dt>Puntualidad</dt><dd><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></dd>
-        {mark?.isLast && <><dt>Salida programada</dt><dd>{clockOfDay(mark.startSeconds)}</dd></>}
+        {(mark?.isLast || mark?.isFirst) && <><dt>Salida programada</dt><dd>{clockOfDay(mark.startSeconds)}</dd></>}
         <dt>Último reporte</dt><dd>hace {Math.max(0, Math.round(nowSec - v.reportedAt))} s</dd>
       </dl>
       <div className="acts"><button className="btn primary" onClick={onFollow}>{following ? "Dejar de seguir" : "Seguir"}</button><button className="btn" onClick={onRoute}>Ver ruta</button></div>

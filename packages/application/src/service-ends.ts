@@ -1,6 +1,8 @@
 /** Primer y último viaje programado de cada ruta por tipo de día (sale del horario del GTFS). */
 export interface ServiceEndsData {
   v: number;
+  /** Fechas (AAAAMMDD) con horario distinto al de su día de la semana: festivos, etc. */
+  dates?: Record<string, "wk" | "sa" | "su">;
   routes: Record<string, Partial<Record<"wk" | "sa" | "su", { first: [string, number]; last: [string, number] }>>>;
 }
 export interface ServiceMark {
@@ -12,14 +14,39 @@ export interface ServiceMark {
   startSeconds: number;
 }
 
+export type DayType = "wk" | "sa" | "su";
+/** Horas del día (hora de Bogotá) antes de las cuales el «día de servicio» sigue siendo el anterior: los horarios pasan de las 24:00. */
+const SERVICE_DAY_CUTOFF_H = 3;
+
+/** Día de servicio de un instante: su tipo de horario y los segundos transcurridos desde la medianoche de ese día (puede pasar de 86 400). */
+export function serviceDay(nowMs: number, dates: Record<string, DayType> = {}): { type: DayType; secs: number } {
+  const bog = new Date(nowMs - 5 * 3600_000);                       // Bogotá es UTC-5 todo el año
+  let secs = bog.getUTCHours() * 3600 + bog.getUTCMinutes() * 60 + bog.getUTCSeconds() + bog.getUTCMilliseconds() / 1000;
+  let day = new Date(Date.UTC(bog.getUTCFullYear(), bog.getUTCMonth(), bog.getUTCDate()));
+  if (bog.getUTCHours() < SERVICE_DAY_CUTOFF_H) { day = new Date(day.getTime() - 86_400_000); secs += 86_400; }
+  const key = `${day.getUTCFullYear()}${String(day.getUTCMonth() + 1).padStart(2, "0")}${String(day.getUTCDate()).padStart(2, "0")}`;
+  const dow = day.getUTCDay();
+  return { type: dates[key] ?? (dow === 0 ? "su" : dow === 6 ? "sa" : "wk"), secs };
+}
+
+export interface RouteDayStatus {
+  /** `before`: aún no sale el primero · `running`: en servicio · `ended`: salió el último y ya no hay buses en la calle. */
+  state: "before" | "running" | "ended";
+  firstStart: number;
+  lastStart: number;
+}
+
 /** Reconoce los buses que hacen el último (o primer) viaje de su ruta, cruzando el viaje en vivo con el horario. */
 export class ServiceEnds {
   private last = new Map<string, number>();
   private first = new Map<string, number>();
+  private byRoute: ServiceEndsData["routes"] = {};
+  private dates: Record<string, DayType> = {};
   get size(): number { return this.last.size; }
 
   load(data: ServiceEndsData): void {
     this.last.clear(); this.first.clear();
+    this.byRoute = data.routes ?? {}; this.dates = data.dates ?? {};
     for (const days of Object.values(data.routes ?? {}))
       for (const d of Object.values(days ?? {})) {
         if (!d) continue;
@@ -32,5 +59,15 @@ export class ServiceEnds {
     const l = this.last.get(tripId), f = this.first.get(tripId);
     if (l == null && f == null) return undefined;
     return { isLast: l != null, isFirst: f != null, startSeconds: (l ?? f)! };
+  }
+
+  /** Estado de la ruta hoy según el horario programado. `activeBuses` son los buses de esa ruta que ahora mismo circulan. */
+  routeStatus(routeId: string, nowMs: number, activeBuses: number): RouteDayStatus | undefined {
+    const { type, secs } = serviceDay(nowMs, this.dates);
+    const d = this.byRoute[routeId]?.[type];
+    if (!d) return undefined;
+    const firstStart = d.first[1], lastStart = d.last[1];
+    const state = secs < firstStart - 900 && activeBuses === 0 ? "before" : secs > lastStart && activeBuses === 0 ? "ended" : "running";
+    return { state, firstStart, lastStart };
   }
 }

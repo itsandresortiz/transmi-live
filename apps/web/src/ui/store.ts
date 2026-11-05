@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SystemType } from "@transmi/domain";
+import { safeStorage } from "../storage";
 import type { ColorMode, Motion } from "../map/BusRenderer";
 
 export type Tab = "rutas" | "buses" | "paradas" | "avisos";
@@ -33,6 +34,8 @@ interface UiState {
   colorMode: ColorMode;
   motion: Motion;
   toast: { text: string; n: number } | null;
+  /** Tamaño del texto de los paneles (1 = normal). */
+  textScale: number;
 
   setTab(t: Tab): void;
   setQuery(q: string): void;
@@ -53,15 +56,20 @@ interface UiState {
   setLayer(k: keyof Layers, v: boolean): void;
   setColorMode(m: ColorMode): void;
   setMotion(m: Motion): void;
+  setTextScale(n: number): void;
   showToast(text: string): void;
 }
+
+const SCALES = [1, 1.15, 1.3];
+const savedScale = (() => { const n = Number(safeStorage.get("tm.textScale")); return SCALES.includes(n) ? n : 1; })();
+if (typeof document !== "undefined") document.documentElement.style.setProperty("--ts", String(savedScale));
 
 const PAGE = 60;
 export const useUi = create<UiState>((set) => ({
   tab: "rutas", query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, routeBusId: null, stopId: null, groupIds: null, stopRoute: null, direction: "0", onlyLate: false,
   openAlert: null, followId: null, followPaused: false, targetStopId: null, settingsOpen: false,
   layers: { streets: true, stops: true, network: false, buses: true },
-  colorMode: "system", motion: "predict", toast: null,
+  colorMode: "system", motion: "predict", toast: null, textScale: savedScale,
 
   setTab: (tab) => set((s) => (s.tab === tab && !s.stopId ? s : { tab, stopId: null, groupIds: null, stopRoute: null, query: "", limit: PAGE, onlyLate: tab === "buses" ? s.onlyLate : false })),
   setQuery: (query) => set({ query, limit: PAGE }),
@@ -82,5 +90,6 @@ export const useUi = create<UiState>((set) => ({
   setLayer: (k, v) => set((s) => ({ layers: { ...s.layers, [k]: v } })),
   setColorMode: (colorMode) => set({ colorMode }),
   setMotion: (motion) => set({ motion }),
+  setTextScale: (textScale) => { safeStorage.set("tm.textScale", String(textScale)); document.documentElement.style.setProperty("--ts", String(textScale)); set({ textScale }); },
   showToast: (text) => set((s) => ({ toast: { text, n: (s.toast?.n ?? 0) + 1 } })),
 }));

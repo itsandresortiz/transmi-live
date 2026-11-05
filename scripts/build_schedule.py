@@ -33,6 +33,14 @@ def main(src, dst):
         wk = any(r[d] == "1" for d in ("monday", "tuesday", "wednesday", "thursday", "friday"))
         day[r["service_id"]] = "wk" if wk else ("sa" if r["saturday"] == "1" and r["sunday"] != "1" else "su")
         if r["saturday"] == "1" and r["sunday"] == "1": day[r["service_id"]] = "su"
+    # fechas con un horario distinto al de su día de la semana (festivos): fecha -> tipo de día de los servicios que se agregan
+    special = defaultdict(Counter)
+    try:
+        for r in rows(z, "calendar_dates.txt"):
+            if r["exception_type"] == "1" and r["service_id"] in day: special[r["date"]][day[r["service_id"]]] += 1
+    except IndexError:
+        pass
+    dates = {d: c.most_common(1)[0][0] for d, c in special.items()}
     # viaje representativo por ruta y sentido (igual que slim_gtfs.py)
     shape_count, first_trip, trip_info = Counter(), {}, {}
     for r in rows(z, "trips.txt"):
@@ -104,7 +112,7 @@ def main(src, dst):
     with open(dst, "w") as f:
         json.dump(out, f, separators=(",", ":"))
     # primer y último viaje programado de cada ruta por tipo de día: sirve para marcar «último servicio»
-    se = {"v": 1, "routes": {}}
+    se = {"v": 2, "routes": {}, "dates": dates}
     for (rid, dtype), (first, last) in ends.items():
         r = se["routes"].setdefault(rid, {})
         r[dtype] = {"first": [first[1], first[0]], "last": [last[1], last[0]]}

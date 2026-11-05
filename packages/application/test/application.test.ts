@@ -121,7 +121,7 @@ describe("lotes incompletos", () => {
   });
 });
 
-import { ServiceEnds } from "@transmi/application";
+import { ServiceEnds, serviceDay } from "@transmi/application";
 describe("último servicio", () => {
   it("marca el último y el primer viaje programado de cada ruta", () => {
     const e = new ServiceEnds();
@@ -130,5 +130,28 @@ describe("último servicio", () => {
     expect(e.markOf("S-0500")?.isFirst).toBe(true);
     expect(e.markOf("T-1200")).toBeUndefined();
     expect(e.markOf(undefined)).toBeUndefined();
+  });
+});
+
+describe("día de servicio y estado de la ruta", () => {
+  // 2026-03-04 es miércoles; Bogotá = UTC-5
+  const at = (iso: string) => Date.parse(iso);
+  it("de madrugada todavía es el día anterior (horarios pasan de 24 h)", () => {
+    const r = serviceDay(at("2026-03-04T05:30:00Z"));            // 00:30 miércoles
+    expect(r.type).toBe("wk");
+    expect(Math.round(r.secs)).toBe(86400 + 1800);
+    expect(serviceDay(at("2026-03-08T06:00:00Z")).type).toBe("sa");  // 01:00 domingo = sábado de servicio
+  });
+  it("los festivos usan su horario especial", () => {
+    expect(serviceDay(at("2026-03-23T15:00:00Z"), { "20260323": "su" }).type).toBe("su");
+  });
+  it("ruta: antes, en servicio y terminada", () => {
+    const e = new ServiceEnds();
+    e.load({ v: 2, routes: { A: { wk: { first: ["t1", 4 * 3600], last: ["t9", 22 * 3600] } } } });
+    expect(e.routeStatus("A", at("2026-03-04T08:00:00Z"), 0)?.state).toBe("before");      // 03:00
+    expect(e.routeStatus("A", at("2026-03-04T17:00:00Z"), 0)?.state).toBe("running");     // 12:00
+    expect(e.routeStatus("A", at("2026-03-05T04:00:00Z"), 0)?.state).toBe("ended");       // 23:00
+    expect(e.routeStatus("A", at("2026-03-05T04:00:00Z"), 3)?.state).toBe("running");     // aún hay buses en la calle
+    expect(e.routeStatus("Z", at("2026-03-04T17:00:00Z"), 0)).toBeUndefined();
   });
 });

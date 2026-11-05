@@ -43,6 +43,11 @@ export function Settings({ th }: { th: MapTheme }) {
           <Seg value={u.motion} set={u.setMotion} opts={[["predict", "Suave (estimado)"], ["reported", "Solo reportado"]]} />
           <p className="hint">{u.motion === "predict" ? "Entre un reporte y otro, el bus sigue avanzando con la velocidad que traía, y se corrige en cuanto llega la posición real." : "El bus se mueve solo cuando TransMilenio informa una posición nueva."}</p>
         </div>
+        <div className="grp"><h3>Tamaño del texto</h3>
+          <div className="seg" style={{ margin: 0 }} role="group" aria-label="Tamaño del texto">
+            {([[1, "Normal"], [1.15, "Grande"], [1.3, "Muy grande"]] as const).map(([v, l]) => <button key={v} aria-pressed={u.textScale === v} onClick={() => u.setTextScale(v)}>{l}</button>)}
+          </div>
+        </div>
         {!standalone && (ev || ios) && (
           <div className="grp"><h3>Instalar</h3>
             {ev ? <button className="btn primary" onClick={() => void ev.prompt()}>Instalar TransMi LIVE en tu celular</button>

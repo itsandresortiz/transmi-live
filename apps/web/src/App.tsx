@@ -17,6 +17,7 @@ import { ago } from "./ui/format";
 import { useNow, useTransitVersion } from "./ui/hooks";
 import { mapPadding } from "./ui/layout";
 import { hadLocationPermission, useLocation } from "./ui/location";
+import { type Target, formatHash, parseHash } from "./deeplink";
 import { useUi } from "./ui/store";
 import { StationView, StopRouteView, StopView } from "./ui/stopViews";
 import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
@@ -218,6 +219,22 @@ export function App() {
     const cur = shapes.find((s) => s.direction === ui.direction) ?? shapes[0]!;
     m.fit(cur.points, mapPadding(), 15);
   }, [ui.routeId, ui.direction]);
+
+  /* enlaces: la dirección refleja lo que se está viendo y, al abrir un enlace, se llega directo a eso */
+  useEffect(() => {
+    const t: Target | null = ui.stopId ? { kind: "parada", id: ui.stopId } : ui.groupIds ? { kind: "estacion", ids: ui.groupIds } : ui.routeId && ui.tab === "rutas" ? { kind: "ruta", id: ui.routeId, direction: ui.direction } : null;
+    const h = t ? formatHash(t) : "";
+    if (location.hash !== h && (h || parseHash(location.hash))) history.replaceState(null, "", h || location.pathname + location.search);
+  }, [ui.stopId, ui.groupIds, ui.routeId, ui.tab, ui.direction]);
+  const linked = useRef(false);
+  useEffect(() => {
+    if (linked.current || !net) return;
+    const t = parseHash(location.hash); linked.current = true;
+    if (!t) return;
+    if (t.kind === "ruta") { if (!transit.routeById(t.id)) return uiRef.current.showToast("Esa ruta ya no aparece en el servicio"); act.openRoute(t.id); if (t.direction) uiRef.current.setDirection(t.direction); uiRef.current.setSheet("half"); }
+    else if (t.kind === "parada") { if (!transit.stopById(t.id)) return uiRef.current.showToast("No encontramos esa parada"); act.openStop(t.id); }
+    else { const ids = t.ids.filter((id) => transit.stopById(id)); if (!ids.length) return uiRef.current.showToast("No encontramos esa estación"); act.openGroup(ids); }
+  }, [net, act]);
 
   useEffect(() => { if (ui.toast) { const t = setTimeout(() => setToastOn(false), 2800); setToastOn(true); return () => clearTimeout(t); } }, [ui.toast]);
   const [toastOn, setToastOn] = useState(false);
