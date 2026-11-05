@@ -198,7 +198,7 @@ export function upcomingAtStop(state: TransitState, stopId: string, nowSec: numb
         if (!v.lastStopId) continue;
         const k = shape.stopIds.indexOf(v.lastStopId);
         if (k < 0 || k >= j) continue;                       // ya la pasó (o está en ella) o va por otro sentido
-        buses.push({ vehicle: v, etaAt: arrivalAtIndex(state, v, shape.stopIds, k, j, nowSec * 1000), official: false, stopsAway: j - k });
+        buses.push({ vehicle: v, etaAt: arrivalAtIndex(state, v, shape, k, j, nowSec * 1000), official: false, stopsAway: j - k });
       }
       if (!buses.length) continue;
       buses.sort((a, b) => a.etaAt - b.etaAt);

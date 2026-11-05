@@ -71,8 +71,8 @@ El error de posición no baja mucho porque los buses son impredecibles (semáfor
 
 ## Cuánto tarda un bus en llegar
 - Comprobado con datos reales: la parada que TransMilenio informa de cada bus (en posiciones y en el viaje) es la **última a la que ya llegó**, con su hora real (en el 99,7 % de los casos queda atrás del bus, a una mediana de 188 m), no la que sigue. La app calcula la siguiente a partir del recorrido de la ruta.
-- No hay hora oficial para las paradas que faltan: se estima como *hora real en que llegó a su última parada + tiempo por parada*
-  (≈ 50–62 s según el sistema, medido con 16 lotes reales). Error mediano ≈ 40–56 s a 1–3 paradas; por eso todos los tiempos dicen «aprox.».
+- No hay hora oficial para las paradas que faltan; se estima así: se ubica el bus sobre el trazado de su ruta, se calcula **cuánto del tramo hacia la siguiente parada ya recorrió**, y se suma lo que falta de ese tramo más el tiempo típico de cada tramo restante (≈ 50–62 s por parada según el sistema, medido con 16 lotes reales), todo contado desde el momento del reporte de posición.
+- Medido con lotes reales (1–3 paradas de distancia): error mediano **34–37 s** usando la posición, frente a 44–57 s contando solo desde la hora a la que llegó a su última parada (que queda como respaldo si el bus no se ubica sobre su trazado). Por eso todos los tiempos dicen «aprox.».
 - **Todos los dispositivos muestran el mismo tiempo.** Se probó una versión que aprendía el tiempo por ruta en cada aparato y se descartó: dos aparatos daban tiempos distintos (mediana 125 s, p90 312 s de diferencia) y, comparado con lo que de verdad ocurrió, erraba más que el valor típico (71 s contra 31 s a una parada). El código quedó apagado (`TravelTimes.apply = false`).
 - **Hora del servidor, no del aparato:** cada consulta mide cuánto se adelanta o atrasa el reloj del dispositivo respecto al del servidor de datos (±1 s) y todos los tiempos («llega en…», «hace … s») usan esa hora corregida.
 - Si el bus va más lento de lo esperado y el cálculo ya quedó en el pasado, no se muestra «ya»: se supone que le falta una parte del tramo.

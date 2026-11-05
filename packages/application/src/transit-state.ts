@@ -80,7 +80,7 @@ export class TransitState {
     const seq = this.sequenceOf(v);
     const stopId = seq?.shape.stopIds[seq.index + 1];
     if (!seq || !stopId) return undefined;
-    return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape.stopIds, seq.index, seq.index + 1, nowMs) };
+    return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape, seq.index, seq.index + 1, nowMs) };
   }
 
   applyPositions(reports: readonly VehicleReport[], nowMs: number): void {
