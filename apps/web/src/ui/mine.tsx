@@ -3,6 +3,7 @@ import { nearestStops, upcomingAtStop } from "@transmi/application";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { Bus, Chevron, Locate } from "./icons";
+import { nowSec as serverNowSec } from "../clock";
 import { etaText } from "./format";
 import { stopKind, stopText } from "./stopname";
 import { useFavs } from "./favorites";
@@ -14,7 +15,7 @@ import type { Actions } from "./views";
 export function useUpcoming(stopId: string | null, perRoute: number) {
   const version = useTransitVersion();
   const nowSec = useNow() / 1000;
-  const rows = useMemo(() => (stopId ? upcomingAtStop(transit, stopId, Date.now() / 1000, perRoute) : []),
+  const rows = useMemo(() => (stopId ? upcomingAtStop(transit, stopId, serverNowSec(), perRoute) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [version, stopId, perRoute]);
   return { rows, nowSec };

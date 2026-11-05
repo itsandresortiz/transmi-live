@@ -87,3 +87,19 @@ describe("lector del GTFS reducido", () => {
     expect(net.shapesOf("R3")[0]!.direction).toBe("0");
   });
 });
+
+describe("reloj del servidor", () => {
+  it("mide cuánto se adelanta o atrasa el reloj del dispositivo respecto al servidor", async () => {
+    const offsets: number[] = [];
+    const serverNow = Math.floor(Date.now() / 1000) + 90;           // el dispositivo está 90 s atrasado respecto al servidor
+    const fetchFn = (async (url: string) => {
+      if (String(url).endsWith("/meta")) return new Response(JSON.stringify({ pos: "p1", at: serverNow }), { status: 200 });
+      return new Response(new Uint8Array(), { status: 200 });
+    }) as unknown as typeof fetch;
+    const feed = new ProxyLiveFeed({ primaryBase: "https://x/fn", fetchFn, onClock: (ms) => offsets.push(ms) });
+    await feed.poll({ pos: "p1" }).catch(() => null);               // sin cambios: igual se mide el reloj
+    expect(offsets).toHaveLength(1);
+    expect(offsets[0]!).toBeGreaterThan(88_000);
+    expect(offsets[0]!).toBeLessThan(92_000);
+  });
+});

@@ -32,5 +32,8 @@ export function arrivalAtIndex(state: TransitState, v: Vehicle, stopIds: readonl
   const tu = v.tripId ? state.tripUpdates.get(v.tripId) : undefined;
   const reached = tu?.nextStop && tu.nextStop.stopId === v.lastStopId ? tu.nextStop.arrivalAt : undefined;
   const base = reached ?? v.reportedAt;
-  return Math.max(base + estimateTravelSeconds(state, v, stopIds, lastIndex, to, nowMs), nowMs / 1000 + 3);
+  const travel = estimateTravelSeconds(state, v, stopIds, lastIndex, to, nowMs);
+  const eta = base + travel, now = nowMs / 1000;
+  // si el bus va más lento que lo esperado el cálculo ya quedó en el pasado: no se sabe cuándo llega, pero no es «ya»; se supone que le falta una parte del tramo
+  return eta > now + 3 ? eta : now + Math.max(10, 0.3 * travel);
 }

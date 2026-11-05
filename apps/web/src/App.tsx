@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { connectionStatus, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, networkSource, transit } from "./composition-root";
+import { nowSec } from "./clock";
 import { BusRenderer } from "./map/BusRenderer";
 import { buildStationGeometry } from "./map/stations";
 import { MapController } from "./map/MapController";
@@ -197,7 +198,7 @@ export function App() {
       if (!shape || shape.points.length < 2) { m.showRoute(null, "0", "", () => undefined); m.flyTo(st.position, 16, pad); return; }
       const path = new RoadPath(shape.points);
       const end = path.project(toWorld(st.position), 0, 0, 250)?.s ?? path.length;
-      const row = upcomingAtStop(transit, ui.stopId, Date.now() / 1000, 6).find((r) => r.route.id === routeId && r.direction === direction);
+      const row = upcomingAtStop(transit, ui.stopId, nowSec(), 6).find((r) => r.route.id === routeId && r.direction === direction);
       const hits = (row?.buses ?? []).map((b) => path.project(b.vehicle.world, 0, 0, 150)?.s).filter((x): x is number => x != null && x <= end);
       const start = Math.max(0, (hits.length ? Math.min(...hits) : end - 1200) - 120);
       const j = shape.stopIds.indexOf(ui.stopId);

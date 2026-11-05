@@ -18,11 +18,15 @@ const MIN_ROUTE_SAMPLES = 8, MIN_SYSTEM_SAMPLES = 20;
 
 /** Aprende cuánto tarda de verdad cada ruta entre paradas, según la franja del día, observando cuándo cambia la «próxima parada» de cada bus. */
 export class TravelTimes {
+  /** Si es `false` (por defecto) se usan siempre los tiempos típicos: lo aprendido por cada dispositivo daba resultados distintos entre
+   *  aparatos y, medido con lotes reales, erraba más que el valor típico (ver README). */
+  apply = false;
   private stats = new Map<string, Stat>();
   private seen = new Map<string, Seen>();
 
   /** Segundos por parada para una ruta ahora: lo aprendido de la ruta, si no del sistema, si no el valor típico. */
   secondsPerStop(routeId: string, system: SystemType, nowMs: number): number {
+    if (!this.apply) return DEFAULT_SECONDS_PER_STOP[system];
     const part = daypartOf(nowMs);
     const r = this.stats.get(`r|${routeId}|${part}`);
     if (r && r.n >= MIN_ROUTE_SAMPLES) return r.mean;
@@ -43,6 +47,7 @@ export class TravelTimes {
 
   /** Revisa la flota tras un lote nuevo: si la próxima parada de un bus avanzó una posición, midió un tramo. */
   observe(state: TransitState): void {
+    if (!this.apply) return;
     for (const v of state.fleet.values()) {
       const stop = v.lastStopId;
       if (!stop) continue;
@@ -50,22 +55,25 @@ export class TravelTimes {
       if (!prev) { this.seen.set(v.id, { stop, since: v.reportedAt, known: false }); continue; }
       if (prev.stop === stop) continue;
       const elapsed = v.reportedAt - prev.since;
-      if (prev.known && elapsed >= MIN_HOP && elapsed <= MAX_HOP && this.isNextStop(state, v.routeId, prev.stop, stop)) {
+      // si entre dos lotes el bus avanzó varias paradas, el tiempo por parada es lo transcurrido entre ellas
+      // (si solo se contaran los tramos de una parada, se descartarían los rápidos y el promedio saldría inflado)
+      const hops = prev.known ? this.hopsBetween(state, v.routeId, prev.stop, stop) : 0;
+      if (hops > 0 && elapsed >= MIN_HOP * hops && elapsed <= MAX_HOP * hops) {
         const part = daypartOf(v.reportedAt * 1000);
-        this.add(`r|${v.routeId}|${part}`, elapsed);
-        this.add(`s|${v.system}|${part}`, elapsed);
+        for (let k = 0; k < hops; k++) { this.add(`r|${v.routeId}|${part}`, elapsed / hops); this.add(`s|${v.system}|${part}`, elapsed / hops); }
       }
       this.seen.set(v.id, { stop, since: v.reportedAt, known: true });
     }
     if (this.seen.size > state.fleet.size * 2 + 100) for (const id of this.seen.keys()) if (!state.fleet.get(id)) this.seen.delete(id);
   }
 
-  private isNextStop(state: TransitState, routeId: string, from: string, to: string): boolean {
+  /** Cuántas paradas hay de `from` a `to` en el recorrido de la ruta (1 a 4), o 0 si no es un avance normal. */
+  private hopsBetween(state: TransitState, routeId: string, from: string, to: string): number {
     for (const sh of state.network.shapes.get(routeId) ?? []) {
-      const i = sh.stopIds.indexOf(from);
-      if (i >= 0 && sh.stopIds[i + 1] === to) return true;
+      const i = sh.stopIds.indexOf(from), j = sh.stopIds.indexOf(to);
+      if (i >= 0 && j > i && j - i <= 4) return j - i;
     }
-    return false;
+    return 0;
   }
 
   toJSON(): [string, number, number][] { return [...this.stats].map(([k, v]) => [k, Math.round(v.mean * 10) / 10, v.n]); }

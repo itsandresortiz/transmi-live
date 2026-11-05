@@ -6,6 +6,7 @@ import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType,
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
+import { nowMs } from "../clock";
 import { stopKind, stopTag, stopText } from "./stopname";
 import { FavoritesSection, NearbySection, StarButton } from "./mine";
 import { useFavs } from "./favorites";
@@ -289,7 +290,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
 export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; th: MapTheme; onFollow(): void; onRoute(): void; following: boolean }) {
   const nowSec = useNow() / 1000;
   useTransitVersion();
-  const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v);
+  const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
   const color = sysColor(th, v.system);
   const target = useUi((u) => u.targetStopId);
   const toTarget = target ? upcomingAtStop(transit, target, nowSec, 40).flatMap((x) => x.buses).find((b) => b.vehicle.id === v.id) : undefined;

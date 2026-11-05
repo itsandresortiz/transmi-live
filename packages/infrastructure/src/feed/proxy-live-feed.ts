@@ -7,9 +7,11 @@ export interface LiveFeedConfig {
   /** Respaldo (copia en GitHub, con minutos de retraso). Archivos: `meta.json`, `positions.pb`, … */
   fallbackBase?: string;
   fetchFn?: typeof fetch;
+  /** Se llama con cuántos ms adelanta (o atrasa) el reloj del servidor respecto al del dispositivo. */
+  onClock?: (offsetMs: number) => void;
 }
 
-interface Meta { pos?: string; tu?: string; al?: string }
+interface Meta { pos?: string; tu?: string; al?: string; /** hora del servidor (segundos desde 1970) */ at?: number }
 
 /** Lee los tres archivos de TransMilenio preguntando primero por una huella mínima (`meta`):
  *  solo se descarga lo que cambió. Si el intermediario falla usa la copia de respaldo. */
@@ -21,9 +23,13 @@ export class ProxyLiveFeed implements LiveFeedPort {
 
   private async json(url: string): Promise<Meta | null> {
     try {
+      const t0 = Date.now();
       const r = await this.f(url, { cache: "no-store" });
       if (!r.ok) return null;
       const m = (await r.json()) as Meta;
+      const t1 = Date.now();
+      // el reloj de cada aparato puede estar adelantado o atrasado: se mide contra la hora del servidor (±1 s) para que todos muestren lo mismo
+      if (typeof m.at === "number" && m.at > 1e9) this.cfg.onClock?.(m.at * 1000 + 500 - (t0 + t1) / 2);
       return m && m.pos ? m : null;
     } catch { return null; }
   }

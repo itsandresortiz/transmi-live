@@ -3,6 +3,7 @@ import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { Back, Bus, Chevron } from "./icons";
 import { StarButton, useUpcoming } from "./mine";
+import { nowMs } from "../clock";
 import { labelOf, stopKind, stopTag, stopText } from "./stopname";
 import { routesAtStop, siblingStops } from "@transmi/application";
 import { useMemo } from "react";
@@ -108,7 +109,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
   const shape = transit.network.shapes.get(stopRoute.routeId)?.find((s) => s.direction === stopRoute.direction);
   const j = shape ? shape.stopIds.indexOf(stopId) : -1;
   const hero = row?.buses[0];
-  const heroNext = hero ? transit.nextStopOf(hero.vehicle)?.stop : undefined;
+  const heroNext = hero ? transit.nextStopOf(hero.vehicle, nowMs())?.stop : undefined;
   // paradas por las que vienen los buses, de la más lejana a la elegida
   const nextIdx = (b: { vehicle: { lastStopId?: string } }) => (shape ? shape.stopIds.indexOf(b.vehicle.lastStopId ?? "") + 1 : -1);   // la parada que sigue a la última
   const ks = row && shape ? row.buses.map(nextIdx).filter((k) => k > 0) : [];

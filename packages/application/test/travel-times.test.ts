@@ -3,8 +3,9 @@ import { DEFAULT_SECONDS_PER_STOP, TransitState, TravelTimes, daypartOf, estimat
 import { TransitNetwork, type VehicleReport } from "@transmi/domain";
 
 const stops = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"];
-function world(): TransitState {
+function world(learn = true): TransitState {
   const st = new TransitState();
+  st.travelTimes.apply = learn;
   const net = new TransitNetwork();
   net.routes.set("R", { id: "R", shortName: "R1", longName: "Ruta", system: "zonal" });
   stops.forEach((id, i) => net.stops.set(id, { id, code: id, name: id, position: { lat: 4.6 + i * 0.001, lon: -74.07 } }));
@@ -23,7 +24,7 @@ describe("tiempos aprendidos", () => {
     stops.forEach((s, i) => st.applyPositions([report(t0 + i * 90, s)], (t0 + i * 90) * 1000));
     expect(st.travelTimes.secondsPerStop("R", "zonal", t0 * 1000)).toBeGreaterThan(80);   // 10 tramos medidos: ya se usa lo aprendido
     expect(world().travelTimes.secondsPerStop("R", "zonal", t0 * 1000)).toBe(DEFAULT_SECONDS_PER_STOP.zonal);   // sin datos: el típico
-    const learned = new TravelTimes();
+    const learned = new TravelTimes(); learned.apply = true;
     // varios buses recorriendo la ruta
     const s3 = world();
     for (let b = 0; b < 3; b++) for (let i = 0; i < stops.length; i++) {
@@ -40,10 +41,18 @@ describe("tiempos aprendidos", () => {
     learned.load(JSON.parse(JSON.stringify(s3.travelTimes.toJSON())));
     expect(learned.secondsPerStop("R", "zonal", t0 * 1000)).toBe(s3.travelTimes.secondsPerStop("R", "zonal", t0 * 1000));
   });
-  it("ignora saltos que no son paradas consecutivas o tardan demasiado", () => {
+  it("por defecto no usa lo aprendido: todos los dispositivos dan el mismo tiempo", () => {
+    const a = world(false), b = world(false);
+    const t0 = Date.UTC(2026, 10, 4, 18, 0) / 1000;
+    stops.forEach((s, i) => a.applyPositions([report(t0 + i * 200, s)], (t0 + i * 200) * 1000));     // A vio un recorrido lentísimo
+    stops.forEach((s, i) => b.applyPositions([report(t0 + i * 20, s)], (t0 + i * 20) * 1000));       // B uno rapidísimo
+    const va = a.fleet.get("bus1")!, vb = b.fleet.get("bus1")!;
+    expect(estimateTravelSeconds(a, va, stops, 0, 3, t0 * 1000)).toBe(estimateTravelSeconds(b, vb, stops, 0, 3, t0 * 1000));
+  });
+  it("ignora saltos de más de 4 paradas o que tardan demasiado", () => {
     const st = world();
     const t0 = 1_700_000_000;
-    [["a", 0], ["b", 60], ["e", 120], ["f", 1000]].forEach(([s, dt]) => st.applyPositions([report(t0 + (dt as number), s as string)], (t0 + (dt as number)) * 1000));
+    [["a", 0], ["b", 60], ["j", 120], ["k", 1000]].forEach(([s, dt]) => st.applyPositions([report(t0 + (dt as number), s as string)], (t0 + (dt as number)) * 1000));
     expect(st.travelTimes.samples).toBe(0);
   });
 });

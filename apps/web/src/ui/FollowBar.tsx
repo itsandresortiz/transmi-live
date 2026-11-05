@@ -4,6 +4,7 @@ import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { useNow, useTransitVersion } from "./hooks";
 import { Close } from "./icons";
+import { nowMs } from "../clock";
 import { stopText } from "./stopname";
 import { useUi } from "./store";
 import { delayText, untilText } from "./format";
@@ -21,7 +22,7 @@ export function FollowBar({ th, onResume }: { th: MapTheme; onResume(): void }) 
   if (live) last.current = live;
   const v = live ?? last.current;
   if (!v) return null;
-  const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v);
+  const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
   const silent = !live || nowSec - v.reportedAt > STALE_SECONDS;
   return (
     <div className="followbar glass" role="status" aria-live="polite">

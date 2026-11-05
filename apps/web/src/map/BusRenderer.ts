@@ -1,4 +1,5 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
+import { nowMs as clockNow } from "../clock";
 import { MotionEngine, type TransitState } from "@transmi/application";
 import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo, toWorld } from "@transmi/domain";
 import { type BusDraw, BusCanvas } from "./BusCanvas";
@@ -88,7 +89,7 @@ export class BusRenderer {
 
   private frame(t: number) {
     const o = this.options(), th = this.theme();
-    const zoom = this.mapc.zoom, nowMs = Date.now(), nowSec = nowMs / 1000;
+    const zoom = this.mapc.zoom, nowMs = clockNow(), nowSec = nowMs / 1000;
     if (!o.visible) { if (this.canvasOn) { this.canvas.clear(); this.canvasOn = false; } this.mapc.setBuses(EMPTY); this.lastDots = t; return; }
     const tau = o.motion === "predict" ? TAU_PREDICT_MS : TAU_REPORTED_MS;
 

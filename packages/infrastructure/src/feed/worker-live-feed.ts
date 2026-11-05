@@ -3,11 +3,11 @@ import { type LiveFeedConfig, ProxyLiveFeed } from "./proxy-live-feed";
 
 /** Mensajes entre la página y el worker que descarga y decodifica los datos en vivo. */
 export type FeedRequest = { id: number; known: FeedSignature };
-export type FeedResponse = { id: number; poll: LivePoll | null } | { id: number; error: string };
+export type FeedResponse = { id: number; poll: LivePoll | null } | { id: number; error: string } | { clock: number };
 
 /** Lado del worker: atiende los sondeos usando un `ProxyLiveFeed` (descarga + decodificación, fuera del hilo principal). */
 export function serveLiveFeed(scope: { onmessage: ((e: MessageEvent<FeedRequest>) => void) | null; postMessage(m: FeedResponse): void }, cfg: LiveFeedConfig): void {
-  const feed = new ProxyLiveFeed(cfg);
+  const feed = new ProxyLiveFeed({ ...cfg, onClock: (ms) => scope.postMessage({ clock: ms }) });
   scope.onmessage = async (e) => {
     const { id, known } = e.data;
     try { scope.postMessage({ id, poll: await feed.poll(known) }); }
@@ -21,8 +21,9 @@ export class WorkerLiveFeed implements LiveFeedPort {
   private nextId = 1;
   private pending = new Map<number, { resolve(p: LivePoll | null): void; reject(e: Error): void; timer: ReturnType<typeof setTimeout> }>();
 
-  constructor(private readonly worker: Worker, private readonly timeoutMs = 30_000) {
+  constructor(private readonly worker: Worker, private readonly onClock?: (offsetMs: number) => void, private readonly timeoutMs = 30_000) {
     worker.onmessage = (e: MessageEvent<FeedResponse>) => {
+      if ("clock" in e.data) { this.onClock?.(e.data.clock); return; }
       const p = this.pending.get(e.data.id);
       if (!p) return;
       this.pending.delete(e.data.id);
