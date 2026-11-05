@@ -1,6 +1,6 @@
 /* TransMi LIVE: guarda la app en el dispositivo para que abra rápido y funcione sin internet.
    Los datos en vivo NO pasan por aquí (la app guarda su propia última copia). */
-const VERSION = "tm-shell-v1";
+const VERSION = "tm-shell-v2";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
@@ -11,6 +11,9 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
+  const root = new URL("./", self.location).pathname;
+  // las páginas de ruta y estación para buscadores (/ruta/…, /estacion/…) son documentos aparte: no se guardan como si fueran la app
+  if (req.mode === "navigate" && url.pathname !== root && url.pathname !== root + "index.html") return;
   if (req.mode === "navigate") {
     // la página: primero la red (para tener siempre la versión nueva); sin red, la última guardada
     e.respondWith((async () => {

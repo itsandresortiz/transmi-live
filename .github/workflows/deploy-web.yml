@@ -3,8 +3,10 @@ name: Publicar app web
 on:
   push:
     branches: [main]
-    paths: ["apps/**", "packages/**", "package.json", "package-lock.json", "tsconfig*.json", ".github/workflows/deploy-web.yml"]
+    paths: ["apps/**", "packages/**", "tools/seo.ts", "package.json", "package-lock.json", "tsconfig*.json", ".github/workflows/deploy-web.yml"]
   workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 1"        # cada lunes: las páginas de rutas y estaciones se regeneran con el GTFS más reciente
 permissions:
   contents: read
   pages: write
@@ -20,6 +22,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # páginas estáticas para buscadores (una por ruta y estación). Si falla la descarga del GTFS, la app se publica igual.
+      - run: npx tsx tools/seo.ts apps/web/dist
       - uses: actions/upload-pages-artifact@v3
         with: { path: apps/web/dist }
   deploy:
