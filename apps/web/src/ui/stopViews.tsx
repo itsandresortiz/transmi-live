@@ -70,7 +70,8 @@ export function StationView({ th, act }: { th: MapTheme; act: Actions }) {
   const stops = (groupIds ?? []).map((id) => transit.stopById(id)).filter((s): s is NonNullable<typeof s> => !!s);
   const rows = useMemo(() => stops.map((s) => {
     const rs = routesAtStop(transit, s.id);
-    const names = [...new Set(rs.map((r) => r.shortName))];
+    const seen = new Set<string>();
+    const names = rs.filter((r) => !seen.has(r.shortName) && !!seen.add(r.shortName)).sort((a, b) => a.shortName.localeCompare(b.shortName, "es", { numeric: true }));
     // hacia dónde van las rutas que paran en este vagón (destino de la primera)
     const shape = rs.length ? (transit.network.shapes.get(rs[0]!.id) ?? []).find((sh) => sh.stopIds.includes(s.id)) : undefined;
     return { s, names, towards: shape?.headsign || rs[0]?.longName || "" };
@@ -89,7 +90,10 @@ export function StationView({ th, act }: { th: MapTheme; act: Actions }) {
               <span className="rb" style={{ ["--c" as string]: th.troncal }}>{labelOf(s)?.wagon ? `V${labelOf(s)!.wagon}` : labelOf(s)?.platform ?? "·"}</span>
               <span className="rm">
                 <span className="rt">{tag || s.name}{towards && <i className="apx"> · hacia {towards}</i>}</span>
-                <span className="rs">{names.slice(0, 8).join(" · ") + (names.length > 8 ? ` · +${names.length - 8}` : "")}</span>
+                <span className="rs rbadges">
+                  {names.slice(0, 10).map((r) => <span key={r.id} className="rb xs" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r.shortName}</span>)}
+                  {names.length > 10 && <span className="more-n">+{names.length - 10}</span>}
+                </span>
               </span>
               <span className="chev"><Chevron /></span>
             </button>
