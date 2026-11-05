@@ -1,0 +1,15 @@
+name: Inspeccionar GTFS (temporal)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descargar GTFS e inspeccionar horarios
+        run: |
+          curl -fsSL --retry 3 --max-time 600 -A "Mozilla/5.0 (transmi-live)" -o GTFS.zip https://gtfs.transmilenio.gov.co/GTFS.zip
+          python3 scripts/inspect_gtfs.py GTFS.zip
