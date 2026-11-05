@@ -47,7 +47,10 @@ function meanAxis(axes: Axis[]): Axis {
 }
 
 /** Dibuja las estaciones de la troncal: la estación completa como una base, y sus vagones como cápsulas adentro. */
-export function buildStationGeometry(state: TransitState, stations: readonly Station[]): StationGeometry {
+/** Puntos de las líneas dibujadas de la troncal (lat, lon) con su letra: la línea por la que realmente pasa una estación manda sobre cuántas rutas la usan. */
+export interface CorridorLine { l: string; p: readonly [number, number][] }
+
+export function buildStationGeometry(state: TransitState, stations: readonly Station[], corridors: readonly CorridorLine[] = []): StationGeometry {
   const index = new Map<string, RouteShape>();
   for (const [rid, shapes] of state.network.shapes) {
     const sys = state.network.routes.get(rid)?.system;
@@ -62,9 +65,27 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
     if (!l) continue;
     for (const sh of shapes) for (const id of sh.stopIds) { const c = letters.get(id) ?? letters.set(id, new Map()).get(id)!; c.set(l, (c.get(l) ?? 0) + 1); }
   }
+  // letras de las líneas dibujadas a menos de 45 m de la parada (cada corredor tiene su letra)
+  const nearLetters = (id: string): Set<string> => {
+    const out = new Set<string>(), st = state.network.stops.get(id);
+    if (!st) return out;
+    const { lat, lon } = st.position, kx = 111_320 * Math.cos((lat * Math.PI) / 180), ky = 110_540;
+    for (const c of corridors) {
+      if (out.has(c.l.trim())) continue;
+      for (let i = 0; i + 1 < c.p.length; i++) {
+        const a = c.p[i]!, b = c.p[i + 1]!;
+        const ax = (a[1] - lon) * kx, ay = (a[0] - lat) * ky, bx = (b[1] - lon) * kx, by = (b[0] - lat) * ky;
+        const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2));
+        if (Math.hypot(ax + t * dx, ay + t * dy) <= 45) { out.add(c.l.trim()); break; }
+      }
+    }
+    return out;
+  };
   const lineOf = (ids: string[]): string => {
     const tot = new Map<string, number>();
     for (const id of ids) for (const [l, n] of letters.get(id) ?? []) tot.set(l, (tot.get(l) ?? 0) + n);
+    // el corredor por el que pasa la estación desempata (y pesa más que una ruta que solo la atraviesa)
+    for (const id of ids) for (const l of nearLetters(id)) tot.set(l, (tot.get(l) ?? 0) + 2);
     return [...tot.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "X";
   };
   const m = 1 / METERS_PER_WORLD_UNIT;

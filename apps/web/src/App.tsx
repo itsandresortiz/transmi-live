@@ -5,6 +5,7 @@ import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadServiceEnds, networkSource, transit } from "./composition-root";
 import { nowSec } from "./clock";
 import { BusRenderer } from "./map/BusRenderer";
+import { loadTroncales } from "./map/geodata";
 import { buildStationGeometry } from "./map/stations";
 import { MapController } from "./map/MapController";
 import { currentScheme, routeBadgeColor, themeOf, type Scheme } from "./map/theme";
@@ -142,7 +143,7 @@ export function App() {
     void networkSource.load().then((n) => {
       if (stopped) return;
       transit.setNetwork(n);
-      void m.ready.then(() => { m.setStations(buildStationGeometry(transit, trunkStations(transit))); m.setNetwork(n); setNet((x) => x + 1); });
+      void Promise.all([m.ready, loadTroncales()]).then(([, lines]) => { m.setStations(buildStationGeometry(transit, trunkStations(transit), lines)); m.setNetwork(n); setNet((x) => x + 1); });
     }).catch(() => uiRef.current.showToast("No pudimos cargar las rutas; los buses siguen en vivo"));
 
     const mq = matchMedia("(prefers-color-scheme: dark)");
