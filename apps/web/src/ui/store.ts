@@ -60,7 +60,7 @@ const PAGE = 60;
 export const useUi = create<UiState>((set) => ({
   tab: "rutas", query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, routeBusId: null, stopId: null, groupIds: null, stopRoute: null, direction: "0", onlyLate: false,
   openAlert: null, followId: null, followPaused: false, targetStopId: null, settingsOpen: false,
-  layers: { streets: true, stops: true, network: true, buses: true },
+  layers: { streets: true, stops: true, network: false, buses: true },
   colorMode: "system", motion: "predict", toast: null,
 
   setTab: (tab) => set((s) => (s.tab === tab && !s.stopId ? s : { tab, stopId: null, groupIds: null, stopRoute: null, query: "", limit: PAGE, onlyLate: tab === "buses" ? s.onlyLate : false })),

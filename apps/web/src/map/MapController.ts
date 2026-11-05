@@ -4,6 +4,7 @@ import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
+import { stationChipImage } from "./sprites";
 import { type MapTheme, type Scheme, themeOf } from "./theme";
 
 export interface MapEvents {
@@ -26,6 +27,19 @@ const STREET_LAYERS = ["street-0", "street-2", "street-3", "street-4"];
 const BUS_LAYERS = ["bus-dots"];
 const BOGOTA: [number, number] = [-74.075, 4.65];
 
+/** Las líneas de todas las rutas van tenues para que se lea la jerarquía de las calles; al elegir una ruta se resalta sola. */
+const NETWORK_OPACITY = 0.2;
+type RoadKey = "minor" | "tertiary" | "secondary" | "primary" | "trunk";
+/** Ancho (px) de cada tipo de vía según el zoom. Las autopistas y avenidas se ven anchas, como en Google Maps. */
+const ROAD_CLASSES: { id: string; key: RoadKey; filter: unknown[]; minzoom: number; casing: boolean; major: boolean; widths: [number, number][] }[] = [
+  { id: "road-0", key: "minor", filter: ["<=", ["get", "c"], 1], minzoom: 13, casing: false, major: false, widths: [[13, 0.5], [15, 2], [17, 7], [19, 16]] },
+  { id: "road-2", key: "tertiary", filter: ["==", ["get", "c"], 2], minzoom: 11.5, casing: true, major: false, widths: [[11.5, 0.5], [13, 1.4], [15, 4.5], [17, 10], [19, 22]] },
+  { id: "road-3", key: "secondary", filter: ["==", ["get", "c"], 3], minzoom: 10.5, casing: true, major: false, widths: [[10.5, 0.6], [13, 2.2], [15, 6], [17, 13], [19, 28]] },
+  { id: "road-4", key: "primary", filter: ["==", ["get", "c"], 4], minzoom: 9, casing: true, major: true, widths: [[9, 0.6], [12, 2.2], [14, 6], [16, 11], [18, 22], [19.5, 38]] },
+  { id: "road-5", key: "trunk", filter: ["==", ["get", "c"], 5], minzoom: 8, casing: true, major: true, widths: [[8, 0.6], [12, 3], [14, 7.5], [16, 14], [18, 28], [19.5, 48]] },
+];
+const casingWidth = (z: number) => (z < 12 ? 0.4 : z < 16 ? 0.4 + (z - 12) * 0.2 : 1.2 + Math.min(z - 16, 3) * 0.25);
+
 const zoomWidth = (...pairs: [number, number][]): ExpressionSpecification =>
   ["interpolate", ["linear"], ["zoom"], ...pairs.flat()] as ExpressionSpecification;
 
@@ -34,6 +48,7 @@ export class MapController {
   readonly map: MLMap;
   readonly ready: Promise<void>;
   private theme: MapTheme;
+  private scheme: Scheme;
   private popup: Popup | null = null;
   private me: maplibregl.Marker | null = null;
   private networkLoaded = false;
@@ -41,7 +56,7 @@ export class MapController {
   busHit: ((pt: { x: number; y: number }) => string | null) | null = null;
 
   constructor(container: HTMLElement, scheme: Scheme, private readonly events: MapEvents) {
-    this.theme = themeOf(scheme);
+    this.theme = themeOf(scheme); this.scheme = scheme;
     const base = new URL(import.meta.env.BASE_URL, location.href).href;
     const emptyGlyph = `${base}fonts/empty.pbf`;
     this.map = new maplibregl.Map({
@@ -71,33 +86,28 @@ export class MapController {
   }
 
   private addLayers() {
+    this.registerChip();
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-pills"); this.src("station-wagons"); this.src("station-wagon-labels");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips");
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
     m.addLayer({ id: "localidades-line", type: "line", source: "localidades", paint: { "line-color": t.landLine, "line-width": 1.2 } });
 
     const lineLayout = { "line-cap": "round", "line-join": "round" } as const;
-    m.addLayer({
-      id: "roads-minor", type: "line", source: "roads", minzoom: 14, filter: ["<=", ["get", "c"], 1], layout: lineLayout,
-      paint: { "line-color": t.road, "line-width": zoomWidth([14, 0.6], [17, 1.6], [19, 3]) },
+    // calles como en los mapas modernos: primero todos los bordes (de menor a mayor) y luego los rellenos, para que se unan limpiamente
+    for (const cl of ROAD_CLASSES) if (cl.casing) m.addLayer({
+      id: `${cl.id}-casing`, type: "line", source: "roads", minzoom: cl.minzoom, filter: cl.filter as never, layout: lineLayout,
+      paint: { "line-color": cl.major ? t.roads.casingMajor : t.roads.casing, "line-width": ["interpolate", ["linear"], ["zoom"], ...cl.widths.flatMap(([z, w]) => [z, w + 2 * casingWidth(z)])] as never },
     });
-    m.addLayer({
-      id: "roads-mid", type: "line", source: "roads", minzoom: 11, filter: ["==", ["get", "c"], 2], layout: lineLayout,
-      paint: { "line-color": t.road, "line-width": zoomWidth([11, 0.5], [15, 1.5], [19, 4]) },
-    });
-    m.addLayer({
-      id: "roads-major", type: "line", source: "roads", filter: [">=", ["get", "c"], 3], layout: lineLayout,
-      paint: {
-        "line-color": t.roadMajor,
-        "line-width": zoomWidth([9, 0.4], [13, ["match", ["get", "c"], 5, 2.6, 4, 2.2, 1.6] as unknown as number], [17, ["match", ["get", "c"], 5, 6, 4, 5, 3.8] as unknown as number], [19, 12]),
-      },
+    for (const cl of ROAD_CLASSES) m.addLayer({
+      id: `${cl.id}-fill`, type: "line", source: "roads", minzoom: cl.minzoom, filter: cl.filter as never, layout: lineLayout,
+      paint: { "line-color": t.roads[cl.key], "line-width": ["interpolate", ["linear"], ["zoom"], ...cl.widths.flat()] as never },
     });
     m.addLayer({
       id: "network-lines", type: "line", source: "network", minzoom: 9, layout: lineLayout,
-      paint: { "line-color": ["get", "color"], "line-opacity": 0.5, "line-width": zoomWidth([9, 0.6], [14, 1.6], [18, 3.2]) },
+      paint: { "line-color": ["get", "color"], "line-opacity": NETWORK_OPACITY, "line-width": zoomWidth([9, 0.5], [14, 1.3], [18, 2.6]) },
     });
     m.addLayer({
       id: "troncales-lines", type: "line", source: "troncales", layout: lineLayout,
@@ -130,26 +140,31 @@ export class MapController {
       id: "estaciones-circles", type: "circle", source: "estaciones", minzoom: 11, maxzoom: 14.5,
       paint: { "circle-radius": zoomWidth([11, 2], [15, 4.2], [18, 6]), "circle-color": t.surface, "circle-stroke-color": t.troncal, "circle-stroke-width": 2 },
     });
+    // estaciones de la troncal: la estación completa (base), sus vagones (cápsulas, con puertas y número) y su nombre
+    m.addLayer({ id: "station-base-fill", type: "fill", source: "station-bases", minzoom: 14.5, paint: { "fill-color": t.stationBase, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] } });
+    m.addLayer({ id: "station-base-line", type: "line", source: "station-bases", minzoom: 14.5, paint: { "line-color": t.stationEdge, "line-width": ["interpolate", ["linear"], ["zoom"], 14.5, 1, 18, 2] } });
     m.addLayer({
-      id: "estaciones-labels", type: "symbol", source: "estaciones", minzoom: 14.5,
-      layout: { "text-field": ["get", "name"], "text-font": FONT, "text-size": 11, "text-offset": [0, 1.1], "text-anchor": "top", "text-optional": true },
-      paint: { "text-color": t.troncal, "text-halo-color": t.halo, "text-halo-width": 1.6 },
-    });
-    // estaciones de la troncal: píldora (vista media) y un rectángulo por vagón (vista cercana)
-    m.addLayer({ id: "station-pills-fill", type: "fill", source: "station-pills", minzoom: 14.5, maxzoom: 16.3, paint: { "fill-color": t.troncal, "fill-opacity": 0.16 } });
-    m.addLayer({ id: "station-pills-line", type: "line", source: "station-pills", minzoom: 14.5, maxzoom: 16.3, paint: { "line-color": t.troncal, "line-width": 1.6, "line-opacity": 0.85 } });
-    m.addLayer({
-      id: "station-wagons-fill", type: "fill", source: "station-wagons", minzoom: 16,
-      paint: { "fill-color": ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.surface], "fill-opacity": 0.96 },
+      id: "station-capsule-fill", type: "fill", source: "station-capsules", minzoom: 15.6,
+      paint: { "fill-color": ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule], "fill-opacity": 0.98 },
     });
     m.addLayer({
-      id: "station-wagons-line", type: "line", source: "station-wagons", minzoom: 16,
-      paint: { "line-color": ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.troncal], "line-width": ["case", ["==", ["get", "sel"], true], 3, 1.5] },
+      id: "station-capsule-line", type: "line", source: "station-capsules", minzoom: 15.6,
+      paint: { "line-color": ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsuleEdge], "line-width": ["case", ["==", ["get", "sel"], true], 3, 1.6] },
+    });
+    m.addLayer({ id: "station-doors", type: "line", source: "station-doors", minzoom: 17, paint: { "line-color": t.capsuleEdge, "line-width": 1, "line-opacity": 0.55 } });
+    m.addLayer({
+      id: "station-capsule-labels", type: "symbol", source: "station-labels", minzoom: 16.3,
+      layout: { "text-field": ["step", ["zoom"], ["get", "text"], 17.3, ["concat", "Vagón ", ["get", "text"]]], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 16.3, 10, 18.5, 13], "text-allow-overlap": true, "text-ignore-placement": true },
+      paint: { "text-color": ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.labelStrong] },
     });
     m.addLayer({
-      id: "station-wagon-labels", type: "symbol", source: "station-wagon-labels", minzoom: 16.8,
-      layout: { "text-field": ["get", "w"], "text-font": FONT, "text-size": 11, "text-allow-overlap": true, "text-ignore-placement": true },
-      paint: { "text-color": ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.troncal] },
+      id: "station-chips", type: "symbol", source: "station-chips", minzoom: 14.5,
+      layout: {
+        "icon-image": this.chipName(), "icon-text-fit": "both", "icon-text-fit-padding": [3, 9, 3, 30], "icon-allow-overlap": false,
+        "text-field": ["get", "title"], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 14.5, 11, 18, 14],
+        "text-anchor": "bottom", "text-offset": [0, -0.45], "text-optional": false, "text-max-width": 14,
+      },
+      paint: { "text-color": t.labelStrong },
     });
     m.addLayer({
       id: "stops-circles", type: "circle", source: "stops", minzoom: 13.5,
@@ -201,7 +216,7 @@ export class MapController {
     const pick = (pt: { x: number; y: number }): Hit | null => {
       const bus = this.busHit?.(pt);
       if (bus) return { kind: "bus", id: bus };
-      const layers = ["route-stops", "station-wagons-fill", "station-pills-fill", "stops-circles", "estaciones-circles", "bus-dots"].filter((l) => m.getLayer(l));
+      const layers = ["route-stops", "station-capsule-fill", "station-base-fill", "stops-circles", "estaciones-circles", "bus-dots"].filter((l) => m.getLayer(l));
       const feats = m.queryRenderedFeatures([[pt.x - TOUCH_PAD, pt.y - TOUCH_PAD], [pt.x + TOUCH_PAD, pt.y + TOUCH_PAD]], { layers });
       let best: Hit | null = null, bd = Infinity;
       for (const f of feats) {
@@ -213,11 +228,11 @@ export class MapController {
         } else continue;
         const q = m.project([lon, lat]);
         // a igual distancia gana la parada de una ruta resaltada, luego la parada, luego la estación
-        const rank = f.layer.id === "route-stops" || f.layer.id === "station-wagons-fill" ? 0 : f.layer.id === "stops-circles" ? 1 : f.layer.id === "station-pills-fill" ? 4 : 2;
+        const rank = f.layer.id === "route-stops" ? 0 : f.layer.id === "stops-circles" ? 1 : f.layer.id === "station-capsule-fill" ? 5 : f.layer.id === "station-base-fill" ? 8 : 2;
         const d = Math.hypot(q.x - pt.x, q.y - pt.y) + rank * 3;
         if (d >= bd) continue;
         if (f.layer.id === "bus-dots") { bd = d; best = { kind: "bus", id: String(f.properties?.id) }; }
-        else if (f.layer.id === "station-pills-fill") { bd = d; best = { kind: "group", id: String(f.properties?.ids) }; }
+        else if (f.layer.id === "station-capsule-fill" || f.layer.id === "station-base-fill") { bd = d; best = { kind: "group", id: String(f.properties?.all) }; }
         else if (f.layer.id === "estaciones-circles") { if (typeof f.id === "number") { bd = d; best = { kind: "station", id: f.id }; } }
         else { bd = d; best = { kind: "stop", id: String(f.properties?.id) }; }
       }
@@ -236,27 +251,31 @@ export class MapController {
 
   /* ---------- operaciones ---------- */
   setScheme(scheme: Scheme) {
-    this.theme = themeOf(scheme);
+    this.theme = themeOf(scheme); this.scheme = scheme;
     const t = this.theme, m = this.map;
     if (!m.getLayer("bg")) return;
     m.setPaintProperty("bg", "background-color", t.mapbg);
     m.setPaintProperty("localidades-fill", "fill-color", t.land);
     m.setPaintProperty("localidades-line", "line-color", t.landLine);
-    for (const id of ["roads-minor", "roads-mid"]) m.setPaintProperty(id, "line-color", t.road);
-    m.setPaintProperty("roads-major", "line-color", t.roadMajor);
+    for (const cl of ROAD_CLASSES) {
+      m.setPaintProperty(`${cl.id}-fill`, "line-color", t.roads[cl.key]);
+      if (cl.casing) m.setPaintProperty(`${cl.id}-casing`, "line-color", cl.major ? t.roads.casingMajor : t.roads.casing);
+    }
     m.setPaintProperty("troncales-lines", "line-color", t.troncal);
     m.setPaintProperty("localidad-names", "text-color", t.label);
     m.setPaintProperty("localidad-names", "text-halo-color", t.land);
     for (const id of STREET_LAYERS) { m.setPaintProperty(id, "text-color", t.label); m.setPaintProperty(id, "text-halo-color", t.halo); }
     m.setPaintProperty("estaciones-circles", "circle-color", t.surface);
     m.setPaintProperty("estaciones-circles", "circle-stroke-color", t.troncal);
-    m.setPaintProperty("station-pills-fill", "fill-color", t.troncal);
-    m.setPaintProperty("station-pills-line", "line-color", t.troncal);
-    m.setPaintProperty("station-wagons-fill", "fill-color", ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.surface]);
-    m.setPaintProperty("station-wagons-line", "line-color", ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.troncal]);
-    m.setPaintProperty("station-wagon-labels", "text-color", ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.troncal]);
-    m.setPaintProperty("estaciones-labels", "text-color", t.troncal);
-    m.setPaintProperty("estaciones-labels", "text-halo-color", t.halo);
+    m.setPaintProperty("station-base-fill", "fill-color", t.stationBase);
+    m.setPaintProperty("station-base-line", "line-color", t.stationEdge);
+    m.setPaintProperty("station-capsule-fill", "fill-color", ["case", ["==", ["get", "sel"], true], t.troncal, ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsule]);
+    m.setPaintProperty("station-capsule-line", "line-color", ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], t.capsuleEdge]);
+    m.setPaintProperty("station-doors", "line-color", t.capsuleEdge);
+    m.setPaintProperty("station-capsule-labels", "text-color", ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.labelStrong]);
+    m.setPaintProperty("station-chips", "text-color", t.labelStrong);
+    this.registerChip();
+    m.setLayoutProperty("station-chips", "icon-image", this.chipName());
     m.setPaintProperty("stops-circles", "circle-color", t.surface);
     m.setPaintProperty("stops-circles", "circle-stroke-color", t.label);
     m.setPaintProperty("route-stops", "circle-color", t.surface);
@@ -265,17 +284,28 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-pills-fill", "station-pills-line", "station-wagons-fill", "station-wagons-line", "station-wagon-labels"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
   }
 
-  private wagonStopIds = new Set<string>();
   private stationBase: StationGeometry | null = null;
   private stationState = { hl: new Set<string>(), color: "#e11d2e", sel: null as string | null };
 
-  /** Dibuja las estaciones de la troncal. Llamar antes de `setNetwork` (para no repetir sus paradas como puntico). */
+  private chipName() { return this.scheme === "dark" ? "station-chip-dark" : "station-chip-light"; }
+  /** La etiqueta de cada estación: un fondo que se estira según el nombre, con el ícono de bus a la izquierda. */
+  private registerChip() {
+    for (const name of ["station-chip-light", "station-chip-dark"]) if (this.map.hasImage(name)) this.map.removeImage(name);
+    for (const dark of [false, true]) {
+      const { image, options } = stationChipImage(dark);
+      this.map.addImage(dark ? "station-chip-dark" : "station-chip-light", image, options);
+    }
+  }
+
+  /** Dibuja las estaciones de la troncal. */
   setStations(g: StationGeometry) {
-    this.stationBase = g; this.wagonStopIds = g.stopIds;
-    (this.map.getSource("station-pills") as GeoJSONSource | undefined)?.setData(g.pills);
+    this.stationBase = g;
+    (this.map.getSource("station-bases") as GeoJSONSource | undefined)?.setData(g.bases);
+    (this.map.getSource("station-doors") as GeoJSONSource | undefined)?.setData(g.doors);
+    (this.map.getSource("station-chips") as GeoJSONSource | undefined)?.setData(g.chips);
     this.paintStations();
   }
   /** Ilumina los vagones donde se detiene la ruta elegida y marca el vagón de la parada abierta. */
@@ -286,9 +316,12 @@ export class MapController {
   private paintStations() {
     const g = this.stationBase; if (!g) return;
     const { hl, color, sel } = this.stationState;
-    const mark = <T extends { properties: Record<string, unknown> | null }>(f: T): T => ({ ...f, properties: { ...f.properties, hl: hl.has(String(f.properties?.id)), hlColor: color, sel: f.properties?.id === sel } });
-    (this.map.getSource("station-wagons") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: g.wagons.features.map(mark) });
-    (this.map.getSource("station-wagon-labels") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: g.labels.features.map(mark) });
+    const mark = <T extends { properties: Record<string, unknown> | null }>(f: T): T => {
+      const ids = String(f.properties?.ids ?? "").split(",");
+      return { ...f, properties: { ...f.properties, hl: ids.some((i) => hl.has(i)), hlColor: color, sel: sel != null && ids.includes(sel) } };
+    };
+    (this.map.getSource("station-capsules") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: g.capsules.features.map(mark) });
+    (this.map.getSource("station-labels") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: g.labels.features.map(mark) });
   }
 
   setBuses(data: FeatureCollection<Point>) { (this.map.getSource("buses") as GeoJSONSource | undefined)?.setData(data); }
@@ -306,7 +339,7 @@ export class MapController {
     (this.map.getSource("network") as GeoJSONSource).setData({ type: "FeatureCollection", features: lines });
     const stops: Feature<Point>[] = [];
     for (const s of net.stops.values())
-      if (!this.wagonStopIds.has(s.id)) stops.push({ type: "Feature", properties: { id: s.id }, geometry: { type: "Point", coordinates: [s.position.lon, s.position.lat] } });
+      stops.push({ type: "Feature", properties: { id: s.id }, geometry: { type: "Point", coordinates: [s.position.lon, s.position.lat] } });
     (this.map.getSource("stops") as GeoJSONSource).setData({ type: "FeatureCollection", features: stops });
     this.networkLoaded = true;
     this.map.setLayoutProperty("troncales-lines", "visibility", "none");
@@ -319,7 +352,7 @@ export class MapController {
     const sel = this.map.getSource("route-sel") as GeoJSONSource, stops = this.map.getSource("route-stops") as GeoJSONSource;
     if (!shapes || !shapes.length) {
       sel.setData(EMPTY); stops.setData(EMPTY);
-      this.map.setPaintProperty("network-lines", "line-opacity", 0.5);
+      this.map.setPaintProperty("network-lines", "line-opacity", NETWORK_OPACITY);
       return;
     }
     this.map.setPaintProperty("network-lines", "line-opacity", 0.1);

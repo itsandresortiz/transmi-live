@@ -37,6 +37,21 @@ export function estacionPoints(e: Estacion[]) {
 
 /** Clase de vía: 0 residencial · 1 sin clasificar · 2 terciaria · 3 secundaria · 4 primaria · 5 troncal. */
 const ROAD_ORDER = ["residential", "unclassified", "tertiary", "secondary", "primary", "trunk"];
+/** Suaviza una línea cortando sus esquinas (Chaikin): los datos vienen con ~10 m de precisión y, con calles anchas, se verían quebradas. */
+function smooth(coords: [number, number][], iterations: number): [number, number][] {
+  let pts = coords;
+  for (let it = 0; it < iterations && pts.length > 2; it++) {
+    const out: [number, number][] = [pts[0]!];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i]!, b = pts[i + 1]!;
+      out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+    }
+    out.push(pts[pts.length - 1]!);
+    pts = out;
+  }
+  return pts;
+}
+
 export async function loadRoads(): Promise<FeatureCollection<LineString>> {
   const raw = (await import("../data/roads.json")).default as unknown as Record<string, number[][]>;
   const features: Feature<LineString>[] = [];
@@ -45,7 +60,7 @@ export async function loadRoads(): Promise<FeatureCollection<LineString>> {
       let a = e[0]!, b = e[1]!; // latitud y longitud ×1e4, luego diferencias
       const coords: [number, number][] = [[b / 1e4, a / 1e4]];
       for (let i = 2; i < e.length; i += 2) { a += e[i]!; b += e[i + 1]!; coords.push([b / 1e4, a / 1e4]); }
-      features.push({ type: "Feature", properties: { c }, geometry: { type: "LineString", coordinates: coords } });
+      features.push({ type: "Feature", properties: { c }, geometry: { type: "LineString", coordinates: smooth(coords, c >= 2 ? 2 : 1) } });
     }
   });
   return fc<LineString>(features);
