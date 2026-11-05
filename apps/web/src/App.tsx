@@ -155,6 +155,18 @@ export function App() {
   /* ---------- estado de la interfaz → mapa ---------- */
   useEffect(() => { document.documentElement.dataset.scheme = scheme; void mc.current?.ready.then(() => { mc.current?.setScheme(scheme); if (transit.network.routes.size) mc.current?.recolorNetwork(transit.network); br.current?.refresh(); }); }, [scheme]);
   useEffect(() => { void mc.current?.ready.then(() => mc.current?.setToggles(ui.layers)); br.current?.refresh(); }, [ui.layers]);
+  /* semáforos: el archivo se baja solo la primera vez que se enciende la capa */
+  useEffect(() => {
+    const m = mc.current; if (!ui.layers.signals || !m || m.hasSignals) return;
+    void m.ready.then(async () => {
+      try {
+        const r = await fetch(new URL("semaforos.json", new URL(import.meta.env.BASE_URL, location.href)).href);
+        if (!r.ok) throw new Error(String(r.status));
+        const d = (await r.json()) as { rows: [number, number, string, string, string][] };
+        m.setSignals(d.rows);
+      } catch { uiRef.current.showToast("Todavía no hay datos de semáforos disponibles"); }
+    });
+  }, [ui.layers.signals]);
   useEffect(() => { br.current?.refresh(); }, [ui.colorMode, ui.motion, ui.system, ui.tab, ui.routeId, ui.stopRoute]);
   useEffect(() => { br.current?.setFollow(ui.followId); }, [ui.followId]);
   useEffect(() => { br.current?.setFollowPaused(ui.followPaused); }, [ui.followPaused]);

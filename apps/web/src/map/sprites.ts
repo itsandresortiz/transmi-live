@@ -67,3 +67,14 @@ export function stationChipImage(dark: boolean, color = "#e11d2e", portal = fals
   g.beginPath(); g.moveTo(18, 35); g.lineTo(20, 31.5); g.moveTo(30, 35); g.lineTo(28, 31.5); g.stroke();
   return { image: g.getImageData(0, 0, W, H), options: { pixelRatio: 2, stretchX: [[56, 88]], stretchY: [[16, 32]], content: [52, 8, 112, 40] } };
 }
+
+/** Semáforo pequeño: cuerpo oscuro con las tres luces. */
+export function trafficLightImage(): ImageData {
+  const W = 16, H = 30, r = 2, c = document.createElement("canvas");
+  c.width = W * r; c.height = H * r;
+  const g = c.getContext("2d")!; g.scale(r, r);
+  g.lineWidth = 1.6; g.strokeStyle = "#fff"; g.fillStyle = "#222936";
+  rounded(g, 2.5, 1.5, 11, 27, 4); g.fill(); g.stroke();
+  ["#ff4b3e", "#ffc533", "#3ddc84"].forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.arc(8, 7.5 + i * 7.5, 2.6, 0, 6.3); g.fill(); });
+  return g.getImageData(0, 0, W * r, H * r);
+}

@@ -30,6 +30,7 @@ export function Settings({ th }: { th: MapTheme }) {
           <Switch label="Nombres de calles" on={u.layers.streets} set={(v) => u.setLayer("streets", v)} />
           <Switch label="Paradas" on={u.layers.stops} set={(v) => u.setLayer("stops", v)} />
           <Switch label="Líneas de rutas" on={u.layers.network} set={(v) => u.setLayer("network", v)} />
+          <Switch label="Semáforos" on={u.layers.signals} set={(v) => u.setLayer("signals", v)} />
         </div></div>
         <div className="grp"><h3>Color de los buses</h3>
           <Seg value={u.colorMode} set={u.setColorMode} opts={[["system", "Por sistema"], ["delay", "Por puntualidad"]]} />
@@ -54,7 +55,7 @@ export function Settings({ th }: { th: MapTheme }) {
               : <p className="hint">En iPhone: toca el botón Compartir y luego «Añadir a pantalla de inicio».</p>}
           </div>
         )}
-        <p className="credits">Datos en tiempo real de TransMilenio (GTFS-realtime). Mapa: © OpenStreetMap contributors.</p>
+        <p className="credits">Datos en tiempo real de TransMilenio (GTFS-realtime). Mapa: © OpenStreetMap contributors. Semáforos: Secretaría Distrital de Movilidad (CC BY 4.0).</p>
       </section>
     </>
   );

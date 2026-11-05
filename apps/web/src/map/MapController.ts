@@ -4,7 +4,7 @@ import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
-import { stationChipImage } from "./sprites";
+import { stationChipImage, trafficLightImage } from "./sprites";
 import { type MapTheme, type Scheme, themeOf } from "./theme";
 
 export interface MapEvents {
@@ -19,7 +19,7 @@ export interface MapEvents {
   /** Toque en una parte vacía del mapa (no sobre un bus, parada ni estación). */
   onMapTap?(): void;
 }
-export interface LayerToggles { streets: boolean; stops: boolean; network: boolean; buses: boolean }
+export interface LayerToggles { streets: boolean; stops: boolean; network: boolean; buses: boolean; signals: boolean }
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const FONT = ["Noto Sans Regular"];
@@ -96,7 +96,8 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos");
+    if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
     m.addLayer({ id: "localidades-line", type: "line", source: "localidades", paint: { "line-color": t.landLine, "line-width": 1.2 } });
@@ -179,6 +180,19 @@ export class MapController {
         "text-anchor": "bottom", "text-offset": [0, -0.45], "text-optional": false, "text-max-width": 14,
       },
       paint: { "text-color": t.labelStrong },
+    });
+    m.addLayer({
+      id: "semaforos-dots", type: "circle", source: "semaforos", minzoom: 13.2, maxzoom: 15.4,
+      paint: { "circle-radius": zoomWidth([13.2, 1.6], [15.4, 3.2]), "circle-color": "#e8503f", "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 },
+    });
+    m.addLayer({
+      id: "semaforos-icons", type: "symbol", source: "semaforos", minzoom: 15.4,
+      layout: { "icon-image": "semaforo", "icon-size": ["interpolate", ["linear"], ["zoom"], 15.4, 0.55, 18, 0.95], "icon-allow-overlap": true, "icon-ignore-placement": true },
+    });
+    m.addLayer({
+      id: "semaforos-labels", type: "symbol", source: "semaforos", minzoom: 17.2,
+      layout: { "text-field": ["get", "dir"], "text-font": FONT, "text-size": 10.5, "text-offset": [0, 1.35], "text-anchor": "top", "text-optional": true },
+      paint: { "text-color": t.label, "text-halo-color": t.halo, "text-halo-width": 1.2 },
     });
     m.addLayer({
       id: "portal-chips", type: "symbol", source: "estaciones", minzoom: 12.5, filter: ["==", ["get", "portal"], true],
@@ -314,8 +328,19 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
   }
+
+  private signalsLoaded = false;
+  /** Pone los semáforos en el mapa (se llama la primera vez que el usuario enciende la capa). */
+  setSignals(rows: readonly (readonly [number, number, string, string, string])[]) {
+    this.signalsLoaded = true;
+    (this.map.getSource("semaforos") as GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: rows.map((r) => ({ type: "Feature", properties: { dir: r[2], loc: r[3], tipo: r[4] }, geometry: { type: "Point", coordinates: [r[0], r[1]] } })),
+    });
+  }
+  get hasSignals(): boolean { return this.signalsLoaded; }
 
   private stationBase: StationGeometry | null = null;
   private estacionesAll: FeatureCollection<Point> | null = null;
