@@ -234,7 +234,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
       <div className="ph"><span className="rb" style={{ ["--c" as string]: color }}>{r?.shortName ?? v.routeId}</span><div><h4>{SYSTEM_LABEL[v.system]}</h4><small>{r?.longName}</small></div></div>
       <div className="plate"><span>{v.plate || v.label || v.id}</span><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></div>
       {target && toTarget && (
-        <div className="tgt"><b>{toTarget.official ? "" : "~"}{eta(toTarget.etaAt, nowSec)}</b> para llegar a <b>{transit.stopById(target)?.name}</b>
+        <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{eta(toTarget.etaAt, nowSec)}</b> a <b>{transit.stopById(target)?.name}</b>
           <small>{toTarget.stopsAway <= 1 ? "es su próxima parada" : `le faltan ${toTarget.stopsAway - 1} ${toTarget.stopsAway - 1 === 1 ? "parada" : "paradas"} antes`}</small></div>
       )}
       <dl>
@@ -247,7 +247,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
   );
 }
 
-const away = (n: number) => (n <= 1 ? "su próxima parada" : `a ${n - 1} ${n - 1 === 1 ? "parada" : "paradas"}`);
+const away = (n: number, official: boolean) => `${official ? "" : "aprox., "}${n <= 1 ? "su próxima parada" : `a ${n - 1} ${n - 1 === 1 ? "parada" : "paradas"}`}`;
 const eta = (at: number, nowSec: number) => {
   const s = Math.round(at - nowSec);
   return s <= 15 ? "llegando" : s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
@@ -261,7 +261,7 @@ export function StopPopup({ stopId, th, onRoute, onBus }: { stopId: string; th: 
   const rows = upcomingAtStop(transit, stopId, nowSec, 2).slice(0, 6);
   return (
     <div className="pc">
-      <div className="ph"><div><h4>{s?.name ?? "Parada"}</h4><small>Próximos buses</small></div></div>
+      <div className="ph"><div><h4>{s?.name ?? "Parada"}</h4><small>{rows.length ? "Toca un bus para verlo en el mapa" : "Próximos buses"}</small></div></div>
       {rows.length === 0 && <p className="cs" style={{ margin: "12px 0 0", color: "var(--muted)" }}>Ningún bus viene hacia esta parada en este momento.</p>}
       <div className="ups">
         {rows.map((r) => (
@@ -272,8 +272,8 @@ export function StopPopup({ stopId, th, onRoute, onBus }: { stopId: string; th: 
               <div className="etas">
                 {r.buses.map((b) => (
                   <button key={b.vehicle.id} className={`eta${b.official ? "" : " est"}`} onClick={() => onBus(b.vehicle.id)}
-                    title={b.official ? "Hora oficial de TransMilenio" : "Tiempo calculado"}>
-                    {b.official ? "" : "~"}{eta(b.etaAt, nowSec)}<small>{away(b.stopsAway)}</small>
+                    aria-label={`${eta(b.etaAt, nowSec)}, ${away(b.stopsAway, b.official)}. Ver el bus en el mapa`}>
+                    <span className="t">{!b.official && <i>aprox.</i>}{eta(b.etaAt, nowSec)}</span><small>{b.stopsAway <= 1 ? "su próxima parada" : `a ${b.stopsAway - 1} ${b.stopsAway - 1 === 1 ? "parada" : "paradas"}`}</small>
                   </button>
                 ))}
               </div>
@@ -281,7 +281,6 @@ export function StopPopup({ stopId, th, onRoute, onBus }: { stopId: string; th: 
           </div>
         ))}
       </div>
-      {rows.some((r) => r.buses.some((b) => !b.official)) && <p className="note">El «~» es un cálculo; sin «~» es la hora oficial.</p>}
     </div>
   );
 }
