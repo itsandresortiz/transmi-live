@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Perfil de tiempos por tramo sacado del horario programado (stop_times.txt) del GTFS.
+
+Para cada ruta y su recorrido representativo (el mismo que usa gtfs-lite.zip) guarda:
+  - seg:   segundos típicos de cada tramo entre paradas consecutivas (mediana de todos los viajes),
+  - scale: cuánto más lento o rápido se programa por tipo de día y franja horaria (1 = típico).
+Uso: python3 scripts/build_schedule.py GTFS.zip schedule.json
+"""
+import csv, io, json, statistics, sys, zipfile
+from collections import Counter, defaultdict
+
+BUCKETS = [(0, 5), (5, 7), (7, 9), (9, 12), (12, 15), (15, 17), (17, 20), (20, 48)]   # horas del día (el horario pasa de 24 h)
+
+def bucket(h):
+    for i, (a, b) in enumerate(BUCKETS):
+        if a <= h < b: return i
+    return len(BUCKETS) - 1
+
+def rows(z, name):
+    hit = [n for n in z.namelist() if n.split("/")[-1] == name]
+    with z.open(hit[0]) as f:
+        yield from csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig", newline=""))
+
+def secs(t):
+    h, m, s = t.split(":")
+    return int(h) * 3600 + int(m) * 60 + int(s)
+
+def main(src, dst):
+    z = zipfile.ZipFile(src)
+    # tipo de día de cada servicio
+    day = {}
+    for r in rows(z, "calendar.txt"):
+        wk = any(r[d] == "1" for d in ("monday", "tuesday", "wednesday", "thursday", "friday"))
+        day[r["service_id"]] = "wk" if wk else ("sa" if r["saturday"] == "1" and r["sunday"] != "1" else "su")
+        if r["saturday"] == "1" and r["sunday"] == "1": day[r["service_id"]] = "su"
+    # viaje representativo por ruta y sentido (igual que slim_gtfs.py)
+    shape_count, first_trip, trip_info = Counter(), {}, {}
+    for r in rows(z, "trips.txt"):
+        key = (r["route_id"], r.get("direction_id", ""), r.get("shape_id", ""))
+        shape_count[key] += 1
+        first_trip.setdefault(key, r["trip_id"])
+        trip_info[r["trip_id"]] = (r["route_id"], day.get(r["service_id"], "wk"))
+    best = {}
+    for (rid, d, sh), n in shape_count.items():
+        cur = best.get((rid, d))
+        if cur is None or n > cur[0]: best[(rid, d)] = (n, sh, first_trip[(rid, d, sh)])
+    rep = {}                      # route_id -> trip representativo (si una ruta tiene dos sentidos, el de más viajes)
+    for (rid, d), (n, sh, tid) in best.items():
+        if rid not in rep or n > rep[rid][0]: rep[rid] = (n, tid)
+    rep_trip = {rid: tid for rid, (n, tid) in rep.items()}
+    rep_ids = set(rep_trip.values())
+
+    # paso 1: paradas del viaje representativo, en orden
+    stops_of = defaultdict(list)
+    for r in rows(z, "stop_times.txt"):
+        if r["trip_id"] in rep_ids: stops_of[r["trip_id"]].append((int(r["stop_sequence"]), r["stop_id"]))
+    seq = {rid: [s for _, s in sorted(stops_of[tid])] for rid, tid in rep_trip.items() if tid in stops_of}
+    pair = {}                     # (ruta, parada_i, parada_i+1) -> índice del tramo
+    for rid, ss in seq.items():
+        for i in range(len(ss) - 1): pair[(rid, ss[i], ss[i + 1])] = i
+
+    # paso 2: tiempos de tramo de todos los viajes (cada tramo entre paradas consecutivas del recorrido representativo)
+    samples = defaultdict(list)   # (ruta, tramo) -> [(segundos, tipo de día, franja)]
+    cur_trip, buf = None, []
+    def flush():
+        if not buf: return
+        rid, dtype = trip_info.get(cur_trip, (None, "wk"))
+        if rid not in seq: return
+        buf.sort()
+        for (a_seq, a_stop, a_t), (b_seq, b_stop, b_t) in zip(buf, buf[1:]):
+            i = pair.get((rid, a_stop, b_stop))
+            if i is None: continue
+            d = b_t - a_t
+            if 5 <= d <= 1800: samples[(rid, i)].append((d, dtype, bucket(a_t // 3600)))
+    for r in rows(z, "stop_times.txt"):
+        if r["trip_id"] != cur_trip:
+            flush(); cur_trip, buf = r["trip_id"], []
+        buf.append((int(r["stop_sequence"]), r["stop_id"], secs(r["arrival_time"])))
+    flush()
+
+    out = {"v": 1, "buckets": [list(b) for b in BUCKETS], "routes": {}}
+    scale_acc = defaultdict(lambda: defaultdict(list))     # ruta -> (tipo, franja) -> [razón]
+    for rid, ss in seq.items():
+        seg = []
+        for i in range(len(ss) - 1):
+            ds = samples.get((rid, i))
+            seg.append(round(statistics.median(d for d, _, _ in ds)) if ds else 0)
+        for i in range(len(ss) - 1):
+            if seg[i] <= 0: continue
+            for d, dtype, b in samples[(rid, i)]: scale_acc[rid][(dtype, b)].append(d / seg[i])
+        scale = {}
+        for dtype in ("wk", "sa", "su"):
+            row = []
+            for b in range(len(BUCKETS)):
+                v = scale_acc[rid].get((dtype, b))
+                row.append(round(statistics.median(v), 2) if v and len(v) >= 5 else 0)
+            scale[dtype] = row
+        out["routes"][rid] = {"stops": ss, "seg": seg, "scale": scale}
+    with open(dst, "w") as f:
+        json.dump(out, f, separators=(",", ":"))
+    import os
+    n_seg = sum(len(r["seg"]) for r in out["routes"].values())
+    print("rutas", len(out["routes"]), "tramos", n_seg, "bytes", os.path.getsize(dst))
+    # ejemplo legible
+    for rid, r in list(out["routes"].items())[:3]:
+        print("ejemplo", rid, r["seg"][:8], r["scale"]["wk"])
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3: sys.exit(__doc__)
+    main(sys.argv[1], sys.argv[2])

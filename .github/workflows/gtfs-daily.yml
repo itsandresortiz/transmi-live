@@ -11,7 +11,7 @@ concurrency:
 jobs:
   gtfs:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Descargar y reducir GTFS.zip
@@ -19,6 +19,8 @@ jobs:
           mkdir out
           curl -fsSL --retry 3 --max-time 600 -A "Mozilla/5.0 (transmi-live)" -o GTFS.zip https://gtfs.transmilenio.gov.co/GTFS.zip
           python3 scripts/slim_gtfs.py GTFS.zip out/gtfs-lite.zip
+          python3 scripts/build_schedule.py GTFS.zip out/schedule.json
+          gzip -9 -k out/schedule.json && rm out/schedule.json
           ls -lh out
       - name: Publicar en la rama live-data
         env:
