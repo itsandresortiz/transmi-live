@@ -79,6 +79,7 @@ export class MapController {
       transformRequest: (url, type) =>
         type === "Glyphs" && !/\/(0-255|256-511)\.pbf$/.test(url) ? { url: emptyGlyph } : undefined,
     });
+    this.map.on("rotate", () => { if (this.meHeading != null) this.me?.getElement().style.setProperty("--h", `${this.meHeading - this.map.getBearing()}deg`); });
     this.map.touchZoomRotate.enableRotation();      // dos dedos giran el mapa (clic derecho + arrastrar en el computador)
     this.map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap · TransMilenio · Bogotá" }), "bottom-right");
     this.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
@@ -459,8 +460,18 @@ export class MapController {
     if (!this.me) {
       const el = document.createElement("div");
       el.className = "me";
+      el.innerHTML = '<i class="cone" aria-hidden="true"></i>';
       this.me = new maplibregl.Marker({ element: el }).setLngLat([p.lon, p.lat]).addTo(this.map);
     } else this.me.setLngLat([p.lon, p.lat]);
+  }
+  private meHeading: number | null = null;
+  /** Dibuja el haz de luz hacia donde apunta el celular (`null` lo oculta). Se ajusta al giro del mapa. */
+  setMeHeading(deg: number | null) {
+    this.meHeading = deg;
+    const el = this.me?.getElement(); if (!el) return;
+    const on = deg != null;
+    el.classList.toggle("aim", on);
+    if (on) el.style.setProperty("--h", `${deg - this.map.getBearing()}deg`);
   }
   get zoom(): number { return this.map.getZoom(); }
   resize() { this.map.resize(); }

@@ -19,11 +19,14 @@ interface Loc {
   headingUp: boolean;
   /** Activa o apaga el giro con tu orientación. Devuelve `false` si el aparato no tiene brújula ni permiso. */
   setHeadingUp(v: boolean): Promise<boolean>;
+  /** Lee la brújula para dibujar hacia dónde apunta el celular (sin girar el mapa). `false` si no hay brújula o permiso. */
+  trackHeading(): Promise<boolean>;
   /** Empieza a seguir tu ubicación en tiempo real y devuelve la primera posición. */
   locate(): Promise<GeoPoint | null>;
 }
 
 let watchId: number | null = null;
+let tried = false;
 let wanted = false;
 
 export const useLocation = create<Loc>((set, get) => {
@@ -35,6 +38,7 @@ export const useLocation = create<Loc>((set, get) => {
     // en movimiento el GPS da el rumbo; parado se usa la brújula
     if (p.coords.heading != null && !Number.isNaN(p.coords.heading) && (p.coords.speed ?? 0) > 1.2) set({ heading: p.coords.heading });
     set({ me: next, accuracy: p.coords.accuracy ?? null, status: "ok" });
+    if (!compassOff && !tried) { tried = true; void get().trackHeading(); }
   };
   const onError = (e: GeolocationPositionError) => {
     if (e.code === e.PERMISSION_DENIED) { safeStorage.remove(KEY); wanted = false; stop(); set({ status: "denied" }); }
@@ -46,13 +50,14 @@ export const useLocation = create<Loc>((set, get) => {
   };
   const stop = () => { if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; } };
   // con la pantalla apagada o la pestaña oculta se deja de usar el GPS (batería)
-  if (typeof document !== "undefined") document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); else if (wanted) start(); });
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", () => { if (document.hidden) { stop(); stopCompass(); } else if (wanted) { start(); if (useLocation.getState().heading != null) void useLocation.getState().trackHeading(); } });
 
   return {
     me: null, accuracy: null, status: "idle", following: false, heading: null, headingUp: false,
     setFollowing: (following) => set(following ? { following } : { following, headingUp: false }),
+    trackHeading: async () => (compassOff ? true : startCompass((h) => set({ heading: h }))),
     setHeadingUp: async (v) => {
-      if (!v) { stopCompass(); set({ headingUp: false }); return true; }
+      if (!v) { set({ headingUp: false }); return true; }
       const ok = await startCompass((h) => set({ heading: h }));
       if (!ok && get().heading == null) return false;
       set({ headingUp: true });

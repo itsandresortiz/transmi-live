@@ -194,6 +194,8 @@ button.stat:active{transform:scale(.97)}
 .maplibregl-ctrl-group button{width:44px!important;height:44px!important;border-bottom:.5px solid var(--line)!important}
 :root:not([data-scheme=light]) .maplibregl-ctrl-icon{filter:none}
 @media (prefers-color-scheme:dark){.maplibregl-ctrl-icon{filter:invert(1)}}
+.me .cone{display:none;position:absolute;left:50%;top:50%;width:84px;height:84px;margin:-42px 0 0 -42px;pointer-events:none;border-radius:50%;transform:rotate(var(--h,0deg));background:conic-gradient(from -34deg,color-mix(in srgb,var(--zonal) 70%,transparent) 0deg 68deg,transparent 68deg);-webkit-mask:radial-gradient(circle,#000 8%,transparent 70%);mask:radial-gradient(circle,#000 8%,transparent 70%)}
+.me.aim .cone{display:block}
 .me{width:18px;height:18px;border-radius:50%;background:var(--zonal);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);animation:pulse 2s infinite}
 
 /* ---------- pantallas anchas ---------- */

@@ -248,6 +248,7 @@ export function App() {
   /* tu ubicación en tiempo real: el punto se mueve contigo y, si pulsaste el botón, el mapa te acompaña */
   const me = useLocation((l) => l.me), following = useLocation((l) => l.following), headingUp = useLocation((l) => l.headingUp), heading = useLocation((l) => l.heading);
   const flewAt = useRef(0);
+  useEffect(() => { const m = mc.current; if (m) void m.ready.then(() => m.setMeHeading(heading)); }, [heading, me]);
   /* mapa que gira con hacia dónde miras: se evitan sacudidas ignorando cambios de menos de 4° y se gira por el camino corto */
   useEffect(() => {
     const m = mc.current; if (!m || !headingUp || heading == null) return;
@@ -285,6 +286,7 @@ export function App() {
       return;
     }
     const g = await st.locate();
+    void st.trackHeading();                                // el toque permite pedir el permiso de la brújula (iPhone)
     if (!g) return ui.showToast("No pudimos obtener tu ubicación. Revisa el permiso del navegador.");
     uiRef.current.setFollow(null);                      // seguir un bus y seguirte a ti son cosas distintas
     st.setFollowing(true);
