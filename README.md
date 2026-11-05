@@ -45,9 +45,23 @@ npm run build      # genera apps/web/dist
    Las rutas se clasifican por su color oficial: rojo troncal, azul zonal, verde alimentador o dual.
 
 ## Cómo se mueven los buses
-- Cada bus se dibuja con la posición que informa TransMilenio; entre reportes avanza por el trazado de su ruta
-  con la velocidad medida (de 15 s a 75 s después del dato), y se corrige al llegar el siguiente.
-- Es una estimación: de 5.177 buses reales, la distancia media a su ruta pasó de 62 m (en línea recta) a 10,5 m.
+TransMilenio informa la posición de cada bus cada 9–78 s (y llega con 5–15 s de retraso). Para que el movimiento sea continuo:
+
+1. **Por su ruta:** cada bus se pega al trazado de su ruta (en su sentido) y avanza *por la calle*, curvas incluidas. Si cambia de variante o el dato salta, se desliza a su sitio en ~2 s, sin teletransportarse.
+2. **Estimación calibrada:** entre reportes avanza `velocidad medida × tiempo × 0,5` desde el primer segundo. La velocidad medida sobrestima (los buses frenan y esperan), y con 0,5 el error de posición baja 10–25 % frente a dejarlo quieto (medido con 16 lotes reales y unos 5.000 buses en movimiento).
+3. **Corrección suave, sin retroceder:** cuando llega un reporte, el bus acelera o frena poco a poco para ponerse al día (hasta 3× su ritmo), nunca se devuelve y nunca queda congelado por completo mientras debería ir andando.
+4. **Dibujo cuadro a cuadro** en un canvas (≈60 fps), solo de los buses que se ven.
+
+Medido en simulación con los 16 lotes reales (1.200 buses, 229 s), frente al método anterior (suavizado exponencial):
+
+| | Anterior | Actual |
+| --- | --- | --- |
+| Error de posición (medio / p90) | 82 m / 202 m | 86 m / 197 m |
+| Retroceso | 41 m/min | ≈ 0 (14 m/min es el piso de la medición) |
+| Tirones de velocidad | 1,10 m/s² | 0,39 m/s² |
+| Saltos al llegar un reporte (p99) | 14 m | 19 m |
+
+El error de posición no baja mucho porque los buses son impredecibles (semáforos, paradas): el objetivo es que *se vean* naturales, no adivinar más.
 
 ## Cuánto tarda un bus en llegar
 - El feed solo da la hora oficial hacia la **próxima** parada de cada bus. Para paradas más lejanas se calcula:

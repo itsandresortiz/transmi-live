@@ -66,7 +66,12 @@ export class RoadPath {
 export interface RouteLock { path: RoadPath; s: number; sign: 1 | -1 }
 
 /** Elige el trazado (y sentido) por el que realmente va el bus: el más cercano que concuerda con su rumbo. */
-export function lockToRoute(paths: readonly RoadPath[], p: WorldPoint, vel: { ux: number; uy: number } | null, maxMeters = 45): RouteLock | null {
+export function lockToRoute(paths: readonly RoadPath[], p: WorldPoint, vel: { ux: number; uy: number } | null, maxMeters = 45, prefer?: RoadPath): RouteLock | null {
+  if (prefer && paths.includes(prefer)) {
+    // si el bus sigue sobre el mismo trazado se conserva (evita saltar entre variantes paralelas de una ruta)
+    const hit = prefer.project(p, vel?.ux ?? 0, vel?.uy ?? 0, maxMeters);
+    if (hit && (!vel || hit.forward)) return { path: prefer, s: hit.s, sign: 1 };
+  }
   let best: RouteLock | null = null, bestDist = Infinity;
   for (const path of paths) {
     const hit = path.project(p, vel?.ux ?? 0, vel?.uy ?? 0, maxMeters);
