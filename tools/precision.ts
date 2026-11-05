@@ -8,8 +8,8 @@
  *
  * Uso: npx tsx tools/precision.ts [segundos] [espera_entre_descargas]
  */
-import { MotionEngine, TransitState } from "@transmi/application";
-import { RoadPath, distanceMeters, toWorld, type VehicleReport } from "@transmi/domain";
+import { DEFAULT_MOTION, MotionEngine, type MotionParams, TransitState } from "@transmi/application";
+import { DEFAULT_PREDICTION, RoadPath, distanceMeters, toWorld, type VehicleReport } from "@transmi/domain";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 
 const SECONDS = Number(process.argv[2] ?? 270), GAP_MS = Number(process.argv[3] ?? 8) * 1000;
@@ -38,39 +38,49 @@ async function main() {
   if (batches.length < 3) { console.log("Muy pocos lotes (¿es de madrugada?). No se mide."); return; }
   console.log("intervalos entre lotes (s):", batches.slice(1).map((b, i) => (b.at - batches[i]!.at).toFixed(0)).join(","));
 
-  // 2) reproducción con el motor de la app
-  const eng = new MotionEngine(st);
-  const paths = new Map<string, RoadPath[]>();
-  const pathsOf = (rid: string) => paths.get(rid) ?? (paths.set(rid, (st.network.shapes.get(rid) ?? []).filter((s) => s.points.length > 1).map((s) => new RoadPath(s.points))), paths.get(rid)!);
-  const err = { model: [] as number[], held: [] as number[], along: [] as number[], lat: [] as number[] };
-  const lag: number[] = [];
-  let hist = new Map<string, { t: number; x: number; y: number }[]>();
-  for (let k = 0; k < batches.length; k++) {
-    const b = batches[k]!;
-    if (k > 0) {
-      for (const r of b.reports) {
-        const h = hist.get(r.id), prev = st.fleet.get(r.id);
-        if (!h || !prev || r.reportedAt === prev.reportedAt) continue;
-        const rw = toWorld(r.position);
-        if (distanceMeters(prev.world, rw) < 15) continue;       // parado: no mide el movimiento
-        let best = h[0]!; for (const p of h) if (Math.abs(p.t - r.reportedAt) < Math.abs(best.t - r.reportedAt)) best = p;
-        if (Math.abs(best.t - r.reportedAt) > 1.2) continue;
-        err.model.push(distanceMeters(best, rw)); err.held.push(distanceMeters(prev.world, rw)); lag.push(b.at - r.reportedAt);
-        const ps = pathsOf(prev.routeId); let bp: { s: number; dist: number } | null = null, bi = -1;
-        ps.forEach((p, i) => { const h2 = p.project(rw, 0, 0, 120); if (h2 && (!bp || h2.dist < bp.dist)) { bp = h2; bi = i; } });
-        if (bp && bi >= 0) { const sh = ps[bi]!.project(best, 0, 0, 200); if (sh) { err.along.push(Math.abs(sh.s - (bp as { s: number }).s)); err.lat.push(sh.dist); } }
+  // 2) reproducción con el motor de la app, para varias políticas de predicción (misma captura)
+  const net = st.network;
+  const evaluate = (gain: number, extra: Partial<MotionParams> = {}) => {
+    (DEFAULT_PREDICTION as { gain: number }).gain = gain;
+    const state = new TransitState(); state.setNetwork(net);
+    const eng = new MotionEngine(state, { ...DEFAULT_MOTION, ...extra });
+    const paths = new Map<string, RoadPath[]>();
+    const pathsOf = (rid: string) => paths.get(rid) ?? (paths.set(rid, (net.shapes.get(rid) ?? []).filter((x) => x.points.length > 1).map((x) => new RoadPath(x.points))), paths.get(rid)!);
+    const err = { model: [] as number[], held: [] as number[], along: [] as number[], lat: [] as number[], signed: [] as number[] };
+    const lag: number[] = [];
+    let hist = new Map<string, { t: number; x: number; y: number }[]>();
+    for (let k = 0; k < batches.length; k++) {
+      const b = batches[k]!;
+      if (k > 0) {
+        for (const r of b.reports) {
+          const h = hist.get(r.id), prev = state.fleet.get(r.id);
+          if (!h || !prev || r.reportedAt === prev.reportedAt) continue;
+          const rw = toWorld(r.position);
+          if (distanceMeters(prev.world, rw) < 15) continue;       // parado: no mide el movimiento
+          let best = h[0]!; for (const p of h) if (Math.abs(p.t - r.reportedAt) < Math.abs(best.t - r.reportedAt)) best = p;
+          if (Math.abs(best.t - r.reportedAt) > 1.2) continue;
+          err.model.push(distanceMeters(best, rw)); err.held.push(distanceMeters(prev.world, rw)); lag.push(b.at - r.reportedAt);
+          const ps = pathsOf(prev.routeId); let bp: { s: number; dist: number } | null = null, bi = -1;
+          ps.forEach((p, i2) => { const h2 = p.project(rw, 0, 0, 120); if (h2 && (!bp || h2.dist < bp.dist)) { bp = h2; bi = i2; } });
+          if (bp && bi >= 0) { const sh = ps[bi]!.project(best, 0, 0, 200); if (sh) { const d = sh.s - (bp as { s: number }).s; err.along.push(Math.abs(d)); err.signed.push(d); err.lat.push(sh.dist); } }
+        }
       }
+      state.applyPositions(b.reports, b.at * 1000);
+      const next = batches[k + 1]; if (!next) break;
+      hist = new Map();
+      for (let t = b.at; t < next.at; t += 0.25) for (const v of state.fleet.values()) { const w = eng.step(v, t); (hist.get(v.id) ?? hist.set(v.id, []).get(v.id)!).push({ t, x: w.x, y: w.y }); }
     }
-    st.applyPositions(b.reports, b.at * 1000);
-    const next = batches[k + 1]; if (!next) break;
-    hist = new Map();
-    for (let t = b.at; t < next.at; t += 0.25) for (const v of st.fleet.values()) { const w = eng.step(v, t); (hist.get(v.id) ?? hist.set(v.id, []).get(v.id)!).push({ t, x: w.x, y: w.y }); }
-  }
-  console.log("\n=== PRECISIÓN (buses que se movieron más de 15 m entre reportes) ===");
-  console.log("Dibujado a la hora del reporte vs. reporte:", f(err.model));
-  console.log("Sin predicción (quieto en el último reporte):", f(err.held));
-  console.log("Error a lo largo de la ruta:", f(err.along));
-  console.log("Distancia a la ruta (a lo ancho):", f(err.lat));
-  console.log(`Retraso entre el reporte y su llegada: mediana ${pct(lag, 0.5).toFixed(1)} s, p90 ${pct(lag, 0.9).toFixed(1)} s`);
+    return { err, lag };
+  };
+  const base = evaluate(0.5);
+  console.log("\n=== PRECISIÓN (buses que se movieron más de 15 m entre reportes; " + base.err.model.length + " muestras) ===");
+  console.log("Sin predicción (quieto en el último reporte):", f(base.err.held));
+  console.log("Distancia a la ruta (a lo ancho):", f(base.err.lat));
+  console.log(`Retraso entre el reporte y su llegada: mediana ${pct(base.lag, 0.5).toFixed(1)} s, p90 ${pct(base.lag, 0.9).toFixed(1)} s`);
+  console.log("--- políticas (ganancia = fracción de la velocidad medida que realmente avanza) ---");
+  const row = (label: string, r: ReturnType<typeof evaluate>) => console.log(`${label.padEnd(34)} error ${f(r.err.model)} | a lo largo: sesgo mediano ${pct(r.err.signed.map((x) => x), 0.5).toFixed(1)} m (neg = se queda corto)`);
+  for (const g of [0.3, 0.5, 0.7, 0.9, 1.1]) row(`ganancia ${g}`, g === 0.5 ? base : evaluate(g));
+  for (const [c, name] of [[0.1, "corrección suave"], [0.3, "corrección fuerte"]] as const) row(`ganancia 0.7 + ${name}`, evaluate(0.7, { catchUp: c }));
 }
+
 main().catch((e) => { console.error(e); process.exit(1); });
