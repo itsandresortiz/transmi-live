@@ -246,20 +246,44 @@ export function App() {
   const [toastOn, setToastOn] = useState(false);
 
   /* tu ubicación en tiempo real: el punto se mueve contigo y, si pulsaste el botón, el mapa te acompaña */
-  const me = useLocation((l) => l.me), following = useLocation((l) => l.following);
+  const me = useLocation((l) => l.me), following = useLocation((l) => l.following), headingUp = useLocation((l) => l.headingUp), heading = useLocation((l) => l.heading);
   const flewAt = useRef(0);
+  /* mapa que gira con hacia dónde miras: se evitan sacudidas ignorando cambios de menos de 4° y se gira por el camino corto */
+  useEffect(() => {
+    const m = mc.current; if (!m || !headingUp || heading == null) return;
+    const cur = m.bearing;
+    const diff = ((heading - cur + 540) % 360) - 180;
+    if (Math.abs(diff) < 4) return;
+    const here = useLocation.getState().me;
+    m.map.easeTo({ bearing: cur + diff, ...(here ? { center: [here.lon, here.lat] as [number, number] } : {}), duration: 250, easing: (t) => t });
+  }, [headingUp, heading]);
+  useEffect(() => {
+    const m = mc.current; if (!headingUp || !m) return;
+    // si el usuario gira el mapa con los dedos, se respeta y se deja de girar solo
+    const f = (e: { originalEvent?: unknown }) => { if (e.originalEvent) void useLocation.getState().setHeadingUp(false); };
+    m.map.on("rotatestart", f);
+    return () => { m.map.off("rotatestart", f); };
+  }, [headingUp]);
   useEffect(() => { if (hadLocationPermission()) void useLocation.getState().locate(); }, []);
   useEffect(() => {
     const m = mc.current; if (!me || !m) return;
     void m.ready.then(() => {
       m.showMe(me);
       // (no se interrumpe el vuelo que acaba de empezar al pulsar el botón)
-      if (useLocation.getState().following && Date.now() - flewAt.current > 1500) m.map.easeTo({ center: [me.lon, me.lat], duration: 900, easing: (t) => t });
+      if (useLocation.getState().following && Date.now() - flewAt.current > 1500) m.map.easeTo({ center: [me.lon, me.lat], ...(useLocation.getState().headingUp ? { bearing: m.bearing } : {}), duration: 900, easing: (t) => t });
     });
   }, [me]);
 
   const locate = async () => {
     const st = useLocation.getState();
+    // segundo toque estando ya contigo: el mapa empieza a girar según hacia dónde miras; tercero: vuelve al norte
+    if (st.following && st.me) {
+      if (!st.headingUp) {
+        const ok = await st.setHeadingUp(true);
+        ui.showToast(ok ? "El mapa gira contigo. Toca otra vez para dejarlo fijo." : "Tu aparato no tiene brújula disponible");
+      } else { await st.setHeadingUp(false); mc.current?.resetNorth(); }
+      return;
+    }
     const g = await st.locate();
     if (!g) return ui.showToast("No pudimos obtener tu ubicación. Revisa el permiso del navegador.");
     uiRef.current.setFollow(null);                      // seguir un bus y seguirte a ti son cosas distintas
@@ -278,7 +302,7 @@ export function App() {
         </div>
         <div className="tools">
           {Math.abs(bearing) > 0.5 && <button className="fab glass" aria-label="Volver a poner el norte arriba" title="Norte arriba" onClick={() => mc.current?.resetNorth()}><span style={{ display: "grid", transform: `rotate(${-bearing}deg)` }}><Compass /></span></button>}
-          <button className="fab glass" aria-label="Mi ubicación" aria-pressed={following} onClick={() => void locate()}><Locate /></button>
+          <button className="fab glass" aria-label={headingUp ? "Dejar el mapa fijo" : following ? "Girar el mapa según hacia dónde miro" : "Mi ubicación"} aria-pressed={following} onClick={() => void locate()}><Locate /></button>
           <button className="fab glass" aria-label="Ajustes del mapa" aria-pressed={ui.settingsOpen} onClick={() => ui.setSettingsOpen(true)}><Sliders /></button>
         </div>
       </header>
