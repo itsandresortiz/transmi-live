@@ -17,6 +17,8 @@ interface UiState {
   onlyLate: boolean;
   openAlert: number | null;
   followId: string | null;
+  /** El usuario movió el mapa con el dedo: el seguimiento se pausa hasta que pida volver al bus. */
+  followPaused: boolean;
   /** Parada que el usuario eligió: los tiempos de los buses se cuentan hasta ella. */
   targetStopId: string | null;
   settingsOpen: boolean;
@@ -35,6 +37,7 @@ interface UiState {
   setOnlyLate(v: boolean): void;
   setOpenAlert(i: number | null): void;
   setFollow(id: string | null): void;
+  setFollowPaused(v: boolean): void;
   setTargetStop(id: string | null): void;
   setSettingsOpen(v: boolean): void;
   setLayer(k: keyof Layers, v: boolean): void;
@@ -46,7 +49,7 @@ interface UiState {
 const PAGE = 60;
 export const useUi = create<UiState>((set) => ({
   tab: "rutas", query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, direction: "0", onlyLate: false,
-  openAlert: null, followId: null, targetStopId: null, settingsOpen: false,
+  openAlert: null, followId: null, followPaused: false, targetStopId: null, settingsOpen: false,
   layers: { streets: true, stops: true, network: true, buses: true },
   colorMode: "system", motion: "predict", toast: null,
 
@@ -59,7 +62,8 @@ export const useUi = create<UiState>((set) => ({
   setDirection: (direction) => set({ direction }),
   setOnlyLate: (onlyLate) => set({ onlyLate, limit: PAGE }),
   setOpenAlert: (openAlert) => set({ openAlert }),
-  setFollow: (followId) => set({ followId }),
+  setFollow: (followId) => set({ followId, followPaused: false }),
+  setFollowPaused: (followPaused) => set({ followPaused }),
   setTargetStop: (targetStopId) => set({ targetStopId }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setLayer: (k, v) => set((s) => ({ layers: { ...s.layers, [k]: v } })),

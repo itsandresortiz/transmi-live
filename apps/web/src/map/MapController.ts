@@ -9,6 +9,9 @@ export interface MapEvents {
   onBusClick(id: string): void;
   onStopClick(id: string): void;
   onStationClick(index: number): void;
+  onUserDrag?(): void;
+  /** El dedo o el mouse está sobre el mapa (true) o se soltó (false). */
+  onPointerHold?(hold: boolean): void;
 }
 export interface LayerToggles { streets: boolean; stops: boolean; network: boolean; buses: boolean }
 
@@ -162,6 +165,16 @@ export class MapController {
       m.on("mouseenter", id, () => (m.getCanvas().style.cursor = "pointer"));
       m.on("mouseleave", id, () => (m.getCanvas().style.cursor = ""));
     };
+    // arrastrar el mapa con el dedo o el mouse pausa el seguimiento (se detecta en el lienzo, antes de que MapLibre procese el gesto)
+    const cv = m.getCanvas();
+    let down: { x: number; y: number } | null = null, fired = false;
+    cv.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY }; fired = false; this.events.onPointerHold?.(true); });
+    window.addEventListener("pointermove", (e) => {
+      if (!down || fired) return;
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) { fired = true; this.events.onUserDrag?.(); }
+    });
+    const up = () => { down = null; this.events.onPointerHold?.(false); };
+    window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);   // en la ventana: el dedo puede soltarse fuera del mapa
     pointer("bus-dots");
     m.on("click", "bus-dots", (e) => { const f = e.features?.[0]; if (f) { e.originalEvent.cancelBubble = true; this.events.onBusClick(String(f.properties?.id)); } });
     // los buses dibujados en canvas (zoom ≥ 13) tienen prioridad sobre paradas y estaciones
@@ -276,7 +289,11 @@ export class MapController {
   flyTo(p: GeoPoint, zoom: number, padding?: maplibregl.PaddingOptions) {
     this.map.flyTo({ center: [p.lon, p.lat], zoom, duration: 800, padding, essential: true });
   }
-  follow(p: GeoPoint) { this.map.easeTo({ center: [p.lon, p.lat], duration: 450, easing: (t) => t }); }
+  /** Acerca el centro del mapa a `p` una fracción `k` (0..1) del camino, sin animaciones que choquen con el dedo. */
+  follow(p: GeoPoint, k = 1) {
+    const c = this.map.getCenter();
+    this.map.jumpTo({ center: [c.lng + (p.lon - c.lng) * k, c.lat + (p.lat - c.lat) * k] });
+  }
 
   showPopup(p: GeoPoint, content: HTMLElement, onClose?: () => void): Popup {
     this.popup?.remove();

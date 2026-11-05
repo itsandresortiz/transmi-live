@@ -52,7 +52,21 @@ export class BusRenderer {
   stop() { cancelAnimationFrame(this.raf); }
   /** Pide dibujar en el próximo cuadro (por ejemplo, tras cambiar un filtro). */
   refresh() { this.last = 0; this.lastDots = 0; }
-  setFollow(id: string | null) { this.followId = id; }
+  setFollow(id: string | null) { this.followId = id; this.followLast = 0; }
+  setFollowPaused(v: boolean) { this.paused = v; }
+  private paused = false;
+  private hold = false;
+  /** Mientras hay un dedo sobre el mapa no se mueve la cámara (si no, el gesto se corta). */
+  setHold(v: boolean) { this.hold = v; }
+  private followLast = 0;
+  /** Mantiene el bus seguido en el centro, con un deslizamiento suave (independiente de los cuadros por segundo). */
+  private applyFollow(nowMs: number) {
+    if (!this.followId || this.paused || this.hold) return;
+    const p = this.position(this.followId); if (!p) return;
+    const dt = this.followLast ? Math.min(250, nowMs - this.followLast) : 1000;
+    this.followLast = nowMs;
+    this.mapc.follow(p, 1 - Math.exp(-dt / 220));
+  }
 
   position(id: string): GeoPoint | null {
     const s = this.shown.get(id);
@@ -120,6 +134,7 @@ export class BusRenderer {
         features.push({ type: "Feature", properties: { id: v.id, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th) }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
       }
       this.mapc.setBuses({ type: "FeatureCollection", features });
+      this.applyFollow(nowMs);
       return;
     }
 
@@ -142,7 +157,7 @@ export class BusRenderer {
     this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
     this.items = items;
     this.canvas.draw(items);
-    if (this.followId) { const p = this.position(this.followId); if (p) this.mapc.follow(p); }
+    this.applyFollow(nowMs);
     if (nowMs - this.lastPrune > 30_000) {
       this.lastPrune = nowMs;
       for (const id of this.shown.keys()) if (!this.state.fleet.get(id)) { this.shown.delete(id); this.locks.delete(id); }

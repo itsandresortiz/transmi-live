@@ -7,6 +7,7 @@ import { BusRenderer } from "./map/BusRenderer";
 import { MapController } from "./map/MapController";
 import { currentScheme, themeOf, type Scheme } from "./map/theme";
 import estaciones from "./data/estaciones.json";
+import { FollowBar } from "./ui/FollowBar";
 import { Settings } from "./ui/Settings";
 import { Sheet } from "./ui/Sheet";
 import { Locate, Mark, Sliders } from "./ui/icons";
@@ -55,7 +56,7 @@ export function App() {
         s().setSheet("peek");
         m.flyTo(p, Math.max(m.zoom, 16), { ...mapPadding(), top: 300 });
         popup(p, <BusPopup v={v} th={thRef.current} following={s().followId === id}
-          onFollow={() => { const f = s().followId === id ? null : id; s().setFollow(f); closePopup(); s().showToast(f ? "Siguiendo este bus" : "Dejaste de seguirlo"); }}
+          onFollow={() => { const f = s().followId === id ? null : id; s().setFollow(f); closePopup(); if (f) { s().setSheet("peek"); mc.current?.flyTo(br.current?.position(id) ?? v.position, Math.max(mc.current.zoom, 16), mapPadding()); } }}
           onRoute={() => a.openRoute(v.routeId)} />);
       },
       focusStop(id) {
@@ -86,6 +87,8 @@ export function App() {
       onBusClick: (id) => act.focusBus(id),
       onStopClick: (id) => act.focusStop(id),
       onStationClick: (i) => act.focusStation(i),
+      onPointerHold: (h) => br.current?.setHold(h),
+      onUserDrag: () => { if (uiRef.current.followId) uiRef.current.setFollowPaused(true); },
     });
     mc.current = m;
     const r = new BusRenderer(transit, m, () => {
@@ -122,17 +125,21 @@ export function App() {
   useEffect(() => { void mc.current?.ready.then(() => mc.current?.setToggles(ui.layers)); br.current?.refresh(); }, [ui.layers]);
   useEffect(() => { br.current?.refresh(); }, [ui.colorMode, ui.motion, ui.system, ui.tab, ui.routeId]);
   useEffect(() => { br.current?.setFollow(ui.followId); }, [ui.followId]);
+  useEffect(() => { br.current?.setFollowPaused(ui.followPaused); }, [ui.followPaused]);
   useEffect(() => {
     const m = mc.current; if (!m) return;
     void m.ready.then(() => {
       m.setAlertStops(null);
-      const id = ui.routeId, shapes = id ? transit.network.shapes.get(id) : undefined;
+      const fv = ui.followId ? transit.fleet.get(ui.followId) : undefined;
+      const id = ui.routeId ?? fv?.routeId ?? null, shapes = id ? transit.network.shapes.get(id) : undefined;
       if (!id || !shapes) { m.showRoute(null, "0", "", () => undefined); return; }
       const route = transit.routeById(id);
-      const dir = shapes.find((s) => s.direction === ui.direction) ? ui.direction : shapes[0]!.direction;
+      const own = !ui.routeId && fv ? shapes.find((sh) => fv.nextStopId && sh.stopIds.includes(fv.nextStopId))?.direction : undefined;
+      const want = own ?? ui.direction;
+      const dir = shapes.find((s) => s.direction === want) ? want : shapes[0]!.direction;
       m.showRoute(shapes, dir, thRef.current.system[route?.system ?? "otro"], (sid) => transit.stopById(sid)?.position);
     });
-  }, [ui.routeId, ui.direction, net, scheme]);
+  }, [ui.routeId, ui.direction, ui.followId, net, scheme]);
   useEffect(() => {
     const m = mc.current, id = ui.routeId; if (!m || !id) return;
     const shapes = transit.network.shapes.get(id); if (!shapes) return;
@@ -172,6 +179,7 @@ export function App() {
           : ui.tab === "paradas" ? <StopsView th={th} act={act} />
           : <AlertsView th={th} act={act} />}
       </Sheet>
+      <FollowBar th={th} onResume={() => { useUi.getState().setFollowPaused(false); }} />
       <Settings th={th} />
       <div className={`toast glass${toastOn ? " on" : ""}`} role="status" aria-live="polite">{ui.toast?.text}</div>
     </>
