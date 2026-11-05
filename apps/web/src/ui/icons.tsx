@@ -10,3 +10,4 @@ export const Chevron = () => <I s={18} w={2.2}><path d="m9 6 6 6-6 6" /></I>;
 export const Back = () => <I s={18} w={2.4}><path d="m15 6-6 6 6 6" /></I>;
 export const Bus = () => <I s={30} w={1.6}><rect x="4" y="3" width="16" height="14" rx="3" /><path d="M4 11h16M8 21l1.5-4M16 21l-1.5-4" /><circle cx="8" cy="14" r=".7" /><circle cx="16" cy="14" r=".7" /></I>;
 export const Mark = () => <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="14" rx="3" /><path d="M4 11h16M8 21l1.5-4M16 21l-1.5-4" /><circle cx="8" cy="14" r=".7" /><circle cx="16" cy="14" r=".7" /></svg>;
+export const Compass = () => <I s={22}><circle cx="12" cy="12" r="9.5" /><path d="M12 5.5 15 12H9z" fill="#e5484d" stroke="#e5484d" /><path d="M12 18.5 9 12h6z" /></I>;

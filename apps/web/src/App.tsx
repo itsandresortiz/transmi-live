@@ -12,7 +12,7 @@ import estaciones from "./data/estaciones.json";
 import { FollowBar } from "./ui/FollowBar";
 import { Settings } from "./ui/Settings";
 import { Sheet } from "./ui/Sheet";
-import { Locate, Mark, Sliders } from "./ui/icons";
+import { Compass, Locate, Mark, Sliders } from "./ui/icons";
 import { ago } from "./ui/format";
 import { useNow, useTransitVersion } from "./ui/hooks";
 import { mapPadding } from "./ui/layout";
@@ -33,6 +33,7 @@ export function App() {
   const popupRoot = useRef<ReturnType<typeof createRoot> | null>(null);
   const [scheme, setScheme] = useState<Scheme>(currentScheme);
   const [net, setNet] = useState(0);
+  const [bearing, setBearing] = useState(0);
   const th = useMemo(() => themeOf(scheme), [scheme]);
   const ui = useUi();
   const thRef = useRef(th); thRef.current = th;
@@ -122,6 +123,8 @@ export function App() {
       return { colorMode: u.colorMode, motion: u.motion, system: !u.stopRoute && (u.tab === "buses" || u.tab === "rutas") ? u.system : null, routeId: u.stopRoute?.routeId ?? (u.tab === "rutas" ? u.routeId : null), visible: u.layers.buses };
     }, () => thRef.current);
     br.current = r;
+    const onRotate = () => setBearing(m.bearing);
+    m.map.on("rotate", onRotate);
     (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData, act, ui: useUi };
     let stopped = false;
     void m.ready.then(() => { if (!stopped) { r.start(); m.setToggles(uiRef.current.layers); } });
@@ -274,6 +277,7 @@ export function App() {
           <div className="bt"><b>TransMi <i>LIVE</i></b><Status /></div>
         </div>
         <div className="tools">
+          {Math.abs(bearing) > 0.5 && <button className="fab glass" aria-label="Volver a poner el norte arriba" title="Norte arriba" onClick={() => mc.current?.resetNorth()}><span style={{ display: "grid", transform: `rotate(${-bearing}deg)` }}><Compass /></span></button>}
           <button className="fab glass" aria-label="Mi ubicación" aria-pressed={following} onClick={() => void locate()}><Locate /></button>
           <button className="fab glass" aria-label="Ajustes del mapa" aria-pressed={ui.settingsOpen} onClick={() => ui.setSettingsOpen(true)}><Sliders /></button>
         </div>

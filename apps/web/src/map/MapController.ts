@@ -73,13 +73,13 @@ export class MapController {
         layers: [{ id: "bg", type: "background", paint: { "background-color": this.theme.mapbg } }],
       },
       center: BOGOTA, zoom: 11, minZoom: 9, maxZoom: 19.5,
-      attributionControl: false, dragRotate: false, pitchWithRotate: false, maxPitch: 0,
+      attributionControl: false, dragRotate: true, pitchWithRotate: false, maxPitch: 0,
       fadeDuration: 0, renderWorldCopies: false,
       // los rangos de tipografía que no incluimos (otros alfabetos) se resuelven en vacío, sin error
       transformRequest: (url, type) =>
         type === "Glyphs" && !/\/(0-255|256-511)\.pbf$/.test(url) ? { url: emptyGlyph } : undefined,
     });
-    this.map.touchZoomRotate.disableRotation();
+    this.map.touchZoomRotate.enableRotation();      // dos dedos giran el mapa (clic derecho + arrastrar en el computador)
     this.map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap · TransMilenio · Bogotá" }), "bottom-right");
     this.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     this.ready = new Promise((res) => this.map.once("load", () => { this.addLayers(); this.bindEvents(); void this.loadStatic(); res(); }));
@@ -427,6 +427,9 @@ export class MapController {
       features: points.map((p) => ({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [p.lon, p.lat] } })),
     });
   }
+
+  get bearing(): number { return this.map.getBearing(); }
+  resetNorth() { this.map.easeTo({ bearing: 0, duration: 450 }); }
 
   fit(points: readonly GeoPoint[], padding: maplibregl.PaddingOptions, maxZoom = 16.5) {
     if (!points.length) return;
