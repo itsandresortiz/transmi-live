@@ -38,7 +38,7 @@ export function troncalLines(t: Troncal[]) {
 }
 export function estacionPoints(e: Estacion[]) {
   return fc<Point>(e.map((x, i) => ({
-    type: "Feature", id: i, properties: { name: x[2], place: x[3], troncal: x[4], l: lineOfCorridor(x[4]) }, geometry: { type: "Point", coordinates: [x[1], x[0]] },
+    type: "Feature", id: i, properties: { name: x[2], place: x[3], troncal: x[4], l: lineOfCorridor(x[4]), portal: /^(portal|terminal)\b/i.test(x[2]) }, geometry: { type: "Point", coordinates: [x[1], x[0]] },
   })));
 }
 

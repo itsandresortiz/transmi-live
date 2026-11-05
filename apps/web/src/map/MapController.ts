@@ -148,7 +148,7 @@ export class MapController {
     });
     // portales y estaciones que no se dibujan completas: puntico con su nombre (como antes)
     m.addLayer({
-      id: "estaciones-labels", type: "symbol", source: "estaciones", minzoom: 13.5,
+      id: "estaciones-labels", type: "symbol", source: "estaciones", minzoom: 13.5, filter: ["!=", ["get", "portal"], true],
       layout: { "text-field": ["get", "name"], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 13.5, 10.5, 17, 12.5], "text-offset": [0, 1.1], "text-anchor": "top", "text-optional": true },
       paint: { "text-color": lineMatch(t, t.troncal), "text-halo-color": t.halo, "text-halo-width": 1.8 },
     });
@@ -174,9 +174,18 @@ export class MapController {
     m.addLayer({
       id: "station-chips", type: "symbol", source: "station-chips", minzoom: 14.5,
       layout: {
-        "icon-image": this.chipImage(), "icon-text-fit": "both", "icon-text-fit-padding": [3, 9, 3, 30], "icon-allow-overlap": false,
+        "icon-image": this.chipImage(), "icon-text-fit": "both", "icon-text-fit-padding": [3, 6, 3, 3], "icon-allow-overlap": false,
         "text-field": ["get", "title"], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 14.5, 11, 18, 14],
         "text-anchor": "bottom", "text-offset": [0, -0.45], "text-optional": false, "text-max-width": 14,
+      },
+      paint: { "text-color": t.labelStrong },
+    });
+    m.addLayer({
+      id: "portal-chips", type: "symbol", source: "estaciones", minzoom: 12.5, filter: ["==", ["get", "portal"], true],
+      layout: {
+        "icon-image": this.portalImage(), "icon-text-fit": "both", "icon-text-fit-padding": [3, 8, 3, 3], "icon-allow-overlap": false,
+        "text-field": ["get", "name"], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 12.5, 11, 18, 14.5],
+        "text-anchor": "bottom", "text-offset": [0, -0.45], "text-optional": false, "text-max-width": 14, "symbol-sort-key": 0,
       },
       paint: { "text-color": t.labelStrong },
     });
@@ -293,8 +302,10 @@ export class MapController {
     m.setPaintProperty("station-links-line", "line-color", lineMatch(t, t.capsuleEdge));
     m.setPaintProperty("station-capsule-labels", "text-color", ["case", ["any", ["==", ["get", "sel"], true], ["==", ["get", "hl"], true]], "#ffffff", t.labelStrong]);
     m.setPaintProperty("station-chips", "text-color", t.labelStrong);
+    m.setPaintProperty("portal-chips", "text-color", t.labelStrong);
     this.registerChip();
     m.setLayoutProperty("station-chips", "icon-image", this.chipImage());
+    m.setLayoutProperty("portal-chips", "icon-image", this.portalImage());
     m.setPaintProperty("stops-circles", "circle-color", t.surface);
     m.setPaintProperty("stops-circles", "circle-stroke-color", t.label);
     m.setPaintProperty("route-stops", "circle-color", t.surface);
@@ -303,7 +314,7 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis(["stops-circles", "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(BUS_LAYERS, t.buses);
   }
 
   private stationBase: StationGeometry | null = null;
@@ -318,6 +329,9 @@ export class MapController {
   }
   private stationState = { hl: new Set<string>(), color: "#e11d2e", sel: null as string | null };
 
+  private portalImage(): ExpressionSpecification {
+    return ["concat", "portal-chip-", ["get", "l"], this.scheme === "dark" ? "-dark" : "-light"] as unknown as ExpressionSpecification;
+  }
   private chipImage(): ExpressionSpecification {
     return ["concat", "station-chip-", ["get", "l"], this.scheme === "dark" ? "-dark" : "-light"] as unknown as ExpressionSpecification;
   }
@@ -330,6 +344,10 @@ export class MapController {
         if (this.map.hasImage(name)) this.map.removeImage(name);
         const { image, options } = stationChipImage(dark, color);
         this.map.addImage(name, image, options);
+        const pname = `portal-chip-${letter}${dark ? "-dark" : "-light"}`;
+        if (this.map.hasImage(pname)) this.map.removeImage(pname);
+        const pc = stationChipImage(dark, color, true);
+        this.map.addImage(pname, pc.image, pc.options);
       }
   }
 
