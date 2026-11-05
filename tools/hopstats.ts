@@ -62,7 +62,7 @@ async function main() {
           const dur = cur.arrivalAt - prev.at;
           for (const sh of shapesOf(u.routeId)) {
             const idx = stopIndex.get(`${u.routeId}|${sh.direction}`)!;
-            const a = idx.get(prev.stop), b = idx.get(cur.stop);
+            const a = idx.get(prev.stop), b = idx.get(cur.stopId);
             if (a == null || b == null || b <= a || b - a > 4) continue;
             const hops = b - a, per = dur / hops;
             if (per < 5 || per > 900) break;
