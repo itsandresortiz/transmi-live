@@ -3,6 +3,7 @@ import { SYSTEMS, SYSTEM_LABEL } from "@transmi/domain";
 import type { MapTheme } from "../map/theme";
 import { Close } from "./icons";
 import { useUi } from "./store";
+import { ServiceStats } from "./views";
 
 const Switch = ({ label, on, set }: { label: string; on: boolean; set(v: boolean): void }) =>
   <button className="srow" role="switch" aria-checked={on} onClick={() => set(!on)}>{label}<span className="sw" aria-checked={on} /></button>;
@@ -25,6 +26,7 @@ export function Settings({ th }: { th: MapTheme }) {
       <div className={`scrim${u.settingsOpen ? " on" : ""}`} onClick={() => u.setSettingsOpen(false)} />
       <section className={`settings glass${u.settingsOpen ? " on" : ""}`} role="dialog" aria-modal="true" aria-label="Ajustes del mapa">
         <div className="sh"><h2>Ajustes del mapa</h2><button className="fab" aria-label="Cerrar" onClick={() => u.setSettingsOpen(false)}><Close /></button></div>
+        <div className="grp"><h3>Estado del servicio</h3><ServiceStats /></div>
         <div className="grp"><h3>Capas</h3><div className="box">
           <Switch label="Buses" on={u.layers.buses} set={(v) => u.setLayer("buses", v)} />
           <Switch label="Nombres de calles" on={u.layers.streets} set={(v) => u.setLayer("streets", v)} />

@@ -56,16 +56,18 @@ function More({ shown, total }: { shown: number; total: number }) {
   return total > shown ? <button className="more" onClick={more}>Ver más ({total - shown})</button> : null;
 }
 
-export function Home({ th, act }: Props) {
+/** Cifras generales del servicio (buses, rutas activas, retrasos y avisos). Viven en Ajustes: son más de información que de uso diario. */
+export function ServiceStats() {
   useTransitVersion();
   const k = kpis(transit);
-  const { setTab, setOnlyLate } = useUi();
+  const { setTab, setOnlyLate, setSettingsOpen, setSheet } = useUi();
+  const go = (f: () => void) => () => { f(); setSettingsOpen(false); setSheet("half"); };
   return (
     <div className="stats">
       <div className="stat"><b>{k.vehicles.toLocaleString("es-CO")}</b><span>Buses en vivo</span></div>
       <div className="stat"><b>{k.routes}</b><span>Rutas activas</span></div>
-      <button className="stat late" onClick={() => { setOnlyLate(true); setTab("buses"); }}><b>{k.late}</b><span>Muy tarde</span></button>
-      <button className="stat" onClick={() => setTab("avisos")}><b>{k.alerts}</b><span>Avisos</span></button>
+      <button className="stat late" onClick={go(() => { setOnlyLate(true); setTab("buses"); })}><b>{k.late}</b><span>Muy tarde</span></button>
+      <button className="stat" onClick={go(() => setTab("avisos"))}><b>{k.alerts}</b><span>Avisos</span></button>
     </div>
   );
 }
@@ -83,7 +85,6 @@ export function RoutesView({ th, act }: Props) {
   return (
     <>
       <FavoritesSection th={th} act={act} />
-      <Home th={th} act={act} />
       <Chips th={th} />
       {!list.length ? <Empty title="Sin resultados" text="Prueba con otro número de ruta o destino." /> : (
         <div className="list">

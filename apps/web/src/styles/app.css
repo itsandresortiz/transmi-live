@@ -307,3 +307,5 @@ button.stat:active{transform:scale(.97)}
 .mq.on .mqi{animation:mq var(--dur,10s) ease-in-out infinite}
 @keyframes mq{0%,16%{transform:translateX(0)}46%,62%{transform:translateX(calc(var(--shift,0px) * -1))}92%,100%{transform:translateX(0)}}
 @media (prefers-reduced-motion:reduce){.mq.on .mqi{animation:none}.mq{text-overflow:ellipsis}.mq.on{-webkit-mask-image:none;mask-image:none}}
+
+.settings .stats{margin:0;grid-template-columns:repeat(2,1fr)}.settings .stat{background:var(--hover)}
