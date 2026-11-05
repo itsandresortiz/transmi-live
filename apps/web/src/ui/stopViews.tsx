@@ -6,7 +6,7 @@ import { Back, Bus, Chevron } from "./icons";
 import { StarButton, useUpcoming } from "./mine";
 import { ShareButton } from "./share";
 import { nowMs } from "../clock";
-import { FirstBadge, LastBadge, RouteStatusNote } from "./lastService";
+import { FirstBadge, LastBadge, clockOfDay } from "./lastService";
 import { labelOf, stopKind, stopTag, stopText } from "./stopname";
 import { routesAtStop, siblingStops } from "@transmi/application";
 import { useMemo } from "react";
@@ -38,7 +38,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
           })}
         </div>
       )}
-      {rows.length === 0 ? <><Empty title="Ningún bus viene ahora" text="Cuando un bus se acerque a esta parada aparecerá aquí." />{stopId && <EndedRoutes stopId={stopId} nowMs={nowSec * 1000} />}</> : (
+      {rows.length === 0 ? <NoBuses th={th} stopId={stopId} nowMs={nowSec * 1000} /> : (
         <>
           <div className="sec">Toca una ruta para ver de dónde viene</div>
           <div className="list">
@@ -125,8 +125,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
         <span className="rb big" style={{ ["--c" as string]: color }}>{route?.shortName}</span>
         <div><h2>{shape?.headsign ? `Hacia ${shape.headsign}` : route?.longName}</h2><p>{route ? SYSTEM_LABEL[route.system] : ""} · llega a {stopText(stop)}</p></div>
       </div>
-      {(!row || !hero) && <RouteStatusNote routeId={stopRoute.routeId} nowMs={nowSec * 1000} />}
-      {!row || !hero ? <Empty title="Ningún bus viene ahora" text="Esta ruta no tiene buses acercándose a la parada en este momento." /> : (
+      {!row || !hero ? <RouteEmpty routeId={stopRoute.routeId} nowMs={nowSec * 1000} /> : (
         <>
           {transit.serviceOf(hero.vehicle)?.isFirst && !transit.serviceOf(hero.vehicle)?.isLast && <div className="lastnote"><FirstBadge mark={transit.serviceOf(hero.vehicle)} /><br />Es el primer viaje programado de hoy en esta ruta.</div>}
           {transit.serviceOf(hero.vehicle)?.isLast && <div className="lastnote"><LastBadge mark={transit.serviceOf(hero.vehicle)} long /><br />Es el último viaje programado de hoy en esta ruta: después de este no hay más buses.</div>}
@@ -178,9 +177,30 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
   );
 }
 
-/** En una parada sin buses: las rutas que paran ahí y que ya terminaron su servicio de hoy. */
-function EndedRoutes({ stopId, nowMs }: { stopId: string; nowMs: number }) {
-  const ended = [...new Set(routesAtStop(transit, stopId).filter((r) => transit.routeStatus(r.id, nowMs)?.state === "ended").map((r) => r.shortName))];
-  if (!ended.length) return null;
-  return <div className="lastnote" role="status"><b>Ya no hay más buses hoy</b> de {ended.slice(0, 8).join(", ")}{ended.length > 8 ? " y otras" : ""}.</div>;
+/** Parada sin buses acercándose. Si las rutas que paran aquí ya terminaron por hoy, lo dice en la misma pantalla, con el mismo estilo. */
+function NoBuses({ th, stopId, nowMs }: { th: MapTheme; stopId: string | null; nowMs: number }) {
+  const all = stopId ? routesAtStop(transit, stopId) : [];
+  const ended = all.filter((r) => transit.routeStatus(r.id, nowMs)?.state === "ended");
+  const names = new Map(ended.map((r) => [r.shortName, r]));
+  if (!names.size) return <Empty title="Ningún bus viene ahora" text="Cuando un bus se acerque a esta parada aparecerá aquí." />;
+  const every = ended.length >= all.length;
+  const shown = [...names.values()].slice(0, 10);
+  return (
+    <div className="empty">
+      <Bus />
+      <b>{every ? "Ya no hay más buses hoy" : "Ningún bus viene ahora"}</b>
+      {every ? "El servicio de las rutas de esta parada ya terminó por hoy." : "Cuando un bus se acerque a esta parada aparecerá aquí."}
+      <div className="endedrow" aria-label="Rutas que ya terminaron hoy">
+        <small>{every ? "Rutas que pasaban por aquí" : "Ya terminaron hoy"}</small>
+        <div>{shown.map((r) => <span key={r.id} className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r.shortName}</span>)}{names.size > shown.length && <span className="more">+{names.size - shown.length}</span>}</div>
+      </div>
+    </div>
+  );
+}
+
+function RouteEmpty({ routeId, nowMs }: { routeId: string; nowMs: number }) {
+  const st = transit.routeStatus(routeId, nowMs);
+  if (st?.state === "ended") return <Empty title="Ya no hay más buses hoy" text={`El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`} />;
+  if (st?.state === "before") return <Empty title="Aún no empieza el servicio" text={`El primer bus sale a las ${clockOfDay(st.firstStart)}.`} />;
+  return <Empty title="Ningún bus viene ahora" text="Esta ruta no tiene buses acercándose a la parada en este momento." />;
 }
