@@ -26,12 +26,13 @@ export function FollowBar({ th, onResume }: { th: MapTheme; onResume(): void }) 
     <div className="followbar glass" role="status" aria-live="polite">
       <span className="rb sm" style={{ ["--c" as string]: th.system[v.system] }}>{r?.shortName ?? v.routeId}</span>
       <div className="fm">
-        <b>{v.plate || v.label || v.id}</b>
+        <b>{r?.longName || SYSTEM_LABEL[v.system]}</b>
         <span>
           {silent ? "Este bus dejó de reportar. Puede haber terminado su recorrido."
-            : ns?.stop ? `${delayText(d)} · ${ns.stop.name}${ns.arrivalAt ? ` ${untilText(ns.arrivalAt, nowSec)}` : ""}`
-            : `${SYSTEM_LABEL[v.system]} · siguiéndolo`}
+            : ns?.stop ? `${delayText(d)} · próxima: ${ns.stop.name}${ns.arrivalAt ? ` ${untilText(ns.arrivalAt, nowSec)}` : ""}`
+            : `${delayText(d)} · siguiéndolo`}
         </span>
+        <em>{SYSTEM_LABEL[v.system]} · {v.plate || v.label || v.id}</em>
       </div>
       {followPaused && !silent && <button className="btn primary sm" onClick={onResume}>Volver al bus</button>}
       <button className="fab sm" aria-label="Dejar de seguir" onClick={() => setFollow(null)}><Close /></button>

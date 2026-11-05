@@ -268,3 +268,5 @@ button.stat:active{transform:scale(.97)}
 @media (min-width:900px){.view{padding-bottom:28px}}
 .view .back{position:sticky;top:-4px;z-index:3;background:var(--sheetbg);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 .tgt{padding:8px 12px;font-size:13.5px}
+.followbar .fm em{font-style:normal;font-size:11px;color:var(--faint);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.followbar .fm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
