@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import {
-  arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStops,
+  arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStopGroups, siblingStops,
 } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
+import { stopKind, stopTag, stopText } from "./stopname";
 import { FavoritesSection, NearbySection, StarButton } from "./mine";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
@@ -20,6 +21,7 @@ import type { MapTheme } from "../map/theme";
 export interface Actions {
   openRoute(id: string, busId?: string): void;
   openStop(id: string): void;
+  openGroup(ids: string[]): void;
   followBus(id: string): void;
   focusBus(id: string, keepTarget?: boolean): void;
   focusStop(id: string): void;
@@ -133,23 +135,33 @@ export function StopsView({ th, act }: Props) {
     : [];
   const seen = new Set<string>();
   const uniq = stations.filter(({ e }) => !seen.has(e[2]) && !!seen.add(e[2]));
-  const stops = searchStops(transit, query, limit);
+  const groups = useMemo(() => searchStopGroups(transit, query, limit), [query, limit, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!q) return <><FavoritesSection th={th} act={act} /><NearbySection th={th} act={act} /><p className="hint" style={{ margin: "16px 2px" }}>O escribe arriba el nombre de una parada o estación, por ejemplo «Portal Norte».</p></>;
-  if (!uniq.length && !stops.length) return <Empty title="Sin resultados" text={transit.network.stops.size ? "No encontramos esa parada." : "Cargando las paradas de la ciudad…"} />;
+  if (!uniq.length && !groups.length) return <Empty title="Sin resultados" text={transit.network.stops.size ? "No encontramos esa parada." : "Cargando las paradas de la ciudad…"} />;
+  // las estaciones de la troncal que ya salen como grupo de vagones no se repiten
+  const groupTitles = new Set(groups.map((g) => normalize(g.title)));
   return (
     <div className="list">
-      {uniq.slice(0, 20).map(({ e, i }) => (
+      {uniq.filter(({ e }) => !groupTitles.has(normalize(e[2]))).slice(0, 20).map(({ e, i }) => (
         <button key={`e${i}`} className="row" onClick={() => act.focusStation(i)}>
           <span className="rb sm" style={{ ["--c" as string]: th.troncal }}>TM</span>
           <span className="rm"><span className="rt">{e[2]}</span><span className="rs">{e[4]} · {e[3]}</span></span><span className="chev"><Chevron /></span>
         </button>
       ))}
-      {stops.map((s) => (
-        <button key={s.id} className="row" onClick={() => act.focusStop(s.id)}>
-          <span className="rb sm" style={{ ["--c" as string]: th.system.otro }}>{s.code.slice(0, 5) || "·"}</span>
-          <span className="rm"><span className="rt">{s.name}</span><span className="rs">Parada</span></span><span className="chev"><Chevron /></span>
-        </button>
-      ))}
+      {groups.map((g) => {
+        const wagons = g.stops.map((s) => transit.labelOf(s).wagon).filter((w): w is number => !!w);
+        const plats = g.stops.filter((s) => transit.labelOf(s).platform).length;
+        const kind = stopKind(g.stops[0]);
+        const sub = g.stops.length === 1 ? (stopTag(g.stops[0]) ? `${kind} · ${stopTag(g.stops[0])}` : kind)
+          : wagons.length >= 2 ? `${kind} · vagones ${[...new Set(wagons)].sort((a, b) => a - b).join(", ")}`
+          : plats ? `${kind} · ${plats} plataformas` : `${kind} · ${g.stops.length} paradas`;
+        return (
+          <button key={g.stops[0]!.id} className="row" onClick={() => (g.stops.length === 1 ? act.openStop(g.stops[0]!.id) : act.openGroup(g.stops.map((s) => s.id)))}>
+            <span className="rb sm" style={{ ["--c" as string]: g.stops.length > 1 ? th.troncal : th.system.otro }}>{g.stops.length > 1 ? "TM" : (g.stops[0]!.code.slice(0, 5) || "·")}</span>
+            <span className="rm"><span className="rt">{g.title}</span><span className="rs">{sub}</span></span><span className="chev"><Chevron /></span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -257,7 +269,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
               const heading = !bus ? d.vehicles.filter((v) => { const q = transit.sequenceOf(v); return q?.shape === cur && q.index + 1 === i; }) : [];
               return (
                 <li key={sid} ref={isNext ? nextRef : undefined} className={`${isNext ? "next" : ""}${passed ? " passed" : ""}${heading.length ? " here" : ""}`} onClick={() => act.openStop(sid)}>
-                  {s?.name ?? sid}{tag && <span className={`bx${isNext ? "" : " soft"}`}>{tag}</span>}
+                  {stopText(s, sid)}{tag && <span className={`bx${isNext ? "" : " soft"}`}>{tag}</span>}
                   {heading.length > 0 && <span className="bx">{heading.length === 1 ? "1 bus va hacia aquí" : `${heading.length} buses van hacia aquí`}</span>}
                 </li>
               );
@@ -288,11 +300,11 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
         <div><h4>{r?.longName || SYSTEM_LABEL[v.system]}</h4><small>{SYSTEM_LABEL[v.system]} · <span className="plate-s">{v.plate || v.label || v.id}</span></small></div>
       </div>
       {target && toTarget && (
-        <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{etaText(toTarget.etaAt, nowSec)}</b> a <b>{transit.stopById(target)?.name}</b>
+        <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{etaText(toTarget.etaAt, nowSec)}</b> a <b>{stopText(transit.stopById(target))}</b>
           <small>{toTarget.stopsAway <= 1 ? "es su próxima parada" : `le faltan ${toTarget.stopsAway - 1} ${toTarget.stopsAway - 1 === 1 ? "parada" : "paradas"} antes`}</small></div>
       )}
       <dl>
-        <dt>Próxima parada</dt><dd>{ns?.stop?.name ?? "—"}</dd>
+        <dt>Próxima parada</dt><dd>{stopText(ns?.stop, "—")}</dd>
         <dt>Llega</dt><dd>{untilText(ns?.arrivalAt, nowSec)}</dd>
         <dt>Puntualidad</dt><dd><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></dd>
         <dt>Último reporte</dt><dd>hace {Math.max(0, Math.round(nowSec - v.reportedAt))} s</dd>

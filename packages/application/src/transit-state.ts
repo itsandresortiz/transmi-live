@@ -1,6 +1,6 @@
 import {
   Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle, type RouteShape,
-  type VehicleReport, TransitNetwork, delayFromSeconds, inferSystemFromReport,
+  type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, parseStopName,
 } from "@transmi/domain";
 import { arrivalAtIndex } from "./eta";
 import { TravelTimes } from "./travel-times";
@@ -21,6 +21,9 @@ export class TransitState {
   /** Lo que se ha aprendido de cuánto tarda cada ruta por parada. */
   readonly travelTimes = new TravelTimes();
   private provisional = new Map<string, Route>();
+  private trunk: Set<string> | null = null;
+  private served: Set<string> | null = null;
+  private labels = new Map<string, StopLabel>();
   private seq = new Map<string, { shape: RouteShape; index: number } | null>();
   private listeners = new Set<() => void>();
 
@@ -34,6 +37,29 @@ export class TransitState {
   stopById(id: string | undefined): Stop | undefined { return id ? this.network.stops.get(id) : undefined; }
 
   delayOf(v: Vehicle): Delay { return delayFromSeconds(v.tripId ? this.tripUpdates.get(v.tripId)?.delaySeconds : null); }
+  /** La parada tiene al menos una ruta que se detiene en ella (hay paradas del archivo sin servicio). */
+  isServed(id: string): boolean {
+    if (!this.served) { this.served = new Set(); for (const shapes of this.network.shapes.values()) for (const sh of shapes) for (const sid of sh.stopIds) this.served.add(sid); }
+    return this.served.has(id);
+  }
+  /** Paradas por las que pasan rutas troncales o duales (donde el nombre trae vagón o plataforma). */
+  isTrunkStop(id: string): boolean {
+    if (!this.trunk) {
+      this.trunk = new Set();
+      for (const [rid, shapes] of this.network.shapes) {
+        const sys = this.network.routes.get(rid)?.system;
+        if (sys === "troncal" || sys === "dual") for (const sh of shapes) for (const sid of sh.stopIds) this.trunk.add(sid);
+      }
+    }
+    return this.trunk.has(id);
+  }
+  /** Nombre limpio de la parada y su vagón (estaciones) o plataforma (portales). */
+  labelOf(stop: Stop): StopLabel {
+    let l = this.labels.get(stop.id);
+    if (!l) { l = parseStopName(stop.name, this.isTrunkStop(stop.id)); this.labels.set(stop.id, l); }
+    return l;
+  }
+
   /** Dónde va el bus dentro del recorrido de su ruta: su última parada, la lista de paradas y su posición en ella. */
   sequenceOf(v: Vehicle): { shape: RouteShape; index: number } | undefined {
     if (!v.lastStopId) return undefined;
@@ -85,7 +111,7 @@ export class TransitState {
 
   setNetwork(network: TransitNetwork): void {
     this.network = network;
-    this.seq.clear();
+    this.seq.clear(); this.trunk = null; this.served = null; this.labels.clear();
     this.resolveSystems();
     this.touch();
   }

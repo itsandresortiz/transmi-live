@@ -10,6 +10,7 @@ funciona sin internet con lo último visto) y adaptado a escritorio.
 - Ver todos los buses moviéndose de forma fluida, por su ruta, con el color de su sistema o de su puntualidad.
 - Tocar una **parada** y ver qué rutas vienen, de dónde viene el próximo bus y en cuánto llega.
 - **Seguir** un bus: el mapa lo acompaña y te dice su próxima parada.
+- Ver en qué **vagón** de la estación (o plataforma del portal) para cada ruta: en el GTFS la **letra** del nombre es el vagón (A = 1, B = 2…) y los números cambian entre sentidos; se comprobó con rutas conocidas (La Campiña: H15 vagón 3, 7 vagón 1).
 - Guardar **favoritos** (paradas y rutas) y ver **paradas cerca de ti**.
 - Ver solo los **avisos** que te afectan (tus favoritos o tu zona).
 

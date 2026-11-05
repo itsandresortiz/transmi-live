@@ -284,3 +284,8 @@ button.stat:active{transform:scale(.97)}
 .scc .rb{font-style:normal;min-width:42px;height:26px;font-size:12px}
 .scc em{font-style:normal;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
 .btn[disabled]{opacity:.6}
+
+/* ---------- vagones y plataformas ---------- */
+.vtag{display:inline-block;padding:1px 9px;border-radius:9px;background:var(--accent);color:var(--accent-fg);font-size:12.5px;font-weight:700;letter-spacing:.01em}
+.kick{display:block;margin:0 0 2px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.kindchip{padding:1px 8px;border-radius:8px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)!important;font-size:11.5px!important;font-weight:700;letter-spacing:.02em}

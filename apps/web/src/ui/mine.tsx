@@ -4,6 +4,7 @@ import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { Bus, Chevron, Locate } from "./icons";
 import { etaText } from "./format";
+import { stopKind, stopText } from "./stopname";
 import { useFavs } from "./favorites";
 import { useNow, useTransitVersion } from "./hooks";
 import { hadLocationPermission, useLocation } from "./location";
@@ -37,7 +38,7 @@ export function StopCard({ stopId, th, act, meters }: { stopId: string; th: MapT
   const dist = meters == null ? "" : meters < 1000 ? `${Math.round(meters / 10) * 10} m` : `${(meters / 1000).toFixed(1)} km`;
   return (
     <button className="card stopcard" onClick={() => act.openStop(stopId)}>
-      <div className="sct"><b>{stop.name}</b>{dist && <span>{dist}</span>}<span className="chev"><Chevron /></span></div>
+      <div className="sct"><b>{stopText(stop)}</b>{stopKind(stop) !== "Parada" && <span className="kindchip">{stopKind(stop)}</span>}{dist && <span>{dist}</span>}<span className="chev"><Chevron /></span></div>
       {rows.length ? (
         <div className="scr">
           {rows.slice(0, 3).map((r) => (

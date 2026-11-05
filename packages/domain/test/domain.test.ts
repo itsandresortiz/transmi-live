@@ -164,3 +164,32 @@ describe("RoadPath", () => {
     expect(lockToRoute([L], { x: p.x, y: p.y + 0.001 }, { ux: 1, uy: 0 })).toBeNull(); // muy lejos
   });
 });
+
+import { parseStopName, stopLabelText } from "../src";
+describe("nombres de paradas de la troncal", () => {
+  it("la letra es el vagón (A = 1, B = 2, C = 3…)", () => {
+    expect(parseStopName("La Campiña A - 2")).toEqual({ title: "La Campiña", wagon: 1 });
+    expect(parseStopName("Campiña C - 1 ó 5")).toEqual({ title: "Campiña", wagon: 3 });
+    expect(parseStopName("Rionegro B - 4")).toEqual({ title: "Rionegro", wagon: 2 });
+    expect(parseStopName("Toberín E - 1")).toEqual({ title: "Toberín", wagon: 5 });
+    expect(parseStopName("Toberín A - 4 ó 6-nw")).toEqual({ title: "Toberín", wagon: 1 });
+    expect(parseStopName("Danubio  A - 2 ó 5")).toEqual({ title: "Danubio", wagon: 1 });
+    expect(parseStopName("Cra. 90 A - 2 ó 5")).toEqual({ title: "Cra. 90", wagon: 1 });
+    expect(stopLabelText(parseStopName("Calle 187 B - 4 ó 6"))).toBe("Calle 187 · vagón 2");
+  });
+  it("reconoce las plataformas de los portales", () => {
+    expect(parseStopName("Portal Norte T1")).toEqual({ title: "Portal Norte", platform: "T1" });
+    expect(parseStopName("Portal 80 T-2")).toEqual({ title: "Portal 80", platform: "T2" });
+    expect(parseStopName("PORTAL 20 DE JULIO T3")).toEqual({ title: "PORTAL 20 DE JULIO", platform: "T3" });
+    expect(parseStopName("Portal Usme T4D")).toEqual({ title: "Portal Usme", platform: "T4D" });
+    expect(parseStopName("Portal Tunal T6.")).toEqual({ title: "Portal Tunal", platform: "T6" });
+    expect(parseStopName("Portal Américas T2 A")).toEqual({ title: "Portal Américas", platform: "T2A" });
+    expect(parseStopName("Banderas T7")).toEqual({ title: "Banderas", platform: "T7" });
+    expect(parseStopName("Patio Bonito B - 4 ó 6.")).toEqual({ title: "Patio Bonito", wagon: 2 });
+  });
+  it("deja intactas las paradas comunes y las zonales", () => {
+    expect(parseStopName("Br. El Tunal")).toEqual({ title: "Br. El Tunal" });
+    expect(parseStopName("Cra. 19 A - 2", false)).toEqual({ title: "Cra. 19 A - 2" });
+    expect(parseStopName("AK 30 - CL 72")).toEqual({ title: "AK 30 - CL 72" });
+  });
+});

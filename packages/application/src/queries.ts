@@ -69,14 +69,68 @@ export function listVehicles(state: TransitState, o: { query?: string; system?: 
   });
 }
 
-export function searchStops(state: TransitState, query: string, limit = 60): Stop[] {
-  const q = normalize(query.trim());
-  if (!q) return [];
-  const out: Stop[] = [];
-  for (const s of state.network.stops.values()) {
-    if (normalize(`${s.name} ${s.code}`).includes(q)) { out.push(s); if (out.length >= limit) break; }
+/** Una estación o portal: todas sus paradas (vagones o plataformas) agrupadas bajo un nombre. */
+export interface StopGroup { key: string; title: string; stops: Stop[]; position: { lat: number; lon: number } }
+
+const LINK_METERS = 200;
+const titleKeys = new WeakMap<Stop, string>();
+function keyOf(state: TransitState, stop: Stop): string {
+  let k = titleKeys.get(stop);
+  if (k === undefined) { k = normalize(state.labelOf(stop).title); titleKeys.set(stop, k); }
+  return k;
+}
+/** Ordena las paradas de una estación: vagón 1, 2, 3…, luego plataformas, luego el resto. */
+export function sortStationStops(state: TransitState, stops: Stop[]): Stop[] {
+  const rank = (s: Stop) => { const l = state.labelOf(s); return l.wagon ?? (l.platform ? 100 : 200); };
+  return stops.slice().sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "es", { numeric: true }));
+}
+
+/** Une en una misma estación las paradas de igual nombre que están encadenadas a menos de 200 m (una estación puede medir 400 m). */
+function clusterStops(state: TransitState, stops: Stop[]): Stop[][] {
+  const byKey = new Map<string, Stop[]>();
+  for (const s of stops) { const k = keyOf(state, s); const l = byKey.get(k); l ? l.push(s) : byKey.set(k, [s]); }
+  const out: Stop[][] = [];
+  for (const list of byKey.values()) {
+    const left = list.slice();
+    while (left.length) {
+      const cluster = [left.pop()!];
+      for (let i = 0; i < cluster.length; i++) {
+        for (let j = left.length - 1; j >= 0; j--) if (hav(cluster[i]!.position, left[j]!.position) <= LINK_METERS) cluster.push(left.splice(j, 1)[0]!);
+      }
+      out.push(cluster);
+    }
   }
   return out;
+}
+
+/** Busca estaciones y paradas por nombre. Los vagones y plataformas de una misma estación salen juntos, no repetidos. */
+export function searchStopGroups(state: TransitState, query: string, limit = 40): StopGroup[] {
+  const q = normalize(query.trim());
+  if (!q) return [];
+  const hits: Stop[] = [];
+  for (const stop of state.network.stops.values()) {
+    if (state.network.shapes.size && !state.isServed(stop.id)) continue;      // sin ninguna ruta: no sirve para el usuario
+    if (normalize(`${stop.name} ${stop.code}`).includes(q)) hits.push(stop);
+  }
+  const groups = clusterStops(state, hits).map((stops): StopGroup => {
+    const sorted = sortStationStops(state, stops);
+    return { key: keyOf(state, sorted[0]!), title: state.labelOf(sorted[0]!).title, stops: sorted, position: sorted[0]!.position };
+  });
+  // primero las estaciones y portales (con vagones o plataformas), luego las más grandes
+  const trunkish = (g: StopGroup) => (g.stops.some((s) => state.labelOf(s).wagon || state.labelOf(s).platform) ? 0 : 1);
+  groups.sort((a, b) => trunkish(a) - trunkish(b) || b.stops.length - a.stops.length || a.title.localeCompare(b.title, "es"));
+  return groups.slice(0, limit);
+}
+
+/** Las demás paradas de la misma estación (otros vagones o plataformas), incluida ésta. */
+export function siblingStops(state: TransitState, stop: Stop): Stop[] {
+  const key = keyOf(state, stop), near: Stop[] = [];
+  for (const s of state.network.stops.values()) {
+    if (Math.abs(s.position.lat - stop.position.lat) > 1200 / 111_000) continue;
+    if (keyOf(state, s) === key && (!state.network.shapes.size || state.isServed(s.id))) near.push(s);
+  }
+  const cluster = clusterStops(state, near).find((c) => c.some((s) => s.id === stop.id)) ?? [stop];
+  return sortStationStops(state, cluster);
 }
 
 export function routesAtStop(state: TransitState, stopId: string): Route[] {
@@ -168,7 +222,7 @@ export function nearestStops(state: TransitState, p: { lat: number; lon: number 
   }
   out.sort((a, b) => a.meters - b.meters);
   const seen = new Set<string>(), res: NearbyStop[] = [];
-  for (const n of out) { const k = normalize(n.stop.name); if (seen.has(k)) continue; seen.add(k); res.push(n); if (res.length >= count) break; }
+  for (const n of out) { const k = keyOf(state, n.stop); if (seen.has(k)) continue; seen.add(k); res.push(n); if (res.length >= count) break; }
   return res;
 }
 

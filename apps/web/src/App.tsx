@@ -16,7 +16,7 @@ import { useNow, useTransitVersion } from "./ui/hooks";
 import { mapPadding } from "./ui/layout";
 import { hadLocationPermission, useLocation } from "./ui/location";
 import { useUi } from "./ui/store";
-import { StopRouteView, StopView } from "./ui/stopViews";
+import { StationView, StopRouteView, StopView } from "./ui/stopViews";
 import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
 
 const POLL_MS = 2500;
@@ -54,6 +54,13 @@ export function App() {
       openStop(id) {
         const st = transit.stopById(id); if (!st) return;
         closePopup(); s().openStop(id); s().setSheet("half");
+      },
+      openGroup(ids) {
+        const first = transit.stopById(ids[0]), m = mc.current; if (!first || !m) return;
+        closePopup(); s().openGroup(ids); s().setSheet("half");
+        const pts = ids.map((id) => transit.stopById(id)?.position).filter((p): p is NonNullable<typeof p> => !!p);
+        m.showRoute(null, "0", "", () => undefined); m.setFocusStop(null);
+        m.fit(pts, mapPadding(), 17);
       },
       followBus(id) {
         const v = transit.fleet.get(id), m = mc.current; if (!v || !m) return;
@@ -233,7 +240,8 @@ export function App() {
         </div>
       </header>
       <Sheet>
-        {ui.stopId ? (ui.stopRoute ? <StopRouteView th={th} act={act} /> : <StopView th={th} />)
+        {ui.stopId ? (ui.stopRoute ? <StopRouteView th={th} act={act} /> : <StopView th={th} act={act} />)
+          : ui.groupIds ? <StationView th={th} act={act} />
           : ui.routeId && ui.tab === "rutas" ? <RouteDetailView id={ui.routeId} th={th} act={act} />
           : ui.tab === "rutas" ? <RoutesView th={th} act={act} />
           : ui.tab === "buses" ? <BusesView th={th} act={act} />
