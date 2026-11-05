@@ -1,4 +1,4 @@
-import { type GeoPoint, METERS_PER_WORLD_UNIT, type WorldPoint, toWorld } from "../shared/geo";
+import { type GeoPoint, METERS_PER_WORLD_UNIT, type WorldPoint, toGeo, toWorld } from "../shared/geo";
 
 /** Trazado de una ruta en coordenadas de mundo, con distancias acumuladas, para avanzar «por la calle». */
 export class RoadPath {
@@ -39,6 +39,15 @@ export class RoadPath {
     }
     const dist = Math.sqrt(best) * METERS_PER_WORLD_UNIT;
     return dist <= maxMeters ? { s: bs, dist, forward: bdot >= 0 } : null;
+  }
+
+  /** Tramo del trazado entre `s0` y `s1` metros desde el inicio. */
+  slice(s0: number, s1: number): GeoPoint[] {
+    const a = Math.max(0, Math.min(s0, s1)), b = Math.min(this.length, Math.max(s0, s1));
+    const out: GeoPoint[] = [toGeo(this.pointAt(a))];
+    for (let i = 0; i < this.size; i++) if (this.cum[i]! > a && this.cum[i]! < b) out.push(toGeo({ x: this.xs[i]!, y: this.ys[i]! }));
+    out.push(toGeo(this.pointAt(b)));
+    return out;
   }
 
   /** Punto a `s` metros desde el inicio (limitado a los extremos). */

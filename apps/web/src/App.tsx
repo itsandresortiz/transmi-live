@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { connectionStatus, type ConnectionStatus } from "@transmi/application";
-import { SYSTEM_LABEL } from "@transmi/domain";
+import { connectionStatus, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
+import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, networkSource, transit } from "./composition-root";
 import { BusRenderer } from "./map/BusRenderer";
 import { MapController } from "./map/MapController";
@@ -15,7 +15,8 @@ import { ago } from "./ui/format";
 import { useNow, useTransitVersion } from "./ui/hooks";
 import { mapPadding } from "./ui/layout";
 import { useUi } from "./ui/store";
-import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopPopup, StopsView } from "./ui/views";
+import { StopRouteView, StopView } from "./ui/stopViews";
+import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
 
 const POLL_MS = 2500;
 
@@ -46,25 +47,29 @@ export function App() {
   const act: Actions = useMemo(() => {
     const s = () => useUi.getState();
     const a: Actions = {
-      openRoute(id) {
-        closePopup(); s().setFollow(null); s().setRoute(id); s().setTab("rutas"); s().setRoute(id);
+      openRoute(id, busId) {
+        closePopup(); s().setFollow(null); s().setTab("rutas"); s().setRoute(id, busId ?? null);
+      },
+      openStop(id) {
+        const st = transit.stopById(id); if (!st) return;
+        closePopup(); s().openStop(id); s().setSheet("half");
+      },
+      followBus(id) {
+        const v = transit.fleet.get(id), m = mc.current; if (!v || !m) return;
+        s().setFollow(id); s().setSheet("peek");
+        m.flyTo(br.current?.position(id) ?? v.position, Math.max(m.zoom, 16), mapPadding());
       },
       focusBus(id, keepTarget = false) {
         if (!keepTarget) s().setTargetStop(null);
         const v = transit.fleet.get(id), m = mc.current; if (!v || !m) return;
         const p = br.current?.position(id) ?? v.position;
         s().setSheet("peek");
-        m.flyTo(p, Math.max(m.zoom, 16), { ...mapPadding(), top: 300 });
+        m.flyTo(p, Math.max(m.zoom, 16), { ...mapPadding(), top: 420 });
         popup(p, <BusPopup v={v} th={thRef.current} following={s().followId === id}
           onFollow={() => { const f = s().followId === id ? null : id; s().setFollow(f); closePopup(); if (f) { s().setSheet("peek"); mc.current?.flyTo(br.current?.position(id) ?? v.position, Math.max(mc.current.zoom, 16), mapPadding()); } }}
-          onRoute={() => a.openRoute(v.routeId)} />);
+          onRoute={() => a.openRoute(v.routeId, v.id)} />);
       },
-      focusStop(id) {
-        const st = transit.stopById(id), m = mc.current; if (!st || !m) return;
-        s().setTargetStop(id);
-        m.flyTo(st.position, Math.max(m.zoom, 16), { ...mapPadding(), top: 410 });
-        popup(st.position, <StopPopup stopId={id} th={thRef.current} onRoute={a.openRoute} onBus={(bid) => a.focusBus(bid, true)} />);
-      },
+      focusStop(id) { a.openStop(id); },
       focusStation(i) {
         const e = (estaciones as [number, number, string, string, string][])[i], m = mc.current; if (!e || !m) return;
         const p = { lat: e[0], lon: e[1] };
@@ -93,7 +98,7 @@ export function App() {
     mc.current = m;
     const r = new BusRenderer(transit, m, () => {
       const u = uiRef.current;
-      return { colorMode: u.colorMode, motion: u.motion, system: u.tab === "buses" || u.tab === "rutas" ? u.system : null, routeId: u.tab === "rutas" ? u.routeId : null, visible: u.layers.buses };
+      return { colorMode: u.colorMode, motion: u.motion, system: !u.stopRoute && (u.tab === "buses" || u.tab === "rutas") ? u.system : null, routeId: u.stopRoute?.routeId ?? (u.tab === "rutas" ? u.routeId : null), visible: u.layers.buses };
     }, () => thRef.current);
     br.current = r;
     (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData, act };
@@ -123,11 +128,12 @@ export function App() {
   /* ---------- estado de la interfaz → mapa ---------- */
   useEffect(() => { document.documentElement.dataset.scheme = scheme; void mc.current?.ready.then(() => { mc.current?.setScheme(scheme); if (transit.network.routes.size) mc.current?.recolorNetwork(transit.network); br.current?.refresh(); }); }, [scheme]);
   useEffect(() => { void mc.current?.ready.then(() => mc.current?.setToggles(ui.layers)); br.current?.refresh(); }, [ui.layers]);
-  useEffect(() => { br.current?.refresh(); }, [ui.colorMode, ui.motion, ui.system, ui.tab, ui.routeId]);
+  useEffect(() => { br.current?.refresh(); }, [ui.colorMode, ui.motion, ui.system, ui.tab, ui.routeId, ui.stopRoute]);
   useEffect(() => { br.current?.setFollow(ui.followId); }, [ui.followId]);
   useEffect(() => { br.current?.setFollowPaused(ui.followPaused); }, [ui.followPaused]);
   useEffect(() => {
     const m = mc.current; if (!m) return;
+    if (ui.stopId) return;
     void m.ready.then(() => {
       m.setAlertStops(null);
       const fv = ui.followId ? transit.fleet.get(ui.followId) : undefined;
@@ -139,7 +145,39 @@ export function App() {
       const dir = shapes.find((s) => s.direction === want) ? want : shapes[0]!.direction;
       m.showRoute(shapes, dir, thRef.current.system[route?.system ?? "otro"], (sid) => transit.stopById(sid)?.position);
     });
-  }, [ui.routeId, ui.direction, ui.followId, net, scheme]);
+  }, [ui.routeId, ui.direction, ui.followId, ui.stopId, net, scheme]);
+
+  /* parada abierta: se marca en el mapa y, si hay una ruta elegida, solo por donde vienen sus buses */
+  useEffect(() => {
+    const m = mc.current; if (!m) return;
+    void m.ready.then(() => {
+      const st = transit.stopById(ui.stopId ?? undefined);
+      m.setFocusStop(st ? st.position : null, thRef.current.troncal);
+      if (!st || !ui.stopId) return;
+      const pad = mapPadding();
+      if (!ui.stopRoute) {
+        m.showRoute(null, "0", "", () => undefined);
+        m.flyTo(st.position, Math.max(m.zoom, 16), pad);
+        return;
+      }
+      const { routeId, direction } = ui.stopRoute;
+      const shape = transit.network.shapes.get(routeId)?.find((x) => x.direction === direction);
+      const color = thRef.current.system[transit.routeById(routeId)?.system ?? "otro"];
+      if (!shape || shape.points.length < 2) { m.showRoute(null, "0", "", () => undefined); m.flyTo(st.position, 16, pad); return; }
+      const path = new RoadPath(shape.points);
+      const end = path.project(toWorld(st.position), 0, 0, 250)?.s ?? path.length;
+      const row = upcomingAtStop(transit, ui.stopId, Date.now() / 1000, 6).find((r) => r.route.id === routeId && r.direction === direction);
+      const hits = (row?.buses ?? []).map((b) => path.project(b.vehicle.world, 0, 0, 150)?.s).filter((x): x is number => x != null && x <= end);
+      const start = Math.max(0, (hits.length ? Math.min(...hits) : end - 1200) - 120);
+      const j = shape.stopIds.indexOf(ui.stopId);
+      const ks = (row?.buses ?? []).map((b) => shape.stopIds.indexOf(b.vehicle.nextStopId ?? "")).filter((k) => k >= 0);
+      const kmin = ks.length ? Math.min(...ks) : Math.max(0, j - 6);
+      const stops = shape.stopIds.slice(Math.max(0, kmin), j + 1).flatMap((id) => { const p = transit.stopById(id)?.position; return p ? [{ id, p }] : []; });
+      const pts = path.slice(start, end);
+      m.showSegment(pts, color, stops);
+      m.fit([...pts, st.position], pad, 16.5);
+    });
+  }, [ui.stopId, ui.stopRoute, net]);
   useEffect(() => {
     const m = mc.current, id = ui.routeId; if (!m || !id) return;
     const shapes = transit.network.shapes.get(id); if (!shapes) return;
@@ -173,7 +211,8 @@ export function App() {
         </div>
       </header>
       <Sheet>
-        {ui.routeId && ui.tab === "rutas" ? <RouteDetailView id={ui.routeId} th={th} act={act} />
+        {ui.stopId ? (ui.stopRoute ? <StopRouteView th={th} act={act} /> : <StopView th={th} />)
+          : ui.routeId && ui.tab === "rutas" ? <RouteDetailView id={ui.routeId} th={th} act={act} />
           : ui.tab === "rutas" ? <RoutesView th={th} act={act} />
           : ui.tab === "buses" ? <BusesView th={th} act={act} />
           : ui.tab === "paradas" ? <StopsView th={th} act={act} />

@@ -1,18 +1,21 @@
 import { useMemo } from "react";
 import {
-  upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStops,
+  estimateTravelSeconds, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStops,
 } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
 import { useUi } from "./store";
-import { delayClass, delayText, untilText } from "./format";
+import { delayClass, delayText, etaText, stopsAwayText, untilText } from "./format";
+import { useEffect, useRef } from "react";
 import { useNow, useTransitVersion } from "./hooks";
 import type { MapTheme } from "../map/theme";
 
 export interface Actions {
-  openRoute(id: string): void;
+  openRoute(id: string, busId?: string): void;
+  openStop(id: string): void;
+  followBus(id: string): void;
   focusBus(id: string, keepTarget?: boolean): void;
   focusStop(id: string): void;
   focusStation(i: number): void;
@@ -176,47 +179,69 @@ export function AlertsView({ th, act }: Props) {
 export function RouteDetailView({ id, th, act }: { id: string } & Props) {
   useTransitVersion();
   const nowSec = useNow() / 1000;
-  const { direction, setDirection, setRoute } = useUi();
+  const { direction, setDirection, setRoute, routeBusId } = useUi();
   const d = routeDetail(transit, id);
+  const nextRef = useRef<HTMLLIElement>(null);
+  const bus = routeBusId ? transit.fleet.get(routeBusId) : undefined;
+  const shapes = transit.network.shapes.get(id) ?? [];
+  // si se abrió desde un bus, se muestra el sentido en el que va ese bus
+  const busShape = bus?.nextStopId ? shapes.find((sh) => sh.stopIds.includes(bus.nextStopId!)) : undefined;
+  const cur = busShape ?? shapes.find((s) => s.direction === direction) ?? shapes[0];
+  const k = bus && cur ? cur.stopIds.indexOf(bus.nextStopId ?? "") : -1;
+  useEffect(() => {
+    const el = nextRef.current, box = el?.closest(".view") as HTMLElement | null;
+    if (!el || !box) return;
+    // la hoja es más alta que lo que se ve en pantalla: se cuenta solo la parte visible
+    const hidden = window.matchMedia("(min-width:900px)").matches ? 0 : parseFloat(getComputedStyle(box.parentElement!).getPropertyValue("--sy")) || 0;
+    const visible = box.clientHeight - hidden;
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - visible * 0.3;
+    box.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, [k, cur?.direction]);
   if (!d) return <Empty title="Ruta no encontrada" text="Ya no aparece en el servicio." />;
   const route: Route = d.route;
   const color = sysColor(th, route.system);
-  const shapes = transit.network.shapes.get(id) ?? [];
-  const cur = shapes.find((s) => s.direction === direction) ?? shapes[0];
   const avg = d.averageDelaySeconds;
+  const tu = bus?.tripId ? transit.tripUpdates.get(bus.tripId) : undefined;
+  const base = tu?.nextStop?.arrivalAt ?? nowSec + 20;
   return (
     <>
-      <button className="back" onClick={() => setRoute(null)}><Back /> Rutas</button>
+      <button className="back" onClick={() => setRoute(null)}><Back /> {bus ? "Atrás" : "Rutas"}</button>
       <div className="dcard">
         <span className="rb big" style={{ ["--c" as string]: color }}>{route.shortName}</span>
-        <div><h2>{route.longName || SYSTEM_LABEL[route.system]}</h2>
-          <p>{SYSTEM_LABEL[route.system]} · {d.vehicles.length} {d.vehicles.length === 1 ? "bus" : "buses"}{avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
+        <div><h2>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName || SYSTEM_LABEL[route.system]}</h2>
+          <p>{SYSTEM_LABEL[route.system]}{bus ? ` · bus ${bus.plate || bus.label || bus.id}` : ` · ${d.vehicles.length} ${d.vehicles.length === 1 ? "bus" : "buses"}`}{!bus && avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
       </div>
-      {shapes.length > 1 && (
+      {!bus && shapes.length > 1 && (
         <div className="seg" role="group" aria-label="Sentido">
           {shapes.map((s) => <button key={s.direction} aria-pressed={cur?.direction === s.direction} onClick={() => setDirection(s.direction)}>{s.headsign ? `Hacia ${s.headsign}` : `Sentido ${Number(s.direction) + 1}`}</button>)}
         </div>
       )}
       {d.alerts.map(({ alert, index }) => <div key={index} className="card"><span className="pill warn">{ALERT_EFFECT_LABEL[alert.effect]}</span><div className="cs" style={{ marginTop: 8 }}>{describeAlert(alert)}</div></div>)}
-      <div className="sec">Buses en esta ruta</div>
-      {d.vehicles.length ? <div className="list">{d.vehicles.slice(0, 40).map((v) => <BusRow key={v.id} v={v} th={th} act={act} />)}</div> : <Empty title="Sin buses ahora" text="Ningún bus de esta ruta está reportando en este momento." />}
       {cur && cur.stopIds.length > 0 && (
         <>
-          <div className="sec">Paradas {cur.headsign ? `· hacia ${cur.headsign}` : ""}</div>
+          <div className="sec">{bus ? "Por dónde va este bus" : "Paradas"}</div>
           <ul className="tl" style={{ ["--rc" as string]: color }}>
-            {cur.stopIds.map((sid) => {
+            {cur.stopIds.map((sid, i) => {
               const s = transit.stopById(sid);
-              const here = d.vehicles.find((v) => v.nextStopId === sid);
-              const arr = (transit.arrivalsByStop.get(sid) ?? []).find((a) => a.routeId === id);
+              const isNext = bus && i === k, passed = bus && k >= 0 && i < k;
+              const tag = !bus || k < 0 || i < k ? null
+                : i === k ? `Próxima parada · ${tu?.nextStop?.arrivalAt ? etaText(tu.nextStop.arrivalAt, nowSec) : "en camino"}`
+                : i - k <= 6 ? `aprox. ${etaText(base + estimateTravelSeconds(transit, bus, cur.stopIds, k, i), nowSec)}` : null;
+              const atHere = !bus ? d.vehicles.find((v) => v.nextStopId === sid) : undefined;
               return (
-                <li key={sid} className={here ? "here" : ""} onClick={() => act.focusStop(sid)}>
-                  {s?.name ?? sid}{here && <span className="bx">{untilText(arr?.arrivalAt, nowSec)}</span>}
+                <li key={sid} ref={isNext ? nextRef : undefined} className={`${isNext ? "next" : ""}${passed ? " passed" : ""}${atHere ? " here" : ""}`} onClick={() => act.openStop(sid)}>
+                  {s?.name ?? sid}{tag && <span className={`bx${isNext ? "" : " soft"}`}>{tag}</span>}
+                  {atHere && <span className="bx">bus · {untilText(transit.arrivalsByStop.get(sid)?.find((a) => a.routeId === id)?.arrivalAt, nowSec)}</span>}
                 </li>
               );
             })}
           </ul>
         </>
       )}
+      <details className="morebuses">
+        <summary>Ver los {d.vehicles.length} {d.vehicles.length === 1 ? "bus" : "buses"} de esta ruta</summary>
+        {d.vehicles.length ? <div className="list">{d.vehicles.slice(0, 40).map((v) => <BusRow key={v.id} v={v} th={th} act={act} />)}</div> : <Empty title="Sin buses ahora" text="Ningún bus de esta ruta está reportando en este momento." />}
+      </details>
     </>
   );
 }
@@ -231,15 +256,18 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
   const toTarget = target ? upcomingAtStop(transit, target, nowSec, 40).flatMap((x) => x.buses).find((b) => b.vehicle.id === v.id) : undefined;
   return (
     <div className="pc">
-      <div className="ph"><span className="rb" style={{ ["--c" as string]: color }}>{r?.shortName ?? v.routeId}</span><div><h4>{SYSTEM_LABEL[v.system]}</h4><small>{r?.longName}</small></div></div>
-      <div className="plate"><span>{v.plate || v.label || v.id}</span><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></div>
+      <div className="ph">
+        <span className="rb big" style={{ ["--c" as string]: color }}>{r?.shortName ?? v.routeId}</span>
+        <div><h4>{r?.longName || SYSTEM_LABEL[v.system]}</h4><small>{SYSTEM_LABEL[v.system]} · <span className="plate-s">{v.plate || v.label || v.id}</span></small></div>
+      </div>
       {target && toTarget && (
-        <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{eta(toTarget.etaAt, nowSec)}</b> a <b>{transit.stopById(target)?.name}</b>
+        <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{etaText(toTarget.etaAt, nowSec)}</b> a <b>{transit.stopById(target)?.name}</b>
           <small>{toTarget.stopsAway <= 1 ? "es su próxima parada" : `le faltan ${toTarget.stopsAway - 1} ${toTarget.stopsAway - 1 === 1 ? "parada" : "paradas"} antes`}</small></div>
       )}
       <dl>
         <dt>Próxima parada</dt><dd>{ns?.stop?.name ?? "—"}</dd>
         <dt>Llega</dt><dd>{untilText(ns?.arrivalAt, nowSec)}</dd>
+        <dt>Puntualidad</dt><dd><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></dd>
         <dt>Último reporte</dt><dd>hace {Math.max(0, Math.round(nowSec - v.reportedAt))} s</dd>
       </dl>
       <div className="acts"><button className="btn primary" onClick={onFollow}>{following ? "Dejar de seguir" : "Seguir"}</button><button className="btn" onClick={onRoute}>Ver ruta</button></div>
@@ -247,43 +275,6 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
   );
 }
 
-const away = (n: number, official: boolean) => `${official ? "" : "aprox., "}${n <= 1 ? "su próxima parada" : `a ${n - 1} ${n - 1 === 1 ? "parada" : "paradas"}`}`;
-const eta = (at: number, nowSec: number) => {
-  const s = Math.round(at - nowSec);
-  return s <= 15 ? "llegando" : s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
-};
-
-/** Parada: rutas que pasan y en cuánto llegan sus próximos buses. Tocar un bus lo muestra en el mapa. */
-export function StopPopup({ stopId, th, onRoute, onBus }: { stopId: string; th: MapTheme; onRoute(id: string): void; onBus(id: string): void }) {
-  useTransitVersion();
-  const nowSec = useNow() / 1000;
-  const s = transit.stopById(stopId);
-  const rows = upcomingAtStop(transit, stopId, nowSec, 2).slice(0, 6);
-  return (
-    <div className="pc">
-      <div className="ph"><div><h4>{s?.name ?? "Parada"}</h4><small>{rows.length ? "Toca un bus para verlo en el mapa" : "Próximos buses"}</small></div></div>
-      {rows.length === 0 && <p className="cs" style={{ margin: "12px 0 0", color: "var(--muted)" }}>Ningún bus viene hacia esta parada en este momento.</p>}
-      <div className="ups">
-        {rows.map((r) => (
-          <div key={r.route.id + r.direction} className="up">
-            <button className="rb sm" style={{ ["--c" as string]: th.system[r.route.system] }} onClick={() => onRoute(r.route.id)}>{r.route.shortName}</button>
-            <div className="upm">
-              <span className="rs">{r.headsign ? `Hacia ${r.headsign}` : r.route.longName}</span>
-              <div className="etas">
-                {r.buses.map((b) => (
-                  <button key={b.vehicle.id} className={`eta${b.official ? "" : " est"}`} onClick={() => onBus(b.vehicle.id)}
-                    aria-label={`${eta(b.etaAt, nowSec)}, ${away(b.stopsAway, b.official)}. Ver el bus en el mapa`}>
-                    <span className="t">{!b.official && <i>aprox.</i>}{eta(b.etaAt, nowSec)}</span><small>{b.stopsAway <= 1 ? "su próxima parada" : `a ${b.stopsAway - 1} ${b.stopsAway - 1 === 1 ? "parada" : "paradas"}`}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function StationPopup({ index }: { index: number }) {
   const e = (estaciones as [number, number, string, string, string][])[index]!;

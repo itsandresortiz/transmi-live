@@ -69,7 +69,7 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus");
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
     m.addLayer({ id: "localidades-line", type: "line", source: "localidades", paint: { "line-color": t.landLine, "line-width": 1.2 } });
@@ -143,6 +143,8 @@ export class MapController {
       paint: { "circle-radius": 9, "circle-color": "#f59e0b", "circle-opacity": 0.4, "circle-stroke-color": "#f59e0b", "circle-stroke-width": 2.5 },
     });
 
+    m.addLayer({ id: "stop-focus-halo", type: "circle", source: "stop-focus", paint: { "circle-radius": 22, "circle-color": ["get", "color"], "circle-opacity": 0.2 } });
+    m.addLayer({ id: "stop-focus-dot", type: "circle", source: "stop-focus", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
     m.addLayer({
       id: "bus-dots", type: "circle", source: "buses", maxzoom: 13,
       paint: { "circle-radius": zoomWidth([9, 2.2], [13, 4.2]), "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 },
@@ -271,6 +273,19 @@ export class MapController {
       if (p) feats.push({ type: "Feature", properties: { id, color }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } });
     }
     stops.setData({ type: "FeatureCollection", features: feats });
+  }
+
+  /** Marca la parada elegida con un punto grande. */
+  setFocusStop(p: GeoPoint | null, color = "#e11d2e") {
+    (this.map.getSource("stop-focus") as GeoJSONSource | undefined)?.setData(!p ? EMPTY : { type: "FeatureCollection", features: [{ type: "Feature", properties: { color }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } }] });
+  }
+
+  /** Resalta solo un tramo de una ruta (por ejemplo, por donde vienen los buses hacia una parada). */
+  showSegment(points: readonly GeoPoint[], color: string, stops: readonly { id: string; p: GeoPoint }[]) {
+    const sel = this.map.getSource("route-sel") as GeoJSONSource, st = this.map.getSource("route-stops") as GeoJSONSource;
+    this.map.setPaintProperty("network-lines", "line-opacity", 0.1);
+    sel.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: { color, on: true }, geometry: { type: "LineString", coordinates: points.map((p) => [p.lon, p.lat]) } }] });
+    st.setData({ type: "FeatureCollection", features: stops.map((s) => ({ type: "Feature", properties: { id: s.id, color }, geometry: { type: "Point", coordinates: [s.p.lon, s.p.lat] } })) });
   }
 
   setAlertStops(points: readonly GeoPoint[] | null) {

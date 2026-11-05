@@ -13,6 +13,11 @@ interface UiState {
   limit: number;
   sheet: SheetState;
   routeId: string | null;
+  /** Si se abrió «Ver ruta» desde un bus, la ruta se muestra desde el punto de vista de ese bus. */
+  routeBusId: string | null;
+  /** Parada abierta y, dentro de ella, la ruta elegida. */
+  stopId: string | null;
+  stopRoute: { routeId: string; direction: string } | null;
   direction: string;
   onlyLate: boolean;
   openAlert: number | null;
@@ -32,7 +37,9 @@ interface UiState {
   setSystem(s: SystemType | null): void;
   more(): void;
   setSheet(s: SheetState): void;
-  setRoute(id: string | null): void;
+  setRoute(id: string | null, busId?: string | null): void;
+  openStop(id: string | null): void;
+  setStopRoute(r: { routeId: string; direction: string } | null): void;
   setDirection(d: string): void;
   setOnlyLate(v: boolean): void;
   setOpenAlert(i: number | null): void;
@@ -48,17 +55,19 @@ interface UiState {
 
 const PAGE = 60;
 export const useUi = create<UiState>((set) => ({
-  tab: "rutas", query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, direction: "0", onlyLate: false,
+  tab: "rutas", query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, routeBusId: null, stopId: null, stopRoute: null, direction: "0", onlyLate: false,
   openAlert: null, followId: null, followPaused: false, targetStopId: null, settingsOpen: false,
   layers: { streets: true, stops: true, network: true, buses: true },
   colorMode: "system", motion: "predict", toast: null,
 
-  setTab: (tab) => set((s) => (s.tab === tab ? s : { tab, query: "", limit: PAGE, onlyLate: tab === "buses" ? s.onlyLate : false })),
+  setTab: (tab) => set((s) => (s.tab === tab && !s.stopId ? s : { tab, stopId: null, stopRoute: null, query: "", limit: PAGE, onlyLate: tab === "buses" ? s.onlyLate : false })),
   setQuery: (query) => set({ query, limit: PAGE }),
   setSystem: (system) => set({ system, limit: PAGE }),
   more: () => set((s) => ({ limit: s.limit + PAGE })),
   setSheet: (sheet) => set({ sheet }),
-  setRoute: (routeId) => set({ routeId, direction: "0" }),
+  setRoute: (routeId, busId = null) => set({ routeId, routeBusId: routeId ? busId : null, direction: "0", stopId: null, stopRoute: null }),
+  openStop: (stopId) => set({ stopId, stopRoute: null, targetStopId: stopId, routeId: null, routeBusId: null }),
+  setStopRoute: (stopRoute) => set({ stopRoute }),
   setDirection: (direction) => set({ direction }),
   setOnlyLate: (onlyLate) => set({ onlyLate, limit: PAGE }),
   setOpenAlert: (openAlert) => set({ openAlert }),
