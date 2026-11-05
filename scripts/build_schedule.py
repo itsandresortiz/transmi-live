@@ -61,12 +61,17 @@ def main(src, dst):
 
     # paso 2: tiempos de tramo de todos los viajes (cada tramo entre paradas consecutivas del recorrido representativo)
     samples = defaultdict(list)   # (ruta, tramo) -> [(segundos, tipo de día, franja)]
+    ends = {}                     # (ruta, tipo de día) -> [(salida más temprana, viaje), (salida más tardía, viaje)]
     cur_trip, buf = None, []
     def flush():
         if not buf: return
         rid, dtype = trip_info.get(cur_trip, (None, "wk"))
         if rid not in seq: return
         buf.sort()
+        start = buf[0][2]
+        e = ends.setdefault((rid, dtype), [(start, cur_trip), (start, cur_trip)])
+        if start < e[0][0]: e[0] = (start, cur_trip)
+        if start > e[1][0]: e[1] = (start, cur_trip)
         for (a_seq, a_stop, a_t), (b_seq, b_stop, b_t) in zip(buf, buf[1:]):
             i = pair.get((rid, a_stop, b_stop))
             if i is None: continue
@@ -98,6 +103,14 @@ def main(src, dst):
         out["routes"][rid] = {"stops": ss, "seg": seg, "scale": scale}
     with open(dst, "w") as f:
         json.dump(out, f, separators=(",", ":"))
+    # primer y último viaje programado de cada ruta por tipo de día: sirve para marcar «último servicio»
+    se = {"v": 1, "routes": {}}
+    for (rid, dtype), (first, last) in ends.items():
+        r = se["routes"].setdefault(rid, {})
+        r[dtype] = {"first": [first[1], first[0]], "last": [last[1], last[0]]}
+    with open(dst.replace("schedule", "service-ends"), "w") as f:
+        json.dump(se, f, separators=(",", ":"))
+    print("rutas con primer/último viaje:", len(se["routes"]))
     import os
     n_seg = sum(len(r["seg"]) for r in out["routes"].values())
     print("rutas", len(out["routes"]), "tramos", n_seg, "bytes", os.path.getsize(dst))
