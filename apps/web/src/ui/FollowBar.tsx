@@ -10,6 +10,7 @@ import { stopText } from "./stopname";
 import { useUi } from "./store";
 import { delayText, untilText } from "./format";
 import { Marquee } from "./Marquee";
+import { useRide } from "./ride";
 
 const STALE_SECONDS = 90;
 
@@ -19,7 +20,8 @@ export function FollowBar({ th, onResume }: { th: MapTheme; onResume(): void }) 
   useTransitVersion();
   const nowSec = useNow() / 1000;
   const last = useRef<Vehicle | null>(null);
-  if (!followId) { last.current = null; return null; }
+  const riding = useRide((s) => !!s.busId);
+  if (!followId || riding) { last.current = null; return null; }
   const live = transit.fleet.get(followId);
   if (live) last.current = live;
   const v = live ?? last.current;

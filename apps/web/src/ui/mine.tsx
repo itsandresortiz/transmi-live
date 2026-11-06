@@ -1,15 +1,18 @@
-import { useEffect, useMemo } from "react";
-import { nearestStops, upcomingAtStop } from "@transmi/application";
+import { useEffect, useMemo, useState } from "react";
+import { type Itinerary, nearestStops, planTrip, upcomingAtStop } from "@transmi/application";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { routeBadgeColor } from "../map/theme";
-import { Bus, Chevron, Locate } from "./icons";
+import { Bus, Chevron, Directions, Locate } from "./icons";
 import { nowSec as serverNowSec } from "../clock";
 import { etaText } from "./format";
 import { stopKind, stopText } from "./stopname";
 import { useFavs } from "./favorites";
 import { useNow, useTransitVersion } from "./hooks";
 import { hadLocationPermission, useLocation } from "./location";
+import { SLOT_LABEL, type Slot, usePlaces } from "./places";
+import { openPlannerTo, durText } from "./planner";
+import { nowMs } from "../clock";
 import type { Actions } from "./views";
 
 /** Próximos buses de una parada, calculados una vez por lote (no cada segundo). */
@@ -91,9 +94,45 @@ export function NearbySection({ th, act, compact = false }: { th: MapTheme; act:
           <button className="btn primary" style={{ marginTop: 12 }} disabled={status === "asking"} onClick={() => void locate()}><Locate /> {status === "asking" ? "Buscando tu ubicación…" : "Usar mi ubicación"}</button>
         </div>
       ) : !transit.network.stops.size ? (
-        <div className="empty"><Bus /><b>Cargando paradas…</b></div>
+        <div role="status" aria-label="Cargando paradas">{[0, 1, 2].map((i) => <span key={i} className="skel" style={{ height: 76, marginBottom: 8, opacity: 1 - i * 0.2 }} />)}</div>
       ) : near.length ? near.map((n) => <StopCard key={n.stop.id} stopId={n.stop.id} th={th} act={act} meters={n.meters} />)
         : <div className="empty"><Bus /><b>No hay paradas a menos de 1,2 km</b>Acércate a un sector con servicio.</div>}
     </div>
+  );
+}
+
+/** «Mi viaje de siempre»: Casa y Trabajo con el próximo bus a un toque. */
+export function QuickTrips() {
+  const places = usePlaces();
+  const me = useLocation((l) => l.me);
+  const version = useTransitVersion();
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "America/Bogota" }).format(new Date()));
+  const slots = (["work", "home"] as Slot[]).filter((s) => places[s]).sort((a) => ((a === "work") === (hour < 13) ? -1 : 1));
+  if (!slots.length) return null;
+  return (
+    <div className="quick">
+      {slots.map((s) => <QuickTrip key={s} slot={s} me={me} version={Math.floor(version / 4)} />)}
+    </div>
+  );
+}
+
+function QuickTrip({ slot, me, version }: { slot: Slot; me: { lat: number; lon: number } | null; version: number }) {
+  const place = usePlaces((p) => p[slot])!;
+  const [best, setBest] = useState<Itinerary | null>(null);
+  useEffect(() => {
+    if (!me || !transit.network.stops.size) { setBest(null); return; }
+    const t = setTimeout(() => {
+      try { setBest(planTrip(transit, { name: "Mi ubicación", position: me }, place, { nowMs: nowMs(), limit: 1 })[0] ?? null); } catch { setBest(null); }
+    }, 60);
+    return () => clearTimeout(t);
+  }, [me, place, version]);
+  const ride = best?.legs.find((l) => l.kind === "ride");
+  const sub = !me ? "Activa tu ubicación para ver el próximo bus" : best ? `${ride && ride.kind === "ride" ? `${ride.shortName} · ` : ""}${durText(best.seconds)} · llegas ${new Date(best.arriveAt * 1000).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", timeZone: "America/Bogota" })}` : "Toca para ver cómo llegar";
+  return (
+    <button className="row nearrow" onClick={() => openPlannerTo(place)}>
+      <span className="pico"><Directions /></span>
+      <span className="rm"><span className="rt">Ir a {SLOT_LABEL[slot].toLowerCase()}</span><span className="rs">{sub}</span></span>
+      <span className="chev"><Chevron /></span>
+    </button>
   );
 }

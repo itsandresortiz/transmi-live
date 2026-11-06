@@ -365,3 +365,23 @@ button.stat:active{transform:scale(.97)}
 .nearrow{margin:4px 0 6px;border-radius:14px;background:var(--surface2)}.nearrow .pico{color:var(--accent)}
 @media (min-width:700px) and (max-width:1023px){.sheet{width:372px}.top{left:404px}.followbar{left:404px;width:min(520px,calc(100vw - 440px))}}
 .dcard .official{font-size:11px;color:var(--muted,#8a8f98);margin:2px 0 0;line-height:1.3;word-break:break-word}
+.when{margin:8px 0 2px}.when .tchips{margin:0}
+.whent{display:flex;align-items:center;gap:10px;margin:8px 2px 0;font-size:14px}.whent span{color:var(--muted,#8a8f98)}
+.whent input{font:inherit;padding:6px 10px;border-radius:10px;border:1px solid var(--line,rgba(128,128,128,.3));background:var(--hover,transparent);color:inherit}
+.whent small{color:var(--muted,#8a8f98);text-transform:capitalize}
+.savep{display:flex;gap:14px;margin:2px 2px 8px}
+.ridebar{border:1.5px solid var(--accent)}.ridebar .fm em{font-size:11.5px;color:var(--faint);font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ridebar.now{animation:ridepulse 1.2s ease-in-out infinite}.ridebar .fm>span{white-space:normal;font-weight:600;color:var(--fg,inherit)}
+@keyframes ridepulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 30%,transparent)}}
+@media (prefers-reduced-motion:reduce){.ridebar.now{animation:none}}
+.tl .getoff{margin-left:8px;font-size:12.5px}
+.etabig.old{opacity:.65}.nodata{margin-bottom:10px}
+/* esqueleto de carga */
+.skel{display:block;border-radius:10px;background:linear-gradient(90deg,var(--hover) 25%,color-mix(in srgb,var(--hover) 50%,transparent) 50%,var(--hover) 75%);background-size:200% 100%;animation:skel 1.3s linear infinite}
+@keyframes skel{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+/* contraste alto: el del sistema o el que se elige en Ajustes */
+@media (prefers-contrast:more){:root{--line:rgba(128,128,128,.7)}.chip,.btn,.row,.card{border:1px solid currentColor!important}}
+:root[data-contrast="high"]{--line:rgba(128,128,128,.75)}
+:root[data-contrast="high"] .chip,:root[data-contrast="high"] .btn,:root[data-contrast="high"] .row,:root[data-contrast="high"] .card{border:1px solid currentColor!important}
+:root[data-contrast="high"] .faint,:root[data-contrast="high"] .rs,:root[data-contrast="high"] .cs{opacity:1;color:inherit}

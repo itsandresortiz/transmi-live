@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import {
   arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStopGroups, siblingStops,
 } from "@transmi/application";
+import { useRide } from "./ride";
+import { haptic } from "./haptics";
 import { routeOfficialName, routeTitle, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
@@ -9,14 +11,14 @@ import { Back, Bus, Chevron } from "./icons";
 import { nowMs } from "../clock";
 import { stopCode, stopKind, stopTag, stopText } from "./stopname";
 import { FirstBadge, LastBadge, RouteStatusNote, clockOfDay } from "./lastService";
-import { FavoritesSection, NearbySection, StarButton } from "./mine";
+import { FavoritesSection, NearbySection, QuickTrips, StarButton } from "./mine";
 import { ShareButton } from "./share";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
-import { alertsFor, nearestStops, routeIdsAtStops } from "@transmi/application";
+import { alertsFor, connectionStatus, nearestStops, routeIdsAtStops } from "@transmi/application";
 import { useState } from "react";
 import { useUi } from "./store";
-import { delayClass, delayText, etaText, stopsAwayText, untilText } from "./format";
+import { agoShort, delayClass, delayText, etaText, stopsAwayText, untilText } from "./format";
 import { useEffect, useRef } from "react";
 import { useNow, useTransitVersion } from "./hooks";
 import { routeBadgeColor, type MapTheme } from "../map/theme";
@@ -72,6 +74,21 @@ export function ServiceStats() {
   );
 }
 
+/** Cuando la fuente no publica buses, se explica en vez de dejar el mapa vacío sin motivo. */
+export function NoDataNote() {
+  useTransitVersion();
+  const now = useNow();
+  const st = connectionStatus(transit, now);
+  if (st.connection === "live" || st.connection === "waiting" || st.connection === "connecting" || transit.fleet.size > 0) return null;
+  return (
+    <div className="card nodata" role="status">
+      <div className="ct">{st.connection === "stale" ? "Sin señal con el servicio" : "Aún no hay buses en el mapa"}</div>
+      <div className="cs">{st.connection === "stale" ? "No pudimos hablar con el servidor. Cuando vuelva la conexión se actualiza solo."
+        : `TransMilenio no está publicando buses${st.ageSeconds != null ? ` desde hace ${agoShort(st.ageSeconds)}` : " por ahora"}. Es normal en la madrugada, antes de que empiece la operación; apenas reporten, aparecen aquí solos.`}</div>
+    </div>
+  );
+}
+
 export function RoutesView({ th, act }: Props) {
   useTransitVersion();
   const { query, system, limit } = useUi();
@@ -84,8 +101,10 @@ export function RoutesView({ th, act }: Props) {
   const page = list.slice(0, limit);
   return (
     <>
+      <NoDataNote />
+      {!transit.network.routes.size && <div aria-label="Cargando rutas" role="status">{[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className="skel" style={{ height: 58, marginBottom: 8, opacity: 1 - i * 0.12 }} />)}</div>}
       <FavoritesSection th={th} act={act} />
-      {!query.trim() && !system && <NearbySection th={th} act={act} compact />}
+      {!query.trim() && !system && <><QuickTrips /><NearbySection th={th} act={act} compact /></>}
       {!query.trim() && !system && <div className="sec" style={{ marginTop: 14 }}>Todas las rutas</div>}
       <Chips th={th} />
       {!list.length ? <Empty title="Sin resultados" text="Prueba con otro número de ruta o destino." /> : (
@@ -284,6 +303,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
               return (
                 <li key={sid} ref={isNext ? nextRef : undefined} className={`${isNext ? "next" : ""}${passed ? " passed" : ""}${heading.length ? " here" : ""}`} onClick={() => act.openStop(sid)}>
                   {stopText(s, sid)}{tag && <span className={`bx${isNext ? "" : " soft"}`}>{tag}</span>}
+                  {bus && k >= 0 && i > k && <button className="tlink getoff" onClick={(e) => { e.stopPropagation(); haptic(); useRide.getState().start(bus.id, sid); }}>Bajo aquí</button>}
                   {heading.length > 0 && <span className="bx">{heading.length === 1 ? "1 bus va hacia aquí" : `${heading.length} buses van hacia aquí`}</span>}
                 </li>
               );

@@ -15,6 +15,9 @@ const load = (): string[] => {
   catch { return []; }
 };
 
+/** ¿Es la primera vez en este dispositivo? Entonces lo que ya existe no cuenta como «nuevo». */
+export const firstRun = (): boolean => safeStorage.get(KEY) == null;
+
 interface Seen { seen: Set<string>; markSeen(alerts: readonly ServiceAlert[]): void }
 /** Qué avisos ya vio este usuario (solo en este dispositivo). */
 export const useAlertsSeen = create<Seen>((set, get) => ({

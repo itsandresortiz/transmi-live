@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { alertKey, useAlertsSeen } from "./ui/alertsSeen";
+import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
 import { connectionStatus, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
@@ -12,6 +12,7 @@ import { MapController } from "./map/MapController";
 import { currentScheme, routeBadgeColor, themeOf, type Scheme } from "./map/theme";
 import estaciones from "./data/estaciones.json";
 import { FollowBar } from "./ui/FollowBar";
+import { RideBar } from "./ui/ride";
 import { Settings } from "./ui/Settings";
 import { Sheet } from "./ui/Sheet";
 import { Bell, Compass, Locate, Mark, Sliders } from "./ui/icons";
@@ -275,6 +276,27 @@ export function App() {
     m.fit(cur.points, mapPadding(), 15);
   }, [ui.routeId, ui.direction]);
 
+  /* botón y gesto «atrás»: cierran lo que está abierto (ruta, parada, avisos, ajustes) en vez de salir de la app */
+  const detailOpen = (ui.tab === "rutas" && !!ui.routeId) || !!ui.stopId || !!ui.groupIds || ui.tab === "avisos" || ui.settingsOpen;
+  const pushed = useRef(false), skipPop = useRef(false);
+  useEffect(() => {
+    if (detailOpen && !pushed.current) { try { history.pushState({ tm: 1 }, "", location.href); pushed.current = true; } catch { /* sin historial */ } }
+    else if (!detailOpen && pushed.current) { pushed.current = false; skipPop.current = true; history.back(); }
+  }, [detailOpen]);
+  useEffect(() => {
+    const on = () => {
+      if (skipPop.current) { skipPop.current = false; return; }
+      if (!pushed.current) return;
+      pushed.current = false;
+      const u = useUi.getState();
+      u.setSettingsOpen(false);
+      if (u.tab === "avisos") u.setTab("rutas");
+      u.setRoute(null);
+    };
+    window.addEventListener("popstate", on);
+    return () => window.removeEventListener("popstate", on);
+  }, []);
+
   const linked = useRef(false);
   /* enlaces: la dirección refleja lo que se está viendo y, al abrir un enlace, se llega directo a eso */
   useEffect(() => {
@@ -377,6 +399,7 @@ export function App() {
           : ui.tab === "paradas" ? <StopsView th={th} act={act} />
           : <AlertsView th={th} act={act} />}
       </Sheet>
+      <RideBar th={th} />
       <FollowBar th={th} onResume={() => { useUi.getState().setFollowPaused(false); }} />
       <Settings th={th} />
       <div className={`toast glass${toastOn ? " on" : ""}`} role="status" aria-live="polite">{ui.toast?.text}</div>
@@ -417,6 +440,6 @@ function useAlertCount(): number {
   const seen = useAlertsSeen((s) => s.seen);
   const open = useUi((u) => u.tab === "avisos");
   // mientras la lista está abierta, todo lo que hay se da por visto
-  useEffect(() => { if (open) useAlertsSeen.getState().markSeen(transit.alerts); });
+  useEffect(() => { if ((open || firstRun()) && transit.alerts.length) useAlertsSeen.getState().markSeen(transit.alerts); });
   return open ? 0 : transit.alerts.reduce((n, a) => n + (seen.has(alertKey(a)) ? 0 : 1), 0);
 }

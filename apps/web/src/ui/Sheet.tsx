@@ -17,7 +17,7 @@ export function Sheet({ children }: { children: ReactNode }) {
   const detail = (tab === "rutas" && !!routeId) || !!stopId || !!groupIds;
   useTransitVersion();
   const el = useRef<HTMLElement>(null);
-  const drag = useRef<{ y0: number; off0: number; moved: boolean } | null>(null);
+  const drag = useRef<{ y0: number; off0: number; moved: boolean; t: number; y: number; v: number } | null>(null);
 
   const apply = useCallback((s: SheetState) => {
     const e = el.current; if (!e) return;
@@ -32,13 +32,16 @@ export function Sheet({ children }: { children: ReactNode }) {
   const down = (ev: React.PointerEvent) => {
     if (advanced() || (ev.target as HTMLElement).closest("input,button.tab,button.clear")) return;
     const e = el.current!;
-    drag.current = { y0: ev.clientY, off0: offsetOf(sheet, e.offsetHeight), moved: false };
+    drag.current = { y0: ev.clientY, off0: offsetOf(sheet, e.offsetHeight), moved: false, t: performance.now(), y: ev.clientY, v: 0 };
     (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
     e.classList.add("dragging");
   };
   const move = (ev: React.PointerEvent) => {
     const d = drag.current, e = el.current; if (!d || !e) return;
     const dy = ev.clientY - d.y0;
+    const t = performance.now(), dt = t - d.t;
+    if (dt > 0) d.v = d.v * 0.4 + ((ev.clientY - d.y) / dt) * 0.6;       // velocidad suavizada (px/ms; positivo = hacia abajo)
+    d.t = t; d.y = ev.clientY;
     if (Math.abs(dy) > 4) d.moved = true;
     e.style.setProperty("--sy", `${Math.min(e.offsetHeight - 80, Math.max(0, d.off0 + dy))}px`);
   };
@@ -48,7 +51,11 @@ export function Sheet({ children }: { children: ReactNode }) {
     const h = e.offsetHeight, off = Math.min(h - 80, Math.max(0, d.off0 + ev.clientY - d.y0));
     if (!d.moved) { setSheet(sheet === "peek" ? "half" : sheet === "half" ? "full" : "peek"); return; }
     const cands: SheetState[] = ["full", "half", "peek"];
-    const best = cands.reduce((a, b) => Math.abs(offsetOf(a, h) - off) <= Math.abs(offsetOf(b, h) - off) ? a : b);
+    // con un deslizón rápido se salta al siguiente nivel en esa dirección; si no, al más cercano (con un empujoncito según la velocidad)
+    const order: SheetState[] = ["full", "half", "peek"];
+    const here = order.indexOf(sheet);
+    const flick = Math.abs(d.v) > 0.45 && performance.now() - d.t < 90;
+    const best = flick ? order[Math.min(2, Math.max(0, here + (d.v > 0 ? 1 : -1)))]! : cands.reduce((a, b) => Math.abs(offsetOf(a, h) - (off + d.v * 120)) <= Math.abs(offsetOf(b, h) - (off + d.v * 120)) ? a : b);
     if (best === sheet) apply(best); else setSheet(best);
   };
 

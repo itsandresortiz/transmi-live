@@ -10,7 +10,9 @@ import { etaText } from "./format";
 import { geocode } from "./geocode";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
-import { type Field, type SortBy, sortedResults, usePlanner } from "./plannerStore";
+import { type Field, type SortBy, sortedResults, timeToMs, usePlanner } from "./plannerStore";
+import { useRide } from "./ride";
+import { SLOT_LABEL, type Slot, usePlaces } from "./places";
 import { shareUrl } from "../deeplink";
 import { useNow } from "./hooks";
 import { haptic } from "./haptics";
@@ -66,7 +68,7 @@ export function PlannerView({ th, act }: { th: MapTheme; act: Actions }) {
   // al abrir sin origen: se intenta ubicar al usuario; mientras la pantalla está abierta los tiempos se recalculan con los buses en vivo
   useEffect(() => { if (p.originMe && !me && useLocation.getState().status !== "denied") void useLocation.getState().locate(); }, [p.originMe, me]);
   useEffect(() => { if (p.originMe && me && p.dest && !p.results && !p.busy) p.plan(); }, [p.originMe, me, p.dest, p.results, p.busy]);   // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { const t = setInterval(() => { if (!document.hidden && usePlanner.getState().results) usePlanner.getState().plan(); }, 45_000); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => { if (!document.hidden && usePlanner.getState().results && usePlanner.getState().when.mode === "now") usePlanner.getState().plan(); }, 45_000); return () => clearInterval(t); }, []);
 
   const originLabel = p.originMe ? "Mi ubicación" : p.origin?.name ?? "";
   return (
@@ -81,6 +83,7 @@ export function PlannerView({ th, act }: { th: MapTheme; act: Actions }) {
         </div>
         <button className="swap" aria-label="Intercambiar origen y destino" onClick={() => p.swap()} disabled={!p.dest}><Swap /></button>
       </div>
+      {!p.editing && p.dest && <WhenRow />}
       {p.editing ? <Suggestions field={p.editing} /> : <Results th={th} act={act} />}
     </>
   );
@@ -101,12 +104,54 @@ function PlaceInput({ field, label, placeholder }: { field: Field; label: string
   );
 }
 
+/* ---------- cuándo viajas ---------- */
+
+const hhmmNow = (ms: number) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Bogota" }).format(new Date(ms));
+
+function WhenRow() {
+  const { when, setWhen } = usePlanner();
+  const [time, setTime] = useState(() => hhmmNow(Date.now() + 3600_000));
+  const apply = (mode: "depart" | "arrive", t: string) => { const at = timeToMs(t); if (at) setWhen({ mode, at }); };
+  return (
+    <div className="when" role="group" aria-label="Cuándo viajas">
+      <div className="tchips">
+        <button className="chip" aria-pressed={when.mode === "now"} onClick={() => { haptic(); setWhen({ mode: "now" }); }}>Salir ahora</button>
+        <button className="chip" aria-pressed={when.mode === "depart"} onClick={() => { haptic(); apply("depart", time); }}>Salir a las…</button>
+        <button className="chip" aria-pressed={when.mode === "arrive"} onClick={() => { haptic(); apply("arrive", time); }}>Llegar a las…</button>
+      </div>
+      {when.mode !== "now" && (
+        <label className="whent">
+          <span>{when.mode === "depart" ? "Hora de salida" : "Hora de llegada"}</span>
+          <input type="time" value={hhmmNow(when.at)} onChange={(e) => { setTime(e.target.value); if (e.target.value) apply(when.mode as "depart" | "arrive", e.target.value); }} />
+          <small>{new Date(when.at).toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short", timeZone: "America/Bogota" })}</small>
+        </label>
+      )}
+    </div>
+  );
+}
+
+/** «Guardar como Casa / Trabajo» para el destino que se está viendo. */
+function SavePlace() {
+  const dest = usePlanner((p) => p.dest);
+  const saved = usePlaces();
+  if (!dest) return null;
+  const same = (s: Slot) => saved[s] && Math.abs(saved[s]!.position.lat - dest.position.lat) < 1e-5 && Math.abs(saved[s]!.position.lon - dest.position.lon) < 1e-5;
+  const slots = (["home", "work"] as Slot[]).filter((s) => !same(s));
+  if (!slots.length) return null;
+  return (
+    <div className="savep">
+      {slots.map((s) => <button key={s} className="tlink" onClick={() => { saved.save(s, dest); haptic(); useUi.getState().showToast(`Guardado como ${SLOT_LABEL[s].toLowerCase()}`); }}>Guardar como {SLOT_LABEL[s].toLowerCase()}</button>)}
+    </div>
+  );
+}
+
 /* ---------- sugerencias ---------- */
 
 function Suggestions({ field }: { field: Field }) {
   const { text, recents, setPlace, setEditing, setPicking } = usePlanner();
   const me = useLocation((l) => l.me);
   const favStops = useFavs((f) => f.stops);
+  const saved = usePlaces();
   const q = useDeferredValue(text[field].trim());
   const local = useMemo(() => (q.length >= 2 ? searchPlanPlaces(transit, q, 6) : []), [q]);
   const [remote, setRemote] = useState<PlanPlace[]>([]);
@@ -134,6 +179,7 @@ function Suggestions({ field }: { field: Field }) {
     <div className="list psugg" role="listbox" aria-label="Lugares">
       <Row title="Mi ubicación" sub={me ? "Usar donde estoy ahora" : "Activar la ubicación"} icon={<Locate />} onClick={async () => { const g = await useLocation.getState().locate(); if (g) setPlace(field, field === "origin" ? "me" : { name: "Mi ubicación", position: g }); }} />
       <Row title="Elegir en el mapa" sub="Toca el punto exacto" icon={<Pin />} onClick={() => setPicking(field)} />
+      {!q && (["home", "work"] as Slot[]).map((s) => saved[s] && <Row key={s} title={SLOT_LABEL[s]} sub={saved[s]!.name} icon={<Pin />} onClick={() => pick(saved[s]!)} />)}
       {!q && recents.length > 0 && <div className="sec">Recientes</div>}
       {!q && recents.map((r) => <Row key={r.name + r.position.lat} title={r.name} icon={<Pin />} onClick={() => pick(r)} />)}
       {!q && favs.length > 0 && <div className="sec">Tus paradas favoritas</div>}
@@ -165,7 +211,7 @@ async function shareTrip() {
 }
 
 function Results({ th, act }: { th: MapTheme; act: Actions }) {
-  const { results, sel, busy, origin, originMe, dest, error, select, plan, sortBy, setSort, computedAt } = usePlanner();
+  const { results, sel, busy, origin, originMe, dest, error, select, plan, sortBy, setSort, computedAt, when } = usePlanner();
   const me = useLocation((l) => l.me);
   const now = useNow();
   if (!dest) return (
@@ -189,12 +235,15 @@ function Results({ th, act }: { th: MapTheme; act: Actions }) {
         {SORTS.map(([k, l]) => <button key={k} className="chip" aria-pressed={sortBy === k} onClick={() => { haptic(); setSort(k); }}>{l}</button>)}
       </div>
       <div className="tnote">
-        <span>Sales ahora ({hm(now / 1000)}) · actualizado hace {age < 5 ? "unos segundos" : `${age} s`}</span>
+        <span>{when.mode === "now" ? `Sales ahora (${hm(now / 1000)}) · actualizado hace ${age < 5 ? "unos segundos" : `${age} s`}`
+          : when.mode === "depart" ? `Sales a las ${hm(when.at / 1000)} · según horarios y frecuencias`
+          : `Llegas a las ${hm(when.at / 1000)} · según horarios y frecuencias`}</span>
         <span className="tacts">
           <button className="tlink" onClick={() => plan()} disabled={busy}>{busy ? "Actualizando…" : "Actualizar"}</button>
           <button className="tlink" onClick={() => void shareTrip()}>Compartir</button>
         </span>
       </div>
+      <SavePlace />
       {list.map((it, i) => <Card key={i} it={it} i={i} on={i === sel} th={th} act={act} select={select} nowS={now / 1000} />)}
       <p className="hint tfoot">Tiempos estimados con los buses que van en vivo y el tráfico habitual; pueden cambiar. Caminatas en línea recta con un margen por las calles.</p>
     </div>
@@ -310,6 +359,7 @@ function Steps({ it, th, act, nowS }: { it: Itinerary; th: MapTheme; act: Action
             {l.alerts > 0 && <div className="swarn">Hay {l.alerts} {l.alerts === 1 ? "aviso" : "avisos"} de servicio en esta ruta. <button className="tlink" onClick={() => setTab("avisos")}>Ver avisos</button></div>}
             <div className="sbtns">
               {l.busId && <button className="btn sm" onClick={() => act.followBus(l.busId!)}>Seguir el bus</button>}
+              {l.busId && <button className="btn sm primary" onClick={() => useRide.getState().start(l.busId!, l.alight.id)}>Voy en este bus</button>}
               <button className="btn sm ghost" onClick={() => act.openRoute(l.routeId)}>Ver la ruta {l.shortName}</button>
             </div>
           </div>

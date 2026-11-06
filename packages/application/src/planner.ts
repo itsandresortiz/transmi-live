@@ -55,6 +55,8 @@ export interface Itinerary {
 
 export interface PlanOptions {
   nowMs?: number;
+  /** Planear para otra hora (más tarde): se ignoran los buses en vivo y se usan frecuencias y horarios. */
+  scheduled?: boolean;
   /** Cuánto se está dispuesto a caminar para llegar a la primera parada y desde la última (m). */
   maxAccessMeters?: number;
   maxTransfers?: number;
@@ -163,13 +165,13 @@ interface Live {
   headway: Map<string, number>;          // ruta → segundos entre buses
   running: Set<string>;                  // rutas que se pueden usar ahora
 }
-function liveInfo(state: TransitState, ix: Index, nowMs: number): Live {
+function liveInfo(state: TransitState, ix: Index, nowMs: number, scheduled = false): Live {
   const counts = new Map<string, number>();
   for (const v of state.fleet.values()) counts.set(v.routeId, (counts.get(v.routeId) ?? 0) + 1);
-  const hasLive = state.fleet.size >= 50;
+  const hasLive = !scheduled && state.fleet.size >= 50;
   const headway = new Map<string, number>(), running = new Set<string>();
   for (const [routeId, list] of ix.byRoute) {
-    const pat = ix.patterns[list[0]!]!, n = counts.get(routeId) ?? 0;
+    const pat = ix.patterns[list[0]!]!, n = scheduled ? 0 : counts.get(routeId) ?? 0;
     const status = (hasLive ? state.routeStatus(routeId, nowMs) : state.serviceEnds.routeStatus(routeId, nowMs, 0))?.state;
     if (status === "ended" || status === "before") continue;                   // fuera de su horario de hoy
     if (hasLive && n === 0 && status !== "running") continue;                  // con datos en vivo y sin buses ni horario que la respalde
@@ -367,7 +369,7 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   const limit = opts.limit ?? 5, maxRounds = (opts.maxTransfers ?? 3) + 1, maxAccess = opts.maxAccessMeters ?? MAX_ACCESS_M;
   const ix = buildIndex(state);
   if (!ix.patterns.length) return [];
-  const live = liveInfo(state, ix, nowMs);
+  const live = liveInfo(state, ix, nowMs, opts.scheduled);
 
   // llegada real de los buses a las paradas cercanas al origen (para el tiempo de espera del primer bus)
   const liveEtas = new Map<number, Map<number, LiveBus[]>>();

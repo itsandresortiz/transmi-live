@@ -60,6 +60,10 @@ export function Settings({ th }: { th: MapTheme }) {
             {([[1, "Normal"], [1.15, "Grande"], [1.3, "Muy grande"]] as const).map(([v, l]) => <button key={v} aria-pressed={u.textScale === v} onClick={() => u.setTextScale(v)}>{l}</button>)}
           </div>
         </div>
+        <div className="grp"><h3>Contraste</h3>
+          <Seg value={u.highContrast ? "alto" : "normal"} set={(v: string) => u.setHighContrast(v === "alto")} opts={[["normal", "Normal"], ["alto", "Alto"]]} />
+          <p className="hint">Bordes y textos más marcados para leer mejor al sol.</p>
+        </div>
         {!standalone && (ev || ios) && (
           <div className="grp"><h3>Instalar</h3>
             {ev ? <button className="btn primary" onClick={() => void ev.prompt()}>Instalar TransMi LIVE en tu celular</button>

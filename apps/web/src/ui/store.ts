@@ -35,6 +35,8 @@ interface UiState {
   toast: { text: string; n: number } | null;
   /** Tamaño del texto de los paneles (1 = normal). */
   textScale: number;
+  highContrast: boolean;
+  setHighContrast(v: boolean): void;
 
   setTab(t: Tab): void;
   setQuery(q: string): void;
@@ -62,14 +64,19 @@ const SCALES = [1, 1.15, 1.3];
 const savedScale = (() => { const n = Number(safeStorage.get("tm.textScale")); return SCALES.includes(n) ? n : 1; })();
 if (typeof document !== "undefined") document.documentElement.style.setProperty("--ts", String(savedScale));
 
+const savedContrast = safeStorage.get("tm.contrast") === "1";
+if (typeof document !== "undefined" && savedContrast) document.documentElement.dataset.contrast = "high";
+
+const savedTab = ((): Tab => { const t = safeStorage.get("tm.tab"); return t === "viaje" || t === "paradas" || t === "buses" ? t : "rutas"; })();
 const PAGE = 60;
 export const useUi = create<UiState>((set) => ({
-  tab: "rutas", query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, routeBusId: null, stopId: null, groupIds: null, stopRoute: null, direction: "0",
+  tab: savedTab, query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, routeBusId: null, stopId: null, groupIds: null, stopRoute: null, direction: "0",
   openAlert: null, followId: null, followPaused: false, targetStopId: null, settingsOpen: false,
   layers: { streets: true, stops: true, network: false, buses: true, signals: true, traffic: false },
-  colorMode: "system", motion: "predict", toast: null, textScale: savedScale,
+  colorMode: "system", motion: "predict", toast: null, textScale: savedScale, highContrast: savedContrast,
+  setHighContrast: (highContrast) => { safeStorage.set("tm.contrast", highContrast ? "1" : "0"); if (highContrast) document.documentElement.dataset.contrast = "high"; else delete document.documentElement.dataset.contrast; set({ highContrast }); },
 
-  setTab: (tab) => set((s) => (s.tab === tab && !s.stopId ? s : { tab, stopId: null, groupIds: null, stopRoute: null, query: "", limit: PAGE })),
+  setTab: (tab) => { if (tab !== "avisos") safeStorage.set("tm.tab", tab); set((s) => (s.tab === tab && !s.stopId ? s : { tab, stopId: null, groupIds: null, stopRoute: null, query: "", limit: PAGE })); },
   setQuery: (query) => set({ query, limit: PAGE }),
   setSystem: (system) => set({ system, limit: PAGE }),
   more: () => set((s) => ({ limit: s.limit + PAGE })),
