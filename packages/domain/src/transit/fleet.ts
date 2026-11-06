@@ -3,6 +3,9 @@ import { Vehicle, type VehicleReport, type VehicleId } from "./vehicle";
 /** Cuánto se conserva un bus que dejó de aparecer en los lotes (la fuente a veces omite algunos). */
 export const RETENTION_MS = 90_000;
 
+/** Un bus sin reportar en tanto tiempo ya no está circulando (típico de madrugada, con la fuente congelada). */
+export const MAX_REPORT_AGE_S = 600;
+
 /** Agregado: la flota de buses en circulación. */
 export class Fleet {
   private readonly byId = new Map<VehicleId, Vehicle>();
@@ -31,6 +34,14 @@ export class Fleet {
       if (!seen.has(id) && nowMs - v.lastSeenMs > RETENTION_MS) this.byId.delete(id);
     }
     this.version++;
+  }
+
+  /** Quita los buses cuyo último reporte (hora de la fuente, en segundos) es anterior a `minReportedAt`. Devuelve cuántos quitó. */
+  dropReportedBefore(minReportedAt: number): number {
+    let n = 0;
+    for (const [id, v] of this.byId) if (v.reportedAt < minReportedAt) { this.byId.delete(id); n++; }
+    if (n) this.version++;
+    return n;
   }
 
   clear(): void { this.byId.clear(); this.version++; }

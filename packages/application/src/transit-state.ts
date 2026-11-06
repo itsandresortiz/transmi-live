@@ -1,6 +1,6 @@
 import {
   Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle, type RouteShape,
-  type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, isAlertActive, parseStopName,
+  type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, isAlertActive, parseStopName, MAX_REPORT_AGE_S,
 } from "@transmi/domain";
 import { arrivalAtIndex } from "./eta";
 import { type RouteDayStatus, ServiceEnds, type ServiceMark } from "./service-ends";
@@ -100,8 +100,13 @@ export class TransitState {
     return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape, seq.index, seq.index + 1, nowMs) };
   }
 
+  /** Saca de la flota los buses que llevan mucho sin reportar. Hay que llamarlo aunque no lleguen datos nuevos. */
+  dropStale(nowMs: number): void {
+    if (this.fleet.dropReportedBefore(nowMs / 1000 - MAX_REPORT_AGE_S)) { this.resolveSystems(); this.touch(); }
+  }
+
   applyPositions(reports: readonly VehicleReport[], nowMs: number): void {
-    this.fleet.ingest(reports, nowMs);
+    this.fleet.ingest(reports.filter((r) => r.reportedAt >= nowMs / 1000 - MAX_REPORT_AGE_S), nowMs);
     let latest = this.lastBatchAt ?? 0;
     for (const r of reports) if (r.reportedAt > latest) latest = r.reportedAt;
     if (latest) this.lastBatchAt = latest;

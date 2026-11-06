@@ -34,6 +34,7 @@ export class LiveDataService {
       const poll = await this.feed.poll(this.signature);
       this.failures = 0;
       this.state.lastPollOkAt = this.clock.now();
+      this.state.dropStale(this.clock.now());
       if (!poll) return false;
       const { batch, signature, source } = poll;
       const now = this.clock.now();
