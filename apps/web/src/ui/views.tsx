@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import {
   arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStopGroups, siblingStops,
 } from "@transmi/application";
-import { ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
+import { routeOfficialName, routeTitle, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
@@ -91,9 +91,9 @@ export function RoutesView({ th, act }: Props) {
       {!list.length ? <Empty title="Sin resultados" text="Prueba con otro número de ruta o destino." /> : (
         <div className="list">
           {page.map((r) => (
-            <button key={r.id} className="row" aria-label={`Ruta ${r.shortName}, ${SYSTEM_LABEL[r.system]}${r.longName ? `, ${r.longName.replace(/\|\|/g, "a")}` : ""}, ${counts.get(r.id) ?? 0} buses en servicio`} onClick={() => act.openRoute(r.id)}>
+            <button key={r.id} className="row" aria-label={`Ruta ${r.shortName}, ${SYSTEM_LABEL[r.system]}${r.longName ? `, ${routeTitle(r)}` : ""}, ${counts.get(r.id) ?? 0} buses en servicio`} onClick={() => act.openRoute(r.id)}>
               <span className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r.shortName}</span>
-              <span className="rm"><span className="rt">{r.longName || SYSTEM_LABEL[r.system]}</span><span className="rs">{SYSTEM_LABEL[r.system]}</span></span>
+              <span className="rm"><span className="rt" title={routeOfficialName(r)}>{r.longName ? routeTitle(r) : SYSTEM_LABEL[r.system]}</span><span className="rs">{SYSTEM_LABEL[r.system]}</span></span>
               <span className="rr">{counts.get(r.id) ?? 0} <Bus /></span>
               <span className="chev"><Chevron /></span>
             </button>
@@ -110,7 +110,7 @@ function BusRow({ v, th, act }: { v: Vehicle } & Props) {
   return (
     <button className="row" onClick={() => act.focusBus(v.id)}>
       <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r, v.system) }}>{r?.shortName ?? v.routeId}</span>
-      <span className="rm"><span className="rt">{v.plate || v.label || v.id}</span><span className="rs">{r?.longName || SYSTEM_LABEL[v.system]}</span></span>
+      <span className="rm"><span className="rt">{v.plate || v.label || v.id}</span><span className="rs">{r?.longName ? routeTitle(r) : SYSTEM_LABEL[v.system]}</span></span>
       <span className={`pill ${delayClass(d)}`}>{delayText(d)}</span>
     </button>
   );
@@ -257,7 +257,8 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
       <button className="back" onClick={() => setRoute(null)}><Back /> {bus ? "Atrás" : "Rutas"}</button>
       <div className="dcard">
         <span className="rb big" style={{ ["--c" as string]: color }}>{route.shortName}</span>
-        <div style={{ flex: 1, minWidth: 0 }}><h2>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName || SYSTEM_LABEL[route.system]}</h2>
+        <div style={{ flex: 1, minWidth: 0 }}><h2>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName ? routeTitle(route) : SYSTEM_LABEL[route.system]}</h2>
+          {route.longName && <p className="official">Nombre oficial: {routeOfficialName(route)}</p>}
           <p>{SYSTEM_LABEL[route.system]}{bus ? ` · bus ${bus.plate || bus.label || bus.id}` : ` · ${d.vehicles.length} ${d.vehicles.length === 1 ? "bus" : "buses"}`}{!bus && avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
         <ShareButton target={{ kind: "ruta", id, direction: cur?.direction }} title={`Ruta ${route.shortName}`} />
         <StarButton kind="route" id={id} />
@@ -311,7 +312,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
     <div className="pc">
       <div className="ph">
         <span className="rb big" style={{ ["--c" as string]: color }}>{r?.shortName ?? v.routeId}</span>
-        <div><h4>{r?.longName || SYSTEM_LABEL[v.system]}</h4><small>{SYSTEM_LABEL[v.system]} · <span className="plate-s">{v.plate || v.label || v.id}</span></small>{(mark?.isLast || mark?.isFirst) && <div style={{ marginTop: 6 }}><LastBadge mark={mark} long /><FirstBadge mark={mark} /></div>}</div>
+        <div><h4 title={r ? routeOfficialName(r) : undefined}>{r?.longName ? routeTitle(r) : SYSTEM_LABEL[v.system]}</h4><small>{SYSTEM_LABEL[v.system]} · <span className="plate-s">{v.plate || v.label || v.id}</span></small>{(mark?.isLast || mark?.isFirst) && <div style={{ marginTop: 6 }}><LastBadge mark={mark} long /><FirstBadge mark={mark} /></div>}</div>
       </div>
       {target && toTarget && (
         <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{etaText(toTarget.etaAt, nowSec)}</b> a <b>{stopText(transit.stopById(target))}</b>

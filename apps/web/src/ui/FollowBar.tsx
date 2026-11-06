@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { SYSTEM_LABEL, type Vehicle } from "@transmi/domain";
+import { routeTitle, SYSTEM_LABEL, type Vehicle } from "@transmi/domain";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { routeBadgeColor } from "../map/theme";
@@ -30,7 +30,7 @@ export function FollowBar({ th, onResume }: { th: MapTheme; onResume(): void }) 
     <div className="followbar glass" role="status" aria-live="polite">
       <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r, v.system) }}>{r?.shortName ?? v.routeId}</span>
       <div className="fm">
-        <b><Marquee>{r?.longName || SYSTEM_LABEL[v.system]}</Marquee></b>
+        <b><Marquee>{r?.longName ? routeTitle(r) : SYSTEM_LABEL[v.system]}</Marquee></b>
         <span><Marquee>
           {silent ? "Este bus dejó de reportar. Puede haber terminado su recorrido."
             : ns?.stop ? `${delayText(d)} · próxima: ${stopText(ns.stop)}${ns.arrivalAt ? ` ${untilText(ns.arrivalAt, nowSec)}` : ""}`

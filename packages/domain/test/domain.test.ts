@@ -63,7 +63,7 @@ describe("sistema de transporte", () => {
   });
   it("da un título legible a las rutas", () => {
     const t = routeTitle({ id: "1", shortName: "ML82", longName: "M82 CLL134 KR 7 || L82 Portal 20 de Julio", system: "zonal" });
-    expect(t).toBe("CLL134 KR 7  ⇄  Portal 20 de Julio");
+    expect(t).toBe("Calle 134 con Cra. 7 ⇄ Portal 20 de Julio");
     expect(routeTitle({ id: "13833", shortName: "13833", longName: "", system: "otro", provisional: true })).toBe("Ruta 13833");
   });
 });

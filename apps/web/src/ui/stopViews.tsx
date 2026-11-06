@@ -1,4 +1,4 @@
-import { SYSTEM_LABEL } from "@transmi/domain";
+import { routeTitle, SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { routeBadgeColor } from "../map/theme";
@@ -50,7 +50,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
                 <button key={r.route.id + r.direction} className="row stoprow" onClick={() => setStopRoute({ routeId: r.route.id, direction: r.direction })}>
                   <span className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r.route) }}>{r.route.shortName}</span>
                   <span className="rm">
-                    <span className="rt">{r.headsign ? `Hacia ${r.headsign}` : r.route.longName}</span>
+                    <span className="rt">{r.headsign ? `Hacia ${r.headsign}` : routeTitle(r.route)}</span>
                     <span className="rs">{first.official ? "" : "aprox. "}{stopsAwayText(first.stopsAway)}{next ? ` · luego ${etaText(next.etaAt, nowSec)}` : ""}{(first.vehicle && transit.serviceOf(first.vehicle)?.isLast) || (next && transit.serviceOf(next.vehicle)?.isLast) ? " · " : ""}{first.vehicle && transit.serviceOf(first.vehicle)?.isLast ? <LastBadge mark={transit.serviceOf(first.vehicle)} /> : next && transit.serviceOf(next.vehicle)?.isLast ? <><LastBadge mark={transit.serviceOf(next.vehicle)} /></> : null}</span>
                   </span>
                   <span className={`etabig${first.etaAt - nowSec <= 60 ? " soon" : ""}`}>{etaText(first.etaAt, nowSec)}</span>
@@ -76,7 +76,7 @@ export function StationView({ th, act }: { th: MapTheme; act: Actions }) {
     const names = rs.filter((r) => !seen.has(r.shortName) && !!seen.add(r.shortName)).sort((a, b) => a.shortName.localeCompare(b.shortName, "es", { numeric: true }));
     // hacia dónde van las rutas que paran en este vagón (destino de la primera)
     const shape = rs.length ? (transit.network.shapes.get(rs[0]!.id) ?? []).find((sh) => sh.stopIds.includes(s.id)) : undefined;
-    return { s, names, towards: shape?.headsign || rs[0]?.longName || "" };
+    return { s, names, towards: shape?.headsign || rs[0] ? routeTitle(rs[0]) : "" };
   }), [groupIds, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   const title = stops[0] ? labelOf(stops[0])?.title : "Estación";
   const wagons = stops.some((s) => labelOf(s)?.wagon);
@@ -129,7 +129,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
       <button className="back" onClick={() => setStopRoute(null)}><Back /> {stopText(stop, "Parada")}</button>
       <div className="dcard">
         <span className="rb big" style={{ ["--c" as string]: color }}>{route?.shortName}</span>
-        <div><h2>{shape?.headsign ? `Hacia ${shape.headsign}` : route?.longName}</h2><p>{route ? SYSTEM_LABEL[route.system] : ""} · llega a {stopText(stop)}</p></div>
+        <div><h2>{shape?.headsign ? `Hacia ${shape.headsign}` : route ? routeTitle(route) : ""}</h2><p>{route ? SYSTEM_LABEL[route.system] : ""} · llega a {stopText(stop)}</p></div>
       </div>
       {!row || !hero ? <RouteEmpty routeId={stopRoute.routeId} nowMs={nowSec * 1000} /> : (
         <>

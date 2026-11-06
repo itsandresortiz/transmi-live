@@ -1,4 +1,4 @@
-import { type Route, type SystemType, type Vehicle, type ServiceAlert, type Stop, alertSeverity } from "@transmi/domain";
+import { routeTitle, type Route, type SystemType, type Vehicle, type ServiceAlert, type Stop, alertSeverity } from "@transmi/domain";
 import { arrivalAtIndex, hav } from "./eta";
 import type { TransitState } from "./transit-state";
 
@@ -25,7 +25,7 @@ export function vehiclesByRoute(state: TransitState): Map<string, number> {
 
 const collator = new Intl.Collator("es", { numeric: true });
 const routeText = new WeakMap<Route, string>();
-const textOf = (r: Route): string => { let t = routeText.get(r); if (t === undefined) { t = normalize(`${r.shortName} ${r.longName}`); routeText.set(r, t); } return t; };
+const textOf = (r: Route): string => { let t = routeText.get(r); if (t === undefined) { t = normalize(`${r.shortName} ${r.longName} ${routeTitle(r)}`); routeText.set(r, t); } return t; };
 const headsignText = new WeakMap<string[], string[]>();
 const headsignsOf = (hs: string[]): string[] => { let t = headsignText.get(hs); if (!t) { t = hs.map(normalize); headsignText.set(hs, t); } return t; };
 
