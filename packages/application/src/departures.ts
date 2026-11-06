@@ -25,6 +25,9 @@ export class Departures {
     return v;
   }
 
+  /** Última parada del recorrido (su destino). */
+  terminusOf(routeId: string, direction: string): string | undefined { const s = this.data[routeId]?.[direction]?.stops; return s?.[s.length - 1]; }
+
   /** Próximas `n` horas de paso de cada ruta y sentido por la parada, desde `secs` (segundos del día de servicio). */
   nextAt(stopId: string, type: DayType, secs: number, n = 3): ScheduledPass[] {
     if (!this.byStop) {

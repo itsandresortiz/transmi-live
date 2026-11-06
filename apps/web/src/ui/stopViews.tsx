@@ -196,7 +196,7 @@ function ScheduledAtStop({ stopId, th, act, nowMs }: { stopId: string | null; th
       <p className="hint" style={{ margin: "0 2px 8px" }}>Son horas programadas, no buses en vivo: la hora real puede variar.</p>
       {rows.map(({ routeId, direction, times }) => {
         const r = transit.routeById(routeId);
-        const head = transit.network.shapes.get(routeId)?.find((s) => s.direction === direction)?.headsign;
+        const end = transit.departures.terminusOf(routeId, direction), head = end ? stopText(transit.stopById(end), end) : undefined;
         return (
           <button key={routeId + direction} className="row" onClick={() => act.openRoute(routeId)}>
             <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r?.shortName ?? routeId}</span>
