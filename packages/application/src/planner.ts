@@ -177,7 +177,8 @@ function liveInfo(state: TransitState, ix: Index, nowMs: number, scheduled = fal
     if (scheduled && status === undefined) continue;                           // a otra hora, sin horario conocido no se puede asegurar que funcione
     if (hasLive && n === 0 && status !== "running") continue;                  // con datos en vivo y sin buses ni horario que la respalde
     const cycle = list.reduce((a, p) => a + ix.patterns[p]!.runSeconds, 0) + (list.length > 1 ? 2 : 1) * LAYOVER_S;
-    const h = n > 0 ? cycle / n : DEFAULT_HEADWAY[pat.route.system];
+    const sched = scheduled ? state.departures.headwayAt(routeId, state.serviceEnds.dayAt(nowMs).type, state.serviceEnds.dayAt(nowMs).secs) : undefined;
+    const h = sched ?? (n > 0 ? cycle / n : DEFAULT_HEADWAY[pat.route.system]);
     headway.set(routeId, Math.min(1800, Math.max(75, h)));
     running.add(routeId);
   }

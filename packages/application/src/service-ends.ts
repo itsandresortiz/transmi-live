@@ -61,6 +61,9 @@ export class ServiceEnds {
     return { isLast: l != null, isFirst: f != null, startSeconds: (l ?? f)! };
   }
 
+  /** Tipo de día y segundos transcurridos del día de servicio en este instante. */
+  dayAt(nowMs: number): { type: DayType; secs: number } { return serviceDay(nowMs, this.dates); }
+
   /** Primer y último viaje de la ruta en cada tipo de día (segundos desde la medianoche), y cuál es el de hoy. */
   scheduleOf(routeId: string, nowMs: number): { today: DayType; days: { type: DayType; first: number; last: number }[] } | undefined {
     const r = this.byRoute[routeId]; if (!r) return undefined;

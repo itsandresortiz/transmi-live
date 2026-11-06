@@ -183,6 +183,31 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
   );
 }
 
+/** Horas de paso según el horario programado (no son buses en vivo). */
+function ScheduledAtStop({ stopId, th, act, nowMs }: { stopId: string | null; th: MapTheme; act: Actions; nowMs: number }) {
+  useTransitVersion();
+  if (!stopId || !transit.departures.size) return null;
+  const { type, secs } = transit.serviceEnds.dayAt(nowMs);
+  const rows = transit.departures.nextAt(stopId, type, secs, 3).slice(0, 8);
+  if (!rows.length) return null;
+  return (
+    <div className="sched-stop">
+      <div className="sec">Próximos según el horario</div>
+      <p className="hint" style={{ margin: "0 2px 8px" }}>Son horas programadas, no buses en vivo: la hora real puede variar.</p>
+      {rows.map(({ routeId, direction, times }) => {
+        const r = transit.routeById(routeId);
+        const head = transit.network.shapes.get(routeId)?.find((s) => s.direction === direction)?.headsign;
+        return (
+          <button key={routeId + direction} className="row" onClick={() => act.openRoute(routeId)}>
+            <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r?.shortName ?? routeId}</span>
+            <span className="rm"><span className="rt">{head ? `Hacia ${head}` : r ? routeTitle(r) : routeId}</span><span className="rs">{times.map((t) => clockOfDay(t)).join(" · ")}</span></span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Parada sin buses acercándose: se explica y, aun así, se muestran las rutas que normalmente pasan por aquí (las que ya terminaron, atenuadas). */
 function NoBuses({ th, stopId, nowMs, act }: { th: MapTheme; stopId: string | null; nowMs: number; act: Actions }) {
   const all = stopId ? routesAtStop(transit, stopId) : [];
@@ -194,10 +219,14 @@ function NoBuses({ th, stopId, nowMs, act }: { th: MapTheme; stopId: string | nu
   const every = routes.length > 0 && off >= routes.length && routes.every((r) => state(r) === "ended");
   const shown = routes.slice(0, 24);
   return (
+    <>
     <div className="empty">
       <Bus />
       <b>{every ? "Ya no hay más buses hoy" : "Ningún bus viene ahora"}</b>
       {every ? "El servicio de las rutas de esta parada ya terminó por hoy." : "Cuando un bus se acerque a esta parada aparecerá aquí."}
+    </div>
+    <ScheduledAtStop stopId={stopId} th={th} act={act} nowMs={nowMs} />
+    <div className="empty" style={{ paddingTop: 8 }}>
       {routes.length > 0 && (
         <div className="endedrow" aria-label="Rutas que pasan por esta parada">
           <small>Rutas que pasan por aquí</small>
@@ -213,6 +242,7 @@ function NoBuses({ th, stopId, nowMs, act }: { th: MapTheme; stopId: string | nu
         </div>
       )}
     </div>
+    </>
   );
 }
 

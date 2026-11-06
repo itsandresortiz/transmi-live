@@ -4,6 +4,7 @@ import {
 } from "@transmi/domain";
 import { arrivalAtIndex } from "./eta";
 import { type RouteDayStatus, ServiceEnds, type ServiceMark } from "./service-ends";
+import { Departures } from "./departures";
 import { TravelTimes } from "./travel-times";
 import type { FeedSource } from "./ports";
 
@@ -25,6 +26,7 @@ export class TransitState {
   readonly travelTimes = new TravelTimes();
   /** Primer y último viaje de cada ruta, para marcar «último servicio». */
   readonly serviceEnds = new ServiceEnds();
+  readonly departures = new Departures();
   private provisional = new Map<string, Route>();
   private trunk: Set<string> | null = null;
   private served: Set<string> | null = null;
@@ -41,6 +43,7 @@ export class TransitState {
   routeOf(v: Vehicle): Route | undefined { return this.routeById(v.routeId); }
   stopById(id: string | undefined): Stop | undefined { return id ? this.network.stops.get(id) : undefined; }
 
+  setDepartures(data: Parameters<Departures["load"]>[0]): void { this.departures.load(data); this.touch(); }
   setServiceEnds(data: Parameters<ServiceEnds["load"]>[0]): void { this.serviceEnds.load(data); this.touch(); }
   /** ¿Este bus hace el último (o el primer) viaje programado de su ruta? */
   serviceOf(v: Vehicle): ServiceMark | undefined { return this.serviceEnds.markOf(v.tripId); }

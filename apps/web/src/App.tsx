@@ -3,7 +3,7 @@ import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
 import { connectionStatus, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
-import { CONFIG, liveData, loadServiceEnds, networkSource, transit } from "./composition-root";
+import { CONFIG, liveData, loadDepartures, loadServiceEnds, networkSource, transit } from "./composition-root";
 import { nowSec } from "./clock";
 import { BusRenderer } from "./map/BusRenderer";
 import { loadTroncales } from "./map/geodata";
@@ -145,6 +145,7 @@ export function App() {
     document.addEventListener("visibilitychange", vis);
 
     void loadServiceEnds();
+    void loadDepartures();
     void networkSource.load().then((n) => {
       if (stopped) return;
       transit.setNetwork(n);

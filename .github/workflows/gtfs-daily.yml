@@ -20,7 +20,7 @@ jobs:
           curl -fsSL --retry 3 --max-time 600 -A "Mozilla/5.0 (transmi-live)" -o GTFS.zip https://gtfs.transmilenio.gov.co/GTFS.zip
           python3 scripts/slim_gtfs.py GTFS.zip out/gtfs-lite.zip
           python3 scripts/build_schedule.py GTFS.zip sched/schedule.json
-          gzip -9 sched/schedule.json sched/service-ends.json
+          gzip -9 sched/schedule.json sched/service-ends.json sched/departures.json
           ls -lh out sched
       - name: Publicar el GTFS reducido en la rama live-data
         env:

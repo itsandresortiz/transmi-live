@@ -25,9 +25,11 @@ const DAY_LABEL: Record<"wk" | "sa" | "su", string> = { wk: "Lunes a viernes", s
 export function RouteSchedule({ routeId, nowMs }: { routeId: string; nowMs: number }) {
   const s = transit.serviceEnds.scheduleOf(routeId, nowMs);
   if (!s) return null;
+  const day = transit.serviceEnds.dayAt(nowMs), gap = transit.departures.headwayAt(routeId, day.type, day.secs);
   return (
     <details className="sched">
       <summary>Horario de la ruta</summary>
+      {gap != null && <p className="sched-now">A esta hora, según el horario, sale un bus cada ~{Math.max(1, Math.round(gap / 60))} min.</p>}
       <ul>
         {s.days.map((d) => (
           <li key={d.type} className={d.type === s.today ? "today" : ""}>
