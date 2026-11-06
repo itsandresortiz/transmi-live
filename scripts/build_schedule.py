@@ -69,6 +69,7 @@ def main(src, dst):
         if r["trip_id"] in rep_ids or r["trip_id"] in dir_ids: stops_of[r["trip_id"]].append((int(r["stop_sequence"]), r["stop_id"]))
     seq = {rid: [s for _, s in sorted(stops_of[tid])] for rid, tid in rep_trip.items() if tid in stops_of}
     dir_stops = {k: [st for _, st in sorted(stops_of[t])] for k, t in dir_trip.items() if t in stops_of}
+    dbg = Counter()
     starts = defaultdict(list)    # (ruta, sentido, tipo de día) -> salidas (segundos) de los viajes del recorrido principal
     offs = defaultdict(list)      # (ruta, sentido) -> [segundos desde la salida hasta cada parada] de unos cuantos viajes
     pair = {}                     # (ruta, parada_i, parada_i+1) -> índice del tramo
@@ -85,10 +86,13 @@ def main(src, dst):
         buf.sort()
         start = buf[0][2]
         meta = trip_meta.get(cur_trip)
+        dbg["trips"] += 1
+        if meta: dbg["meta"] += 1
         if meta and dir_shape.get((meta[0], meta[2])) == meta[3]:
+            dbg["shape_ok"] += 1
             k = (meta[0], meta[2])
             starts[(k[0], k[1], meta[1])].append(start)
-            if len(offs[k]) < 30 and [st for _, st, _ in buf] == dir_stops.get(k): offs[k].append([t - start for _, _, t in buf])
+            if len(offs[k]) < 30 and [st for _, st, _ in buf] == dir_stops.get(k): offs[k].append([t - start for _, _, t in buf]); dbg["stops_ok"] += 1
         if rid not in seq: return
         e = ends.setdefault((rid, dtype), [(start, cur_trip), (start, cur_trip)])
         if start < e[0][0]: e[0] = (start, cur_trip)
@@ -142,7 +146,7 @@ def main(src, dst):
         dep["routes"].setdefault(rid, {})[d or "0"] = entry
     with open(dst.replace("schedule", "departures"), "w") as f:
         json.dump(dep, f, separators=(",", ":"))
-    print("rutas con horas de paso:", len(dep["routes"]))
+    print("rutas con horas de paso:", len(dep["routes"]), dict(dbg), "dir_trip", len(dir_trip), "dir_stops", len(dir_stops), "ejemplo clave", next(iter(dir_shape.items()), None))
     with open(dst.replace("schedule", "service-ends"), "w") as f:
         json.dump(se, f, separators=(",", ":"))
     print("rutas con primer/último viaje:", len(se["routes"]))
