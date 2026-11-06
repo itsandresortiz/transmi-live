@@ -73,7 +73,7 @@ b,strong{font-weight:650}
 .search input::placeholder{color:var(--faint)}
 .search input:focus-visible{box-shadow:0 0 0 2px var(--accent)}
 .clear{position:absolute;right:8px;width:30px;height:30px;border-radius:15px;display:grid;place-items:center;color:var(--faint)}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;padding:3px;border-radius:12px;background:var(--hover)}
+.tabs{display:grid;grid-template-columns:1.45fr 1fr 1fr 1.1fr;gap:4px;margin-top:10px;padding:3px;border-radius:12px;background:var(--hover)}
 .tab{position:relative;height:34px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--muted);transition:background .2s,color .2s}
 .tab[aria-selected=true]{background:var(--surface);color:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.14)}
 .tab .n{display:inline-grid;place-items:center;min-width:18px;height:18px;margin-left:5px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--accent-fg);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
@@ -338,3 +338,9 @@ button.stat:active{transform:scale(.97)}
 .step b{font-weight:700}.step small{color:var(--muted)}.sd{font-size:13px;color:var(--muted);margin-top:2px}.sd b{color:var(--fg)}
 .step .btn.sm{margin-top:8px;min-height:32px;padding:0 12px;font-size:12.5px;border-radius:10px}.btn.ghost{background:var(--hover)}
 .step.end b{font-size:15px}
+
+/* «Cómo llegar» destacado en las pestañas y campana de avisos */
+.tab.hot{display:inline-flex;align-items:center;justify-content:center;gap:6px;color:var(--accent);font-weight:750}.tab.hot .ic{width:16px;height:16px}
+.tab.hot[aria-selected=true]{background:var(--accent);color:var(--accent-fg);box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 45%,transparent)}
+.tab.hot:not([aria-selected=true]){background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.fab.bell{position:relative}.fab.bell .badge{position:absolute;top:-3px;right:-3px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--accent);color:var(--accent-fg);font-size:11px;font-weight:750;display:grid;place-items:center;font-variant-numeric:tabular-nums;box-shadow:0 0 0 2px var(--sheetbg,#fff)}

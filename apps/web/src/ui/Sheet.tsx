@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { advanced } from "./layout";
-import { Close, Search } from "./icons";
+import { Close, Directions, Search } from "./icons";
 import { type SheetState, type Tab, useUi } from "./store";
-import { kpis } from "@transmi/application";
-import { transit } from "../composition-root";
 import { useTransitVersion } from "./hooks";
 
-const TABS: [Tab, string][] = [["rutas", "Rutas"], ["buses", "Buses"], ["paradas", "Paradas"], ["avisos", "Avisos"]];
+const TABS: [Tab, string][] = [["viaje", "Cómo llegar"], ["rutas", "Rutas"], ["buses", "Buses"], ["paradas", "Paradas"]];
 const PEEK = 152;
 
 export const sheetHeight = () => window.innerHeight - 76 - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sat")) || 0);
@@ -17,7 +15,6 @@ export function Sheet({ children }: { children: ReactNode }) {
   useTransitVersion();
   const el = useRef<HTMLElement>(null);
   const drag = useRef<{ y0: number; off0: number; moved: boolean } | null>(null);
-  const alerts = kpis(transit).alerts;
 
   const apply = useCallback((s: SheetState) => {
     const e = el.current; if (!e) return;
@@ -59,17 +56,17 @@ export function Sheet({ children }: { children: ReactNode }) {
         {tab !== "viaje" && <label className="search">
           <Search />
           <input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCapitalize="off" spellCheck={false}
-            placeholder={tab === "paradas" ? "Buscar parada o estación" : tab === "buses" ? "Buscar placa o ruta" : "Buscar ruta o destino"}
+            placeholder={tab === "paradas" ? "Buscar parada o estación" : tab === "buses" ? "Buscar placa o ruta" : tab === "avisos" ? "Buscar aviso por ruta o parada" : "Buscar ruta o destino"}
             aria-label="Buscar" value={query} onFocus={() => sheet === "peek" && setSheet("half")} onChange={(e) => setQuery(e.target.value)} />
           {query && <button className="clear" type="button" aria-label="Borrar búsqueda" onClick={() => setQuery("")}><Close /></button>}
         </label>}
-        {tab !== "viaje" && <div className="tabs" role="tablist">
+        <div className="tabs" role="tablist">
           {TABS.map(([t, l]) => (
-            <button key={t} className="tab" role="tab" aria-selected={tab === t} onClick={() => { setTab(t); useUi.getState().setRoute(null); if (useUi.getState().sheet === "peek") setSheet("half"); }}>
-              {l}{t === "avisos" && alerts > 0 && <span className="n">{alerts}</span>}
+            <button key={t} className={`tab${t === "viaje" ? " hot" : ""}`} role="tab" aria-selected={tab === t} onClick={() => { setTab(t); useUi.getState().setRoute(null); if (useUi.getState().sheet === "peek") setSheet("half"); }}>
+              {t === "viaje" && <Directions />}{l}
             </button>
           ))}
-        </div>}
+        </div>
       </div>
       <div className="view" role="tabpanel" aria-live="polite">{children}</div>
     </main>

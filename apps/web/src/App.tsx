@@ -13,7 +13,7 @@ import estaciones from "./data/estaciones.json";
 import { FollowBar } from "./ui/FollowBar";
 import { Settings } from "./ui/Settings";
 import { Sheet } from "./ui/Sheet";
-import { Compass, Directions, Locate, Mark, Sliders } from "./ui/icons";
+import { Bell, Compass, Locate, Mark, Sliders } from "./ui/icons";
 import { PlannerView, tripGeo } from "./ui/planner";
 import { usePlanner } from "./ui/plannerStore";
 import { reverse } from "./ui/geocode";
@@ -160,6 +160,7 @@ export function App() {
   useEffect(() => { void mc.current?.ready.then(() => mc.current?.setToggles(ui.layers)); br.current?.refresh(); }, [ui.layers]);
   /* viaje planeado: se dibuja la opción elegida en el mapa y se encuadra */
   const planner = usePlanner();
+  const alertCount = useAlertCount();
   useEffect(() => {
     const m = mc.current; if (!m) return;
     void m.ready.then(() => {
@@ -352,7 +353,9 @@ export function App() {
         </div>
         <div className="tools">
           {Math.abs(bearing) > 0.5 && <button className="fab glass" aria-label="Volver a poner el norte arriba" title="Norte arriba" onClick={() => mc.current?.resetNorth()}><span style={{ display: "grid", transform: `rotate(${-bearing}deg)` }}><Compass /></span></button>}
-          <button className="fab glass" aria-label="Cómo llegar" aria-pressed={ui.tab === "viaje"} onClick={() => { const u = useUi.getState(); u.setRoute(null); u.setTab("viaje"); u.setSheet("half"); }}><Directions /></button>
+          <button className="fab glass bell" aria-label={`Avisos del servicio${alertCount ? `, ${alertCount} vigentes` : ""}`} aria-pressed={ui.tab === "avisos"} onClick={() => { const u = useUi.getState(); u.setRoute(null); u.setTab("avisos"); u.setSheet("half"); }}>
+            <Bell />{alertCount > 0 && <span className="badge">{alertCount > 99 ? "99+" : alertCount}</span>}
+          </button>
           <button className="fab glass" aria-label={headingUp ? "Dejar el mapa fijo" : following ? "Girar el mapa según hacia dónde miro" : "Mi ubicación"} aria-pressed={following} onClick={() => void locate()}><Locate /></button>
           <button className="fab glass" aria-label="Ajustes del mapa" aria-pressed={ui.settingsOpen} onClick={() => ui.setSettingsOpen(true)}><Sliders /></button>
         </div>
@@ -400,3 +403,9 @@ function Status() {
   return <div className="st"><span className={`dot ${cls}`} /><span>{text}</span></div>;
 }
 void CONFIG; void SYSTEM_LABEL;
+
+/** Cuántos avisos vigentes hay (se actualiza con cada lote de datos). */
+function useAlertCount(): number {
+  useTransitVersion();
+  return transit.alerts.length;
+}

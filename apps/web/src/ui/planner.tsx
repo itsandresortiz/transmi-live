@@ -59,7 +59,6 @@ export function tripGeo(it: Itinerary, th: MapTheme, origin: PlanPlace, dest: Pl
 export function PlannerView({ th, act }: { th: MapTheme; act: Actions }) {
   const p = usePlanner();
   const me = useLocation((l) => l.me);
-  const setTab = useUi((u) => u.setTab);
 
   // al abrir sin origen: se intenta ubicar al usuario; mientras la pantalla está abierta los tiempos se recalculan con los buses en vivo
   useEffect(() => { if (p.originMe && !me && useLocation.getState().status !== "denied") void useLocation.getState().locate(); }, [p.originMe, me]);
@@ -69,10 +68,6 @@ export function PlannerView({ th, act }: { th: MapTheme; act: Actions }) {
   const originLabel = p.originMe ? "Mi ubicación" : p.origin?.name ?? "";
   return (
     <>
-      <div className="trip-top">
-        <button className="back" onClick={() => { setTab("rutas"); }}><Back /> Cerrar</button>
-        <h2>Cómo llegar</h2>
-      </div>
       <div className="trip-fields">
         <div className="trip-col">
           <i className="dot a" /><i className="line" /><i className="dot b" />

@@ -187,11 +187,16 @@ export function AlertsView({ th, act }: Props) {
     return alertsFor(transit, routeIdsAtStops(transit, ids), new Set(ids));
   }, [me, transit.alerts, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   const hasMine = favStops.length + favRoutes.length > 0;
+  const setTab = useUi((u) => u.setTab);
   const base = scope === "mine" ? mine : scope === "near" ? near : all;
   const q = normalize(query.trim());
   const list = q ? base.filter((x) => all.some((y) => y.index === x.index)) : base;
   return (
     <>
+      <div className="trip-top">
+        <button className="back" onClick={() => setTab("rutas")}><Back /> Cerrar</button>
+        <h2>Avisos del servicio</h2>
+      </div>
       <div className="chips" role="group" aria-label="Qué avisos ver">
         <button className="chip" aria-pressed={scope === "all"} onClick={() => setScope("all")}>Todos ({all.length})</button>
         {hasMine && <button className="chip" aria-pressed={scope === "mine"} onClick={() => setScope("mine")}>De mis favoritos ({mine.length})</button>}

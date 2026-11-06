@@ -15,3 +15,4 @@ export const Directions = () => <I s={22}><circle cx="6" cy="19" r="2" /><circle
 export const Walk = () => <I s={16} w={2}><circle cx="13" cy="4.5" r="1.6" /><path d="m9 21 2-6 2.5 2v4M10.5 9.5 8 12l-1 3M10.5 9.5l3-1.5 2.5 3 3 .5" /></I>;
 export const Swap = () => <I s={18} w={2}><path d="M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4" /></I>;
 export const Pin = () => <I s={18} w={2}><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z" /><circle cx="12" cy="10" r="2.3" /></I>;
+export const Bell = () => <I s={22}><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z" /><path d="M10 21a2 2 0 0 0 4 0" /></I>;
