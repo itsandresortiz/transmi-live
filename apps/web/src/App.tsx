@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { alertKey, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
 import { connectionStatus, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
@@ -359,7 +360,7 @@ export function App() {
         </div>
         <div className="tools">
           {Math.abs(bearing) > 0.5 && <button className="fab glass" aria-label="Volver a poner el norte arriba" title="Norte arriba" onClick={() => mc.current?.resetNorth()}><span style={{ display: "grid", transform: `rotate(${-bearing}deg)` }}><Compass /></span></button>}
-          <button className="fab glass bell" aria-label={`Avisos del servicio${alertCount ? `, ${alertCount} vigentes` : ""}`} aria-pressed={ui.tab === "avisos"} onClick={() => { const u = useUi.getState(); u.setRoute(null); u.setTab("avisos"); u.setSheet("half"); }}>
+          <button className="fab glass bell" aria-label={ui.tab === "avisos" ? "Cerrar avisos" : `Avisos del servicio${alertCount ? `, ${alertCount} sin ver` : ""}`} aria-pressed={ui.tab === "avisos"} onClick={() => { const u = useUi.getState(); if (u.tab === "avisos") { u.setTab("rutas"); return; } u.setRoute(null); u.setTab("avisos"); u.setSheet("half"); }}>
             <Bell />{alertCount > 0 && <span className="badge">{alertCount > 99 ? "99+" : alertCount}</span>}
           </button>
           <button className="fab glass" aria-label={headingUp ? "Dejar el mapa fijo" : following ? "Girar el mapa según hacia dónde miro" : "Mi ubicación"} aria-pressed={following} onClick={() => void locate()}><Locate /></button>
@@ -410,8 +411,12 @@ function Status() {
 }
 void CONFIG; void SYSTEM_LABEL;
 
-/** Cuántos avisos vigentes hay (se actualiza con cada lote de datos). */
+/** Cuántos avisos vigentes aún no ha visto el usuario (se actualiza con cada lote de datos). */
 function useAlertCount(): number {
   useTransitVersion();
-  return transit.alerts.length;
+  const seen = useAlertsSeen((s) => s.seen);
+  const open = useUi((u) => u.tab === "avisos");
+  // mientras la lista está abierta, todo lo que hay se da por visto
+  useEffect(() => { if (open) useAlertsSeen.getState().markSeen(transit.alerts); });
+  return open ? 0 : transit.alerts.reduce((n, a) => n + (seen.has(alertKey(a)) ? 0 : 1), 0);
 }
