@@ -13,6 +13,8 @@ import { hadLocationPermission, useLocation } from "./location";
 import { SLOT_LABEL, type Slot, usePlaces } from "./places";
 import { openPlannerTo, durText } from "./planner";
 import { nowMode } from "./plannerStore";
+import { liveDown } from "./liveStatus";
+import { clockOfDay } from "./lastService";
 import { nowMs } from "../clock";
 import type { Actions } from "./views";
 
@@ -36,6 +38,26 @@ export function StarButton({ kind, id }: { kind: "stop" | "route"; id: string })
   );
 }
 
+/** Sin datos en vivo: los próximos pasos según el horario, en tono atenuado y con su hora programada. */
+function ScheduledChips({ stopId, th }: { stopId: string; th: MapTheme }) {
+  const { type, secs } = transit.serviceEnds.dayAt(serverNowSec() * 1000);
+  const rows = transit.departures.nextAt(stopId, type, secs, 1).slice(0, 3);
+  if (!rows.length) return <div className="cs">Sin datos en vivo por ahora</div>;
+  return (
+    <>
+      <div className="scr">
+        {rows.map((r) => (
+          <span key={r.routeId + r.direction} className="scc idle">
+            <i className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, transit.routeById(r.routeId)) }}>{transit.routeById(r.routeId)?.shortName ?? r.routeId}</i>
+            <em>{clockOfDay(r.times[0]!)}</em>
+          </span>
+        ))}
+      </div>
+      <div className="cs" style={{ fontSize: 12, marginTop: 4 }}>Según el horario · sin datos en vivo por ahora</div>
+    </>
+  );
+}
+
 /** Tarjeta corta de una parada con lo que viene ahora. */
 export function StopCard({ stopId, th, act, meters }: { stopId: string; th: MapTheme; act: Actions; meters?: number }) {
   const stop = transit.stopById(stopId);
@@ -54,7 +76,7 @@ export function StopCard({ stopId, th, act, meters }: { stopId: string; th: MapT
             </span>
           ))}
         </div>
-      ) : <div className="cs">Ningún bus viene ahora</div>}
+      ) : liveDown() ? <ScheduledChips stopId={stopId} th={th} /> : <div className="cs">Ningún bus viene ahora</div>}
     </button>
   );
 }

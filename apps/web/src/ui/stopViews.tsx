@@ -9,6 +9,7 @@ import { Directions } from "./icons";
 import { openPlannerTo } from "./planner";
 import { nowMs } from "../clock";
 import { FirstBadge, LastBadge, clockOfDay } from "./lastService";
+import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, liveDown } from "./liveStatus";
 import { labelOf, stopCode, stopKind, stopTag, stopText } from "./stopname";
 import { routesAtStop, siblingStops } from "@transmi/application";
 import { useMemo } from "react";
@@ -30,7 +31,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
     <>
       <button className="back" onClick={() => openStop(null)}><Back /> Atrás</button>
       <div className="dcard"><div style={{ flex: 1, minWidth: 0 }}><small className="kick">{stopKind(stop)}</small><h2>{label?.title ?? "Parada"}</h2>
-        <p>{tag && <b className="vtag">{tag}</b>}{tag ? " · " : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : "Sin buses acercándose"}</p></div>{stop && <button className="star" aria-label="Cómo llegar a esta parada" onClick={() => openPlannerTo({ name: label?.title ?? "Parada", position: stop.position })}><Directions /></button>}{stopId && <ShareButton target={{ kind: "parada", id: stopId }} title={label?.title ?? "Parada"} />}{stopId && <StarButton kind="stop" id={stopId} />}</div>
+        <p>{tag && <b className="vtag">{tag}</b>}{tag ? " · " : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : liveDown() ? "Sin datos en vivo por ahora" : "Sin buses acercándose"}</p></div>{stop && <button className="star" aria-label="Cómo llegar a esta parada" onClick={() => openPlannerTo({ name: label?.title ?? "Parada", position: stop.position })}><Directions /></button>}{stopId && <ShareButton target={{ kind: "parada", id: stopId }} title={label?.title ?? "Parada"} />}{stopId && <StarButton kind="stop" id={stopId} />}</div>
       {siblings.length > 1 && (
         <div className="chips" role="group" aria-label="Otros vagones de esta estación">
           {siblings.map(({ x, names }) => {
@@ -222,8 +223,8 @@ function NoBuses({ th, stopId, nowMs, act }: { th: MapTheme; stopId: string | nu
     <>
     <div className="empty">
       <Bus />
-      <b>{every ? "Ya no hay más buses hoy" : "Ningún bus viene ahora"}</b>
-      {every ? "El servicio de las rutas de esta parada ya terminó por hoy." : "Cuando un bus se acerque a esta parada aparecerá aquí."}
+      <b>{every ? "Ya no hay más buses hoy" : liveDown() ? LIVE_DOWN_TITLE : "Ningún bus viene ahora"}</b>
+      {every ? `${liveDown() ? "Según el horario, el" : "El"} servicio de las rutas de esta parada ya terminó por hoy.` : liveDown() ? LIVE_DOWN_TEXT : "Cuando un bus se acerque a esta parada aparecerá aquí."}
     </div>
     <ScheduledAtStop stopId={stopId} th={th} act={act} nowMs={nowMs} />
     <div className="empty" style={{ paddingTop: 8 }}>
@@ -248,7 +249,8 @@ function NoBuses({ th, stopId, nowMs, act }: { th: MapTheme; stopId: string | nu
 
 function RouteEmpty({ routeId, nowMs }: { routeId: string; nowMs: number }) {
   const st = transit.routeStatus(routeId, nowMs);
-  if (st?.state === "ended") return <Empty title="Ya no hay más buses hoy" text={`El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`} />;
+  if (st?.state === "ended") return <Empty title="Ya no hay más buses hoy" text={liveDown() ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`} />;
   if (st?.state === "before") return <Empty title="Aún no empieza el servicio" text={`El primer bus sale a las ${clockOfDay(st.firstStart)}.`} />;
+  if (liveDown()) return <Empty title={LIVE_DOWN_TITLE} text="TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio." />;
   return <Empty title="Ningún bus viene ahora" text="Esta ruta no tiene buses acercándose a la parada en este momento." />;
 }

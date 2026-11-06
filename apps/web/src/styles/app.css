@@ -400,3 +400,4 @@ button.stat:active{transform:scale(.97)}
 .endedrow>div{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 8px;padding:0 4px}
 .endedrow>div .rb{margin:0}.endedrow>div .more{align-self:center;font-size:12.5px;color:var(--muted)}
 .sched-now{margin:0 0 6px;font-size:14px;font-weight:600}.sched-stop{margin-bottom:6px}
+.scc.idle{opacity:.7}.scc.idle em{font-style:normal;color:var(--muted)}
