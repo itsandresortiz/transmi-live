@@ -172,7 +172,7 @@ function Results({ th, act }: { th: MapTheme; act: Actions }) {
   );
   return (
     <div className="tlist">
-      <p className="hint tnote">Salida ahora · {hm(nowSec())}. Tiempos estimados con los buses que van en vivo y el tráfico habitual.</p>
+      <p className="hint tnote">Sales ahora ({hm(nowSec())}). Tiempos estimados con los buses que van en vivo y el tráfico habitual.</p>
       {results.map((it, i) => <Card key={i} it={it} i={i} on={i === sel} th={th} act={act} select={select} />)}
     </div>
   );
@@ -181,9 +181,14 @@ function Results({ th, act }: { th: MapTheme; act: Actions }) {
 function Chain({ it, th }: { it: Itinerary; th: MapTheme }) {
   return (
     <div className="chain" aria-hidden="true">
-      {it.legs.map((l, i) => isRide(l)
-        ? <span key={i} className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, transit.routeById(l.routeId), l.system) }}>{l.shortName}</span>
-        : <span key={i} className="wk"><Walk /> {mins(l.seconds)}</span>)}
+      {it.legs.map((l, i) => (
+        <span key={i} className="cl">
+          {i > 0 && <span className="sep">›</span>}
+          {isRide(l)
+            ? <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, transit.routeById(l.routeId), l.system) }}>{l.shortName}</span>
+            : <span className="wk"><Walk /> {mins(l.seconds)} min</span>}
+        </span>
+      ))}
     </div>
   );
 }
@@ -234,7 +239,7 @@ function Steps({ it, th, act }: { it: Itinerary; th: MapTheme; act: Actions }) {
         <li key={i} className="step ride" style={{ ["--c" as string]: routeBadgeColor(th, transit.routeById(l.routeId), l.system) }}>
           <span className="rb sm">{l.shortName}</span>
           <div>
-            <b>{l.headsign ? `Hacia ${l.headsign}` : SYSTEM_LABEL[l.system]}</b>
+            <b>{l.headsign ? `Hacia ${l.headsign}` : `${SYSTEM_LABEL[l.system]} ${l.shortName}`}</b>
             <div className="sd">Sube en <b>{l.board.name}</b></div>
             <div className="sd">{l.waitKind === "live" ? <span className="live">El bus llega {etaText(l.departAt, now) === "llegando" ? "ya" : "en " + etaText(l.departAt, now)} (en vivo)</span> : <>Pasa cada ~{mins(l.headwaySeconds)} min · espera aprox. {durText(l.waitSeconds)}</>}</div>
             <div className="sd">{l.stops} {l.stops === 1 ? "parada" : "paradas"} · {durText(l.rideSeconds)}</div>
