@@ -69,9 +69,11 @@ export function isAlertActive(a: ServiceAlert, nowSec: number): boolean {
   return true;
 }
 
-/** «Desde el 5 nov. · hasta el 25 nov.» (hora de Bogotá). */
-export function alertValidity(a: ServiceAlert): string {
-  const f = (t: number) => new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", timeZone: "America/Bogota" }).format(new Date(t * 1000)).replace(/\.$/, "");
+/** «Desde el 5 nov. · hasta el 25 nov.» (hora de Bogotá). Si la fecha no es de este año se agrega el año, para que no se confunda. */
+export function alertValidity(a: ServiceAlert, nowSec: number = Date.now() / 1000): string {
+  const year = (t: number) => Number(new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: "America/Bogota" }).format(new Date(t * 1000)));
+  const thisYear = year(nowSec);
+  const f = (t: number) => new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", ...(year(t) !== thisYear ? { year: "numeric" } : {}), timeZone: "America/Bogota" }).format(new Date(t * 1000)).replace(/\.$/, "");
   const parts: string[] = [];
   if (a.startsAt != null) parts.push(`Desde el ${f(a.startsAt)}`);
   if (a.endsAt != null) parts.push(`hasta el ${f(a.endsAt)}`);

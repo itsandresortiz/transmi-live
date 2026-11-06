@@ -395,7 +395,7 @@ function Status() {
   const cls = st.connection === "live" ? "live" : st.connection === "waiting" || st.connection === "idle" ? "warn" : st.connection === "stale" ? "bad" : "";
   const text =
     !online ? (st.ageSeconds != null ? `Sin internet · último dato hace ${ago(st.ageSeconds)}` : "Sin internet")
-    : st.connection === "idle" ? (st.ageSeconds != null ? `Sin buses en servicio · último dato hace ${ago(st.ageSeconds)}` : "Sin buses en servicio por ahora")
+    : st.connection === "idle" ? (st.ageSeconds != null ? `Sin servicio · hace ${ago(st.ageSeconds)}` : "Sin servicio por ahora")
     : st.connection === "connecting" ? "Conectando…"
     : st.connection === "live" ? `En vivo · hace ${ago(st.ageSeconds!)}`
     : st.connection === "waiting" ? `Actualizando · hace ${ago(st.ageSeconds!)}`

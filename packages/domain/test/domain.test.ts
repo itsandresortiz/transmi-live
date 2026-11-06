@@ -228,6 +228,8 @@ describe("avisos legibles y vigentes", () => {
     expect(isAlertActive(base, now)).toBe(true);
   });
   it("muestra el periodo en hora de Bogotá", () => {
-    expect(alertValidity({ ...base, startsAt: Date.UTC(2026, 10, 5, 12) / 1000, endsAt: Date.UTC(2026, 10, 25, 12) / 1000 })).toMatch(/^Desde el 5 de nov.* · hasta el 25 de nov/);
+    const now = Date.UTC(2026, 10, 6, 12) / 1000;
+    expect(alertValidity({ ...base, startsAt: Date.UTC(2026, 10, 5, 12) / 1000, endsAt: Date.UTC(2026, 10, 25, 12) / 1000 }, now)).toMatch(/^Desde el 5 de nov.* · hasta el 25 de nov/);
+    expect(alertValidity({ ...base, startsAt: Date.UTC(2025, 11, 22, 12) / 1000, endsAt: Date.UTC(2026, 10, 25, 12) / 1000 }, now)).toMatch(/Desde el 22 de dic.* 2025 · hasta el 25 de nov/);
   });
 });
