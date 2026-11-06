@@ -123,7 +123,7 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal"); this.src("trip-lines"); this.src("trip-pts");
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
@@ -159,6 +159,19 @@ export class MapController {
         "line-width": ["interpolate", ["linear"], ["zoom"], 9, ["case", ["get", "on"], 2.5, 2], 14, ["case", ["get", "on"], 5, 3], 18, ["case", ["get", "on"], 9, 4]] as unknown as number,
       },
     });
+    // viaje planeado: caminatas punteadas, tramos en bus con el color de la ruta
+    m.addLayer({ id: "trip-casing", type: "line", source: "trip-lines", filter: ["==", ["get", "k"], "ride"], layout: lineLayout,
+      paint: { "line-color": "#ffffff", "line-opacity": 0.95, "line-width": zoomWidth([9, 5], [14, 9], [18, 15]) } });
+    m.addLayer({ id: "trip-ride", type: "line", source: "trip-lines", filter: ["==", ["get", "k"], "ride"], layout: lineLayout,
+      paint: { "line-color": ["get", "color"], "line-width": zoomWidth([9, 3], [14, 5.5], [18, 9]) } });
+    m.addLayer({ id: "trip-walk", type: "line", source: "trip-lines", filter: ["==", ["get", "k"], "walk"], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": t.label, "line-width": zoomWidth([9, 2], [14, 3], [18, 4.5]), "line-dasharray": [0.1, 2.2] } });
+    m.addLayer({ id: "trip-pts", type: "circle", source: "trip-pts",
+      paint: { "circle-radius": ["match", ["get", "k"], "origin", 8, "dest", 9, 5.5], "circle-color": ["match", ["get", "k"], "origin", "#1f6fd1", "dest", "#e11d2e", "#ffffff"],
+        "circle-stroke-color": ["match", ["get", "k"], "stop", ["get", "color"], "#ffffff"], "circle-stroke-width": ["match", ["get", "k"], "stop", 3, 3] } });
+    m.addLayer({ id: "trip-labels", type: "symbol", source: "trip-pts", filter: ["!=", ["get", "k"], "stop"],
+      layout: { "text-field": ["get", "name"], "text-font": FONT, "text-size": 12.5, "text-offset": [0, 1.2], "text-anchor": "top", "text-max-width": 11, "text-optional": true },
+      paint: { "text-color": t.labelStrong, "text-halo-color": t.halo, "text-halo-width": 1.6 } });
 
     m.addLayer({
       id: "localidad-names", type: "symbol", source: "localidad-labels", maxzoom: 13.5,
@@ -315,6 +328,7 @@ export class MapController {
       return best;
     };
     m.on("click", (e) => {
+      if (this.pickHandler) { const h = this.pickHandler; this.pickHandler = null; h({ lat: e.lngLat.lat, lon: e.lngLat.lng }); return; }
       const hit = pick(e.point);
       if (!hit) { this.events.onMapTap?.(); return; }
       if (hit.kind === "bus") this.events.onBusClick(String(hit.id));
@@ -568,6 +582,14 @@ export class MapController {
     const k = id ? this.stopSector.get(id) : undefined;
     return k == null ? props : { ...props, k };
   }
+
+  /** Dibuja (o borra) el viaje planeado. */
+  setTrip(data: { lines: FeatureCollection; points: FeatureCollection } | null) {
+    (this.map.getSource("trip-lines") as GeoJSONSource | undefined)?.setData(data?.lines ?? EMPTY);
+    (this.map.getSource("trip-pts") as GeoJSONSource | undefined)?.setData(data?.points ?? EMPTY);
+  }
+  /** Si hay una función aquí, el próximo toque en el mapa se entrega a ella (elegir origen o destino) y no abre nada. */
+  pickHandler: ((p: GeoPoint) => void) | null = null;
 
   /** Marca la parada elegida con un punto grande. */
   setFocusStop(p: GeoPoint | null, color = "#e11d2e", stopId?: string) {

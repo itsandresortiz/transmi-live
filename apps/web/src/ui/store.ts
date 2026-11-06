@@ -3,7 +3,7 @@ import type { SystemType } from "@transmi/domain";
 import { safeStorage } from "../storage";
 import type { ColorMode, Motion } from "../map/BusRenderer";
 
-export type Tab = "rutas" | "buses" | "paradas" | "avisos";
+export type Tab = "rutas" | "buses" | "paradas" | "avisos" | "viaje";
 export type SheetState = "peek" | "half" | "full";
 export interface Layers { streets: boolean; stops: boolean; network: boolean; buses: boolean; signals: boolean; traffic: boolean }
 

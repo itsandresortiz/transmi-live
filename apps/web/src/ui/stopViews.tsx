@@ -5,6 +5,8 @@ import { routeBadgeColor } from "../map/theme";
 import { Back, Bus, Chevron } from "./icons";
 import { StarButton, useUpcoming } from "./mine";
 import { ShareButton } from "./share";
+import { Directions } from "./icons";
+import { openPlannerTo } from "./planner";
 import { nowMs } from "../clock";
 import { FirstBadge, LastBadge, clockOfDay } from "./lastService";
 import { labelOf, stopCode, stopKind, stopTag, stopText } from "./stopname";
@@ -28,7 +30,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
     <>
       <button className="back" onClick={() => openStop(null)}><Back /> Atrás</button>
       <div className="dcard"><div style={{ flex: 1, minWidth: 0 }}><small className="kick">{stopKind(stop)}</small><h2>{label?.title ?? "Parada"}</h2>
-        <p>{tag && <b className="vtag">{tag}</b>}{tag ? " · " : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : "Sin buses acercándose"}</p></div>{stopId && <ShareButton target={{ kind: "parada", id: stopId }} title={label?.title ?? "Parada"} />}{stopId && <StarButton kind="stop" id={stopId} />}</div>
+        <p>{tag && <b className="vtag">{tag}</b>}{tag ? " · " : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : "Sin buses acercándose"}</p></div>{stop && <button className="star" aria-label="Cómo llegar a esta parada" onClick={() => openPlannerTo({ name: label?.title ?? "Parada", position: stop.position })}><Directions /></button>}{stopId && <ShareButton target={{ kind: "parada", id: stopId }} title={label?.title ?? "Parada"} />}{stopId && <StarButton kind="stop" id={stopId} />}</div>
       {siblings.length > 1 && (
         <div className="chips" role="group" aria-label="Otros vagones de esta estación">
           {siblings.map(({ x, names }) => {
@@ -81,7 +83,7 @@ export function StationView({ th, act }: { th: MapTheme; act: Actions }) {
   return (
     <>
       <button className="back" onClick={() => openGroup(null)}><Back /> Atrás</button>
-      <div className="dcard"><div><small className="kick">{stops[0] ? stopKind(stops[0]) : "Estación"}</small><h2>{title}</h2><p>{wagons ? `${stops.length} paradas en ${new Set(stops.map((s) => labelOf(s)?.wagon)).size} vagones` : `${stops.length} paradas`} · toca una para ver sus buses</p></div><ShareButton target={{ kind: "estacion", ids: stops.map((s) => s.id) }} title={title ?? "Estación"} /></div>
+      <div className="dcard"><div><small className="kick">{stops[0] ? stopKind(stops[0]) : "Estación"}</small><h2>{title}</h2><p>{wagons ? `${stops.length} paradas en ${new Set(stops.map((s) => labelOf(s)?.wagon)).size} vagones` : `${stops.length} paradas`} · toca una para ver sus buses</p></div>{stops[0] && <button className="star" aria-label="Cómo llegar a esta estación" onClick={() => openPlannerTo({ name: title ?? "Estación", position: stops[0]!.position })}><Directions /></button>}<ShareButton target={{ kind: "estacion", ids: stops.map((s) => s.id) }} title={title ?? "Estación"} /></div>
       <div className="list">
         {rows.map(({ s, names, towards }) => {
           const tag = stopTag(s);

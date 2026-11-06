@@ -56,20 +56,20 @@ export function Sheet({ children }: { children: ReactNode }) {
     <main className="sheet glass" ref={el} aria-label="Rutas, buses, paradas y avisos">
       <div className="shead" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         <div className="grab" role="button" tabIndex={0} aria-label="Subir o bajar el panel" onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSheet(sheet === "peek" ? "half" : "peek"); }}><i /></div>
-        <label className="search">
+        {tab !== "viaje" && <label className="search">
           <Search />
           <input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCapitalize="off" spellCheck={false}
             placeholder={tab === "paradas" ? "Buscar parada o estación" : tab === "buses" ? "Buscar placa o ruta" : "Buscar ruta o destino"}
             aria-label="Buscar" value={query} onFocus={() => sheet === "peek" && setSheet("half")} onChange={(e) => setQuery(e.target.value)} />
           {query && <button className="clear" type="button" aria-label="Borrar búsqueda" onClick={() => setQuery("")}><Close /></button>}
-        </label>
-        <div className="tabs" role="tablist">
+        </label>}
+        {tab !== "viaje" && <div className="tabs" role="tablist">
           {TABS.map(([t, l]) => (
             <button key={t} className="tab" role="tab" aria-selected={tab === t} onClick={() => { setTab(t); useUi.getState().setRoute(null); if (useUi.getState().sheet === "peek") setSheet("half"); }}>
               {l}{t === "avisos" && alerts > 0 && <span className="n">{alerts}</span>}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
       <div className="view" role="tabpanel" aria-live="polite">{children}</div>
     </main>

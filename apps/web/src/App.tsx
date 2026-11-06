@@ -13,7 +13,10 @@ import estaciones from "./data/estaciones.json";
 import { FollowBar } from "./ui/FollowBar";
 import { Settings } from "./ui/Settings";
 import { Sheet } from "./ui/Sheet";
-import { Compass, Locate, Mark, Sliders } from "./ui/icons";
+import { Compass, Directions, Locate, Mark, Sliders } from "./ui/icons";
+import { PlannerView, tripGeo } from "./ui/planner";
+import { usePlanner } from "./ui/plannerStore";
+import { reverse } from "./ui/geocode";
 import { ago } from "./ui/format";
 import { useNow, useTransitVersion } from "./ui/hooks";
 import { mapPadding } from "./ui/layout";
@@ -126,7 +129,7 @@ export function App() {
     br.current = r;
     const onRotate = () => setBearing(m.bearing);
     m.map.on("rotate", onRotate);
-    (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData, act, ui: useUi };
+    (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData, act, ui: useUi, planner: usePlanner };
     let stopped = false;
     void m.ready.then(() => { if (!stopped) { r.start(); m.setToggles(uiRef.current.layers); } });
 
@@ -155,6 +158,29 @@ export function App() {
   /* ---------- estado de la interfaz → mapa ---------- */
   useEffect(() => { document.documentElement.dataset.scheme = scheme; void mc.current?.ready.then(() => { mc.current?.setScheme(scheme); if (transit.network.routes.size) mc.current?.recolorNetwork(transit.network); br.current?.refresh(); }); }, [scheme]);
   useEffect(() => { void mc.current?.ready.then(() => mc.current?.setToggles(ui.layers)); br.current?.refresh(); }, [ui.layers]);
+  /* viaje planeado: se dibuja la opción elegida en el mapa y se encuadra */
+  const planner = usePlanner();
+  useEffect(() => {
+    const m = mc.current; if (!m) return;
+    void m.ready.then(() => {
+      const it = ui.tab === "viaje" ? planner.results?.[planner.sel] : undefined;
+      const origin = planner.originMe ? (useLocation.getState().me ? { name: "Mi ubicación", position: useLocation.getState().me! } : null) : planner.origin;
+      if (!it || !origin || !planner.dest) { m.setTrip(null); return; }
+      m.setTrip(tripGeo(it, thRef.current, origin, planner.dest));
+      const pts = it.legs.flatMap((l) => l.line);
+      if (pts.length) m.fit(pts, mapPadding(), 16);
+    });
+  }, [ui.tab, planner.results, planner.sel, planner.dest, planner.origin, planner.originMe, scheme]);   // eslint-disable-line react-hooks/exhaustive-deps
+  /* elegir origen o destino tocando el mapa */
+  useEffect(() => {
+    const m = mc.current, field = planner.picking; if (!m) return;
+    if (!field) { m.pickHandler = null; return; }
+    uiRef.current.showToast(field === "origin" ? "Toca el mapa para elegir el punto de partida" : "Toca el mapa para elegir el destino");
+    uiRef.current.setSheet("peek");
+    m.pickHandler = (pt) => { void reverse(pt).then((place) => { usePlanner.getState().setPlace(field, place); uiRef.current.setSheet("half"); }); };
+    return () => { if (m.pickHandler) m.pickHandler = null; };
+  }, [planner.picking]);
+
   /* tráfico: velocidad de los buses en las calles, recalculada con cada dato nuevo (máx. una vez cada 4 s) */
   useEffect(() => {
     const m = mc.current; if (!ui.layers.traffic || !m) { return; }
@@ -326,12 +352,14 @@ export function App() {
         </div>
         <div className="tools">
           {Math.abs(bearing) > 0.5 && <button className="fab glass" aria-label="Volver a poner el norte arriba" title="Norte arriba" onClick={() => mc.current?.resetNorth()}><span style={{ display: "grid", transform: `rotate(${-bearing}deg)` }}><Compass /></span></button>}
+          <button className="fab glass" aria-label="Cómo llegar" aria-pressed={ui.tab === "viaje"} onClick={() => { const u = useUi.getState(); u.setRoute(null); u.setTab("viaje"); u.setSheet("half"); }}><Directions /></button>
           <button className="fab glass" aria-label={headingUp ? "Dejar el mapa fijo" : following ? "Girar el mapa según hacia dónde miro" : "Mi ubicación"} aria-pressed={following} onClick={() => void locate()}><Locate /></button>
           <button className="fab glass" aria-label="Ajustes del mapa" aria-pressed={ui.settingsOpen} onClick={() => ui.setSettingsOpen(true)}><Sliders /></button>
         </div>
       </header>
       <Sheet>
-        {ui.stopId ? (ui.stopRoute ? <StopRouteView th={th} act={act} /> : <StopView th={th} act={act} />)
+        {ui.tab === "viaje" ? <PlannerView th={th} act={act} />
+          : ui.stopId ? (ui.stopRoute ? <StopRouteView th={th} act={act} /> : <StopView th={th} act={act} />)
           : ui.groupIds ? <StationView th={th} act={act} />
           : ui.routeId && ui.tab === "rutas" ? <RouteDetailView id={ui.routeId} th={th} act={act} />
           : ui.tab === "rutas" ? <RoutesView th={th} act={act} />
