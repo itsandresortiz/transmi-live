@@ -123,7 +123,7 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal");
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
@@ -142,6 +142,11 @@ export class MapController {
     m.addLayer({
       id: "network-lines", type: "line", source: "network", minzoom: 9, layout: lineLayout,
       paint: { "line-color": ["get", "color"], "line-opacity": NETWORK_OPACITY, "line-width": zoomWidth([9, 0.5], [14, 1.3], [18, 2.6]) },
+    });
+    // dentro de los portales las rutas se ven siempre, en gris, aunque la capa «Líneas de rutas» esté apagada
+    m.addLayer({
+      id: "network-portal", type: "line", source: "network-portal", minzoom: 14.5, layout: lineLayout,
+      paint: { "line-color": this.scheme === "dark" ? "#7d889c" : "#8c96a8", "line-opacity": 0.6, "line-width": zoomWidth([14.5, 0.8], [17, 1.8], [19, 3.2]) },
     });
     m.addLayer({
       id: "troncales-lines", type: "line", source: "troncales", layout: lineLayout,
@@ -261,7 +266,7 @@ export class MapController {
     const [loc, tron, est] = await Promise.all([geo.loadLocalidades(), geo.loadTroncales(), geo.loadEstaciones()]);
     set("localidades", geo.localidadPolygons(loc)); set("localidad-labels", geo.localidadLabels(loc));
     set("troncales", geo.troncalLines(tron));
-    this.estacionesAll = geo.estacionPoints(est); this.applyEstaciones();
+    this.estacionesAll = geo.estacionPoints(est); this.applyEstaciones(); this.rebuildPortalLines();
     set("roads", await geo.loadRoads());
     set("street-labels", await geo.loadStreetLabels());
   }
@@ -353,6 +358,7 @@ export class MapController {
     this.registerChip();
     m.setLayoutProperty("station-chips", "icon-image", this.chipImage());
     m.setLayoutProperty("portal-chips", "icon-image", this.portalImage());
+    m.setPaintProperty("network-portal", "line-color", this.scheme === "dark" ? "#7d889c" : "#8c96a8");
     for (const id of sidedIds("stops-circles")) { m.setPaintProperty(id, "circle-color", t.surface); m.setPaintProperty(id, "circle-stroke-color", t.label); }
     for (const id of sidedIds("route-stops")) m.setPaintProperty(id, "circle-color", t.surface);
   }
@@ -360,7 +366,7 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis([...sidedIds("stops-circles"), "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["trafico-casing", "trafico-lines"], t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis([...sidedIds("stops-circles"), "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["network-portal"], t.stops && !t.network); vis(["trafico-casing", "trafico-lines"], t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
   }
 
   /** Velocidad de los buses en las calles (cada tramo con su banda de color). */
@@ -455,6 +461,7 @@ export class MapController {
     }
     (this.map.getSource("network") as GeoJSONSource).setData({ type: "FeatureCollection", features: lines });
     this.computeSectors(net);
+    this.netRef = net; this.rebuildPortalLines();
     const stops: Feature<Point>[] = [];
     for (const s of net.stops.values()) {
       const k = this.stopSector.get(s.id);
@@ -463,6 +470,46 @@ export class MapController {
     (this.map.getSource("stops") as GeoJSONSource).setData({ type: "FeatureCollection", features: stops });
     this.networkLoaded = true;
   }
+  private netRef: TransitNetwork | null = null;
+  /** Centros de los portales (de estaciones.json): lon, lat. */
+  private portalCenters(): [number, number][] {
+    const out: [number, number][] = [], seen = new Set<string>();
+    for (const f of this.estacionesAll?.features ?? []) {
+      if (f.properties?.portal !== true) continue;
+      const [lon, lat] = f.geometry.coordinates as [number, number], key = `${lon.toFixed(3)},${lat.toFixed(3)}`;
+      if (!seen.has(key)) { seen.add(key); out.push([lon, lat]); }
+    }
+    return out;
+  }
+  /** Los tramos de las rutas que quedan a menos de ~300 m de un portal: ahí se dibujan siempre, en gris. */
+  private rebuildPortalLines() {
+    const net = this.netRef, portals = this.portalCenters(), src = this.map.getSource("network-portal") as GeoJSONSource | undefined;
+    if (!net || !portals.length || !src) return;
+    const R = 300, kx = 111_320 * Math.cos((4.65 * Math.PI) / 180), ky = 110_540;
+    const inside = (lon: number, lat: number) => {
+      for (const [plon, plat] of portals) {
+        const dy = (lat - plat) * ky; if (Math.abs(dy) > R) continue;
+        const dx = (lon - plon) * kx; if (Math.abs(dx) > R) continue;
+        if (dx * dx + dy * dy <= R * R) return true;
+      }
+      return false;
+    };
+    const feats: Feature<LineString>[] = [], seen = new Set<string>();
+    for (const shapes of net.shapes.values()) for (const sh of shapes) {
+      let run: [number, number][] = [];
+      const flush = () => {
+        if (run.length > 1) {
+          const k = `${run.length}|${run[0]![0].toFixed(5)},${run[0]![1].toFixed(5)}|${run[run.length - 1]![0].toFixed(5)},${run[run.length - 1]![1].toFixed(5)}`;
+          if (!seen.has(k)) { seen.add(k); feats.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: run } }); }
+        }
+        run = [];
+      };
+      for (const p of sh.points) { if (inside(p.lon, p.lat)) run.push([p.lon, p.lat]); else flush(); }
+      flush();
+    }
+    src.setData({ type: "FeatureCollection", features: feats });
+  }
+
   /** Para cada parada, hacia dónde queda la derecha de la vía según el sentido de la primera ruta que pasa por ella. */
   private computeSectors(net: TransitNetwork) {
     this.stopSector = new Map();
