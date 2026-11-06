@@ -1,20 +1,15 @@
 import { create } from "zustand";
-import { type Itinerary, type PlanPlace, planTrip } from "@transmi/application";
+import { type Itinerary, type PlanPlace, type PlanSort, planTrip, sortItineraries } from "@transmi/application";
 import { transit } from "../composition-root";
 import { safeStorage } from "../storage";
 import { nowMs } from "../clock";
 import { useLocation } from "./location";
 
 export type Field = "origin" | "dest";
-export type SortBy = "mejor" | "rapida" | "trasbordos" | "caminata";
-/** Las opciones en el orden que pidió la persona (el planificador ya las entrega de la mejor a la peor). */
+export type SortBy = PlanSort;
+/** Las opciones en el orden que pidió la persona. */
 export function sortedResults(results: Itinerary[] | null, by: SortBy): Itinerary[] {
-  if (!results) return [];
-  const r = results.slice();
-  if (by === "rapida") r.sort((a, b) => a.arriveAt - b.arriveAt);
-  else if (by === "trasbordos") r.sort((a, b) => a.transfers - b.transfers || a.arriveAt - b.arriveAt);
-  else if (by === "caminata") r.sort((a, b) => a.walkMeters - b.walkMeters || a.arriveAt - b.arriveAt);
-  return r;
+  return results ? sortItineraries(results, by) : [];
 }
 const KEY = "tm.recents.v1";
 const loadRecents = (): PlanPlace[] => {

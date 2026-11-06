@@ -418,7 +418,8 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
     && (b.arriveAt < a.arriveAt - 60 || b.transfers < a.transfers || b.walkMeters < a.walkMeters - 50 || (j < i && b.arriveAt <= a.arriveAt))));
   // y las que llegan mucho después de la mejor (más de 35 min o el doble del tiempo)
   const best = [...list].sort((a, b) => a.arriveAt - b.arriveAt)[0]!;
-  list = list.filter((a) => a.seconds <= Math.max(best.seconds * 1.8, best.seconds + 900) && a.seconds <= best.seconds + 2400);
+  // (una opción sin trasbordos se conserva aunque sea bastante más lenta: mucha gente prefiere no cambiar de bus)
+  list = list.filter((a) => (a.transfers <= 0 ? a.seconds <= Math.max(best.seconds * 2.2, best.seconds + 1800) : a.seconds <= Math.max(best.seconds * 1.8, best.seconds + 900) && a.seconds <= best.seconds + 2400));
   list = list.slice(0, limit);
 
   const rideOnes = list.filter((x) => x.transfers >= 0);
@@ -431,6 +432,16 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   const leastWalk = [...list].sort((a, b) => a.walkMeters - b.walkMeters || a.arriveAt - b.arriveAt)[0];
   if (leastWalk && leastWalk !== earliest && leastWalk.transfers >= 0 && leastWalk.arriveAt <= best.arriveAt + 15 * 60) mark(leastWalk, "Menos caminata");
   return list.map((it) => ({ ...it, transfers: Math.max(0, it.transfers) }));
+}
+
+export type PlanSort = "mejor" | "rapida" | "trasbordos" | "caminata";
+/** Ordena las opciones. «Mejor» pone primero las que no tienen trasbordos (aunque lleguen un poco después) y, dentro de cada grupo, la que llega antes. */
+export function sortItineraries(list: readonly Itinerary[], by: PlanSort): Itinerary[] {
+  const r = list.slice();
+  if (by === "rapida") r.sort((a, b) => a.arriveAt - b.arriveAt);
+  else if (by === "caminata") r.sort((a, b) => a.walkMeters - b.walkMeters || a.arriveAt - b.arriveAt);
+  else r.sort((a, b) => a.transfers - b.transfers || a.arriveAt - b.arriveAt);          // «mejor» y «trasbordos»
+  return r;
 }
 
 /** Por qué no se encontró nada: cuántas paradas hay cerca de cada punto y si hay rutas operando. */

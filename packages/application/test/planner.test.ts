@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TransitNetwork, type Route, type RouteShape, type Stop } from "@transmi/domain";
-import { TransitState, planTrip } from "@transmi/application";
+import { TransitState, planTrip, sortItineraries, type Itinerary } from "@transmi/application";
 
 /** Red de juguete en una línea de 0,002° (~220 m) entre paradas:
  *    A0 A1 A2 A3 A4 A5 A6 A7 A8      ruta «X1» (troncal) de A0 a A8
@@ -57,5 +57,17 @@ describe("planificador de viajes", () => {
   it("destino cercano: ofrece ir a pie", () => {
     const r = planTrip(world(), at(1, 0.0002), at(1, 0.0012), { nowMs: now });
     expect(r.some((x) => x.legs.every((l) => l.kind === "walk"))).toBe(true);
+  });
+});
+
+describe("orden de las opciones", () => {
+  const mk = (arriveAt: number, transfers: number, walkMeters: number): Itinerary => ({ legs: [], departAt: 0, arriveAt, seconds: arriveAt, walkMeters, walkSeconds: 0, waitSeconds: 0, transfers, live: false, tags: [] });
+  const a = mk(1000, 1, 300), b = mk(1500, 0, 900), c = mk(1200, 0, 400), d = mk(1100, 2, 100);
+  it("«mejor» pone primero las que no tienen trasbordos, aunque lleguen después", () => {
+    expect(sortItineraries([a, b, c, d], "mejor")).toEqual([c, b, a, d]);
+  });
+  it("«más rápida» ordena por llegada y «menos caminata» por metros", () => {
+    expect(sortItineraries([a, b, c, d], "rapida")).toEqual([a, d, c, b]);
+    expect(sortItineraries([a, b, c, d], "caminata")).toEqual([d, a, c, b]);
   });
 });
