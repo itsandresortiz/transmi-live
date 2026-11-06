@@ -72,14 +72,19 @@ export function FavoritesSection({ th, act }: { th: MapTheme; act: Actions }) {
   );
 }
 
-export function NearbySection({ th, act }: { th: MapTheme; act: Actions }) {
+export function NearbySection({ th, act, compact = false }: { th: MapTheme; act: Actions; compact?: boolean }) {
   useTransitVersion();
   const { me, status, locate } = useLocation();
   useEffect(() => { if (status === "idle" && hadLocationPermission()) void locate(); }, [status, locate]);
-  const near = useMemo(() => (me ? nearestStops(transit, me, 6) : []), [me, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const near = useMemo(() => (me ? nearestStops(transit, me, compact ? 3 : 6) : []), [me, transit.network, compact]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // en la primera pantalla, sin ubicación, basta una fila discreta (no una tarjeta grande)
+  if (compact && !me) {
+    if (status === "denied" || status === "unsupported") return null;
+    return <button className="row nearrow" onClick={() => void locate()} disabled={status === "asking"}><span className="pico"><Locate /></span><span className="rm"><span className="rt">{status === "asking" ? "Buscando tu ubicación…" : "Ver paradas cerca de ti"}</span><span className="rs">Y cuándo pasa el próximo bus</span></span><span className="chev"><Chevron /></span></button>;
+  }
   return (
     <div className="nearby">
-      <div className="sec" style={{ marginTop: 12 }}>Cerca de ti</div>
+      <div className="sec" style={{ marginTop: compact ? 4 : 12 }}>Cerca de ti</div>
       {!me ? (
         <div className="card">
           <div className="cs">{status === "denied" ? "No pudimos ubicarte. Revisa el permiso de ubicación del navegador y vuelve a intentar." : status === "unsupported" ? "Tu navegador no permite ubicarte." : "Mira de una vez las paradas más cercanas y cuándo pasa el próximo bus."}</div>

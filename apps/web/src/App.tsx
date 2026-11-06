@@ -114,7 +114,7 @@ export function App() {
       onPointerHold: (h) => br.current?.setHold(h),
       // como en las apps de mapas: tocar el mapa baja el panel para verlo completo (en celular)
       onMapTap: () => {
-        if (window.matchMedia("(min-width:900px)").matches) return;
+        if (window.matchMedia("(min-width:700px)").matches) return;
         (document.activeElement as HTMLElement | null)?.blur?.();
         if (uiRef.current.sheet !== "peek") uiRef.current.setSheet("peek");
         if (uiRef.current.settingsOpen) uiRef.current.setSettingsOpen(false);

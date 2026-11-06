@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { advanced } from "./layout";
 import { Close, Directions, Search } from "./icons";
+import { haptic } from "./haptics";
 import { type SheetState, type Tab, useUi } from "./store";
 import { useTransitVersion } from "./hooks";
 
@@ -11,7 +12,7 @@ export const sheetHeight = () => window.innerHeight - 76 - (parseFloat(getComput
 const offsetOf = (s: SheetState, h: number) => (s === "peek" ? h - PEEK : s === "half" ? h * 0.46 : 0);
 
 export function Sheet({ children }: { children: ReactNode }) {
-  const { tab, setTab, query, setQuery, sheet, setSheet, routeId, stopId, groupIds } = useUi();
+  const { tab, setTab, query, setQuery, sheet, setSheet, routeId, stopId, groupIds, stopRoute } = useUi();
   // al abrir una ruta, parada o estación el panel pasa a ser «de detalle»: sin buscador ni pestañas (como en Mapas de Apple), con toda la altura para el contenido
   const detail = (tab === "rutas" && !!routeId) || !!stopId || !!groupIds;
   useTransitVersion();
@@ -64,13 +65,13 @@ export function Sheet({ children }: { children: ReactNode }) {
         </label>}
         {!detail && <div className="tabs" role="tablist">
           {TABS.map(([t, l]) => (
-            <button key={t} className={`tab${t === "viaje" ? " hot" : ""}`} role="tab" aria-selected={tab === t} onClick={() => { setTab(t); useUi.getState().setRoute(null); if (useUi.getState().sheet === "peek") setSheet("half"); }}>
+            <button key={t} className={`tab${t === "viaje" ? " hot" : ""}`} role="tab" aria-selected={tab === t} onClick={() => { haptic(); setTab(t); useUi.getState().setRoute(null); if (useUi.getState().sheet === "peek") setSheet("half"); }}>
               {t === "viaje" && <Directions />}{l}
             </button>
           ))}
         </div>}
       </div>
-      <div className="view" role="tabpanel" aria-live="polite">{children}</div>
+      <div className="view" role="tabpanel" aria-live="polite"><div className="vk" key={`${tab}|${routeId ?? ""}|${stopId ?? ""}|${groupIds?.join(",") ?? ""}|${stopRoute?.routeId ?? ""}`}>{children}</div></div>
     </main>
   );
 }

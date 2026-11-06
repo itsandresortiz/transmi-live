@@ -13,6 +13,7 @@ import { useLocation } from "./location";
 import { type Field, type SortBy, sortedResults, usePlanner } from "./plannerStore";
 import { shareUrl } from "../deeplink";
 import { useNow } from "./hooks";
+import { haptic } from "./haptics";
 import { useUi } from "./store";
 import { stopText } from "./stopname";
 import type { Actions } from "./views";
@@ -182,9 +183,10 @@ function Results({ th, act }: { th: MapTheme; act: Actions }) {
   const list = sortedResults(results, sortBy);
   const age = Math.max(0, Math.round((now - computedAt) / 1000));
   return (
-    <div className="tlist">
+    <div className="tlist" role="region" aria-label="Opciones para llegar">
+      <p className="sr" role="status">{list.length} {list.length === 1 ? "opción encontrada" : "opciones encontradas"}.</p>
       <div className="tchips" role="group" aria-label="Ordenar opciones">
-        {SORTS.map(([k, l]) => <button key={k} className="chip" aria-pressed={sortBy === k} onClick={() => setSort(k)}>{l}</button>)}
+        {SORTS.map(([k, l]) => <button key={k} className="chip" aria-pressed={sortBy === k} onClick={() => { haptic(); setSort(k); }}>{l}</button>)}
       </div>
       <div className="tnote">
         <span>Sales ahora ({hm(now / 1000)}) · actualizado hace {age < 5 ? "unos segundos" : `${age} s`}</span>
@@ -246,6 +248,12 @@ function liveLine(l: RideLeg, nowS: number): string {
   return e === "llegando" ? "ya está llegando" : `llega en ${e}`;
 }
 
+/** Lo que lee un lector de pantalla: «Opción 1, más rápida: 35 minutos, llegas 9:25 p. m., sin trasbordos, ruta H17, caminas 1,4 km». */
+function summary(it: Itinerary, i: number): string {
+  const rides = it.legs.filter(isRide).map((l) => l.shortName);
+  return `Opción ${i + 1}${it.tags.length ? `, ${it.tags.join(", ").toLowerCase()}` : ""}: ${durText(it.seconds)}, llegas ${hm(it.arriveAt)}, ${transfersText(it.transfers).toLowerCase()}${rides.length ? `, ruta${rides.length > 1 ? "s" : ""} ${rides.join(" y ")}` : ", a pie"}, caminas ${meters(it.walkMeters)}`;
+}
+
 function Card({ it, i, on, th, act, select, nowS }: { it: Itinerary; i: number; on: boolean; th: MapTheme; act: Actions; select(i: number): void; nowS: number }) {
   const first = it.legs.find(isRide);
   const onlyWalk = !first;
@@ -253,7 +261,7 @@ function Card({ it, i, on, th, act, select, nowS }: { it: Itinerary; i: number; 
   const slow = it.legs.filter(isRide).some((l) => l.lowFrequency);
   return (
     <div className={`tcard${on ? " on" : ""}`}>
-      <button className="thead" aria-pressed={on} onClick={() => select(i)}>
+      <button className="thead" aria-pressed={on} aria-expanded={on} aria-label={summary(it, i)} onClick={() => { haptic(); select(i); }}>
         <div className="ttop">
           <div className="ttags">
             {it.tags.map((t) => <span key={t} className={`tpill${t === "Más rápida" ? " best" : ""}`}>{t}</span>)}
@@ -277,7 +285,7 @@ function Card({ it, i, on, th, act, select, nowS }: { it: Itinerary; i: number; 
 function Steps({ it, th, act, nowS }: { it: Itinerary; th: MapTheme; act: Actions; nowS: number }) {
   const setTab = useUi((u) => u.setTab);
   return (
-    <ol className="steps">
+    <ol className="steps" aria-label="Pasos del viaje">
       {it.legs.map((l, i) => isWalk(l) ? (
         <li key={i} className="step walk">
           <span className="sico"><Walk /></span>

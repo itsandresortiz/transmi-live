@@ -85,11 +85,13 @@ export function RoutesView({ th, act }: Props) {
   return (
     <>
       <FavoritesSection th={th} act={act} />
+      {!query.trim() && !system && <NearbySection th={th} act={act} compact />}
+      {!query.trim() && !system && <div className="sec" style={{ marginTop: 14 }}>Todas las rutas</div>}
       <Chips th={th} />
       {!list.length ? <Empty title="Sin resultados" text="Prueba con otro número de ruta o destino." /> : (
         <div className="list">
           {page.map((r) => (
-            <button key={r.id} className="row" onClick={() => act.openRoute(r.id)}>
+            <button key={r.id} className="row" aria-label={`Ruta ${r.shortName}, ${SYSTEM_LABEL[r.system]}${r.longName ? `, ${r.longName.replace(/\|\|/g, "a")}` : ""}, ${counts.get(r.id) ?? 0} buses en servicio`} onClick={() => act.openRoute(r.id)}>
               <span className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r.shortName}</span>
               <span className="rm"><span className="rt">{r.longName || SYSTEM_LABEL[r.system]}</span><span className="rs">{SYSTEM_LABEL[r.system]}</span></span>
               <span className="rr">{counts.get(r.id) ?? 0} <Bus /></span>
@@ -241,7 +243,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
     const el = nextRef.current, box = el?.closest(".view") as HTMLElement | null;
     if (!el || !box) return;
     // la hoja es más alta que lo que se ve en pantalla: se cuenta solo la parte visible
-    const hidden = window.matchMedia("(min-width:900px)").matches ? 0 : parseFloat(getComputedStyle(box.parentElement!).getPropertyValue("--sy")) || 0;
+    const hidden = window.matchMedia("(min-width:700px)").matches ? 0 : parseFloat(getComputedStyle(box.parentElement!).getPropertyValue("--sy")) || 0;
     const visible = box.clientHeight - hidden;
     const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - visible * 0.3;
     box.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
