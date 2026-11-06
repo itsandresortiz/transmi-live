@@ -234,6 +234,11 @@ export class MapController {
       id: "trafico-lines", type: "line", source: "trafico", minzoom: 11.5, layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": ["match", ["get", "b"], 0, "#e5484d", 1, "#f08a24", 2, "#f5c518", "#2fbf71"], "line-opacity": 0.92, "line-width": zoomWidth([11.5, 1.8], [16, 5], [18.5, 8.5]) },
     });
+    // rayitas que avanzan sobre cada tramo, en el sentido de la marcha: rápidas donde fluye, casi quietas donde hay trancón
+    for (let b = 0; b < 4; b++) m.addLayer({
+      id: `trafico-flow-${b}`, type: "line", source: "trafico", minzoom: 12.5, filter: ["==", ["get", "b"], b], layout: { "line-cap": "butt", "line-join": "round" },
+      paint: { "line-color": "#ffffff", "line-opacity": b === 0 ? 0.65 : 0.88, "line-width": zoomWidth([12.5, 0.9], [16, 2.6], [18.5, 4.6]), "line-dasharray": [1.5, 4.5] },
+    });
     m.addLayer({
       id: "semaforos-dots", type: "circle", source: "semaforos", minzoom: 13.2, maxzoom: 15.4,
       paint: { "circle-radius": zoomWidth([13.2, 1.6], [15.4, 3.2]), "circle-color": "#e8503f", "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 },
@@ -380,7 +385,7 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis([...sidedIds("stops-circles"), "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["network-portal"], t.stops && !t.network); vis(["trafico-casing", "trafico-lines"], t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
+    vis(STREET_LAYERS, t.streets); vis([...sidedIds("stops-circles"), "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["network-portal"], t.stops && !t.network); vis(["trafico-casing", "trafico-lines", "trafico-flow-0", "trafico-flow-1", "trafico-flow-2", "trafico-flow-3"], t.traffic); this.setFlow(t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
   }
 
   /** Velocidad de los buses en las calles (cada tramo con su banda de color). */
@@ -389,6 +394,37 @@ export class MapController {
       type: "FeatureCollection",
       features: segs.map((x) => ({ type: "Feature", properties: { b: trafficBand(x.speed) }, geometry: { type: "LineString", coordinates: (x.line ?? [x.a, x.b]).map((p) => [p.lon, p.lat]) } })),
     });
+  }
+  /* ---------- animación del tráfico ---------- */
+  private flowRaf = 0;
+  /** Ciclos por segundo y cuadros por segundo de cada banda (0 = casi detenido … 3 = fluido). */
+  private static readonly FLOW: { cycles: number; fps: number }[] = [{ cycles: 0.12, fps: 5 }, { cycles: 0.4, fps: 8 }, { cycles: 0.8, fps: 12 }, { cycles: 1.3, fps: 15 }];
+  private static readonly DASH = 1.5; private static readonly GAP = 4.5;
+  /** Arreglo de rayas del patrón «raya + hueco» visto desde la fase `phase` (en anchos de línea): al bajar la fase las rayas avanzan por la línea. */
+  static dashAt(phase: number): number[] {
+    const d = MapController.DASH, g = MapController.GAP, P = d + g;
+    const ph = ((phase % P) + P) % P;
+    const r = (x: number) => Math.round(x * 100) / 100;
+    return ph < d ? [r(d - ph), g, r(ph), 0] : [0, r(g - (ph - d)), d, r(ph - d)];
+  }
+  private setFlow(on: boolean) {
+    if (on === (this.flowRaf !== 0)) return;
+    if (!on) { cancelAnimationFrame(this.flowRaf); this.flowRaf = 0; return; }
+    if (typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;    // sin animación si el aparato pide menos movimiento
+    const last = [0, 0, 0, 0], P = MapController.DASH + MapController.GAP;
+    const tick = (t: number) => {
+      this.flowRaf = requestAnimationFrame(tick);
+      if (this.map.getZoom() < 12.5) return;
+      for (let b = 0; b < 4; b++) {
+        const f = MapController.FLOW[b]!;
+        if (t - last[b]! < 1000 / f.fps) continue;
+        last[b] = t;
+        const phase = P - (((t / 1000) * f.cycles) % 1) * P;
+        const id = `trafico-flow-${b}`;
+        if (this.map.getLayer(id)) this.map.setPaintProperty(id, "line-dasharray", MapController.dashAt(phase));
+      }
+    };
+    this.flowRaf = requestAnimationFrame(tick);
   }
   private signalsLoaded = false;
   /** Pone los semáforos en el mapa (se llama la primera vez que el usuario enciende la capa). */
@@ -658,5 +694,5 @@ export class MapController {
   }
   get zoom(): number { return this.map.getZoom(); }
   resize() { this.map.resize(); }
-  destroy() { this.map.remove(); }
+  destroy() { this.setFlow(false); this.map.remove(); }
 }
