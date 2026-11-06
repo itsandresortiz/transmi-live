@@ -10,7 +10,7 @@ import { etaText } from "./format";
 import { geocode } from "./geocode";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
-import { type Field, type SortBy, sortedResults, timeToMs, usePlanner } from "./plannerStore";
+import { type Field, type SortBy, nowMode, sortedResults, timeToMs, usePlanner } from "./plannerStore";
 import { useRide } from "./ride";
 import { SLOT_LABEL, type Slot, usePlaces } from "./places";
 import { shareUrl } from "../deeplink";
@@ -235,7 +235,7 @@ function Results({ th, act }: { th: MapTheme; act: Actions }) {
         {SORTS.map(([k, l]) => <button key={k} className="chip" aria-pressed={sortBy === k} onClick={() => { haptic(); setSort(k); }}>{l}</button>)}
       </div>
       <div className="tnote">
-        <span>{when.mode === "now" ? `Sales ahora (${hm(now / 1000)}) · actualizado hace ${age < 5 ? "unos segundos" : `${age} s`}`
+        <span>{when.mode === "now" ? (nowMode() === "schedule" ? `Sales ahora (${hm(now / 1000)}) · sin buses en vivo: tiempos según horarios` : `Sales ahora (${hm(now / 1000)}) · actualizado hace ${age < 5 ? "unos segundos" : `${age} s`}`)
           : when.mode === "depart" ? `Sales a las ${hm(when.at / 1000)} · según horarios y frecuencias`
           : `Llegas a las ${hm(when.at / 1000)} · según horarios y frecuencias`}</span>
         <span className="tacts">
@@ -253,7 +253,7 @@ function Results({ th, act }: { th: MapTheme; act: Actions }) {
 function NoResults() {
   const { origin, originMe, dest, when } = usePlanner();
   const me = useLocation((l) => l.me);
-  if (when.mode !== "arrive" && (when.mode === "now" || when.at - Date.now() < 120_000) && transit.fleet.size < 50) return (
+  if (when.mode !== "arrive" && (when.mode === "now" || when.at - Date.now() < 120_000) && nowMode() === "none") return (
     <div className="empty"><Directions /><b>Ahora no hay buses en servicio</b>TransMilenio no está reportando buses en este momento. Elige «Salir a las…» o «Llegar a las…» y una hora (por ejemplo, mañana 5:00 a. m.) para ver las rutas que funcionan a esa hora.</div>
   );
   const from = originMe && me ? { name: "Mi ubicación", position: me } : origin;

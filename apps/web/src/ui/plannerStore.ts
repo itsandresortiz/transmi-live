@@ -103,8 +103,11 @@ export const usePlanner = create<PlannerState>((set, get) => ({
 function planFor(origin: PlanPlace, dest: PlanPlace, when: When): Itinerary[] {
   const now = nowMs();
   const isNow = when.mode === "now" || (when.mode === "depart" && when.at - now < 120_000);
-  // ahora: solo con buses que realmente están reportando (de madrugada, sin buses, no hay nada que mostrar)
-  if (isNow) return transit.fleet.size < 50 ? [] : planTrip(transit, origin, dest, { nowMs: now });
+  // ahora: con buses en vivo; si el feed no reporta pero el horario dice que hay servicio (de día), se usa el horario; de madrugada, sin servicio, no hay nada que mostrar
+  if (isNow) {
+    const mode = nowMode();
+    return mode === "none" ? [] : planTrip(transit, origin, dest, { nowMs: now, scheduled: mode === "schedule" });
+  }
   if (when.mode === "depart") return planTrip(transit, origin, dest, { nowMs: when.at, scheduled: true });
   // llegar a las…: se parte de una salida estimada y se corrige según a qué hora llega realmente la mejor opción
   let depart = Math.max(now, when.at - 45 * 60_000), res: Itinerary[] = [];
@@ -119,4 +122,13 @@ function planFor(origin: PlanPlace, dest: PlanPlace, when: When): Itinerary[] {
   }
   const onTime = res.filter((r) => r.arriveAt * 1000 <= when.at + 60_000);
   return onTime.length ? onTime : res;
+}
+
+/** Cómo se puede planear «salir ahora»: `live` con buses reportando, `schedule` si no reportan pero el horario dice que la ciudad está en servicio, `none` si no hay servicio. */
+export function nowMode(): "live" | "schedule" | "none" {
+  if (transit.fleet.size >= 50) return "live";
+  const now = nowMs();
+  let running = 0;
+  for (const id of transit.network.routes.keys()) if (transit.serviceEnds.routeStatus(id, now, 0)?.state === "running" && ++running >= 200) return "schedule";
+  return "none";
 }

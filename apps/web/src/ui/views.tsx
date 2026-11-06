@@ -3,6 +3,7 @@ import {
   arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStopGroups, siblingStops,
 } from "@transmi/application";
 import { useRide } from "./ride";
+import { nowMode } from "./plannerStore";
 import { haptic } from "./haptics";
 import { routeOfficialName, routeTitle, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
@@ -84,7 +85,7 @@ export function NoDataNote() {
     <div className="card nodata" role="status">
       <div className="ct">{st.connection === "stale" ? "Sin señal con el servicio" : "Aún no hay buses en el mapa"}</div>
       <div className="cs">{st.connection === "stale" ? "No pudimos hablar con el servidor. Cuando vuelva la conexión se actualiza solo."
-        : `TransMilenio no está publicando buses${st.ageSeconds != null ? ` desde hace ${agoShort(st.ageSeconds)}` : " por ahora"}. Es normal en la madrugada, antes de que empiece la operación; apenas reporten, aparecen aquí solos.`}</div>
+        : `TransMilenio no está publicando buses${st.ageSeconds != null ? ` desde hace ${agoShort(st.ageSeconds)}` : " por ahora"}. ${nowMode() === "schedule" ? "A esta hora debería haber servicio, así que el problema parece estar en la fuente de datos de TransMilenio, no en tu celular. Mientras vuelve, puedes consultar horarios y planear viajes según el horario programado." : "Es normal en la madrugada, antes de que empiece la operación; apenas reporten, aparecen aquí solos."}`}</div>
     </div>
   );
 }
