@@ -394,3 +394,8 @@ button.stat:active{transform:scale(.97)}
 .sched ul{list-style:none;margin:0 0 4px;padding:0}.sched li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:.5px solid var(--line);font-size:14px;font-variant-numeric:tabular-nums}
 .sched li.today{font-weight:650}.sched li.today span{color:var(--accent)}.sched .hint{margin:6px 0 12px}
 .rb.off{opacity:.38;filter:grayscale(.85)}.rb.idle{opacity:.62;filter:grayscale(.6)}.empty .endedrow button.rb{cursor:pointer}
+/* listas de rutas atenuadas (Buses y Paradas sin servicio) */
+.endedrow{padding:0 6px}
+.endedrow>small{display:block;font-size:12.5px;line-height:1.4;color:var(--faint);margin-bottom:12px;padding:0 8px}
+.endedrow>div{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 8px;padding:0 4px}
+.endedrow>div .rb{margin:0}.endedrow>div .more{align-self:center;font-size:12.5px;color:var(--muted)}
