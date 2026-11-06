@@ -25,7 +25,7 @@ export interface LayerToggles { streets: boolean; stops: boolean; network: boole
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const FONT = ["Noto Sans Regular"];
 const STREET_LAYERS = ["street-0", "street-2", "street-3", "street-4"];
-const BUS_LAYERS = ["bus-dots"];
+const BUS_LAYERS = ["bus-dots", "bus-dots-minor"];
 const BOGOTA: [number, number] = [-74.075, 4.65];
 
 /** Las líneas de todas las rutas van tenues para que se lea la jerarquía de las calles; al elegir una ruta se resalta sola. */
@@ -272,9 +272,14 @@ export class MapController {
 
     this.addSided({ id: "stop-focus-halo", source: "stop-focus", paint: { "circle-radius": 22, "circle-color": ["get", "color"], "circle-opacity": 0.2 } });
     this.addSided({ id: "stop-focus-dot", source: "stop-focus", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
+    // vista de toda la ciudad: la columna vertebral (troncal y dual) siempre; zonales y alimentadores solo al acercarse, para que el mapa respire
     m.addLayer({
-      id: "bus-dots", type: "circle", source: "buses", maxzoom: 13,
-      paint: { "circle-radius": zoomWidth([9, 2.2], [13, 4.2]), "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 },
+      id: "bus-dots-minor", type: "circle", source: "buses", minzoom: 11.8, maxzoom: 13, filter: ["==", ["get", "m"], 0],
+      paint: { "circle-radius": zoomWidth([11.8, 1.7], [13, 3.4]), "circle-color": ["get", "color"], "circle-opacity": 0.85, "circle-stroke-color": "#ffffff", "circle-stroke-width": 0.8 },
+    });
+    m.addLayer({
+      id: "bus-dots", type: "circle", source: "buses", maxzoom: 13, filter: ["==", ["get", "m"], 1],
+      paint: { "circle-radius": zoomWidth([9, 2.6], [13, 4.4]), "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 },
     });
   }
 
@@ -308,7 +313,7 @@ export class MapController {
     const pick = (pt: { x: number; y: number }): Hit | null => {
       const bus = this.busHit?.(pt);
       if (bus) return { kind: "bus", id: bus };
-      const layers = [...sidedIds("route-stops"), "station-capsule-fill", "station-base-fill", ...sidedIds("stops-circles"), "estaciones-circles", "bus-dots"].filter((l) => m.getLayer(l));
+      const layers = [...sidedIds("route-stops"), "station-capsule-fill", "station-base-fill", ...sidedIds("stops-circles"), "estaciones-circles", "bus-dots", "bus-dots-minor"].filter((l) => m.getLayer(l));
       const feats = m.queryRenderedFeatures([[pt.x - TOUCH_PAD, pt.y - TOUCH_PAD], [pt.x + TOUCH_PAD, pt.y + TOUCH_PAD]], { layers });
       let best: Hit | null = null, bd = Infinity;
       for (const f of feats) {
@@ -325,7 +330,7 @@ export class MapController {
         const rank = f.layer.id.startsWith("route-stops") ? 0 : f.layer.id.startsWith("stops-circles") ? 1 : f.layer.id === "station-capsule-fill" ? 5 : f.layer.id === "station-base-fill" ? 8 : 2;
         const d = Math.hypot(q.x - pt.x, q.y - pt.y) + rank * 3;
         if (d >= bd) continue;
-        if (f.layer.id === "bus-dots") { bd = d; best = { kind: "bus", id: String(f.properties?.id) }; }
+        if (f.layer.id.startsWith("bus-dots")) { bd = d; best = { kind: "bus", id: String(f.properties?.id) }; }
         else if (f.layer.id === "station-capsule-fill" || f.layer.id === "station-base-fill") { bd = d; best = { kind: "group", id: String(f.properties?.all) }; }
         else if (f.layer.id === "estaciones-circles") { if (typeof f.id === "number") { bd = d; best = { kind: "station", id: f.id }; } }
         else { bd = d; best = { kind: "stop", id: String(f.properties?.id) }; }

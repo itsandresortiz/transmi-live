@@ -104,7 +104,7 @@ export class BusRenderer {
         if (o.routeId && v.routeId !== o.routeId) continue;
         const w = this.step(v.id, v.world, nowMs, tau);   // vista lejana: sin adelantar (en línea recta se saldrían de la calle)
         const g = toGeo(w);
-        features.push({ type: "Feature", properties: { id: v.id, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th) }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
+        features.push({ type: "Feature", properties: { id: v.id, m: v.system === "troncal" || v.system === "dual" ? 1 : 0, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th) }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
       }
       this.mapc.setBuses({ type: "FeatureCollection", features });
       this.applyFollow(nowMs);

@@ -17,7 +17,7 @@ import { Bell, Compass, Locate, Mark, Sliders } from "./ui/icons";
 import { PlannerView, tripGeo } from "./ui/planner";
 import { sortedResults, usePlanner } from "./ui/plannerStore";
 import { reverse } from "./ui/geocode";
-import { ago } from "./ui/format";
+import { ago, agoShort } from "./ui/format";
 import { useNow, useTransitVersion } from "./ui/hooks";
 import { mapPadding } from "./ui/layout";
 import { hadLocationPermission, useLocation } from "./ui/location";
@@ -400,12 +400,12 @@ function Status() {
   const st: ConnectionStatus = connectionStatus(transit, now);
   const cls = st.connection === "live" ? "live" : st.connection === "waiting" || st.connection === "idle" ? "warn" : st.connection === "stale" ? "bad" : "";
   const text =
-    !online ? (st.ageSeconds != null ? `Sin internet · último dato hace ${ago(st.ageSeconds)}` : "Sin internet")
-    : st.connection === "idle" ? (st.ageSeconds != null ? `Sin servicio · hace ${ago(st.ageSeconds)}` : "Sin servicio por ahora")
+    !online ? (st.ageSeconds != null ? `Sin internet · hace ${agoShort(st.ageSeconds)}` : "Sin internet")
+    : st.connection === "idle" ? (st.ageSeconds != null ? `Sin servicio · hace ${agoShort(st.ageSeconds)}` : "Sin servicio por ahora")
     : st.connection === "connecting" ? "Conectando…"
     : st.connection === "live" ? `En vivo · hace ${ago(st.ageSeconds!)}`
-    : st.connection === "waiting" ? `Actualizando · hace ${ago(st.ageSeconds!)}`
-    : `Sin señal · hace ${ago(st.ageSeconds!)}`;
+    : st.connection === "waiting" ? `Actualizando · hace ${agoShort(st.ageSeconds!)}`
+    : `Sin señal · hace ${agoShort(st.ageSeconds!)}`;
   return <div className="st"><span className={`dot ${cls}`} /><span>{text}</span></div>;
 }
 void CONFIG; void SYSTEM_LABEL;

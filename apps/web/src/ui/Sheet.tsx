@@ -11,7 +11,9 @@ export const sheetHeight = () => window.innerHeight - 76 - (parseFloat(getComput
 const offsetOf = (s: SheetState, h: number) => (s === "peek" ? h - PEEK : s === "half" ? h * 0.46 : 0);
 
 export function Sheet({ children }: { children: ReactNode }) {
-  const { tab, setTab, query, setQuery, sheet, setSheet, routeId } = useUi();
+  const { tab, setTab, query, setQuery, sheet, setSheet, routeId, stopId, groupIds } = useUi();
+  // al abrir una ruta, parada o estación el panel pasa a ser «de detalle»: sin buscador ni pestañas (como en Mapas de Apple), con toda la altura para el contenido
+  const detail = (tab === "rutas" && !!routeId) || !!stopId || !!groupIds;
   useTransitVersion();
   const el = useRef<HTMLElement>(null);
   const drag = useRef<{ y0: number; off0: number; moved: boolean } | null>(null);
@@ -53,20 +55,20 @@ export function Sheet({ children }: { children: ReactNode }) {
     <main className="sheet glass" ref={el} aria-label="Rutas, buses, paradas y avisos">
       <div className="shead" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         <div className="grab" role="button" tabIndex={0} aria-label="Subir o bajar el panel" onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSheet(sheet === "peek" ? "half" : "peek"); }}><i /></div>
-        {tab !== "viaje" && <label className="search">
+        {tab !== "viaje" && !detail && <label className="search">
           <Search />
           <input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCapitalize="off" spellCheck={false}
             placeholder={tab === "paradas" ? "Buscar parada o estación" : tab === "buses" ? "Buscar placa o ruta" : tab === "avisos" ? "Buscar aviso por ruta o parada" : "Buscar ruta o destino"}
             aria-label="Buscar" value={query} onFocus={() => sheet === "peek" && setSheet("half")} onChange={(e) => setQuery(e.target.value)} />
           {query && <button className="clear" type="button" aria-label="Borrar búsqueda" onClick={() => setQuery("")}><Close /></button>}
         </label>}
-        <div className="tabs" role="tablist">
+        {!detail && <div className="tabs" role="tablist">
           {TABS.map(([t, l]) => (
             <button key={t} className={`tab${t === "viaje" ? " hot" : ""}`} role="tab" aria-selected={tab === t} onClick={() => { setTab(t); useUi.getState().setRoute(null); if (useUi.getState().sheet === "peek") setSheet("half"); }}>
               {t === "viaje" && <Directions />}{l}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
       <div className="view" role="tabpanel" aria-live="polite">{children}</div>
     </main>
