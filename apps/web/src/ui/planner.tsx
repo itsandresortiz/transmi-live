@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
-import { type Itinerary, type Leg, type PlanPlace, type RideLeg, type WalkLeg, searchPlanPlaces } from "@transmi/application";
+import { type Itinerary, type Leg, type PlanPlace, type RideLeg, type WalkLeg, diagnosePlan, searchPlanPlaces } from "@transmi/application";
 import { SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "../composition-root";
 import { routeBadgeColor, type MapTheme } from "../map/theme";
@@ -10,7 +10,9 @@ import { etaText } from "./format";
 import { geocode } from "./geocode";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
-import { type Field, usePlanner } from "./plannerStore";
+import { type Field, type SortBy, sortedResults, usePlanner } from "./plannerStore";
+import { shareUrl } from "../deeplink";
+import { useNow } from "./hooks";
 import { useUi } from "./store";
 import { stopText } from "./stopname";
 import type { Actions } from "./views";
@@ -148,9 +150,23 @@ function Suggestions({ field }: { field: Field }) {
 
 /* ---------- resultados ---------- */
 
+const SORTS: [SortBy, string][] = [["mejor", "Mejor"], ["rapida", "Más rápida"], ["trasbordos", "Menos trasbordos"], ["caminata", "Menos caminata"]];
+
+/** Enlace del viaje actual para compartirlo (WhatsApp, etc.). */
+async function shareTrip() {
+  const p = usePlanner.getState(), me = useLocation.getState().me;
+  if (!p.dest) return;
+  const from = p.originMe ? null : p.origin ? { lat: p.origin.position.lat, lon: p.origin.position.lon, name: p.origin.name } : null;
+  const url = shareUrl({ kind: "viaje", from, to: { lat: p.dest.position.lat, lon: p.dest.position.lon, name: p.dest.name } });
+  void me;
+  try { if (navigator.share) { await navigator.share({ title: `Cómo llegar a ${p.dest.name}`, text: `Cómo llegar a ${p.dest.name} en TransMi LIVE`, url }); return; } } catch (e) { if ((e as Error).name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(url); useUi.getState().showToast("Enlace del viaje copiado"); } catch { useUi.getState().showToast("No pudimos copiar el enlace"); }
+}
+
 function Results({ th, act }: { th: MapTheme; act: Actions }) {
-  const { results, sel, busy, origin, originMe, dest, error, select, plan } = usePlanner();
+  const { results, sel, busy, origin, originMe, dest, error, select, plan, sortBy, setSort, computedAt } = usePlanner();
   const me = useLocation((l) => l.me);
+  const now = useNow();
   if (!dest) return (
     <div className="empty"><Directions /><b>¿A dónde vas?</b>Elige un destino y te mostramos las mejores opciones con los buses que van en vivo, los trasbordos y cuánto caminas.</div>
   );
@@ -162,15 +178,41 @@ function Results({ th, act }: { th: MapTheme; act: Actions }) {
   if (busy && !results) return <div className="empty"><Directions /><b>Buscando cómo llegar…</b>Combinando rutas y buses que van en vivo.</div>;
   if (error) return <div className="empty"><Directions /><b>No pudimos calcular el viaje</b>{error}<button className="btn" style={{ marginTop: 12 }} onClick={() => plan()}>Reintentar</button></div>;
   if (!results) return null;
-  if (!results.length) return (
-    <div className="empty"><Directions /><b>No encontramos una forma de llegar</b>Puede que no haya paradas cerca de uno de los dos puntos, o que las rutas no estén operando a esta hora. Prueba moviendo el origen o el destino unos metros.</div>
-  );
+  if (!results.length) return <NoResults />;
+  const list = sortedResults(results, sortBy);
+  const age = Math.max(0, Math.round((now - computedAt) / 1000));
   return (
     <div className="tlist">
-      <p className="hint tnote">Sales ahora ({hm(nowSec())}). Tiempos estimados con los buses que van en vivo y el tráfico habitual.</p>
-      {results.map((it, i) => <Card key={i} it={it} i={i} on={i === sel} th={th} act={act} select={select} />)}
+      <div className="tchips" role="group" aria-label="Ordenar opciones">
+        {SORTS.map(([k, l]) => <button key={k} className="chip" aria-pressed={sortBy === k} onClick={() => setSort(k)}>{l}</button>)}
+      </div>
+      <div className="tnote">
+        <span>Sales ahora ({hm(now / 1000)}) · actualizado hace {age < 5 ? "unos segundos" : `${age} s`}</span>
+        <span className="tacts">
+          <button className="tlink" onClick={() => plan()} disabled={busy}>{busy ? "Actualizando…" : "Actualizar"}</button>
+          <button className="tlink" onClick={() => void shareTrip()}>Compartir</button>
+        </span>
+      </div>
+      {list.map((it, i) => <Card key={i} it={it} i={i} on={i === sel} th={th} act={act} select={select} nowS={now / 1000} />)}
+      <p className="hint tfoot">Tiempos estimados con los buses que van en vivo y el tráfico habitual; pueden cambiar. Caminatas en línea recta con un margen por las calles.</p>
     </div>
   );
+}
+
+function NoResults() {
+  const { origin, originMe, dest } = usePlanner();
+  const me = useLocation((l) => l.me);
+  const from = originMe && me ? { name: "Mi ubicación", position: me } : origin;
+  const d = from && dest ? diagnosePlan(transit, from, dest) : null;
+  let why = "Prueba moviendo el origen o el destino unos metros.";
+  if (d) {
+    if (d.nearOrigin === 0 && d.nearDest === 0) why = "No hay paradas a menos de 900 m ni del origen ni del destino. Acércate a una avenida o elige puntos dentro de Bogotá.";
+    else if (d.nearOrigin === 0) why = "No hay paradas a menos de 900 m del punto de partida. Prueba con un origen más cerca de una avenida o estación.";
+    else if (d.nearDest === 0) why = "No hay paradas a menos de 900 m del destino. Prueba con un punto más cerca de una avenida o estación.";
+    else if (d.routesRunning === 0) why = d.liveData ? "Ahora mismo no hay rutas en servicio." : "No hay datos en vivo y, según los horarios, ya no hay servicio a esta hora.";
+    else why = "Hay paradas cerca de los dos puntos, pero ninguna combinación de rutas (hasta tres trasbordos) los conecta con los buses que van ahora. Prueba más tarde o cambia un poco el origen o el destino.";
+  }
+  return <div className="empty"><Directions /><b>No encontramos una forma de llegar</b>{why}</div>;
 }
 
 function Chain({ it, th }: { it: Itinerary; th: MapTheme }) {
@@ -198,31 +240,42 @@ function Bar({ it, th }: { it: Itinerary; th: MapTheme }) {
   return <div className="tbar" aria-hidden="true">{parts.map((x, i) => <i key={i} className={x.wait ? "wait" : ""} style={{ width: `${(x.w / total) * 100}%`, background: x.c }} />)}</div>;
 }
 
-function Card({ it, i, on, th, act, select }: { it: Itinerary; i: number; on: boolean; th: MapTheme; act: Actions; select(i: number): void }) {
+/** «llega en 3 min 20 s (en vivo)»: la cuenta regresiva avanza sola cada segundo. */
+function liveLine(l: RideLeg, nowS: number): string {
+  const e = etaText(l.departAt, nowS);
+  return e === "llegando" ? "ya está llegando" : `llega en ${e}`;
+}
+
+function Card({ it, i, on, th, act, select, nowS }: { it: Itinerary; i: number; on: boolean; th: MapTheme; act: Actions; select(i: number): void; nowS: number }) {
   const first = it.legs.find(isRide);
-  const now = nowSec();
   const onlyWalk = !first;
+  const alerts = it.legs.filter(isRide).reduce((a, l) => a + l.alerts, 0);
+  const slow = it.legs.filter(isRide).some((l) => l.lowFrequency);
   return (
     <div className={`tcard${on ? " on" : ""}`}>
       <button className="thead" aria-pressed={on} onClick={() => select(i)}>
         <div className="ttop">
-          <div className="ttags">{it.tags.map((t) => <span key={t} className={`tpill${t === "Más rápida" ? " best" : ""}`}>{t}</span>)}</div>
+          <div className="ttags">
+            {it.tags.map((t) => <span key={t} className={`tpill${t === "Más rápida" ? " best" : ""}`}>{t}</span>)}
+            {alerts > 0 && <span className="tpill warn">{alerts} {alerts === 1 ? "aviso" : "avisos"}</span>}
+            {slow && <span className="tpill warn">Poca frecuencia</span>}
+          </div>
           <div className="tmin"><b>{durText(it.seconds)}</b><small>llegas {hm(it.arriveAt)}</small></div>
         </div>
         <Chain it={it} th={th} />
         <Bar it={it} th={th} />
         <div className="tsub">
           {onlyWalk ? `Caminando · ${meters(it.walkMeters)}` : <>{transfersText(it.transfers)} · caminas {meters(it.walkMeters)}</>}
-          {first && <> · <span className={first.waitKind === "live" ? "live" : ""}>{first.waitKind === "live" ? `${first.shortName} llega ${etaText(first.departAt, now) === "llegando" ? "ya" : "en " + etaText(first.departAt, now)} (en vivo)` : `${first.shortName} pasa cada ~${mins(first.headwaySeconds)} min`}</span></>}
+          {first && <> · <span className={first.waitKind === "live" ? "live" : ""}>{first.waitKind === "live" ? `${first.shortName} ${liveLine(first, nowS)} (en vivo)` : `${first.shortName} pasa cada ~${mins(first.headwaySeconds)} min`}</span></>}
         </div>
       </button>
-      {on && <Steps it={it} th={th} act={act} />}
+      {on && <Steps it={it} th={th} act={act} nowS={nowS} />}
     </div>
   );
 }
 
-function Steps({ it, th, act }: { it: Itinerary; th: MapTheme; act: Actions }) {
-  const now = nowSec();
+function Steps({ it, th, act, nowS }: { it: Itinerary; th: MapTheme; act: Actions; nowS: number }) {
+  const setTab = useUi((u) => u.setTab);
   return (
     <ol className="steps">
       {it.legs.map((l, i) => isWalk(l) ? (
@@ -236,10 +289,21 @@ function Steps({ it, th, act }: { it: Itinerary; th: MapTheme; act: Actions }) {
           <div>
             <b>{l.headsign ? `Hacia ${l.headsign}` : `${SYSTEM_LABEL[l.system]} ${l.shortName}`}</b>
             <div className="sd">Sube en <b>{l.board.name}</b></div>
-            <div className="sd">{l.waitKind === "live" ? <span className="live">El bus llega {etaText(l.departAt, now) === "llegando" ? "ya" : "en " + etaText(l.departAt, now)} (en vivo)</span> : <>Pasa cada ~{mins(l.headwaySeconds)} min · espera aprox. {durText(l.waitSeconds)}</>}</div>
+            <div className="sd">{l.waitKind === "live"
+              ? <span className="live">El bus{l.busLabel ? ` ${l.busLabel}` : ""} {liveLine(l, nowS)} (en vivo)</span>
+              : <>Pasa cada ~{mins(l.headwaySeconds)} min · espera aprox. {durText(l.waitSeconds)}</>}</div>
             <div className="sd">{l.stops} {l.stops === 1 ? "parada" : "paradas"} · {durText(l.rideSeconds)}</div>
+            {l.between.length > 0 && (
+              <details className="via"><summary>Ver las {l.between.length} {l.between.length === 1 ? "parada intermedia" : "paradas intermedias"}</summary>
+                <ul>{l.between.map((b) => <li key={b.id}>{b.name}</li>)}</ul></details>
+            )}
             <div className="sd">Baja en <b>{l.alight.name}</b></div>
-            <button className="btn sm ghost" onClick={() => act.openRoute(l.routeId)}>Ver la ruta {l.shortName}</button>
+            {l.lowFrequency && <div className="swarn">Esta ruta pasa con poca frecuencia (cada ~{mins(l.headwaySeconds)} min).</div>}
+            {l.alerts > 0 && <div className="swarn">Hay {l.alerts} {l.alerts === 1 ? "aviso" : "avisos"} de servicio en esta ruta. <button className="tlink" onClick={() => setTab("avisos")}>Ver avisos</button></div>}
+            <div className="sbtns">
+              {l.busId && <button className="btn sm" onClick={() => act.followBus(l.busId!)}>Seguir el bus</button>}
+              <button className="btn sm ghost" onClick={() => act.openRoute(l.routeId)}>Ver la ruta {l.shortName}</button>
+            </div>
           </div>
         </li>
       ))}

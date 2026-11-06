@@ -15,7 +15,7 @@ import { Settings } from "./ui/Settings";
 import { Sheet } from "./ui/Sheet";
 import { Bell, Compass, Locate, Mark, Sliders } from "./ui/icons";
 import { PlannerView, tripGeo } from "./ui/planner";
-import { usePlanner } from "./ui/plannerStore";
+import { sortedResults, usePlanner } from "./ui/plannerStore";
 import { reverse } from "./ui/geocode";
 import { ago } from "./ui/format";
 import { useNow, useTransitVersion } from "./ui/hooks";
@@ -164,14 +164,14 @@ export function App() {
   useEffect(() => {
     const m = mc.current; if (!m) return;
     void m.ready.then(() => {
-      const it = ui.tab === "viaje" ? planner.results?.[planner.sel] : undefined;
+      const it = ui.tab === "viaje" ? sortedResults(planner.results, planner.sortBy)[planner.sel] : undefined;
       const origin = planner.originMe ? (useLocation.getState().me ? { name: "Mi ubicación", position: useLocation.getState().me! } : null) : planner.origin;
       if (!it || !origin || !planner.dest) { m.setTrip(null); return; }
       m.setTrip(tripGeo(it, thRef.current, origin, planner.dest));
       const pts = it.legs.flatMap((l) => l.line);
       if (pts.length) m.fit(pts, mapPadding(), 16);
     });
-  }, [ui.tab, planner.results, planner.sel, planner.dest, planner.origin, planner.originMe, scheme]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ui.tab, planner.results, planner.sel, planner.sortBy, planner.dest, planner.origin, planner.originMe, scheme]);   // eslint-disable-line react-hooks/exhaustive-deps
   /* elegir origen o destino tocando el mapa */
   useEffect(() => {
     const m = mc.current, field = planner.picking; if (!m) return;
@@ -277,17 +277,23 @@ export function App() {
   const linked = useRef(false);
   /* enlaces: la dirección refleja lo que se está viendo y, al abrir un enlace, se llega directo a eso */
   useEffect(() => {
-    const t: Target | null = ui.stopId ? { kind: "parada", id: ui.stopId } : ui.groupIds ? { kind: "estacion", ids: ui.groupIds } : ui.routeId && ui.tab === "rutas" ? { kind: "ruta", id: ui.routeId, direction: ui.direction } : null;
+    const t: Target | null = ui.tab === "viaje" && planner.dest ? { kind: "viaje", from: planner.originMe || !planner.origin ? null : { lat: planner.origin.position.lat, lon: planner.origin.position.lon, name: planner.origin.name }, to: { lat: planner.dest.position.lat, lon: planner.dest.position.lon, name: planner.dest.name } } : ui.stopId ? { kind: "parada", id: ui.stopId } : ui.groupIds ? { kind: "estacion", ids: ui.groupIds } : ui.routeId && ui.tab === "rutas" ? { kind: "ruta", id: ui.routeId, direction: ui.direction } : null;
     if (!linked.current) return;                  // primero se abre el enlace con el que se llegó; recién después la dirección sigue a la pantalla
     const h = t ? formatHash(t) : "";
     if (location.hash !== h && (h || parseHash(location.hash))) history.replaceState(null, "", h || location.pathname + location.search);
-  }, [ui.stopId, ui.groupIds, ui.routeId, ui.tab, ui.direction, net]);
+  }, [ui.stopId, ui.groupIds, ui.routeId, ui.tab, ui.direction, net, planner.dest, planner.origin, planner.originMe]);
   useEffect(() => {
     if (linked.current || !net) return;
     const t = INITIAL_LINK; linked.current = true;
     if (!t) return;
     if (t.kind === "ruta") { if (!transit.routeById(t.id)) return uiRef.current.showToast("Esa ruta ya no aparece en el servicio"); act.openRoute(t.id); if (t.direction) uiRef.current.setDirection(t.direction); uiRef.current.setSheet("half"); }
     else if (t.kind === "parada") { if (!transit.stopById(t.id)) return uiRef.current.showToast("No encontramos esa parada"); act.openStop(t.id); }
+    else if (t.kind === "viaje") {
+      const P = usePlanner.getState();
+      if (t.from) P.setPlace("origin", { name: t.from.name, position: { lat: t.from.lat, lon: t.from.lon } });
+      P.setPlace("dest", { name: t.to.name, position: { lat: t.to.lat, lon: t.to.lon } });
+      uiRef.current.setTab("viaje"); uiRef.current.setSheet("half");
+    }
     else { const ids = t.ids.filter((id) => transit.stopById(id)); if (!ids.length) return uiRef.current.showToast("No encontramos esa estación"); act.openGroup(ids); }
   }, [net, act]);
 

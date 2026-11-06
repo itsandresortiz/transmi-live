@@ -30,6 +30,14 @@ export interface RideLeg {
   line: GeoPoint[];
   /** Cada cuántos minutos pasa más o menos (estimado con los buses que circulan). */
   headwaySeconds: number;
+  /** Cuando la espera sale de un bus real: cuál es (para seguirlo en el mapa). */
+  busId?: string; busLabel?: string;
+  /** Paradas por las que pasa entre la de subida y la de bajada (sin incluirlas). */
+  between: StopRef[];
+  /** Avisos de servicio vigentes que tocan esta ruta. */
+  alerts: number;
+  /** Pasa con poca frecuencia (más de 15 min entre buses). */
+  lowFrequency: boolean;
 }
 export type Leg = WalkLeg | RideLeg;
 
@@ -178,12 +186,14 @@ function liveInfo(state: TransitState, ix: Index, nowMs: number): Live {
 type Parent =
   | { t: "access"; sec: number }
   | { t: "walk"; from: number; sec: number }
-  | { t: "ride"; p: number; board: number; bi: number; ai: number; dep: number; arr: number; wait: number; liveWait: boolean; from: number };
+  | { t: "ride"; p: number; board: number; bi: number; ai: number; dep: number; arr: number; wait: number; liveWait: boolean; from: number; bus?: LiveBus };
 
+/** Un bus real que se acerca a una parada: cuándo llega y cuál es. */
+interface LiveBus { eta: number; id: string; label?: string }
 interface RunResult { best: { k: number; arrive: number; stop: number }[]; parents: (Parent | undefined)[][]; tau: Float64Array[] }
 
 function raptor(ix: Index, live: Live, origin: GeoPoint, dest: GeoPoint, nowSec: number, banned: ReadonlySet<string>,
-  liveEtas: Map<number, Map<number, number[]>>, maxRounds: number, maxAccess: number): RunResult {
+  liveEtas: Map<number, Map<number, LiveBus[]>>, maxRounds: number, maxAccess: number): RunResult {
   const nS = ix.stopIds.length, INF = Infinity;
   const tau = Array.from({ length: maxRounds + 1 }, () => new Float64Array(nS).fill(INF));
   const parents: (Parent | undefined)[][] = Array.from({ length: maxRounds + 1 }, () => new Array<Parent | undefined>(nS));
@@ -198,15 +208,15 @@ function raptor(ix: Index, live: Live, origin: GeoPoint, dest: GeoPoint, nowSec:
     if (t < tau[0]![a.s]!) { tau[0]![a.s] = t; parents[0]![a.s] = { t: "access", sec: walkSeconds(a.m) }; bestAll[a.s] = t; marked.add(a.s); }
   }
 
-  const waitFor = (p: number, i: number, t: number, k: number): { dep: number; wait: number; live: boolean } => {
+  const waitFor = (p: number, i: number, t: number, k: number): { dep: number; wait: number; live: boolean; bus?: LiveBus } => {
     const pat = ix.patterns[p]!, h = live.headway.get(pat.routeId) ?? DEFAULT_HEADWAY[pat.route.system];
     if (k === 1) {
       const etas = liveEtas.get(pat.stops[i]!)?.get(p);
       if (etas) {
-        const next = etas.find((e) => e >= t - 10);
-        if (next != null) return { dep: Math.max(next, t), wait: Math.max(0, next - t), live: true };
+        const next = etas.find((e) => e.eta >= t - 10);
+        if (next) return { dep: Math.max(next.eta, t), wait: Math.max(0, next.eta - t), live: true, bus: next };
         // los buses vivos ya pasaron: el siguiente llega a un intervalo después del último
-        const last = etas[etas.length - 1]!;
+        const last = etas[etas.length - 1]!.eta;
         const dep = Math.max(t + h * 0.6, last + h);
         return { dep, wait: dep - t, live: false };
       }
@@ -225,14 +235,14 @@ function raptor(ix: Index, live: Live, origin: GeoPoint, dest: GeoPoint, nowSec:
     const improved = new Set<number>();
     for (const [p, start] of queue) {
       const pat = ix.patterns[p]!;
-      let board = -1, dep = 0, wait = 0, liveW = false;
+      let board = -1, dep = 0, wait = 0, liveW = false, bus: LiveBus | undefined;
       for (let i = start; i < pat.stops.length; i++) {
         const s = pat.stops[i]!;
         if (board >= 0) {
           const arr = dep + pat.cum[i]! - pat.cum[board]!;
           if (arr < tau[k]![s]! && arr < bestAll[s]! && arr < bound) {
             tau[k]![s] = arr;
-            parents[k]![s] = { t: "ride", p, board: pat.stops[board]!, bi: board, ai: i, dep, arr, wait, liveWait: liveW, from: pat.stops[board]! };
+            parents[k]![s] = { t: "ride", p, board: pat.stops[board]!, bi: board, ai: i, dep, arr, wait, liveWait: liveW, from: pat.stops[board]!, bus };
             improved.add(s);
           }
         }
@@ -240,7 +250,7 @@ function raptor(ix: Index, live: Live, origin: GeoPoint, dest: GeoPoint, nowSec:
         if (prev < INF) {
           const w = waitFor(p, i, prev, k);
           const here = board >= 0 ? dep + pat.cum[i]! - pat.cum[board]! : INF;
-          if (board < 0 || w.dep < here) { board = i; dep = w.dep; wait = w.wait; liveW = w.live; }
+          if (board < 0 || w.dep < here) { board = i; dep = w.dep; wait = w.wait; liveW = w.live; bus = w.bus; }
         }
       }
     }
@@ -323,11 +333,15 @@ function build(state: TransitState, ix: Index, live: Live, run: RunResult, k: nu
       const h0 = path.project(toWorld(board.position), 0, 0, 150), h1 = path.project(toWorld(alight.position), 0, 0, 150);
       if (h0 && h1 && h1.s > h0.s) line = path.slice(h0.s, h1.s);
     }
+    const between: StopRef[] = [];
+    for (let q = par.bi + 1; q < par.ai; q++) between.push(stopRef(state, ix, pat.stops[q]!));
+    const headway = live.headway.get(pat.routeId) ?? DEFAULT_HEADWAY[pat.route.system];
     rev.push({
       kind: "ride", routeId: pat.routeId, shortName: pat.route.shortName, longName: pat.route.longName, headsign: pat.shape.headsign, system: pat.route.system,
       board, alight, stops: par.ai - par.bi, waitSeconds: par.wait, waitKind: par.liveWait ? "live" : "estimated",
       departAt: par.dep, arriveAt: par.arr, rideSeconds: par.arr - par.dep, line,
-      headwaySeconds: live.headway.get(pat.routeId) ?? DEFAULT_HEADWAY[pat.route.system],
+      headwaySeconds: headway, busId: par.bus?.id, busLabel: par.bus?.label, between,
+      alerts: state.alertsByRoute.get(pat.routeId)?.length ?? 0, lowFrequency: headway > 900,
     });
     s = par.from; round--;
     if (round < 0) return null;
@@ -356,16 +370,16 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   const live = liveInfo(state, ix, nowMs);
 
   // llegada real de los buses a las paradas cercanas al origen (para el tiempo de espera del primer bus)
-  const liveEtas = new Map<number, Map<number, number[]>>();
+  const liveEtas = new Map<number, Map<number, LiveBus[]>>();
   const access = stopsNear(ix, origin.position, maxAccess).sort((a, b) => a.m - b.m).slice(0, 24);
   if (live.hasLive) for (const a of access) {
-    const per = new Map<number, number[]>();
+    const per = new Map<number, LiveBus[]>();
     for (const row of upcomingAtStop(state, ix.stopIds[a.s]!, nowSec, 4)) {
       for (const p of ix.byRoute.get(row.route.id) ?? []) {
         const pat = ix.patterns[p]!;
         if (pat.shape.direction !== row.direction) continue;
         const i = pat.stops.indexOf(a.s); if (i < 0) continue;
-        per.set(p, row.buses.map((b) => b.etaAt).sort((x, y) => x - y));
+        per.set(p, row.buses.map((b) => ({ eta: b.etaAt, id: b.vehicle.id, label: b.vehicle.plate || b.vehicle.label })).sort((x, y) => x.eta - y.eta));
       }
     }
     liveEtas.set(a.s, per);
@@ -417,6 +431,12 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   const leastWalk = [...list].sort((a, b) => a.walkMeters - b.walkMeters || a.arriveAt - b.arriveAt)[0];
   if (leastWalk && leastWalk !== earliest && leastWalk.transfers >= 0 && leastWalk.arriveAt <= best.arriveAt + 15 * 60) mark(leastWalk, "Menos caminata");
   return list.map((it) => ({ ...it, transfers: Math.max(0, it.transfers) }));
+}
+
+/** Por qué no se encontró nada: cuántas paradas hay cerca de cada punto y si hay rutas operando. */
+export function diagnosePlan(state: TransitState, origin: PlanPlace, dest: PlanPlace, nowMs = Date.now()): { nearOrigin: number; nearDest: number; routesRunning: number; liveData: boolean } {
+  const ix = buildIndex(state), live = liveInfo(state, ix, nowMs);
+  return { nearOrigin: stopsNear(ix, origin.position, MAX_ACCESS_M).length, nearDest: stopsNear(ix, dest.position, MAX_ACCESS_M).length, routesRunning: live.running.size, liveData: live.hasLive };
 }
 
 /* ---------- búsqueda de lugares (paradas, estaciones y portales) ---------- */

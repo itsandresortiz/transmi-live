@@ -14,6 +14,14 @@ describe("enlaces", () => {
     if (t.kind === "estacion") expect(back).toEqual(t);
     else expect(back).toMatchObject({ id: (t as { id: string }).id });
   });
+  it("enlace de un viaje: con origen y desde «mi ubicación»", () => {
+    const a: Target = { kind: "viaje", from: { lat: 4.7357, lon: -74.0905, name: "Suba · Gratamira" }, to: { lat: 4.684, lon: -74.0577, name: "Calle 100, Bogotá" } };
+    expect(parseHash(formatHash(a))).toEqual(a);
+    const b: Target = { kind: "viaje", from: null, to: { lat: 4.6, lon: -74.1, name: "Portal Sur" } };
+    expect(formatHash(b)).toMatch(/^#\/viaje\/-\//);
+    expect(parseHash(formatHash(b))).toEqual(b);
+    expect(parseHash("#/viaje/-/xx,yy,Nada")).toBeNull();
+  });
   it("ignora lo que no es un enlace", () => {
     expect(parseHash("")).toBeNull();
     expect(parseHash("#/otra/cosa")).toBeNull();

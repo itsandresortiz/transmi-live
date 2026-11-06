@@ -38,6 +38,7 @@ describe("planificador de viajes", () => {
     const rides = best.legs.filter((l) => l.kind === "ride");
     expect(rides).toHaveLength(1);
     expect(rides[0]).toMatchObject({ shortName: "X1", stops: 6 });
+    expect((rides[0] as { between: unknown[] }).between).toHaveLength(5);          // las paradas intermedias
     expect(best.seconds).toBeGreaterThan(6 * 45);                  // al menos el tiempo de las 6 paradas
     expect(best.seconds).toBeLessThan(3600);
     expect(best.tags).toContain("Más rápida");

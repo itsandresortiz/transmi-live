@@ -6,6 +6,16 @@ import { nowMs } from "../clock";
 import { useLocation } from "./location";
 
 export type Field = "origin" | "dest";
+export type SortBy = "mejor" | "rapida" | "trasbordos" | "caminata";
+/** Las opciones en el orden que pidió la persona (el planificador ya las entrega de la mejor a la peor). */
+export function sortedResults(results: Itinerary[] | null, by: SortBy): Itinerary[] {
+  if (!results) return [];
+  const r = results.slice();
+  if (by === "rapida") r.sort((a, b) => a.arriveAt - b.arriveAt);
+  else if (by === "trasbordos") r.sort((a, b) => a.transfers - b.transfers || a.arriveAt - b.arriveAt);
+  else if (by === "caminata") r.sort((a, b) => a.walkMeters - b.walkMeters || a.arriveAt - b.arriveAt);
+  return r;
+}
 const KEY = "tm.recents.v1";
 const loadRecents = (): PlanPlace[] => {
   try {
@@ -21,7 +31,9 @@ interface PlannerState {
   results: Itinerary[] | null; sel: number; busy: boolean; computedAt: number; error: string | null;
   /** Se está esperando un toque en el mapa para este campo. */
   picking: Field | null;
+  sortBy: SortBy;
   recents: PlanPlace[];
+  setSort(s: SortBy): void;
   setPlace(f: Field, p: PlanPlace | "me"): void;
   setEditing(f: Field | null): void;
   setText(f: Field, t: string): void;
@@ -36,7 +48,8 @@ const samePlace = (a: PlanPlace, b: PlanPlace) => Math.abs(a.position.lat - b.po
 
 export const usePlanner = create<PlannerState>((set, get) => ({
   origin: null, originMe: true, dest: null, editing: null, text: { origin: "", dest: "" },
-  results: null, sel: 0, busy: false, computedAt: 0, error: null, picking: null, recents: loadRecents(),
+  results: null, sel: 0, busy: false, computedAt: 0, error: null, picking: null, sortBy: "mejor", recents: loadRecents(),
+  setSort: (sortBy) => set({ sortBy, sel: 0 }),
 
   setPlace: (f, p) => {
     if (p === "me") { if (f === "origin") set({ originMe: true, origin: null }); }
