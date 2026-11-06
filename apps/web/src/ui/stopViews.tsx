@@ -40,7 +40,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
           })}
         </div>
       )}
-      {rows.length === 0 ? <NoBuses th={th} stopId={stopId} nowMs={nowSec * 1000} /> : (
+      {rows.length === 0 ? <NoBuses th={th} stopId={stopId} nowMs={nowSec * 1000} act={act} /> : (
         <>
           <div className="sec">Toca una ruta para ver de dónde viene</div>
           <div className="list">
@@ -183,23 +183,35 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
   );
 }
 
-/** Parada sin buses acercándose. Si las rutas que paran aquí ya terminaron por hoy, lo dice en la misma pantalla, con el mismo estilo. */
-function NoBuses({ th, stopId, nowMs }: { th: MapTheme; stopId: string | null; nowMs: number }) {
+/** Parada sin buses acercándose: se explica y, aun así, se muestran las rutas que normalmente pasan por aquí (las que ya terminaron, atenuadas). */
+function NoBuses({ th, stopId, nowMs, act }: { th: MapTheme; stopId: string | null; nowMs: number; act: Actions }) {
   const all = stopId ? routesAtStop(transit, stopId) : [];
-  const ended = all.filter((r) => transit.routeStatus(r.id, nowMs)?.state === "ended");
-  const names = new Map(ended.map((r) => [r.shortName, r]));
-  if (!names.size) return <Empty title="Ningún bus viene ahora" text="Cuando un bus se acerque a esta parada aparecerá aquí." />;
-  const every = ended.length >= all.length;
-  const shown = [...names.values()].slice(0, 10);
+  const byName = new Map<string, (typeof all)[number]>();
+  for (const r of all) if (!byName.has(r.shortName)) byName.set(r.shortName, r);
+  const state = (r: (typeof all)[number]) => transit.routeStatus(r.id, nowMs)?.state;
+  const routes = [...byName.values()].sort((a, b) => Number(state(a) === "ended") - Number(state(b) === "ended") || a.shortName.localeCompare(b.shortName, "es", { numeric: true }));
+  const off = routes.filter((r) => state(r) === "ended" || state(r) === "before").length;
+  const every = routes.length > 0 && off >= routes.length && routes.every((r) => state(r) === "ended");
+  const shown = routes.slice(0, 24);
   return (
     <div className="empty">
       <Bus />
       <b>{every ? "Ya no hay más buses hoy" : "Ningún bus viene ahora"}</b>
       {every ? "El servicio de las rutas de esta parada ya terminó por hoy." : "Cuando un bus se acerque a esta parada aparecerá aquí."}
-      <div className="endedrow" aria-label="Rutas que ya terminaron hoy">
-        <small>{every ? "Rutas que pasaban por aquí" : "Ya terminaron hoy"}</small>
-        <div>{shown.map((r) => <span key={r.id} className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r.shortName}</span>)}{names.size > shown.length && <span className="more">+{names.size - shown.length}</span>}</div>
-      </div>
+      {routes.length > 0 && (
+        <div className="endedrow" aria-label="Rutas que pasan por esta parada">
+          <small>Rutas que pasan por aquí</small>
+          <div>
+            {shown.map((r) => {
+              const st = state(r);
+              return <button key={r.id} className={`rb${st === "ended" || st === "before" ? " off" : " idle"}`} style={{ ["--c" as string]: routeBadgeColor(th, r) }} onClick={() => act.openRoute(r.id)}
+                title={st === "ended" ? "Ya terminó por hoy" : st === "before" ? "Aún no empieza hoy" : "Ahora no tiene buses cerca de esta parada"}>{r.shortName}</button>;
+            })}
+            {routes.length > shown.length && <span className="more">+{routes.length - shown.length}</span>}
+          </div>
+          {off > 0 && <small style={{ marginTop: 8 }}>Más tenues: ya terminaron o aún no empiezan hoy. En gris suave: sin buses cerca ahora.</small>}
+        </div>
+      )}
     </div>
   );
 }

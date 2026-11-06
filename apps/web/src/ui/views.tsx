@@ -15,7 +15,7 @@ import { FavoritesSection, NearbySection, QuickTrips, StarButton } from "./mine"
 import { ShareButton } from "./share";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
-import { alertsFor, connectionStatus, nearestStops, routeIdsAtStops } from "@transmi/application";
+import { serviceDay, alertsFor, connectionStatus, nearestStops, routeIdsAtStops } from "@transmi/application";
 import { useState } from "react";
 import { useUi } from "./store";
 import { agoShort, delayClass, delayText, etaText, stopsAwayText, untilText } from "./format";
@@ -135,6 +135,42 @@ function BusRow({ v, th, act }: { v: Vehicle } & Props) {
   );
 }
 
+/** Sin buses en la calle: se explica y se muestran las rutas que, según su horario, deberían estar funcionando o van a empezar. */
+function NoBusesNow({ th, act, system }: Props & { system: SystemType | null }) {
+  const nowMs = useNow();
+  const { running, soon } = useMemo(() => {
+    const run: Route[] = [], next: { r: Route; at: number }[] = [];
+    const seen = new Set<string>();
+    for (const r of transit.network.routes.values()) {
+      if ((system && r.system !== system) || seen.has(r.shortName)) continue;
+      const st = transit.serviceEnds.routeStatus(r.id, nowMs, 0);
+      if (!st) continue;
+      if (st.state === "running") { run.push(r); seen.add(r.shortName); }
+      else if (st.state === "before" && st.firstStart - serviceDay(nowMs).secs < 3 * 3600) { next.push({ r, at: st.firstStart }); seen.add(r.shortName); }
+    }
+    const byName = (a: Route, b: Route) => a.shortName.localeCompare(b.shortName, "es", { numeric: true });
+    return { running: run.sort(byName), soon: next.sort((a, b) => a.at - b.at || byName(a.r, b.r)) };
+  }, [Math.floor(nowMs / 60_000), system, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <NoDataNote />
+      <Empty title="Ningún bus en la calle ahora" text="Cuando TransMilenio vuelva a reportar, los buses aparecen aquí." />
+      {running.length > 0 && (
+        <div className="endedrow" style={{ textAlign: "center" }}>
+          <small>Rutas con servicio a esta hora, según su horario (en gris porque aún no reportan buses)</small>
+          <div>{running.slice(0, 40).map((r) => <button key={r.id} className="rb idle" title="Según su horario debería estar en servicio, pero ahora no hay buses reportando" style={{ ["--c" as string]: routeBadgeColor(th, r) }} onClick={() => act.openRoute(r.id)}>{r.shortName}</button>)}{running.length > 40 && <span className="more">+{running.length - 40}</span>}</div>
+        </div>
+      )}
+      {soon.length > 0 && (
+        <div className="endedrow" style={{ textAlign: "center", marginTop: 16 }}>
+          <small>Aún no empiezan · más tarde</small>
+          <div>{soon.slice(0, 30).map(({ r, at }) => <button key={r.id} className="rb off" title={`Primer bus a las ${clockOfDay(at)}`} style={{ ["--c" as string]: routeBadgeColor(th, r) }} onClick={() => act.openRoute(r.id)}>{r.shortName} <small style={{ opacity: .8, fontWeight: 500 }}>{clockOfDay(at).replace(" a. m.", "").replace(" p. m.", "")}</small></button>)}{soon.length > 30 && <span className="more">+{soon.length - 30}</span>}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function BusesView({ th, act }: Props) {
   useTransitVersion();
   const { query, system, limit } = useUi();
@@ -143,7 +179,7 @@ export function BusesView({ th, act }: Props) {
   return (
     <>
       <Chips th={th} />
-      {!list.length ? <Empty title="Sin buses" text={transit.fleet.size ? "Ningún bus coincide con el filtro." : "Esperando los primeros datos en vivo…"} /> : (
+      {!list.length && !transit.fleet.size ? <NoBusesNow th={th} act={act} system={system} /> : !list.length ? <Empty title="Sin buses" text="Ningún bus coincide con el filtro." /> : (
         <div className="list">{page.map((v) => <BusRow key={v.id} v={v} th={th} act={act} />)}<More shown={page.length} total={list.length} /></div>
       )}
     </>

@@ -393,3 +393,4 @@ button.stat:active{transform:scale(.97)}
 .sched{margin:0 0 12px;border-radius:16px;background:var(--hover);padding:2px 14px}.sched summary{cursor:pointer;padding:12px 0;font-weight:650;font-size:14.5px}
 .sched ul{list-style:none;margin:0 0 4px;padding:0}.sched li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:.5px solid var(--line);font-size:14px;font-variant-numeric:tabular-nums}
 .sched li.today{font-weight:650}.sched li.today span{color:var(--accent)}.sched .hint{margin:6px 0 12px}
+.rb.off{opacity:.38;filter:grayscale(.85)}.rb.idle{opacity:.62;filter:grayscale(.6)}.empty .endedrow button.rb{cursor:pointer}
