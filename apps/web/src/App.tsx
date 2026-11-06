@@ -400,13 +400,13 @@ function Status() {
   const st: ConnectionStatus = connectionStatus(transit, now);
   const cls = st.connection === "live" ? "live" : st.connection === "waiting" || st.connection === "idle" ? "warn" : st.connection === "stale" ? "bad" : "";
   const text =
-    !online ? (st.ageSeconds != null ? `Sin internet · hace ${agoShort(st.ageSeconds)}` : "Sin internet")
-    : st.connection === "idle" ? (st.ageSeconds != null ? `Sin servicio · hace ${agoShort(st.ageSeconds)}` : "Sin servicio por ahora")
+    !online ? (st.ageSeconds != null ? `Sin internet · ${agoShort(st.ageSeconds)}` : "Sin internet")
+    : st.connection === "idle" ? (st.ageSeconds != null ? `Sin servicio · ${agoShort(st.ageSeconds)}` : "Sin servicio por ahora")
     : st.connection === "connecting" ? "Conectando…"
     : st.connection === "live" ? `En vivo · hace ${ago(st.ageSeconds!)}`
-    : st.connection === "waiting" ? `Actualizando · hace ${agoShort(st.ageSeconds!)}`
-    : `Sin señal · hace ${agoShort(st.ageSeconds!)}`;
-  return <div className="st"><span className={`dot ${cls}`} /><span>{text}</span></div>;
+    : st.connection === "waiting" ? `Actualizando · ${agoShort(st.ageSeconds!)}`
+    : `Sin señal · ${agoShort(st.ageSeconds!)}`;
+  return <div className="st" title={st.ageSeconds != null ? `Último dato hace ${ago(st.ageSeconds)}` : undefined}><span className={`dot ${cls}`} /><span>{text}</span></div>;
 }
 void CONFIG; void SYSTEM_LABEL;
 
