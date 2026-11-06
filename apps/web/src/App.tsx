@@ -65,11 +65,11 @@ export function App() {
       },
       openStop(id) {
         const st = transit.stopById(id); if (!st) return;
-        closePopup(); s().openStop(id); s().setSheet("half");
+        closePopup(); s().openStop(id); s().setSheet("full");
       },
       openGroup(ids) {
         const first = transit.stopById(ids[0]), m = mc.current; if (!first || !m) return;
-        closePopup(); s().openGroup(ids); s().setSheet("half");
+        closePopup(); s().openGroup(ids); s().setSheet("full");
         const pts = ids.map((id) => transit.stopById(id)?.position).filter((p): p is NonNullable<typeof p> => !!p);
         m.showRoute(null, "0", "", () => undefined); m.setFocusStop(null);
         m.fit(pts, mapPadding(), 17);
@@ -89,7 +89,7 @@ export function App() {
           onFollow={() => { const f = s().followId === id ? null : id; s().setFollow(f); closePopup(); if (f) { s().setSheet("peek"); mc.current?.flyTo(br.current?.position(id) ?? v.position, Math.max(mc.current.zoom, 16), mapPadding()); } }}
           onRoute={() => a.openRoute(v.routeId, v.id)} />);
       },
-      focusStop(id) { a.openStop(id); },
+      focusStop(id) { a.openStop(id); s().setSheet("half"); },      // tocar una parada en el mapa: el mapa sigue a la vista
       focusStation(i) {
         const e = (estaciones as [number, number, string, string, string][])[i], m = mc.current; if (!e || !m) return;
         const p = { lat: e[0], lon: e[1] };
@@ -309,7 +309,7 @@ export function App() {
     if (linked.current || !net) return;
     const t = INITIAL_LINK; linked.current = true;
     if (!t) return;
-    if (t.kind === "ruta") { if (!transit.routeById(t.id)) return uiRef.current.showToast("Esa ruta ya no aparece en el servicio"); act.openRoute(t.id); if (t.direction) uiRef.current.setDirection(t.direction); uiRef.current.setSheet("half"); }
+    if (t.kind === "ruta") { if (!transit.routeById(t.id)) return uiRef.current.showToast("Esa ruta ya no aparece en el servicio"); act.openRoute(t.id); if (t.direction) uiRef.current.setDirection(t.direction); uiRef.current.setSheet("full"); }
     else if (t.kind === "parada") { if (!transit.stopById(t.id)) return uiRef.current.showToast("No encontramos esa parada"); act.openStop(t.id); }
     else if (t.kind === "viaje") {
       const P = usePlanner.getState();
@@ -382,7 +382,7 @@ export function App() {
         </div>
         <div className="tools">
           {Math.abs(bearing) > 0.5 && <button className="fab glass" aria-label="Volver a poner el norte arriba" title="Norte arriba" onClick={() => mc.current?.resetNorth()}><span style={{ display: "grid", transform: `rotate(${-bearing}deg)` }}><Compass /></span></button>}
-          <button className="fab glass bell" aria-label={ui.tab === "avisos" ? "Cerrar avisos" : `Avisos del servicio${alertCount ? `, ${alertCount} sin ver` : ""}`} aria-pressed={ui.tab === "avisos"} onClick={() => { const u = useUi.getState(); if (u.tab === "avisos") { u.setTab("rutas"); return; } u.setRoute(null); u.setTab("avisos"); u.setSheet("half"); }}>
+          <button className="fab glass bell" aria-label={ui.tab === "avisos" ? "Cerrar avisos" : `Avisos del servicio${alertCount ? `, ${alertCount} sin ver` : ""}`} aria-pressed={ui.tab === "avisos"} onClick={() => { const u = useUi.getState(); if (u.tab === "avisos") { u.setTab("rutas"); return; } u.setRoute(null); u.setTab("avisos"); u.setSheet("full"); }}>
             <Bell />{alertCount > 0 && <span className="badge">{alertCount > 99 ? "99+" : alertCount}</span>}
           </button>
           <button className="fab glass" aria-label={headingUp ? "Dejar el mapa fijo" : following ? "Girar el mapa según hacia dónde miro" : "Mi ubicación"} aria-pressed={following} onClick={() => void locate()}><Locate /></button>

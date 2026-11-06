@@ -19,6 +19,28 @@ export function FirstBadge({ mark }: { mark: ServiceMark | undefined }) {
   return <span className="lastbadge first" title={`Primer viaje programado del día (salida programada a las ${clockOfDay(mark.startSeconds)})`}>Primer servicio</span>;
 }
 
+const DAY_LABEL: Record<"wk" | "sa" | "su", string> = { wk: "Lunes a viernes", sa: "Sábados", su: "Domingos y festivos" };
+
+/** Horario de la ruta: a qué hora sale el primer y el último bus según el día. */
+export function RouteSchedule({ routeId, nowMs }: { routeId: string; nowMs: number }) {
+  const s = transit.serviceEnds.scheduleOf(routeId, nowMs);
+  if (!s) return null;
+  return (
+    <details className="sched">
+      <summary>Horario de la ruta</summary>
+      <ul>
+        {s.days.map((d) => (
+          <li key={d.type} className={d.type === s.today ? "today" : ""}>
+            <span>{DAY_LABEL[d.type]}{d.type === s.today ? " · hoy" : ""}</span>
+            <b>{clockOfDay(d.first)} – {clockOfDay(d.last)}</b>
+          </li>
+        ))}
+      </ul>
+      <p className="hint">Hora en que sale el primer y el último bus desde el inicio de la ruta, según el horario programado. Entre medias pasan con la frecuencia que muestra cada parada.</p>
+    </details>
+  );
+}
+
 /** Aviso de que la ruta ya terminó por hoy (o todavía no empieza), según el horario programado. */
 export function RouteStatusNote({ routeId, nowMs, label }: { routeId: string; nowMs: number; label?: string }) {
   const st = transit.routeStatus(routeId, nowMs);

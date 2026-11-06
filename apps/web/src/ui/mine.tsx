@@ -120,14 +120,14 @@ function QuickTrip({ slot, me, version }: { slot: Slot; me: { lat: number; lon: 
   const place = usePlaces((p) => p[slot])!;
   const [best, setBest] = useState<Itinerary | null>(null);
   useEffect(() => {
-    if (!me || !transit.network.stops.size) { setBest(null); return; }
+    if (!me || !transit.network.stops.size || transit.fleet.size < 50) { setBest(null); return; }
     const t = setTimeout(() => {
       try { setBest(planTrip(transit, { name: "Mi ubicación", position: me }, place, { nowMs: nowMs(), limit: 1 })[0] ?? null); } catch { setBest(null); }
     }, 60);
     return () => clearTimeout(t);
   }, [me, place, version]);
   const ride = best?.legs.find((l) => l.kind === "ride");
-  const sub = !me ? "Activa tu ubicación para ver el próximo bus" : best ? `${ride && ride.kind === "ride" ? `${ride.shortName} · ` : ""}${durText(best.seconds)} · llegas ${new Date(best.arriveAt * 1000).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", timeZone: "America/Bogota" })}` : "Toca para ver cómo llegar";
+  const sub = transit.fleet.size < 50 ? "Ahora no hay buses · toca para elegir otra hora" : !me ? "Activa tu ubicación para ver el próximo bus" : best ? `${ride && ride.kind === "ride" ? `${ride.shortName} · ` : ""}${durText(best.seconds)} · llegas ${new Date(best.arriveAt * 1000).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", timeZone: "America/Bogota" })}` : "Toca para ver cómo llegar";
   return (
     <button className="row nearrow" onClick={() => openPlannerTo(place)}>
       <span className="pico"><Directions /></span>

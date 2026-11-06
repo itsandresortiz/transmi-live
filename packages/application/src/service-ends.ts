@@ -61,6 +61,13 @@ export class ServiceEnds {
     return { isLast: l != null, isFirst: f != null, startSeconds: (l ?? f)! };
   }
 
+  /** Primer y último viaje de la ruta en cada tipo de día (segundos desde la medianoche), y cuál es el de hoy. */
+  scheduleOf(routeId: string, nowMs: number): { today: DayType; days: { type: DayType; first: number; last: number }[] } | undefined {
+    const r = this.byRoute[routeId]; if (!r) return undefined;
+    const days = (["wk", "sa", "su"] as DayType[]).flatMap((type) => { const d = r[type]; return d ? [{ type, first: d.first[1], last: d.last[1] }] : []; });
+    return days.length ? { today: serviceDay(nowMs, this.dates).type, days } : undefined;
+  }
+
   /** Estado de la ruta hoy según el horario programado. `activeBuses` son los buses de esa ruta que ahora mismo circulan. */
   routeStatus(routeId: string, nowMs: number, activeBuses: number): RouteDayStatus | undefined {
     const { type, secs } = serviceDay(nowMs, this.dates);

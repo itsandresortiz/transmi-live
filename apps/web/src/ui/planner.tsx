@@ -39,7 +39,7 @@ const isWalk = (l: Leg): l is WalkLeg => l.kind === "walk";
 /** Abre «Cómo llegar» con un destino ya elegido (desde una parada o estación). */
 export function openPlannerTo(place: PlanPlace) {
   const u = useUi.getState();
-  u.setRoute(null); u.setTab("viaje"); u.setSheet("half");
+  u.setRoute(null); u.setTab("viaje"); u.setSheet("full");
   usePlanner.getState().setPlace("dest", place);
 }
 
@@ -110,7 +110,7 @@ const hhmmNow = (ms: number) => new Intl.DateTimeFormat("en-GB", { hour: "2-digi
 
 function WhenRow() {
   const { when, setWhen } = usePlanner();
-  const [time, setTime] = useState(() => hhmmNow(Date.now() + 3600_000));
+  const [time, setTime] = useState(() => (Number(hhmmNow(Date.now()).slice(0, 2)) < 5 ? "05:00" : hhmmNow(Date.now() + 3600_000)));      // de madrugada se propone la hora en que arranca el servicio
   const apply = (mode: "depart" | "arrive", t: string) => { const at = timeToMs(t); if (at) setWhen({ mode, at }); };
   return (
     <div className="when" role="group" aria-label="Cuándo viajas">
@@ -251,8 +251,11 @@ function Results({ th, act }: { th: MapTheme; act: Actions }) {
 }
 
 function NoResults() {
-  const { origin, originMe, dest } = usePlanner();
+  const { origin, originMe, dest, when } = usePlanner();
   const me = useLocation((l) => l.me);
+  if (when.mode !== "arrive" && (when.mode === "now" || when.at - Date.now() < 120_000) && transit.fleet.size < 50) return (
+    <div className="empty"><Directions /><b>Ahora no hay buses en servicio</b>TransMilenio no está reportando buses en este momento. Elige «Salir a las…» o «Llegar a las…» y una hora (por ejemplo, mañana 5:00 a. m.) para ver las rutas que funcionan a esa hora.</div>
+  );
   const from = originMe && me ? { name: "Mi ubicación", position: me } : origin;
   const d = from && dest ? diagnosePlan(transit, from, dest) : null;
   let why = "Prueba moviendo el origen o el destino unos metros.";
@@ -261,6 +264,7 @@ function NoResults() {
     else if (d.nearOrigin === 0) why = "No hay paradas a menos de 900 m del punto de partida. Prueba con un origen más cerca de una avenida o estación.";
     else if (d.nearDest === 0) why = "No hay paradas a menos de 900 m del destino. Prueba con un punto más cerca de una avenida o estación.";
     else if (d.routesRunning === 0) why = d.liveData ? "Ahora mismo no hay rutas en servicio." : "No hay datos en vivo y, según los horarios, ya no hay servicio a esta hora.";
+    else if (when.mode !== "now") why = "A esa hora no encontramos rutas que conecten los dos puntos según los horarios. Prueba con otra hora o cambia un poco el origen o el destino.";
     else why = "Hay paradas cerca de los dos puntos, pero ninguna combinación de rutas (hasta tres trasbordos) los conecta con los buses que van ahora. Prueba más tarde o cambia un poco el origen o el destino.";
   }
   return <div className="empty"><Directions /><b>No encontramos una forma de llegar</b>{why}</div>;

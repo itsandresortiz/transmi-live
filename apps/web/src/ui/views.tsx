@@ -10,7 +10,7 @@ import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
 import { nowMs } from "../clock";
 import { stopCode, stopKind, stopTag, stopText } from "./stopname";
-import { FirstBadge, LastBadge, RouteStatusNote, clockOfDay } from "./lastService";
+import { FirstBadge, LastBadge, RouteSchedule, RouteStatusNote, clockOfDay } from "./lastService";
 import { FavoritesSection, NearbySection, QuickTrips, StarButton } from "./mine";
 import { ShareButton } from "./share";
 import { useFavs } from "./favorites";
@@ -288,6 +288,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
         </div>
       )}
       <RouteStatusNote routeId={id} nowMs={nowSec * 1000} />
+      {!bus && <RouteSchedule routeId={id} nowMs={nowSec * 1000} />}
       {d.alerts.map(({ alert, index }) => <div key={index} className="card"><span className="pill warn">{ALERT_EFFECT_LABEL[alert.effect]}</span><div className="ct" style={{ marginTop: 8 }}>{alertTitle(alert)}</div><div className="cs">{describeAlert(alert)}</div>{alertValidity(alert) && <div className="cs" style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{alertValidity(alert)}</div>}</div>)}
       {cur && cur.stopIds.length > 0 && (
         <>

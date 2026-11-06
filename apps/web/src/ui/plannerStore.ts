@@ -102,7 +102,9 @@ export const usePlanner = create<PlannerState>((set, get) => ({
 /** Calcula las opciones según cuándo viaja la persona. «Llegar a las…» busca la hora de salida que lo logra. */
 function planFor(origin: PlanPlace, dest: PlanPlace, when: When): Itinerary[] {
   const now = nowMs();
-  if (when.mode === "now" || (when.mode === "depart" && when.at - now < 120_000)) return planTrip(transit, origin, dest, { nowMs: now });
+  const isNow = when.mode === "now" || (when.mode === "depart" && when.at - now < 120_000);
+  // ahora: solo con buses que realmente están reportando (de madrugada, sin buses, no hay nada que mostrar)
+  if (isNow) return transit.fleet.size < 50 ? [] : planTrip(transit, origin, dest, { nowMs: now });
   if (when.mode === "depart") return planTrip(transit, origin, dest, { nowMs: when.at, scheduled: true });
   // llegar a las…: se parte de una salida estimada y se corrige según a qué hora llega realmente la mejor opción
   let depart = Math.max(now, when.at - 45 * 60_000), res: Itinerary[] = [];

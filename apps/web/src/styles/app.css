@@ -385,3 +385,11 @@ button.stat:active{transform:scale(.97)}
 :root[data-contrast="high"]{--line:rgba(128,128,128,.75)}
 :root[data-contrast="high"] .chip,:root[data-contrast="high"] .btn,:root[data-contrast="high"] .row,:root[data-contrast="high"] .card{border:1px solid currentColor!important}
 :root[data-contrast="high"] .faint,:root[data-contrast="high"] .rs,:root[data-contrast="high"] .cs{opacity:1;color:inherit}
+/* celular: los botones del mapa van abajo a la derecha, donde llega el pulgar, y suben con el panel */
+@media (max-width:699px){
+  .tools{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(var(--vis,152px) + 14px);flex-direction:column;align-items:center;transition:bottom .36s cubic-bezier(.2,.9,.25,1),opacity .2s}
+  html[data-sheet="full"] .tools{opacity:0;pointer-events:none}
+}
+.sched{margin:0 0 12px;border-radius:16px;background:var(--hover);padding:2px 14px}.sched summary{cursor:pointer;padding:12px 0;font-weight:650;font-size:14.5px}
+.sched ul{list-style:none;margin:0 0 4px;padding:0}.sched li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:.5px solid var(--line);font-size:14px;font-variant-numeric:tabular-nums}
+.sched li.today{font-weight:650}.sched li.today span{color:var(--accent)}.sched .hint{margin:6px 0 12px}

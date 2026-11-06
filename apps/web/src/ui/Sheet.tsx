@@ -4,6 +4,7 @@ import { Close, Directions, Search } from "./icons";
 import { haptic } from "./haptics";
 import { type SheetState, type Tab, useUi } from "./store";
 import { useTransitVersion } from "./hooks";
+import { usePlanner } from "./plannerStore";
 
 const TABS: [Tab, string][] = [["viaje", "Cómo llegar"], ["rutas", "Rutas"], ["buses", "Buses"], ["paradas", "Paradas"]];
 const PEEK = 152;
@@ -23,11 +24,14 @@ export function Sheet({ children }: { children: ReactNode }) {
     const e = el.current; if (!e) return;
     const h = e.offsetHeight, off = offsetOf(s, h);
     e.style.setProperty("--sy", `${off}px`);
+    document.documentElement.dataset.sheet = s;
     document.documentElement.style.setProperty("--vis", advanced() ? "0px" : `${h - off}px`);
   }, []);
   useEffect(() => { apply(sheet); const on = () => apply(useUi.getState().sheet); window.addEventListener("resize", on); return () => window.removeEventListener("resize", on); }, [sheet, apply]);
-  // al abrir una ruta se muestra a media altura
-  useEffect(() => { if (routeId && useUi.getState().sheet === "peek") setSheet("half"); }, [routeId, setSheet]);
+  // como en Mapas de Apple: al abrir una ruta, una parada o las opciones de un viaje, el panel sube hasta arriba para verlo todo
+  const hasTrip = usePlanner((p) => !!p.results?.length);
+  useEffect(() => { if (routeId && useUi.getState().sheet !== "full") setSheet("full"); }, [routeId, setSheet]);
+  useEffect(() => { if (tab === "viaje" && hasTrip && useUi.getState().sheet !== "full") setSheet("full"); }, [tab, hasTrip, setSheet]);
 
   const down = (ev: React.PointerEvent) => {
     if (advanced() || (ev.target as HTMLElement).closest("input,button.tab,button.clear")) return;
