@@ -98,3 +98,9 @@ export function movementsByMonth(list: readonly CardMovement[]): { month: string
   if (undated.length) groups.push({ month: null, movements: undated });
   return groups;
 }
+
+/** La lectura cruda sirve para comprobar el analizador contra una tarjeta real. Se le tapa el número de la tarjeta (bytes 8 a 15 del archivo de la tarjeta). */
+export function maskedReading(r: CardReading): string {
+  const hide = (h: string) => h.replace(/[^0-9a-f]/gi, "").replace(/^(.{16})(.{16})/i, (_, a: string) => a + "x".repeat(16));
+  return JSON.stringify({ balance: r.balance, purse: r.purse, cardFile: hide(r.cardFile), records: r.records }, null, 1);
+}

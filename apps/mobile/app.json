@@ -11,7 +11,16 @@
       "bundleIdentifier": "com.transmilive.app",
       "supportsTablet": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NFCReaderUsageDescription": "TransMi LIVE lee tu tarjeta TuLlave en el teléfono para mostrarte el saldo. El número no sale del teléfono.",
+        "com.apple.developer.nfc.readersession.iso7816.select-identifiers": [
+          "D4100000030001"
+        ]
+      },
+      "entitlements": {
+        "com.apple.developer.nfc.readersession.formats": [
+          "TAG"
+        ]
       }
     },
     "android": {

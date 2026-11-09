@@ -34,6 +34,10 @@ En los dos casos hay que crear antes la app en App Store Connect con el Bundle I
 
 ## Estado
 
-Hecho: arranque de datos (rutas, horarios y datos en vivo), lista y detalle de rutas, estructura de pestañas.
-Falta: mapa nativo (MapLibre), paradas con horarios, buses, «Cómo llegar», panel inferior, lectura de la tarjeta TuLlave por NFC (módulo nativo; el analizador ya está en `@transmi/domain`), notificaciones y widgets.
-Todo lo anterior se ha verificado solo con tipos y empaquetado; no se ha ejecutado en un teléfono ni en un simulador.
+Hecho (verificado con tipos, empaquetado para iPhone y generación del proyecto nativo; **no ejecutado en un teléfono ni en un simulador**):
+- Barra inferior nativa de iOS (vidrio líquido), sistema de diseño (`src/ui`), pantalla de inicio con favoritos, casa y trabajo.
+- Mapa con buses en vivo (MapLibre + el mismo motor de movimiento de la web), paradas, trazado de la ruta, tu ubicación; hojas nativas de bus y de parada.
+- Rutas (búsqueda, detalle, favoritos), «Cómo llegar» (salir ahora, salir o llegar a una hora, opciones ordenables), avisos del servicio.
+- Saldo de la tarjeta TuLlave por NFC (`modules/tullave`, Swift + Core NFC; el analizador está en `@transmi/domain`). Requiere activar *NFC Tag Reading* en el App ID y un iPhone real.
+
+Falta: modo «voy en el bus», seguir un bus en el mapa, tráfico y semáforos, trazado del viaje en el mapa, contador de avisos sin ver, mapa oscuro, Android (el lector NFC), notificaciones y widgets.

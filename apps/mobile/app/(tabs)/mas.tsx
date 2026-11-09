@@ -10,6 +10,9 @@ export default function Mas() {
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
       <ScrollView contentContainerStyle={{ gap: space[3], paddingBottom: space[10] * 3 }}>
         <Text style={[type.largeTitle, { color: c.text, paddingHorizontal: space[5] }]} accessibilityRole="header">Más</Text>
+        <Tap onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel="Avisos del servicio" style={{ marginHorizontal: space[5] }}>
+          <Card><Text style={[type.headline, { color: c.text }]}>Avisos del servicio</Text><Text style={[type.body, { color: c.muted }]}>Desvíos, cierres de estaciones y cambios de operación.</Text></Card>
+        </Tap>
         <Tap onPress={() => router.push("/card")} accessibilityRole="button" accessibilityLabel="Mi tarjeta TuLlave" style={{ marginHorizontal: space[5] }}>
           <Card><Text style={[type.headline, { color: c.text }]}>Mi tarjeta TuLlave</Text><Text style={[type.body, { color: c.muted }]}>Lee tu saldo acercando la tarjeta al teléfono.</Text></Card>
         </Tap>

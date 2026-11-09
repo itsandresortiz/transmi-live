@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NotTuLlaveError, groupCardNumber, movementsByMonth, parseTuLlave, type CardReading } from "../src";
+import { NotTuLlaveError, groupCardNumber, maskedReading, movementsByMonth, parseTuLlave, type CardReading } from "../src";
 
 const be = (n: number, len: number) => Array.from({ length: len }, (_, i) => (n >> (8 * (len - 1 - i))) & 255);
 const bcd = (n: number) => ((Math.floor(n / 10) << 4) | n % 10);
@@ -46,5 +46,12 @@ describe("lectura de la TuLlave", () => {
     const c = parseTuLlave(reading());
     expect(movementsByMonth(c.movements).map((g) => g.month)).toEqual(["2026-11", "2026-10"]);
     expect(groupCardNumber(c.number)).toBe("1010 0000 1234 5678");
+  });
+  it("la lectura técnica tapa el número de la tarjeta y deja el resto", () => {
+    const r = reading();
+    const out = JSON.parse(maskedReading(r)) as { cardFile: string; balance: string };
+    expect(out.cardFile).not.toContain("1010000012345678");
+    expect(out.cardFile).toContain("xxxxxxxxxxxxxxxx");
+    expect(out.balance).toBe(r.balance);
   });
 });

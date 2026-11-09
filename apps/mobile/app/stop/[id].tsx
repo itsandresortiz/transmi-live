@@ -8,7 +8,8 @@ import { useNow, useTransitVersion } from "@/hooks";
 import { etaText } from "@/format";
 import { clockOfDay, liveDown } from "@/lastService";
 import { stopKind } from "@/stopname";
-import { Card, Tap } from "@/ui/kit";
+import { useSaved } from "@/favorites";
+import { Card, RoundButton, Tap } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { space, type, useColors } from "@/ui/theme";
 
@@ -19,6 +20,7 @@ export default function StopSheet() {
   useTransitVersion();
   const now = useNow() / 1000;
   const stop = transit.stopById(id);
+  const fav = useSaved((f) => f.stops.includes(id)), toggle = useSaved((f) => f.toggleStop);
   if (!stop) return <View style={[styles.screen, { backgroundColor: c.bg }]}><Text style={[type.body, { color: c.muted }]}>No encontramos esa parada.</Text></View>;
   const rows = upcomingAtStop(transit, id, nowSec(), 3);
   const down = liveDown(transit.fleet.size);
@@ -27,8 +29,13 @@ export default function StopSheet() {
 
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={styles.screen}>
-      <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
-      <Text style={[type.largeTitle, { color: c.text }]}>{stopLabelText(transit.labelOf(stop))}</Text>
+      <View style={styles.head}>
+        <View style={{ flex: 1 }}>
+          <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
+          <Text style={[type.largeTitle, { color: c.text }]}>{stopLabelText(transit.labelOf(stop))}</Text>
+        </View>
+        <RoundButton symbol={fav ? "star.fill" : "star"} label={fav ? "Quitar de favoritos" : "Guardar en favoritos"} onPress={() => toggle(id)} />
+      </View>
 
       {rows.length ? rows.map((r) => (
         <Tap key={r.route.id + r.direction} onPress={() => router.push({ pathname: "/route/[id]", params: { id: r.route.id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${r.route.shortName}`}>
@@ -75,5 +82,6 @@ export default function StopSheet() {
 
 const styles = StyleSheet.create({
   screen: { padding: space[5], gap: space[3], paddingBottom: space[10] },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: space[3] },
   row: { flexDirection: "row", alignItems: "center", gap: space[3] },
 });

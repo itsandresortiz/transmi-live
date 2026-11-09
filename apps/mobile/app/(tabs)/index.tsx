@@ -6,6 +6,13 @@ import { connectionStatus } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
+import { upcomingAtStop } from "@transmi/application";
+import { stopLabelText } from "@transmi/domain";
+import { nowSec } from "@/clock";
+import { etaText } from "@/format";
+import { useSaved } from "@/favorites";
+import { usePlanner } from "@/planner/store";
+import { RouteBadge } from "@/ui/RouteBadge";
 import { Card, IconDot, RoundButton, SectionTitle, Tap } from "@/ui/kit";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -20,10 +27,12 @@ export default function Inicio() {
   const st = connectionStatus(transit, nowMs());
   const live = st.connection === "live" || st.connection === "waiting";
 
+  const saved = useSaved();
+  const goTo = (p: typeof saved.home) => { if (p) usePlanner.getState().setDest(p); router.navigate("/viaje"); };
   const quick: { symbol: Parameters<typeof IconDot>[0]["symbol"]; label: string; go: () => void }[] = [
     { symbol: "location.fill", label: "Cerca de mí", go: () => router.navigate("/mapa") },
-    { symbol: "house.fill", label: "Casa", go: () => router.navigate("/viaje") },
-    { symbol: "briefcase.fill", label: "Trabajo", go: () => router.navigate("/viaje") },
+    { symbol: "house.fill", label: saved.home ? "Casa" : "Guardar casa", go: () => goTo(saved.home) },
+    { symbol: "briefcase.fill", label: saved.work ? "Trabajo" : "Guardar trabajo", go: () => goTo(saved.work) },
     { symbol: "star.fill", label: "Favoritos", go: () => router.navigate("/rutas") },
   ];
 
@@ -32,7 +41,7 @@ export default function Inicio() {
       <ScrollView contentContainerStyle={{ paddingBottom: space[10] * 3 }} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
           <Text style={[type.body, { color: c.muted }]}>{greeting()}</Text>
-          <RoundButton symbol="bell" label="Avisos del servicio" onPress={() => router.navigate("/mas")} />
+          <RoundButton symbol="bell" label="Avisos del servicio" onPress={() => router.push("/avisos")} />
         </View>
         <Text style={[type.hero, styles.hero, { color: c.text }]} accessibilityRole="header">¿A dónde{"\n"}vamos hoy?</Text>
 
@@ -69,6 +78,28 @@ export default function Inicio() {
           </Tap>
         </View>
 
+        {saved.stops.length || saved.routes.length ? (
+          <>
+            <SectionTitle title="Tus favoritos" />
+            <View style={{ paddingHorizontal: space[5], gap: space[3] }}>
+              {saved.stops.slice(0, 4).map((id) => {
+                const stop = transit.stopById(id); if (!stop) return null;
+                const next = upcomingAtStop(transit, id, nowSec(), 1)[0];
+                return (
+                  <Tap key={id} onPress={() => router.push({ pathname: "/stop/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={stopLabelText(transit.labelOf(stop))}>
+                    <Card style={styles.favRow}>
+                      <SymbolView name="mappin.circle.fill" tintColor={c.accent} size={24} />
+                      <View style={{ flex: 1 }}><Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{stopLabelText(transit.labelOf(stop))}</Text>
+                        <Text style={[type.caption, { color: c.muted }]}>{next ? `${next.route.shortName} · ${etaText(next.buses[0]!.etaAt, nowSec())}` : live ? "Ningún bus viene ahora" : "Sin datos en vivo"}</Text></View>
+                    </Card>
+                  </Tap>
+                );
+              })}
+              {saved.routes.length ? <View style={styles.favRoutes}>{saved.routes.slice(0, 12).map((id) => { const r = transit.routeById(id); return r ? <Tap key={id} onPress={() => router.push({ pathname: "/route/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${r.shortName}`}><RouteBadge route={r} /></Tap> : null; })}</View> : null}
+            </View>
+          </>
+        ) : null}
+
         <SectionTitle title="En vivo" />
         <View style={{ paddingHorizontal: space[5] }}>
           <Card>
@@ -98,6 +129,8 @@ const styles = StyleSheet.create({
   quick: { alignItems: "center", gap: space[2], width: 76 },
   bigRow: { flexDirection: "row", gap: space[3], paddingHorizontal: space[5], marginTop: space[6] },
   big: { height: 128, justifyContent: "space-between" },
+  favRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
+  favRoutes: { flexDirection: "row", flexWrap: "wrap", gap: space[2] },
   liveRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
   liveDot: { width: 10, height: 10, borderRadius: 5 },
 });

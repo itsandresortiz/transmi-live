@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type CardMovement, type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, movementsByMonth, parseTuLlave } from "@transmi/domain";
+import { type CardMovement, type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, maskedReading, movementsByMonth, parseTuLlave } from "@transmi/domain";
 
 /** Lo que la app nativa (iPhone o Android) le ofrece a la página para leer la tarjeta por NFC. El navegador no puede: ni Safari tiene NFC web, ni Chrome lee estas tarjetas. */
 interface NativeReader { isAvailable(): boolean | Promise<boolean>; read(): Promise<CardReading> }
@@ -12,12 +12,7 @@ const KIND: Record<CardMovement["kind"], string> = { trip: "Viaje", topup: "Reca
 const when = (at: string) => new Date(at).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const month = (m: string) => { const s = new Date(`${m}-15T12:00:00`).toLocaleDateString("es-CO", { month: "long", year: "numeric" }); return s.charAt(0).toUpperCase() + s.slice(1); };
 
-/** La lectura cruda sirve para comprobar el analizador contra una tarjeta real. Se le tapa el número de la tarjeta (bytes 8 a 15 del archivo de la tarjeta). */
-export function technicalReading(r: CardReading): string {
-  const hide = (h: string) => h.replace(/[^0-9a-f]/gi, "").replace(/^(.{16})(.{16})/i, (_, a: string) => a + "x".repeat(16));
-  return JSON.stringify({ balance: r.balance, purse: r.purse, cardFile: hide(r.cardFile), records: r.records }, null, 1);
-}
-const copyTechnical = (r: CardReading) => navigator.clipboard.writeText(technicalReading(r)).catch(() => undefined);
+const copyTechnical = (r: CardReading) => navigator.clipboard.writeText(maskedReading(r)).catch(() => undefined);
 
 /** «Mi tarjeta»: el saldo se lee de la tarjeta en el teléfono; no se envía ni se guarda nada. */
 export function CardSection() {
