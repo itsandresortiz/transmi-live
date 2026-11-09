@@ -10,7 +10,7 @@ export default function RootLayout() {
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="route/[id]" options={{ headerShown: true, title: "Ruta", presentation: "card" }} />
+        <Stack.Screen name="route/[id]" options={{ headerShown: true, title: "Ruta", headerLargeTitle: false, headerTransparent: true, headerBlurEffect: "systemMaterial", presentation: "card" }} />
         <Stack.Screen name="card" options={{ headerShown: true, title: "Mi tarjeta", presentation: "modal" }} />
       </Stack>
     </>

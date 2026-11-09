@@ -1,16 +1,29 @@
-import type { ColorValue } from "react-native";
-import { Tabs } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { NativeTabs } from "expo-router/native-tabs";
 
-const icon = (name: React.ComponentProps<typeof SymbolView>["name"]) => ({ color }: { color: ColorValue }) => <SymbolView name={name} tintColor={color} size={24} />;
-
+/** Barra inferior nativa de iOS: en iOS 26 es de vidrio líquido y se encoge al desplazarse. */
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="index" options={{ title: "Rutas", tabBarIcon: icon("bus") }} />
-      <Tabs.Screen name="buses" options={{ title: "Buses", tabBarIcon: icon("location.north.line") }} />
-      <Tabs.Screen name="paradas" options={{ title: "Paradas", tabBarIcon: icon("mappin.and.ellipse") }} />
-      <Tabs.Screen name="viaje" options={{ title: "Cómo llegar", tabBarIcon: icon("arrow.triangle.turn.up.right.diamond") }} />
-    </Tabs>
+    <NativeTabs tintColor="#e11d2e" minimizeBehavior="onScrollDown">
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
+        <NativeTabs.Trigger.Label>Inicio</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="mapa">
+        <NativeTabs.Trigger.Icon sf={{ default: "map", selected: "map.fill" }} />
+        <NativeTabs.Trigger.Label>Mapa</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="rutas">
+        <NativeTabs.Trigger.Icon sf="bus" />
+        <NativeTabs.Trigger.Label>Rutas</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="viaje">
+        <NativeTabs.Trigger.Icon sf="arrow.triangle.turn.up.right.diamond" />
+        <NativeTabs.Trigger.Label>Cómo llegar</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="mas">
+        <NativeTabs.Trigger.Icon sf="ellipsis.circle" />
+        <NativeTabs.Trigger.Label>Más</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }
