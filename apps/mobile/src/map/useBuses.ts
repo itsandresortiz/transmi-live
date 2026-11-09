@@ -8,10 +8,12 @@ import { SYSTEM_COLOR } from "@/ui/theme";
 
 export interface Viewport { west: number; south: number; east: number; north: number; zoom: number }
 
-const MAX_BUSES = 1800;
+/** Cuántos buses se dibujan según el zoom: lejos no se distinguen y cada actualización cuesta. */
+const capFor = (zoom: number) => (zoom < 11 ? 450 : zoom < 13 ? 1000 : 1800);
+const hash = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0; return Math.abs(h); };
 const EMPTY: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
 
-/** Buses de la pantalla como puntos para el mapa, recalculados cada segundo con el motor de movimiento. Solo los que se ven. */
+/** Buses de la pantalla como puntos para el mapa, recalculados cuatro veces por segundo con el motor de movimiento. Solo los que se ven. */
 export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; enabled?: boolean } = {}): FeatureCollection<Point> {
   const [data, setData] = useState<FeatureCollection<Point>>(EMPTY);
   const { system = null, routeId = null, enabled = true } = opts;
@@ -21,18 +23,24 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       const t = nowSec();
       const padX = (view.east - view.west) * 0.15, padY = (view.north - view.south) * 0.15;
       const features: Feature<Point>[] = [];
+      const cap = capFor(view.zoom);
+      let seen = 0;
       for (const v of transit.fleet.values()) {
         if (routeId && v.routeId !== routeId) continue;
         if (system && v.system !== system) continue;
         const g = toGeo(motion.step(v, t));
         if (g.lon < view.west - padX || g.lon > view.east + padX || g.lat < view.south - padY || g.lat > view.north + padY) continue;
-        features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], h: motion.heading(v.id) ?? v.bearing ?? 0, route: transit.routeOf(v)?.shortName ?? "" } });
-        if (features.length >= MAX_BUSES) break;
+        // a lo lejos se deja una muestra estable de buses (siempre los mismos), no una al azar
+        if (++seen > cap && hash(v.id) % 3 !== 0) continue;
+        const h = (((motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;
+        const left = h >= 180;       // como en la web: el bus se voltea para no quedar de cabeza
+        features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `${v.system}-${v.system === "troncal" ? "l" : "s"}-${left ? "L" : "R"}`, rot: left ? h - 270 : h - 90, route: transit.routeOf(v)?.shortName ?? "" } });
+        if (features.length >= cap * 1.4) break;
       }
       setData({ type: "FeatureCollection", features });
     };
     build();
-    const timer = setInterval(build, 1000);
+    const timer = setInterval(build, 250);
     return () => clearInterval(timer);
   }, [view, system, routeId, enabled]);
   return data;

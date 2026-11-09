@@ -1,0 +1,23 @@
+/** Buses de cada servicio, de lado como en la web, mirando a la derecha (R) o a la izquierda (L). Generados de assets/sprites. */
+export const BUS_SPRITES: Record<string, number> = {
+  "troncal-s-R": require("../../assets/sprites/troncal-s-R.png"),
+  "troncal-s-L": require("../../assets/sprites/troncal-s-L.png"),
+  "troncal-l-R": require("../../assets/sprites/troncal-l-R.png"),
+  "troncal-l-L": require("../../assets/sprites/troncal-l-L.png"),
+  "dual-s-R": require("../../assets/sprites/dual-s-R.png"),
+  "dual-s-L": require("../../assets/sprites/dual-s-L.png"),
+  "dual-l-R": require("../../assets/sprites/dual-l-R.png"),
+  "dual-l-L": require("../../assets/sprites/dual-l-L.png"),
+  "alimentador-s-R": require("../../assets/sprites/alimentador-s-R.png"),
+  "alimentador-s-L": require("../../assets/sprites/alimentador-s-L.png"),
+  "alimentador-l-R": require("../../assets/sprites/alimentador-l-R.png"),
+  "alimentador-l-L": require("../../assets/sprites/alimentador-l-L.png"),
+  "zonal-s-R": require("../../assets/sprites/zonal-s-R.png"),
+  "zonal-s-L": require("../../assets/sprites/zonal-s-L.png"),
+  "zonal-l-R": require("../../assets/sprites/zonal-l-R.png"),
+  "zonal-l-L": require("../../assets/sprites/zonal-l-L.png"),
+  "otro-s-R": require("../../assets/sprites/otro-s-R.png"),
+  "otro-s-L": require("../../assets/sprites/otro-s-L.png"),
+  "otro-l-R": require("../../assets/sprites/otro-l-R.png"),
+  "otro-l-L": require("../../assets/sprites/otro-l-L.png"),
+};

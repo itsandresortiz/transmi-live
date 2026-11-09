@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { SYSTEMS, SYSTEM_LABEL, type SystemType } from "@transmi/domain";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { locateMe } from "@/location";
@@ -11,13 +11,14 @@ import { space } from "@/ui/theme";
 export default function Mapa() {
   const insets = useSafeAreaInsets();
   const map = useRef<TransitMapHandle>(null);
+  const focused = useIsFocused();
   const [system, setSystem] = useState<SystemType | null>(null);
 
   const locate = async () => { const me = await locateMe(); if (me) map.current?.flyTo(me.lat, me.lon, 15.8); };
 
   return (
     <View style={styles.screen}>
-      <TransitMap ref={map} system={system}
+      <TransitMap ref={map} system={system} active={focused}
         onBus={(id) => router.push({ pathname: "/bus/[id]", params: { id } })}
         onStop={(id) => router.push({ pathname: "/stop/[id]", params: { id } })} />
       <View pointerEvents="box-none" style={[styles.top, { top: insets.top + space[2] }]}>
