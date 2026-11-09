@@ -12,9 +12,17 @@ const KIND: Record<CardMovement["kind"], string> = { trip: "Viaje", topup: "Reca
 const when = (at: string) => new Date(at).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const month = (m: string) => { const s = new Date(`${m}-15T12:00:00`).toLocaleDateString("es-CO", { month: "long", year: "numeric" }); return s.charAt(0).toUpperCase() + s.slice(1); };
 
+/** La lectura cruda sirve para comprobar el analizador contra una tarjeta real. Se le tapa el número de la tarjeta (bytes 8 a 15 del archivo de la tarjeta). */
+export function technicalReading(r: CardReading): string {
+  const hide = (h: string) => h.replace(/[^0-9a-f]/gi, "").replace(/^(.{16})(.{16})/i, (_, a: string) => a + "x".repeat(16));
+  return JSON.stringify({ balance: r.balance, purse: r.purse, cardFile: hide(r.cardFile), records: r.records }, null, 1);
+}
+const copyTechnical = (r: CardReading) => navigator.clipboard.writeText(technicalReading(r)).catch(() => undefined);
+
 /** «Mi tarjeta»: el saldo se lee de la tarjeta en el teléfono; no se envía ni se guarda nada. */
 export function CardSection() {
-  const [card, setCard] = useState<{ data: TuLlaveCard; at: number } | null>(null);
+  const [card, setCard] = useState<{ data: TuLlaveCard; at: number; raw: CardReading } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const native = reader();
@@ -24,7 +32,8 @@ export function CardSection() {
     setBusy(true); setError(null);
     try {
       if (!(await native.isAvailable())) { setError("Este teléfono no puede leer tarjetas."); return; }
-      setCard({ data: parseTuLlave(await native.read()), at: Date.now() });
+      const raw = await native.read();
+      setCard({ data: parseTuLlave(raw), at: Date.now(), raw }); setCopied(false);
     } catch (e) {
       const code = (e as { code?: string }).code;
       setError(e instanceof NotTuLlaveError || code === "not_tullave" ? "Esa tarjeta no parece una TuLlave."
@@ -48,6 +57,7 @@ export function CardSection() {
               {card.data.balance < 0 && <div className="cs">Debes {pesos(-card.data.balance)}: se descuenta en tu próxima recarga.</div>}
               {card.data.number && <div className="cs faint">Tarjeta {groupCardNumber(card.data.number)}</div>}
               <div className="cs faint">Leído a las {new Date(card.at).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" })} (solo se muestra aquí, no se guarda)</div>
+              <button className="tlink" onClick={() => void copyTechnical(card.raw).then(() => setCopied(true))}>{copied ? "Copiado" : "Copiar lectura técnica (sin el número de la tarjeta)"}</button>
               {movementsByMonth(card.data.movements).map((g) => (
                 <div key={g.month ?? "sin-fecha"}>
                   <div className="sec">{g.month ? month(g.month) : "Sin fecha"}</div>

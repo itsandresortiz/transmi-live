@@ -1,0 +1,6 @@
+{
+  "appId": "com.transmilive.app",
+  "appName": "TransMi LIVE",
+  "webDir": "apps/web/dist",
+  "ios": { "contentInset": "never", "limitsNavigationsToAppBoundDomains": false }
+}

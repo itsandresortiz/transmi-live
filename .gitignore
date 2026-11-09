@@ -4,3 +4,9 @@ dist/
 .vite/
 .env
 .DS_Store
+
+# app de iPhone
+build/
+*.p8
+ios/App/Pods/
+ios/DerivedData/
