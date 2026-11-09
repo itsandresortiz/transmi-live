@@ -11,6 +11,8 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="route/[id]" options={{ headerShown: true, title: "Ruta", headerLargeTitle: false, headerTransparent: true, headerBlurEffect: "systemMaterial", presentation: "card" }} />
+        <Stack.Screen name="bus/[id]" options={{ presentation: "formSheet", sheetAllowedDetents: [0.34, 0.7], sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 1, sheetCornerRadius: 28, headerShown: false }} />
+        <Stack.Screen name="stop/[id]" options={{ presentation: "formSheet", sheetAllowedDetents: [0.4, 0.92], sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 0, sheetCornerRadius: 28, headerShown: false }} />
         <Stack.Screen name="card" options={{ headerShown: true, title: "Mi tarjeta", presentation: "modal" }} />
       </Stack>
     </>
