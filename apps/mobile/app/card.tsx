@@ -46,11 +46,11 @@ export default function CardScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-    <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
       {!Tullave || !available ? (
         <Card><Text style={[type.headline, { color: c.text }]}>{!Tullave ? "Esta versión no trae el lector de tarjetas" : "No pudimos activar el NFC"}</Text>
           <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{!Tullave
-            ? "Instala la última compilación desde TestFlight: el lector solo viene en las versiones nuevas."
+            ? `El lector de tarjetas no quedó registrado en la app. Módulos nativos que sí hay: ${Object.keys((globalThis as { expo?: { modules?: object } }).expo?.modules ?? {}).filter((k) => !k.startsWith("Expo")).join(", ") || "ninguno"}.`
             : "iOS dice que no puede leer tarjetas ahora. Pasa si el teléfono es anterior al iPhone 7, si es un iPad o si la app se compiló sin el permiso «NFC Tag Reading» en developer.apple.com (Identifiers › com.transmilive.app). No funciona en el simulador."}</Text></Card>
 
       ) : (
