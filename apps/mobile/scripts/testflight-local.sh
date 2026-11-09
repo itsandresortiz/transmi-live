@@ -6,6 +6,15 @@
 #   BUNDLE_ID                       opcional (por defecto com.transmilive.app)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+ROOT="$(git rev-parse --show-toplevel)"
+git -C "$ROOT" fetch -q origin main 2>/dev/null || true
+BEHIND="$(git -C "$ROOT" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)"
+if [ "${BEHIND:-0}" -gt 0 ] && [ -z "${SKIP_PULL_CHECK:-}" ]; then
+  echo "Tu copia está $BEHIND cambios atrás de GitHub, así que compilarías una versión vieja."
+  echo "Corre primero:  git pull   y vuelve a lanzar el script."
+  exit 1
+fi
+echo "Compilando la versión $(git -C "$ROOT" rev-parse --short HEAD) ($(git -C "$ROOT" log -1 --format=%s | cut -c1-70))"
 [ "$(uname)" = "Darwin" ] || { echo "Esto solo corre en un Mac con Xcode."; exit 1; }
 : "${TEAM_ID:?falta TEAM_ID}"
 UPLOAD="${UPLOAD:-transporter}"; BUNDLE_ID="${BUNDLE_ID:-com.transmilive.app}"
