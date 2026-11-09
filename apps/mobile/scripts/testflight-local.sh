@@ -21,9 +21,14 @@ npx expo prebuild --platform ios                      # genera ios/ (y corre pod
 WS="$(ls -d ios/*.xcworkspace | head -1)"; SCHEME="$(basename "$WS" .xcworkspace)"
 BUILD="$(date +%y%m%d%H%M)"; OUT="build/ios"; rm -rf "$OUT"; mkdir -p "$OUT"
 
-xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -destination 'generic/platform=iOS' \
+# El registro completo queda en build/ios/archive.log; si falla, abajo salen solo los errores.
+show_errors() { echo; echo "=== ERRORES ($1) ==="; grep -a "error:" "$OUT/$1.log" | sort -u | head -25; echo "Registro completo: $OUT/$1.log"; }
+if ! xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -destination 'generic/platform=iOS' \
   -archivePath "$OUT/App.xcarchive" "${AUTH[@]}" \
-  DEVELOPMENT_TEAM="$TEAM_ID" PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" CURRENT_PROJECT_VERSION="$BUILD" archive
+  DEVELOPMENT_TEAM="$TEAM_ID" PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" CURRENT_PROJECT_VERSION="$BUILD" archive > "$OUT/archive.log" 2>&1; then
+  show_errors archive; exit 1
+fi
+echo "Compilación lista."
 
 cat > "$OUT/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -36,7 +41,9 @@ cat > "$OUT/ExportOptions.plist" <<PLIST
   <key>uploadSymbols</key><true/>
 </dict></plist>
 PLIST
-xcodebuild -exportArchive -archivePath "$OUT/App.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
+if ! xcodebuild -exportArchive -archivePath "$OUT/App.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}" > "$OUT/export.log" 2>&1; then
+  show_errors export; exit 1
+fi
 
 if [ "$UPLOAD" = api ]; then echo "Subida enviada (compilación $BUILD). Mira App Store Connect → TestFlight en 5–15 minutos."
 else
