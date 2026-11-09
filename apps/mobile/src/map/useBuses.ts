@@ -13,10 +13,10 @@ const capFor = (zoom: number) => (zoom < 11 ? 300 : zoom < 13 ? 600 : 900);
 const hash = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0; return Math.abs(h); };
 const EMPTY: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
 
-/** Buses de la pantalla como puntos para el mapa, recalculados cuatro veces por segundo con el motor de movimiento. Solo los que se ven. */
+/** Buses de la pantalla como puntos para el mapa, recalculados dos veces por segundo con el motor de movimiento. Solo los que se ven. */
 export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; enabled?: boolean; everyMs?: number } = {}): FeatureCollection<Point> {
   const [data, setData] = useState<FeatureCollection<Point>>(EMPTY);
-  const { system = null, routeId = null, enabled = true, everyMs = 250 } = opts;
+  const { system = null, routeId = null, enabled = true, everyMs = 500 } = opts;
   useEffect(() => {
     if (!enabled || !view) { setData(EMPTY); return; }
     const build = () => {

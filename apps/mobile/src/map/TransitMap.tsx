@@ -49,7 +49,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     },
   }), []);
 
-  const buses = useBusFeatures(view, { system, routeId, enabled: active, everyMs: calm ? 1500 : 250 });
+  const buses = useBusFeatures(view, { system, routeId, enabled: active, everyMs: calm ? 2000 : 500 });
 
   const stops = useMemo<FeatureCollection<Point>>(() => {
     const features: Feature<Point>[] = [];
