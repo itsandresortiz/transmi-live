@@ -1,9 +1,9 @@
 import { NativeTabs } from "expo-router/native-tabs";
 
-/** Barra inferior nativa de iOS: en iOS 26 es de vidrio líquido y se encoge al desplazarse. */
+/** Barra inferior nativa de iOS: en iOS 26 es de vidrio líquido . */
 export default function TabsLayout() {
   return (
-    <NativeTabs tintColor="#e11d2e" minimizeBehavior="onScrollDown">
+    <NativeTabs tintColor="#e11d2e">
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
         <NativeTabs.Trigger.Label>Inicio</NativeTabs.Trigger.Label>
