@@ -1,3 +1,4 @@
+import { CardSection } from "./card";
 import { useEffect, useState } from "react";
 import { SYSTEMS, SYSTEM_LABEL } from "@transmi/domain";
 import type { MapTheme } from "../map/theme";
@@ -60,6 +61,7 @@ export function Settings({ th }: { th: MapTheme }) {
             {([[1, "Normal"], [1.15, "Grande"], [1.3, "Muy grande"]] as const).map(([v, l]) => <button key={v} aria-pressed={u.textScale === v} onClick={() => u.setTextScale(v)}>{l}</button>)}
           </div>
         </div>
+        <CardSection />
         <div className="grp"><h3>Contraste</h3>
           <Seg value={u.highContrast ? "alto" : "normal"} set={(v: string) => u.setHighContrast(v === "alto")} opts={[["normal", "Normal"], ["alto", "Alto"]]} />
           <p className="hint">Bordes y textos más marcados para leer mejor al sol.</p>

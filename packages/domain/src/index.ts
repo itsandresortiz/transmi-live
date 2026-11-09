@@ -1,6 +1,7 @@
 export * from "./shared/geo";
 export * from "./transit/system";
 export * from "./transit/route";
+export * from "./card/tullave";
 export * from "./transit/stop";
 export * from "./transit/delay";
 export * from "./transit/alert";

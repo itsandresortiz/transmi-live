@@ -6,7 +6,7 @@ import { useRide } from "./ride";
 import { nowMode } from "./plannerStore";
 import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, liveDown } from "./liveStatus";
 import { haptic } from "./haptics";
-import { routeOfficialName, routeTitle, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
+import { routeCodes, routeOfficialName, routeTitle, routeVariant, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
@@ -91,6 +91,12 @@ export function NoDataNote() {
   );
 }
 
+/** Segunda línea de una ruta: su tipo, los códigos con que la conoce la gente si vienen pareados (HK635 → K635 y H635) y su variante. */
+export function routeSub(r: Route): string {
+  const codes = routeCodes(r);
+  return [SYSTEM_LABEL[r.system], codes.length > 1 ? codes.join(" y ") : "", routeVariant(r) ?? ""].filter(Boolean).join(" · ");
+}
+
 export function RoutesView({ th, act }: Props) {
   useTransitVersion();
   const { query, system, limit } = useUi();
@@ -114,7 +120,7 @@ export function RoutesView({ th, act }: Props) {
           {page.map((r) => (
             <button key={r.id} className="row" aria-label={`Ruta ${r.shortName}, ${SYSTEM_LABEL[r.system]}${r.longName ? `, ${routeTitle(r)}` : ""}, ${liveDown() ? "sin datos en vivo" : `${counts.get(r.id) ?? 0} buses en servicio`}`} onClick={() => act.openRoute(r.id)}>
               <span className="rb" style={{ ["--c" as string]: routeBadgeColor(th, r) }}>{r.shortName}</span>
-              <span className="rm"><span className="rt" title={routeOfficialName(r)}>{r.longName ? routeTitle(r) : SYSTEM_LABEL[r.system]}</span><span className="rs">{SYSTEM_LABEL[r.system]}</span></span>
+              <span className="rm"><span className="rt" title={routeOfficialName(r)}>{r.longName ? routeTitle(r) : SYSTEM_LABEL[r.system]}</span><span className="rs">{routeSub(r)}</span></span>
               <span className="rr">{liveDown() ? "" : `${counts.get(r.id) ?? 0} `}<Bus /></span>
               <span className="chev"><Chevron /></span>
             </button>
@@ -316,7 +322,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
         <span className="rb big" style={{ ["--c" as string]: color }}>{route.shortName}</span>
         <div style={{ flex: 1, minWidth: 0 }}><h2>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName ? routeTitle(route) : SYSTEM_LABEL[route.system]}</h2>
           {route.longName && <p className="official">Nombre oficial: {routeOfficialName(route)}</p>}
-          <p>{SYSTEM_LABEL[route.system]}{bus ? ` · bus ${bus.plate || bus.label || bus.id}` : ` · ${d.vehicles.length} ${d.vehicles.length === 1 ? "bus" : "buses"}`}{!bus && avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
+          <p>{routeSub(route)}{bus ? ` · bus ${bus.plate || bus.label || bus.id}` : ` · ${d.vehicles.length} ${d.vehicles.length === 1 ? "bus" : "buses"}`}{!bus && avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
         <ShareButton target={{ kind: "ruta", id, direction: cur?.direction }} title={`Ruta ${route.shortName}`} />
         <StarButton kind="route" id={id} />
       </div>

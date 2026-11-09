@@ -45,3 +45,20 @@ export function routeTitle(r: Route): string {
   const uniq = parts.filter((x, i) => parts.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
   return uniq.length > 1 ? uniq.join(" ⇄ ") : uniq[0] ?? "";
 }
+
+const VARIANTS = ["Ciclovía", "Festivo", "Nocturna", "Especial"] as const;
+const CODE = /^([A-Z]{1,3}\d{1,4}[A-Z]?)\s+\S/;
+
+/** Los códigos con los que la gente conoce la ruta en el bus. TransMilenio junta las rutas SITP en pareja con un solo código
+ *  (`HK635` es la K635 y la H635): se leen de las dos mitades del nombre. Si no hay mitades, es el código del feed. */
+export function routeCodes(r: Route): string[] {
+  const out: string[] = [];
+  for (const side of r.longName.split("||")) { const m = CODE.exec(side.trim()); if (m && !out.includes(m[1]!)) out.push(m[1]!); }
+  return out.length ? out : [r.shortName];
+}
+
+/** «Ciclovía», «Festivo», «Nocturna» o «Especial» si el nombre de la ruta lo trae al final: es la misma ruta con otro horario. */
+export function routeVariant(r: Route): string | null {
+  const t = r.longName.trim();
+  return VARIANTS.find((v) => t.endsWith(` ${v}`)) ?? null;
+}

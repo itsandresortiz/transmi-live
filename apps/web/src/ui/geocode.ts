@@ -17,7 +17,9 @@ function toPlace(f: PhotonFeature): PlanPlace | null {
 }
 
 export async function geocode(text: string, near?: GeoPoint | null, signal?: AbortSignal): Promise<PlanPlace[]> {
-  const q = new URLSearchParams({ q: text, limit: "8", bbox: BBOX, lang: "es", lat: String(near?.lat ?? 4.65), lon: String(near?.lon ?? -74.1) });
+  /** La ubicación que sale del teléfono hacia el buscador de direcciones se redondea a ~100 m: basta para ordenar resultados cercanos. */
+  const round3 = (n: number) => Math.round(n * 1000) / 1000;
+  const q = new URLSearchParams({ q: text, limit: "8", bbox: BBOX, lang: "es", lat: String(near ? round3(near.lat) : 4.65), lon: String(near ? round3(near.lon) : -74.1) });
   const r = await fetch(`${BASE}/api/?${q}`, { signal });
   if (!r.ok) throw new Error(String(r.status));
   const j = (await r.json()) as { features?: PhotonFeature[] };
