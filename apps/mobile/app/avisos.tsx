@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ALERT_EFFECT_LABEL, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { useTransitVersion } from "@/hooks";
-import { Card, SheetClose } from "@/ui/kit";
+import { Card } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -16,9 +16,7 @@ export default function Avisos() {
   const list = transit.alerts;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-    <SheetClose onPress={() => router.back()} />
-    <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
-      <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">Avisos del servicio</Text>
+    <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
       {!list.length ? <Card><Text style={[type.headline, { color: c.text }]}>Sin avisos</Text><Text style={[type.body, { color: c.muted }]}>No hay novedades del servicio en este momento.</Text></Card> : null}
       {list.map((a, i) => {
         const tone = a.effect === "noService" ? "#dc2626" : a.effect === "additional" ? "#16a34a" : "#d97706";

@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 import { SymbolView } from "expo-symbols";
 import { type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, maskedReading, movementsByMonth, parseTuLlave } from "@transmi/domain";
 import { Tullave } from "../modules/tullave/src";
-import { Card, SheetClose, Tap } from "@/ui/kit";
+import { Card, Tap } from "@/ui/kit";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 const pesos = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("es-CO")}`;
@@ -46,9 +46,7 @@ export default function CardScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-    <SheetClose onPress={() => router.back()} />
-    <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
-      <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">Mi tarjeta</Text>
+    <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
       {!Tullave || !available ? (
         <Card><Text style={[type.headline, { color: c.text }]}>{!Tullave ? "Esta versión no trae el lector de tarjetas" : "No pudimos activar el NFC"}</Text>
           <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{!Tullave
