@@ -6,7 +6,7 @@ Los scripts no se pudieron probar en un Mac desde donde se escribieron: el prime
 ## 0. Una sola vez, en la web de Apple
 
 1. **Team ID**: developer.apple.com → Account → Membership details → *Team ID*.
-2. **Llave de la API** de App Store Connect: appstoreconnect.apple.com → Users and Access → *Integrations* → *App Store Connect API* → generar con rol **App Manager** (o Admin). Descarga el `AuthKey_XXXX.p8` (solo se baja una vez) y guarda el *Key ID* y el *Issuer ID*. No subas el `.p8` al repositorio (ya está en `.gitignore`).
+2. **Llave de la API** de App Store Connect (solo si vas a subir desde la terminal; con Transporter no hace falta): appstoreconnect.apple.com → Users and Access → *Integrations* → *App Store Connect API* → generar con rol **App Manager** (o Admin). Descarga el `AuthKey_XXXX.p8` (solo se baja una vez) y guarda el *Key ID* y el *Issuer ID*. No subas el `.p8` al repositorio (ya está en `.gitignore`).
 3. **Crear la app** en App Store Connect → My Apps → **+** → New App:
    - Plataforma iOS, nombre «TransMi LIVE» (si ya lo usa alguien, «TransMi LIVE Bogotá»), idioma Español (Colombia).
    - Bundle ID: `com.transmilive.app` (si no aparece en la lista, regístralo en developer.apple.com → Identifiers → **+** → App IDs).
@@ -23,15 +23,26 @@ Instala Capacitor, construye la web, crea la carpeta `ios/`, genera los íconos 
 
 ## 2. Compilar y subir (cada vez)
 
+**Con Transporter (lo más fácil, sin llave de la API):** firma con la cuenta de Apple que ya tienes en Xcode (Xcode → Settings → Accounts).
+
 ```bash
 export TEAM_ID=ABCDE12345
+bash scripts/ios-testflight.sh
+```
+
+Construye la web, genera el `.ipa` y lo abre en Transporter. Ahí inicias sesión, pulsas **Entregar** y esperas a que diga «Entregado». (También puedes arrastrar a mano `build/ios/export/App.ipa`.)
+
+**Directo desde la terminal, con la llave de la API (paso 0.2):**
+
+```bash
+export TEAM_ID=ABCDE12345 UPLOAD=api
 export ASC_KEY_ID=XXXXXXXXXX
 export ASC_ISSUER=00000000-0000-0000-0000-000000000000
 export ASC_KEY=$HOME/claves/AuthKey_XXXXXXXXXX.p8
 bash scripts/ios-testflight.sh
 ```
 
-Construye la web, la sincroniza con el proyecto, firma automáticamente con tu llave de la API, genera el `.ipa` y lo sube a App Store Connect. El número de compilación sale de la fecha y la hora, así que nunca se repite.
+En los dos casos el número de compilación sale de la fecha y la hora, así que nunca se repite.
 
 ## 3. En TestFlight
 
