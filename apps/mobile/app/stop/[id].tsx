@@ -1,82 +1,281 @@
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { upcomingAtStop } from "@transmi/application";
-import { routeTitle, stopLabelText } from "@transmi/domain";
+import { SymbolView } from "expo-symbols";
+import { alertsFor, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
+import { ALERT_EFFECT_LABEL, SYSTEM_LABEL, alertTitle, routeTitle, stopLabelText, type Route } from "@transmi/domain";
 import { transit } from "@/composition-root";
-import { nowSec } from "@/clock";
+import { nowMs, nowSec } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
-import { etaText } from "@/format";
+import { etaText, stopsAwayText } from "@/format";
 import { clockOfDay, liveDown } from "@/lastService";
-import { stopKind } from "@/stopname";
+import { stopCode, stopKind, stopTag, stopText } from "@/stopname";
 import { useSaved } from "@/favorites";
+import { useMapFocus } from "@/map/focus";
+import { usePlanner } from "@/planner/store";
 import { reportProblem } from "@/report";
-import { Card, RoundButton, SheetClose, Tap } from "@/ui/kit";
+import { Card, Chip, RoundButton, SheetClose, Tap } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
-import { space, type, useColors } from "@/ui/theme";
+import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
-/** Hoja de una parada: los buses que vienen (en vivo) o, si no hay datos, los horarios programados. */
+/** Hoja de una parada: lo mismo que la web. Rutas que vienen, hora de cada una, de dónde viene el bus y los horarios si no hay datos en vivo. */
 export default function StopSheet() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
   const insets = useSafeAreaInsets();
   useTransitVersion();
   const now = useNow() / 1000;
+  const [sel, setSel] = useState<{ routeId: string; direction: string } | null>(null);
   const stop = transit.stopById(id);
+
   const fav = useSaved((f) => f.stops.includes(id)), toggle = useSaved((f) => f.toggleStop);
   const nick = useSaved((f) => f.nicknames[id]), setNick = useSaved((f) => f.setNickname);
+  const siblings = useMemo(() => (stop ? siblingStops(transit, stop).map((x) => ({ x, names: [...new Set(routesAtStop(transit, x.id).map((r) => r.shortName))].slice(0, 2).join(" ") })) : []), [stop, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!stop) return <View style={[styles.screen, { backgroundColor: c.bg }]}><SheetClose onPress={() => router.back()} /><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>No encontramos esa parada</Text></View>;
-  const rows = upcomingAtStop(transit, id, nowSec(), 3);
+
+  const rows = upcomingAtStop(transit, id, nowSec(), 6);
   const down = liveDown(transit.fleet.size);
-  const day = transit.serviceEnds.dayAt(nowSec() * 1000);
-  const scheduled = transit.departures.size ? transit.departures.nextAt(id, day.type, day.secs, 3).slice(0, 8) : [];
+  const label = transit.labelOf(stop), tag = stopTag(stop);
+  const here = routesAtStop(transit, id);
+  const alerts = alertsFor(transit, new Set(here.map((r) => r.id)), new Set([id])).slice(0, 2);
+
+  const showOnMap = (focus: { routeId?: string | null; busIds?: string[]; followBusId?: string | null }) => {
+    useMapFocus.getState().set({ stopId: id, routeId: focus.routeId ?? null, busIds: focus.busIds ?? [], followBusId: focus.followBusId ?? null });
+    router.dismissAll();
+    router.navigate("/mapa");
+  };
+  const goHere = () => { usePlanner.getState().setDest({ name: stopLabelText(label), position: stop.position }); router.dismissAll(); router.navigate("/viaje"); };
+  const share = () => void Share.share({ message: `${stopLabelText(label)} en TransMi LIVE`, url: `https://transmilive.com/#/parada/${encodeURIComponent(id)}` });
+
+  // la hoja pasa de la lista de rutas al detalle de una ruta (como en la web)
+  const row = sel ? rows.find((r) => r.route.id === sel.routeId && r.direction === sel.direction) : undefined;
+  if (sel) return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <SheetClose onPress={() => router.back()} />
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+        <RouteAtStop stopId={id} sel={sel} row={row} now={now} onBack={() => setSel(null)} onMap={(buses, follow) => showOnMap({ routeId: sel.routeId, busIds: buses, followBusId: follow })} />
+      </ScrollView>
+    </View>
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-    <SheetClose onPress={() => router.back()} />
-    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
-      <View style={styles.head}>
-        <View style={{ flex: 1 }}>
-          <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
-          <Text style={[type.largeTitle, { color: c.text }]}>{nick || stopLabelText(transit.labelOf(stop))}</Text>
-          {nick ? <Text style={[type.caption, { color: c.muted }]}>{stopLabelText(transit.labelOf(stop))}</Text> : null}
+      <SheetClose onPress={() => router.back()} />
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+        <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
+        <Text style={[type.largeTitle, { color: c.text }]}>{nick || label.title}</Text>
+        {nick ? <Text style={[type.caption, { color: c.muted }]}>{label.title}</Text> : null}
+        <Text style={[type.body, { color: c.muted }]}>
+          {tag ? `${tag} · ` : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : down ? "Sin datos en vivo por ahora" : "Sin buses acercándose"}
+        </Text>
+
+        <View style={styles.actions}>
+          <RoundButton symbol="arrow.triangle.turn.up.right.diamond.fill" label="Cómo llegar a esta parada" onPress={goHere} />
+          <RoundButton symbol="map.fill" label="Ver en el mapa" onPress={() => showOnMap({ busIds: rows.flatMap((r) => r.buses.map((b) => b.vehicle.id)) })} />
+          <RoundButton symbol="square.and.arrow.up" label="Compartir" onPress={share} />
+          <RoundButton symbol={fav ? "star.fill" : "star"} label={fav ? "Quitar de favoritos" : "Guardar en favoritos"} onPress={() => toggle(id)} />
         </View>
-        <View style={{ marginRight: space[10] + 2 }}><RoundButton symbol={fav ? "star.fill" : "star"} label={fav ? "Quitar de favoritos" : "Guardar en favoritos"} onPress={() => toggle(id)} /></View>
+        {fav ? <Tap onPress={() => Alert.prompt("Ponerle nombre", "Por ejemplo: «La del colegio»", (t) => setNick(id, t ?? ""), "plain-text", nick ?? "")} accessibilityRole="button" accessibilityLabel={nick ? "Cambiar el nombre de esta parada" : "Ponerle nombre a esta parada"}><Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>{nick ? "Cambiar nombre" : "Ponerle nombre"}</Text></Tap> : null}
+
+        {siblings.length > 1 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2], paddingVertical: space[1] }}>
+            {siblings.map(({ x, names }) => {
+              const t = stopTag(x) || stopCode(x) || "Parada";
+              const dup = siblings.filter((y) => (stopTag(y.x) || stopCode(y.x)) === t).length > 1;      // varias paradas del mismo vagón (una por sentido): se distinguen por sus rutas
+              return <Chip key={x.id} label={dup && names ? `${t} · ${names}` : t} selected={x.id === id} onPress={() => router.setParams({ id: x.id })} />;
+            })}
+          </ScrollView>
+        ) : null}
+
+        {alerts.map(({ alert, index }) => (
+          <Tap key={index} onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel={`Aviso: ${alertTitle(alert)}`}>
+            <Card style={{ gap: space[1] }}>
+              <Text style={[type.caption, { color: alert.effect === "noService" ? "#dc2626" : "#d97706" }]}>{ALERT_EFFECT_LABEL[alert.effect]}</Text>
+              <Text style={[type.headline, { color: c.text }]} numberOfLines={2}>{alertTitle(alert)}</Text>
+            </Card>
+          </Tap>
+        ))}
+
+        {rows.length ? (
+          <>
+            <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>TOCA UNA RUTA PARA VER DE DÓNDE VIENE</Text>
+            {rows.map((r) => <ArrivalRow key={r.route.id + r.direction} r={r} now={now} onPress={() => setSel({ routeId: r.route.id, direction: r.direction })} />)}
+          </>
+        ) : <NoBuses stopId={id} here={here} down={down} now={now} />}
+
+        <Tap onPress={() => reportProblem({ what: `parada ${stopLabelText(label)}`, lines: [`ID de la parada: ${id}`, down ? "Estado: sin datos en vivo" : "Estado: en vivo"] })} accessibilityRole="button" accessibilityLabel="Reportar un problema con esta parada" style={{ marginTop: space[4] }}>
+          <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>¿Algo no cuadra? Reportar un problema con esta parada</Text>
+        </Tap>
+      </ScrollView>
+    </View>
+  );
+}
+
+/** Una ruta que viene hacia la parada: su hora, cuántas paradas faltan y cuándo llega el siguiente. */
+function ArrivalRow({ r, now, onPress }: { r: UpcomingRoute; now: number; onPress(): void }) {
+  const c = useColors();
+  const first = r.buses[0]!, next = r.buses[1];
+  const soon = first.etaAt - now <= 60, old = !!first.vehicle && now - first.vehicle.reportedAt > 90;
+  const mark = first.vehicle ? transit.serviceOf(first.vehicle) : undefined;
+  const sub = `${first.official ? "" : "aprox. "}${stopsAwayText(first.stopsAway)}${next ? ` · luego ${etaText(next.etaAt, now)}` : ""}`;
+  return (
+    <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={`Ruta ${r.route.shortName}${r.headsign ? ` hacia ${r.headsign}` : ""}, llega en ${etaText(first.etaAt, now)}, ${sub}`}>
+      <Card style={styles.row}>
+        <RouteBadge route={r.route} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{r.headsign ? `Hacia ${r.headsign}` : routeTitle(r.route)}</Text>
+          <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{sub}</Text>
+          {mark?.isLast ? <ServicePill text="Último servicio" tone="#dc2626" /> : mark?.isFirst ? <ServicePill text="Primer servicio" tone="#16a34a" /> : null}
+        </View>
+        <Text style={[type.title, { color: soon ? c.accent : c.text, opacity: old ? 0.6 : 1 }]}>{old ? "≈ " : ""}{etaText(first.etaAt, now)}</Text>
+        <SymbolView name="chevron.right" tintColor={c.muted} size={13} />
+      </Card>
+    </Tap>
+  );
+}
+
+function ServicePill({ text, tone }: { text: string; tone: string }) {
+  return <View style={[styles.pill, { borderColor: tone }]}><Text style={[type.caption, { color: tone, fontSize: 11 }]}>{text}</Text></View>;
+}
+
+/** Detalle de una ruta en la parada: el próximo bus y los siguientes, y el recorrido que le falta al bus hasta aquí. */
+function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string; sel: { routeId: string; direction: string }; row?: UpcomingRoute; now: number; onBack(): void; onMap(busIds: string[], follow: string | null): void }) {
+  const c = useColors();
+  const stop = transit.stopById(stopId);
+  const route = transit.routeById(sel.routeId);
+  const color = route ? SYSTEM_COLOR[route.system] : c.accent;
+  const shape = transit.network.shapes.get(sel.routeId)?.find((s) => s.direction === sel.direction);
+  const j = shape ? shape.stopIds.indexOf(stopId) : -1;
+  const hero: UpcomingBus | undefined = row?.buses[0];
+  const heroNext = hero ? transit.nextStopOf(hero.vehicle, nowMs())?.stop : undefined;
+  const nextIdx = (b: UpcomingBus) => (shape ? shape.stopIds.indexOf(b.vehicle.lastStopId ?? "") + 1 : -1);   // la parada que sigue a la última
+  const ks = row && shape ? row.buses.map(nextIdx).filter((k) => k > 0) : [];
+  const kmin = ks.length ? Math.min(...ks) : j;
+  const path = shape && j >= 0 ? shape.stopIds.slice(Math.max(0, kmin), j + 1) : [];
+  const ids = row ? row.buses.map((b) => b.vehicle.id) : [];
+
+  return (
+    <>
+      <Tap onPress={onBack} accessibilityRole="button" accessibilityLabel="Volver a la parada" style={styles.back}>
+        <SymbolView name="chevron.left" tintColor={c.accent} size={16} /><Text style={[type.headline, { color: c.accent }]}>{stopText(stop, "Parada")}</Text>
+      </Tap>
+      <View style={styles.head}>
+        {route ? <RouteBadge route={route} /> : null}
+        <View style={{ flex: 1 }}>
+          <Text style={[type.title, { color: c.text }]} numberOfLines={2}>{shape?.headsign ? `Hacia ${shape.headsign}` : route ? routeTitle(route) : ""}</Text>
+          <Text style={[type.caption, { color: c.muted }]}>{route ? SYSTEM_LABEL[route.system] : ""} · llega a {stopText(stop)}</Text>
+        </View>
       </View>
 
-      {fav ? <Tap onPress={() => Alert.prompt("Ponerle nombre", "Por ejemplo: «La del colegio»", (t) => setNick(id, t ?? ""), "plain-text", nick ?? "")} accessibilityRole="button" accessibilityLabel={nick ? "Cambiar el nombre de esta parada" : "Ponerle nombre a esta parada"}><Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>{nick ? "Cambiar nombre" : "Ponerle nombre"}</Text></Tap> : null}
-
-      {rows.length ? rows.map((r) => (
-        <Tap key={r.route.id + r.direction} onPress={() => router.push({ pathname: "/route/[id]", params: { id: r.route.id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${r.route.shortName}`}>
-          <Card style={styles.row}>
-            <RouteBadge route={r.route} />
-            <View style={{ flex: 1 }}>
-              <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{r.headsign ? `Hacia ${r.headsign}` : routeTitle(r.route)}</Text>
-              <Text style={[type.caption, { color: c.muted }]}>{r.buses[0]!.official ? "En vivo" : "Aproximado"}</Text>
-            </View>
-            <Text style={[type.title, { color: c.text }]}>{etaText(r.buses[0]!.etaAt, now)}</Text>
-          </Card>
-        </Tap>
-      )) : (
-        <Card>
-          <Text style={[type.headline, { color: c.text }]}>{down ? "Sin datos en vivo por ahora" : "Ningún bus viene ahora"}</Text>
-          <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>
-            {down ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: abajo ves el horario programado."
-              : "Cuando un bus se acerque a esta parada aparecerá aquí."}
-          </Text>
-        </Card>
-      )}
-
-      {!rows.length && scheduled.length ? (
+      {!row || !hero ? <RouteEmpty route={route} /> : (
         <>
-          <Text style={[type.eyebrow, { color: c.muted, marginTop: space[4] }]}>PRÓXIMOS SEGÚN EL HORARIO</Text>
+          {transit.serviceOf(hero.vehicle)?.isLast ? <Card><Text style={[type.caption, { color: "#dc2626" }]}>ÚLTIMO SERVICIO</Text><Text style={[type.body, { color: c.text }]}>Es el último viaje programado de hoy en esta ruta: después de este no hay más buses.</Text></Card>
+            : transit.serviceOf(hero.vehicle)?.isFirst ? <Card><Text style={[type.caption, { color: "#16a34a" }]}>PRIMER SERVICIO</Text><Text style={[type.body, { color: c.text }]}>Es el primer viaje programado de hoy en esta ruta.</Text></Card> : null}
+
+          <View style={[styles.hero, { backgroundColor: color }]}>
+            <Text style={[type.eyebrow, { color: "#ffffff", opacity: 0.8 }]}>PRÓXIMO BUS</Text>
+            <Text style={[type.hero, { color: "#ffffff" }]}>{etaText(hero.etaAt, now)}{!hero.official ? <Text style={type.title}> aprox.</Text> : null}</Text>
+            {now - hero.vehicle.reportedAt > 90 ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.85 }]}>Dato de hace {Math.round((now - hero.vehicle.reportedAt) / 60)} min</Text> : null}
+            <Text style={[type.body, { color: "#ffffff" }]}>{hero.stopsAway <= 1 ? "Ya va hacia esta parada." : `Ahora va hacia ${stopText(heroNext, "su próxima parada")}, ${stopsAwayText(hero.stopsAway)} de aquí.`}</Text>
+            <View style={styles.heroActs}>
+              <Tap onPress={() => onMap(ids, hero.vehicle.id)} accessibilityRole="button" accessibilityLabel="Seguir este bus" style={[styles.heroBtn, { backgroundColor: "#ffffff" }]}><Text style={[type.headline, { color: "#111111" }]}>Seguir este bus</Text></Tap>
+              <Tap onPress={() => onMap(ids, null)} accessibilityRole="button" accessibilityLabel="Ver en el mapa" style={[styles.heroBtn, { backgroundColor: "rgba(255,255,255,0.22)" }]}><Text style={[type.headline, { color: "#ffffff" }]}>Ver en el mapa</Text></Tap>
+            </View>
+          </View>
+
+          {row.buses.length > 1 ? (
+            <>
+              <Text style={[type.eyebrow, { color: c.muted, marginTop: space[2] }]}>LOS SIGUIENTES</Text>
+              <Card style={{ gap: space[3] }}>
+                {row.buses.slice(1).map((b, i) => (
+                  <View key={b.vehicle.id} style={styles.next}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[type.headline, { color: c.text }]}>{etaText(b.etaAt, now)}{!b.official ? <Text style={[type.caption, { color: c.muted }]}> aprox.</Text> : null}</Text>
+                      <Text style={[type.caption, { color: c.muted }]}>Bus {i + 2} · {stopsAwayText(b.stopsAway)}</Text>
+                    </View>
+                    {transit.serviceOf(b.vehicle)?.isLast ? <ServicePill text="Último servicio" tone="#dc2626" /> : null}
+                  </View>
+                ))}
+              </Card>
+            </>
+          ) : null}
+
+          {path.length > 1 ? (
+            <>
+              <Text style={[type.eyebrow, { color: c.muted, marginTop: space[2] }]}>RECORRIDO HASTA TU PARADA</Text>
+              <View>
+                {path.map((sid, i) => {
+                  const at = row.buses.filter((b) => shape?.stopIds[nextIdx(b)] === sid);
+                  const last = i === path.length - 1;
+                  return (
+                    <View key={sid} style={styles.tl}>
+                      <View style={styles.tlRail}>
+                        <View style={[styles.tlLine, { backgroundColor: color, top: i === 0 ? "50%" : 0, bottom: last ? "50%" : 0 }]} />
+                        <View style={[styles.tlDot, { backgroundColor: last ? color : c.card, borderColor: color }]} />
+                      </View>
+                      <View style={{ flex: 1, paddingVertical: space[2] }}>
+                        <Text style={[type.body, { color: c.text, fontWeight: last || at.length ? "700" : "400" }]}>{stopText(transit.stopById(sid), sid)}</Text>
+                        {last ? <Text style={[type.caption, { color: color }]}>tu parada</Text> : null}
+                        {at.map((b) => <Text key={b.vehicle.id} style={[type.caption, { color: c.accent }]}>🚌 un bus va hacia aquí</Text>)}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
+        </>
+      )}
+    </>
+  );
+}
+
+/** La ruta no tiene buses hacia esta parada: se dice por qué (terminó, aún no empieza o no hay datos). */
+function RouteEmpty({ route }: { route?: Route }) {
+  const c = useColors();
+  const st = route ? transit.routeStatus(route.id, nowMs()) : undefined;
+  const down = liveDown(transit.fleet.size);
+  const [title, text] = st?.state === "ended" ? ["Ya no hay más buses hoy", down ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`]
+    : st?.state === "before" ? ["Aún no empieza el servicio", `El primer bus sale a las ${clockOfDay(st.firstStart)}.`]
+    : down ? ["Sin datos en vivo por ahora", "TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio."]
+    : ["Ningún bus viene ahora", "Esta ruta no tiene buses acercándose a la parada en este momento."];
+  return <Card><Text style={[type.headline, { color: c.text }]}>{title}</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{text}</Text></Card>;
+}
+
+/** Parada sin buses acercándose: se explica, se muestra el horario programado y las rutas que pasan (las que no están en servicio, atenuadas). */
+function NoBuses({ stopId, here, down, now }: { stopId: string; here: Route[]; down: boolean; now: number }) {
+  const c = useColors();
+  const day = transit.serviceEnds.dayAt(nowSec() * 1000);
+  const scheduled = transit.departures.size ? transit.departures.nextAt(stopId, day.type, day.secs, 3).slice(0, 8) : [];
+  const byName = new Map<string, Route>();
+  for (const r of here) if (!byName.has(r.shortName)) byName.set(r.shortName, r);
+  const state = (r: Route) => transit.routeStatus(r.id, nowMs())?.state;
+  const routes = [...byName.values()].sort((a, b) => Number(state(a) === "ended") - Number(state(b) === "ended") || a.shortName.localeCompare(b.shortName, "es", { numeric: true })).slice(0, 24);
+  const every = routes.length > 0 && routes.every((r) => state(r) === "ended");
+  void now;
+  return (
+    <>
+      <Card>
+        <Text style={[type.headline, { color: c.text }]}>{every ? "Ya no hay más buses hoy" : down ? "Sin datos en vivo por ahora" : "Ningún bus viene ahora"}</Text>
+        <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>
+          {every ? `${down ? "Según el horario, el" : "El"} servicio de las rutas de esta parada ya terminó por hoy.`
+            : down ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: abajo ves el horario programado."
+            : "Cuando un bus se acerque a esta parada aparecerá aquí."}
+        </Text>
+      </Card>
+      {scheduled.length ? (
+        <>
+          <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>PRÓXIMOS SEGÚN EL HORARIO</Text>
           {scheduled.map((s) => {
             const r = transit.routeById(s.routeId);
+            const end = transit.departures.terminusOf(s.routeId, s.direction), head = end ? stopText(transit.stopById(end), end) : undefined;
             return (
               <Card key={s.routeId + s.direction} style={styles.row}>
                 {r ? <RouteBadge route={r} /> : null}
                 <View style={{ flex: 1 }}>
-                  <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{r ? routeTitle(r) : s.routeId}</Text>
+                  <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{head ? `Hacia ${head}` : r ? routeTitle(r) : s.routeId}</Text>
                   <Text style={[type.caption, { color: c.muted }]}>{s.times.map(clockOfDay).join(" · ")}</Text>
                 </View>
               </Card>
@@ -85,16 +284,33 @@ export default function StopSheet() {
           <Text style={[type.caption, { color: c.muted }]}>Son horas programadas, no buses en vivo: la hora real puede variar.</Text>
         </>
       ) : null}
-      <Tap onPress={() => reportProblem({ what: `parada ${stopLabelText(transit.labelOf(stop))}`, lines: [`ID de la parada: ${id}`, down ? "Estado: sin datos en vivo" : "Estado: en vivo"] })} accessibilityRole="button" accessibilityLabel="Reportar un problema con esta parada" style={{ marginTop: space[4] }}>
-        <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>¿Algo no cuadra? Reportar un problema con esta parada</Text>
-      </Tap>
-    </ScrollView>
-    </View>
+      {routes.length ? (
+        <>
+          <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>RUTAS QUE PASAN POR AQUÍ</Text>
+          <View style={styles.routeWrap}>
+            {routes.map((r) => { const st = state(r); return <Tap key={r.id} onPress={() => router.push({ pathname: "/route/[id]", params: { id: r.id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${r.shortName}${st === "ended" ? ", ya terminó hoy" : st === "before" ? ", aún no empieza" : ""}`} style={{ opacity: st === "ended" || st === "before" ? 0.4 : 0.8 }}><RouteBadge route={r} /></Tap>; })}
+          </View>
+          <Text style={[type.caption, { color: c.muted }]}>Más tenues: ya terminaron o aún no empiezan hoy.</Text>
+        </>
+      ) : null}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { padding: space[5], gap: space[3], paddingBottom: space[10] },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: space[3] },
+  screen: { padding: space[5], gap: space[3] },
+  actions: { flexDirection: "row", gap: space[3], marginVertical: space[2] },
   row: { flexDirection: "row", alignItems: "center", gap: space[3] },
+  pill: { alignSelf: "flex-start", borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: space[2], minHeight: 20, justifyContent: "center" },
+  back: { flexDirection: "row", alignItems: "center", gap: space[1], alignSelf: "flex-start" },
+  head: { flexDirection: "row", alignItems: "center", gap: space[3] },
+  hero: { borderRadius: radius.xl, borderCurve: "continuous", padding: space[5], gap: space[1] },
+  heroActs: { flexDirection: "row", gap: space[2], marginTop: space[3] },
+  heroBtn: { flex: 1, minHeight: 48, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", paddingHorizontal: space[2] },
+  next: { flexDirection: "row", alignItems: "center", gap: space[3] },
+  tl: { flexDirection: "row", gap: space[3], minHeight: 44 },
+  tlRail: { width: 18, alignItems: "center" },
+  tlLine: { position: "absolute", width: 3, left: 7.5 },
+  tlDot: { position: "absolute", top: "50%", marginTop: -7, width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
+  routeWrap: { flexDirection: "row", flexWrap: "wrap", gap: space[2] },
 });

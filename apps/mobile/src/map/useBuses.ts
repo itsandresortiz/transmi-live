@@ -14,9 +14,9 @@ const hash = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h 
 const EMPTY: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
 
 /** Buses de la pantalla como puntos para el mapa, recalculados cuatro veces por segundo con el motor de movimiento. Solo los que se ven. */
-export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; enabled?: boolean } = {}): FeatureCollection<Point> {
+export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; enabled?: boolean; everyMs?: number } = {}): FeatureCollection<Point> {
   const [data, setData] = useState<FeatureCollection<Point>>(EMPTY);
-  const { system = null, routeId = null, enabled = true } = opts;
+  const { system = null, routeId = null, enabled = true, everyMs = 250 } = opts;
   useEffect(() => {
     if (!enabled || !view) { setData(EMPTY); return; }
     const build = () => {
@@ -40,8 +40,8 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       setData({ type: "FeatureCollection", features });
     };
     build();
-    const timer = setInterval(build, 250);
+    const timer = setInterval(build, everyMs);
     return () => clearInterval(timer);
-  }, [view, system, routeId, enabled]);
+  }, [view, system, routeId, enabled, everyMs]);
   return data;
 }

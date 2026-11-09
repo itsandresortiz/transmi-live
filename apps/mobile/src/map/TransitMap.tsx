@@ -21,16 +21,20 @@ interface Props {
   system?: SystemType | null;
   /** Si se da, solo se ven los buses de esa ruta y se dibuja su trazado. */
   routeId?: string | null;
-  highlightBusId?: string | null;
+  /** Parada destacada y buses que se acercan a ella (con un aro). */
+  focusStopId?: string | null;
+  highlightIds?: string[];
   /** Si es falso (otra pestaña al frente), los buses dejan de recalcularse para no gastar batería. */
   active?: boolean;
+  /** Mientras una hoja se abre encima, los buses se recalculan más despacio para que la hoja salga al instante. */
+  calm?: boolean;
   onBus?(id: string): void;
   onStop?(id: string): void;
   children?: ReactNode;
 }
 
 /** El mapa de buses en vivo: base, trazado de la ruta, paradas (al acercarse), buses y tu ubicación. */
-export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, highlightBusId = null, active = true, onBus, onStop, children }, ref) {
+export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, calm = false, onBus, onStop, children }, ref) {
   const c = useColors();
   const camera = useRef<CameraRef>(null);
   const [view, setView] = useState<Viewport | null>(null);
@@ -45,7 +49,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     },
   }), []);
 
-  const buses = useBusFeatures(view, { system, routeId, enabled: active });
+  const buses = useBusFeatures(view, { system, routeId, enabled: active, everyMs: calm ? 1500 : 250 });
 
   const stops = useMemo<FeatureCollection<Point>>(() => {
     const features: Feature<Point>[] = [];
@@ -98,6 +102,11 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   const stopsJson = useMemo(() => JSON.stringify(stops), [stops]);
   const busesJson = useMemo(() => JSON.stringify(buses), [buses]);
 
+  const focusJson = useMemo(() => {
+    const st = focusStopId ? transit.stopById(focusStopId) : undefined;
+    return JSON.stringify({ type: "FeatureCollection", features: st ? [{ type: "Feature", geometry: { type: "Point", coordinates: [st.position.lon, st.position.lat] }, properties: {} }] : [] });
+  }, [focusStopId, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   const onRegion = useCallback((e: { nativeEvent: { bounds: [number, number, number, number]; zoom: number } }) => {
     const { bounds, zoom } = e.nativeEvent;
     setView({ west: bounds[0], south: bounds[1], east: bounds[2], north: bounds[3], zoom });
@@ -123,12 +132,17 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         </GeoJSONSource>
       )}
 
+      <GeoJSONSource id="focus-stop" data={focusJson}>
+        <Layer id="focus-stop-halo" type="circle" style={{ circleRadius: 20, circleColor: "#e11d2e", circleOpacity: 0.18 }} />
+        <Layer id="focus-stop-dot" type="circle" style={{ circleRadius: 8, circleColor: "#e11d2e", circleStrokeColor: "#ffffff", circleStrokeWidth: 3 }} />
+      </GeoJSONSource>
       <GeoJSONSource id="stops" data={stopsJson} onPress={(e) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onStop?.(id); }}>
         <Layer id="stops-hit" type="circle" style={{ circleRadius: 16, circleColor: "#000000", circleOpacity: 0.01 }} />
         <Layer id="stops-dot" type="circle" style={{ circleRadius: 5.5, circleColor: "#ffffff", circleStrokeColor: c.dark ? "#d4d4d8" : "#3f3f46", circleStrokeWidth: 2 }} />
       </GeoJSONSource>
 
       <GeoJSONSource id="buses" data={busesJson} onPress={(e) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onBus?.(id); }}>
+        {highlightIds.length ? <Layer id="bus-ring" type="circle" filter={["in", ["get", "id"], ["literal", highlightIds]]} style={{ circleRadius: 22, circleColor: "#e11d2e", circleOpacity: 0.12, circleStrokeColor: "#e11d2e", circleStrokeWidth: 3 }} /> : null}
         <Layer id="bus-hit" type="circle" style={{ circleRadius: 20, circleColor: "#000000", circleOpacity: 0.01 }} />
         <Layer id="bus-dot" type="circle" maxzoom={11.8} style={{ circleRadius: ["interpolate", ["linear"], ["zoom"], 9, 2.6, 11.8, 4], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 1 }} />
         <Layer id="bus-sprite" type="symbol" minzoom={11.8} style={{

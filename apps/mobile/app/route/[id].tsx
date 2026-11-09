@@ -17,7 +17,7 @@ export default function RouteScreen() {
   if (!route) return <View style={[styles.screen, { backgroundColor: c.bg }]}><Text style={[styles.sub, { color: c.muted }]}>Esa ruta ya no aparece en el servicio.</Text></View>;
   const stops = (transit.network.shapes.get(id)?.[0]?.stopIds ?? []).map((s) => transit.stopById(s)?.name ?? s);
   return (
-    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={styles.screen} contentInsetAdjustmentBehavior="automatic">
+    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={styles.screen} >
       <Stack.Screen options={{ title: route.shortName }} />
       <View style={styles.head}><RouteBadge route={route} /><Text style={[styles.title, { color: c.text }]}>{routeTitle(route)}</Text><RoundButton symbol={fav ? "star.fill" : "star"} label={fav ? "Quitar de favoritos" : "Guardar en favoritos"} onPress={() => toggle(id)} /></View>
       <Text style={[styles.sub, { color: c.muted }]}>{SYSTEM_LABEL[route.system]}</Text>

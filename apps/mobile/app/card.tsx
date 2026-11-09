@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { SymbolView } from "expo-symbols";
 import { type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, maskedReading, movementsByMonth, parseTuLlave } from "@transmi/domain";
 import { Tullave } from "../modules/tullave/src";
-import { Card, PAGE, Tap } from "@/ui/kit";
+import { Card, PAGE, SheetClose, Tap } from "@/ui/kit";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 const pesos = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("es-CO")}`;
@@ -18,6 +20,7 @@ const PROMPTS = { hold: "Acerca la tarjeta a la parte de arriba del teléfono", 
 /** Mi tarjeta TuLlave: el saldo se lee de la tarjeta en el teléfono; no se envía ni se guarda nada. */
 export default function CardScreen() {
   const c = useColors();
+  const insets = useSafeAreaInsets();
   const [card, setCard] = useState<{ data: TuLlaveCard; at: number; raw: CardReading } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +45,10 @@ export default function CardScreen() {
   };
 
   return (
-    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={[PAGE, styles.screen]} contentInsetAdjustmentBehavior="automatic">
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <SheetClose onPress={() => router.back()} />
+    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={[PAGE, styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">Mi tarjeta</Text>
       {!Tullave || !available ? (
         <Card><Text style={[type.headline, { color: c.text }]}>Este teléfono no puede leer tarjetas</Text>
           <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>La lectura necesita un iPhone con NFC (7 o más nuevo) y la app instalada desde TestFlight o la App Store; no funciona en el simulador.</Text></Card>
@@ -83,6 +89,7 @@ export default function CardScreen() {
         </>
       )}
     </ScrollView>
+    </View>
   );
 }
 
