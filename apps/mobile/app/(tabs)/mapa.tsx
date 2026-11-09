@@ -1,10 +1,12 @@
 import { useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { router, useIsFocused } from "expo-router";
 import { SYSTEMS, SYSTEM_LABEL, type SystemType } from "@transmi/domain";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { locateMe } from "@/location";
+import { FeedStatus } from "@/ui/FeedStatus";
 import { Chip, Glass, RoundButton } from "@/ui/kit";
 import { space } from "@/ui/theme";
 
@@ -18,9 +20,13 @@ export default function Mapa() {
 
   return (
     <View style={styles.screen}>
+      {focused ? <StatusBar style="dark" /> : null}
+      {/* el mapa no se lee con VoiceOver: las pestañas Rutas y Cómo llegar dicen lo mismo con texto */}
+      <View style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <TransitMap ref={map} system={system} active={focused}
-        onBus={(id) => router.push({ pathname: "/bus/[id]", params: { id } })}
-        onStop={(id) => router.push({ pathname: "/stop/[id]", params: { id } })} />
+        onBus={(id) => router.navigate({ pathname: "/bus/[id]", params: { id } })}
+        onStop={(id) => router.navigate({ pathname: "/stop/[id]", params: { id } })} />
+      </View>
       <View pointerEvents="box-none" style={[styles.top, { top: insets.top + space[2] }]}>
         <Glass style={styles.chipsGlass}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -29,6 +35,7 @@ export default function Mapa() {
           </ScrollView>
         </Glass>
       </View>
+      <View pointerEvents="none" style={[styles.status, { bottom: insets.bottom + 118 }]}><FeedStatus /></View>
       <View pointerEvents="box-none" style={[styles.side, { bottom: insets.bottom + 110 }]}>
         <RoundButton symbol="location.fill" label="Mi ubicación" onPress={() => void locate()} size={52} />
       </View>
@@ -42,4 +49,5 @@ const styles = StyleSheet.create({
   chipsGlass: { borderRadius: 28, overflow: "hidden" },
   chips: { gap: space[2], padding: space[2] },
   side: { position: "absolute", right: space[4] },
+  status: { position: "absolute", left: space[4] },
 });

@@ -5,7 +5,7 @@ import * as Haptics from "expo-haptics";
 import { SymbolView } from "expo-symbols";
 import { type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, maskedReading, movementsByMonth, parseTuLlave } from "@transmi/domain";
 import { Tullave } from "../modules/tullave/src";
-import { Card, Tap } from "@/ui/kit";
+import { Card, PAGE, Tap } from "@/ui/kit";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 const pesos = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("es-CO")}`;
@@ -42,7 +42,7 @@ export default function CardScreen() {
   };
 
   return (
-    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={styles.screen} contentInsetAdjustmentBehavior="automatic">
+    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={[PAGE, styles.screen]} contentInsetAdjustmentBehavior="automatic">
       {!Tullave || !available ? (
         <Card><Text style={[type.headline, { color: c.text }]}>Este teléfono no puede leer tarjetas</Text>
           <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>La lectura necesita un iPhone con NFC (7 o más nuevo) y la app instalada desde TestFlight o la App Store; no funciona en el simulador.</Text></Card>
@@ -89,6 +89,6 @@ export default function CardScreen() {
 const styles = StyleSheet.create({
   screen: { padding: space[5], gap: space[3], paddingBottom: space[10] * 2 },
   hero: { padding: space[6], borderRadius: radius.xl },
-  btn: { height: 56, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  btn: { minHeight: 56, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
   mv: { flexDirection: "row", alignItems: "center", gap: space[3] },
 });

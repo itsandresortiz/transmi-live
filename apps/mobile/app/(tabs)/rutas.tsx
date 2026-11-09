@@ -7,7 +7,7 @@ import { searchRoutes } from "@transmi/application";
 import { SYSTEM_LABEL, routeCodes, routeTitle, routeVariant } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { useTransitVersion } from "@/hooks";
-import { Card, Tap } from "@/ui/kit";
+import { Card, PAGE, Tap } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -32,7 +32,7 @@ export default function Rutas() {
         data={routes}
         keyExtractor={(r) => r.id}
         keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingBottom: space[10] * 3 }}
+        contentContainerStyle={[PAGE, { paddingBottom: space[10] * 3 }]}
         ListEmptyComponent={<Text style={[type.body, styles.empty, { color: c.muted }]}>{transit.network.routes.size ? "No encontramos esa ruta." : "Cargando rutas…"}</Text>}
         renderItem={({ item: r }) => {
           const codes = routeCodes(r);
@@ -60,8 +60,8 @@ export default function Rutas() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   title: { paddingHorizontal: space[5], paddingTop: space[2] },
-  search: { flexDirection: "row", alignItems: "center", gap: space[2], marginHorizontal: space[5], marginVertical: space[4], height: 48, borderRadius: radius.lg, borderCurve: "continuous", paddingHorizontal: space[4], shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
-  input: { flex: 1, height: 48 },
+  search: { flexDirection: "row", alignItems: "center", gap: space[2], marginHorizontal: space[5], marginVertical: space[4], minHeight: 48, borderRadius: radius.lg, borderCurve: "continuous", paddingHorizontal: space[4], shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
+  input: { flex: 1, minHeight: 48 },
   rowWrap: { marginHorizontal: space[5], marginBottom: space[3] },
   row: { flexDirection: "row", alignItems: "center", gap: space[3], padding: space[3] },
   rowText: { flex: 1, gap: 2 },

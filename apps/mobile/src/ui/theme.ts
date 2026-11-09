@@ -1,5 +1,7 @@
 import { useColorScheme } from "react-native";
 import type { SystemType } from "@transmi/domain";
+import { useAccessibility } from "@/accessibility";
+import { DARK, HIGH_DARK, HIGH_LIGHT, LIGHT } from "./palette";
 
 export const SYSTEM_COLOR: Record<SystemType, string> = {
   troncal: "#e11d2e", dual: "#8b5cf6", alimentador: "#16a34a", zonal: "#2563eb", otro: "#64748b",
@@ -18,20 +20,10 @@ export const type = {
   eyebrow: { fontSize: 12, fontWeight: "700", letterSpacing: 0.6 },
 } as const;
 
+/** Colores del tema claro u oscuro, o la paleta de alto contraste si el teléfono tiene «Más contraste». */
 export function useColors() {
   const dark = useColorScheme() === "dark";
-  return {
-    dark,
-    bg: dark ? "#000000" : "#f4f4f6",
-    card: dark ? "#1c1c1e" : "#ffffff",
-    cardAlt: dark ? "#2c2c2e" : "#ececf0",
-    text: dark ? "#ffffff" : "#0b0b0d",
-    muted: dark ? "#9a9aa2" : "#6c6c72",
-    line: dark ? "#2c2c2e" : "#e4e4e9",
-    accent: "#e11d2e",
-    onAccent: "#ffffff",
-    ink: dark ? "#ffffff" : "#0b0b0d",       // botón oscuro en claro, claro en oscuro (como la referencia)
-    onInk: dark ? "#0b0b0d" : "#ffffff",
-    shadow: dark ? "transparent" : "#1b1b2a",
-  };
+  const { moreContrast } = useAccessibility();
+  const p = dark ? (moreContrast ? HIGH_DARK : DARK) : moreContrast ? HIGH_LIGHT : LIGHT;
+  return { dark, moreContrast, ...p };
 }

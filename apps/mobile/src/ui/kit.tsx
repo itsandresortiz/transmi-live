@@ -4,19 +4,22 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-na
 import * as Haptics from "expo-haptics";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { SymbolView, type SFSymbol } from "expo-symbols";
+import { useAccessibility } from "@/accessibility";
 import { radius, space, type, useColors } from "./theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /** Cualquier cosa tocable se hunde un poco al presionarla y vuelve con un resorte, como en iOS. */
 export function Tap({ children, style, haptic = true, onPress, ...rest }: PressableProps & { children: ReactNode; style?: StyleProp<ViewStyle>; haptic?: boolean }) {
+  const { reduceMotion } = useAccessibility();
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <AnimatedPressable
+      hitSlop={12}
       {...rest}
-      onPressIn={() => { scale.value = withSpring(0.96, { damping: 18, stiffness: 420 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 14, stiffness: 300 }); }}
+      onPressIn={() => { if (!reduceMotion) scale.value = withSpring(0.96, { damping: 18, stiffness: 420 }); }}
+      onPressOut={() => { if (!reduceMotion) scale.value = withSpring(1, { damping: 14, stiffness: 300 }); }}
       onPress={(e) => { if (haptic && Platform.OS === "ios") void Haptics.selectionAsync(); onPress?.(e); }}
       style={[style, anim]}
     >
@@ -33,9 +36,11 @@ export function Card({ children, style, dark = false }: { children: ReactNode; s
   );
 }
 
-/** Superficie de vidrio líquido en iOS 26; en lo demás, un fondo translúcido. */
+/** Superficie de vidrio líquido en iOS 26; en lo demás, un fondo translúcido. Con «Reducir transparencia» del teléfono, un fondo sólido. */
 export function Glass({ children, style, interactive = false }: { children?: ReactNode; style?: StyleProp<ViewStyle>; interactive?: boolean }) {
   const c = useColors();
+  const { reduceTransparency } = useAccessibility();
+  if (reduceTransparency) return <View style={[{ backgroundColor: c.card }, style]}>{children}</View>;
   if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView glassEffectStyle="regular" isInteractive={interactive} style={style}>{children}</GlassView>;
   return <View style={[{ backgroundColor: c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)" }, style]}>{children}</View>;
 }
@@ -51,6 +56,14 @@ export function RoundButton({ symbol, label, onPress, size = 46 }: { symbol: SFS
     </Tap>
   );
 }
+
+/** Botón de cerrar de una hoja: arriba a la derecha, de vidrio, con área de toque grande. */
+export function SheetClose({ onPress }: { onPress: () => void }) {
+  return <View style={styles.close}><RoundButton symbol="xmark" label="Cerrar" onPress={onPress} size={40} /></View>;
+}
+
+/** En pantallas anchas (iPad) el contenido no se estira de lado a lado: se centra en una columna. */
+export const PAGE: StyleProp<ViewStyle> = { width: "100%", maxWidth: 680, alignSelf: "center" };
 
 /** Etiqueta redonda para elegir (ordenar, filtrar). */
 export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress: () => void }) {
@@ -81,7 +94,8 @@ export function IconDot({ symbol, tint, bg }: { symbol: SFSymbol; tint: string; 
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, borderCurve: "continuous", padding: space[4], shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
   round: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  chip: { paddingHorizontal: space[4], height: 40, borderRadius: radius.pill, borderCurve: "continuous", alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
+  chip: { paddingHorizontal: space[4], minHeight: 44, borderRadius: radius.pill, borderCurve: "continuous", alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
   sectionRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: space[6], marginBottom: space[3], paddingHorizontal: space[5] },
+  close: { position: "absolute", top: space[3], right: space[4], zIndex: 5 },
   dot: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
 });

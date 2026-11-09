@@ -2,7 +2,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { ALERT_EFFECT_LABEL, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { useTransitVersion } from "@/hooks";
-import { Card } from "@/ui/kit";
+import { Card, PAGE } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -12,7 +12,7 @@ export default function Avisos() {
   useTransitVersion();
   const list = transit.alerts;
   return (
-    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={styles.screen} contentInsetAdjustmentBehavior="automatic">
+    <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={[PAGE, styles.screen]} contentInsetAdjustmentBehavior="automatic">
       {!list.length ? <Card><Text style={[type.headline, { color: c.text }]}>Sin avisos</Text><Text style={[type.body, { color: c.muted }]}>No hay novedades del servicio en este momento.</Text></Card> : null}
       {list.map((a, i) => {
         const tone = a.effect === "noService" ? "#dc2626" : a.effect === "additional" ? "#16a34a" : "#d97706";

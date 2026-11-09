@@ -13,7 +13,7 @@ import { etaText } from "@/format";
 import { durText, hm, isRide, isWalk, meters, mins, transfersText } from "@/planner/format";
 import { nowMode, sorted, usePlanner, type When } from "@/planner/store";
 import { useSaved } from "@/favorites";
-import { Card, Chip, Tap } from "@/ui/kit";
+import { Card, Chip, Tap, PAGE } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -51,7 +51,7 @@ export default function Viaje() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
-      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{ paddingBottom: space[10] * 3 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[PAGE, { paddingBottom: space[10] * 3 }]}>
         <Text style={[type.largeTitle, styles.title, { color: c.text }]} accessibilityRole="header">¿Cómo llegar?</Text>
 
         <View style={styles.pad}>
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   pickerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: space[3] },
   tripTop: { flexDirection: "row", gap: space[3] },
   tags: { flexDirection: "row", gap: space[2], flexWrap: "wrap" },
-  tag: { paddingHorizontal: space[2], height: 22, borderRadius: radius.pill, justifyContent: "center" },
+  tag: { paddingHorizontal: space[2], minHeight: 22, borderRadius: radius.pill, justifyContent: "center" },
   chain: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space[1] },
   chainItem: { flexDirection: "row", alignItems: "center", gap: space[1] },
   walk: { flexDirection: "row", alignItems: "center", gap: 2 },

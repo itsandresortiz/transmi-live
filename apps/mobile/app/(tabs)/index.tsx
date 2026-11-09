@@ -13,7 +13,7 @@ import { etaText } from "@/format";
 import { useSaved } from "@/favorites";
 import { usePlanner } from "@/planner/store";
 import { RouteBadge } from "@/ui/RouteBadge";
-import { Card, IconDot, RoundButton, SectionTitle, Tap } from "@/ui/kit";
+import { Card, IconDot, RoundButton, SectionTitle, Tap, PAGE } from "@/ui/kit";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 const greeting = () => {
@@ -38,7 +38,7 @@ export default function Inicio() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: space[10] * 3 }} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[PAGE, { paddingBottom: space[10] * 3 }]} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
           <Text style={[type.body, { color: c.muted }]}>{greeting()}</Text>
           <RoundButton symbol="bell" label="Avisos del servicio" onPress={() => router.push("/avisos")} />
@@ -89,7 +89,7 @@ export default function Inicio() {
                   <Tap key={id} onPress={() => router.push({ pathname: "/stop/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={stopLabelText(transit.labelOf(stop))}>
                     <Card style={styles.favRow}>
                       <SymbolView name="mappin.circle.fill" tintColor={c.accent} size={24} />
-                      <View style={{ flex: 1 }}><Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{stopLabelText(transit.labelOf(stop))}</Text>
+                      <View style={{ flex: 1 }}><Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{saved.nicknames[id] || stopLabelText(transit.labelOf(stop))}</Text>
                         <Text style={[type.caption, { color: c.muted }]}>{next ? `${next.route.shortName} · ${etaText(next.buses[0]!.etaAt, nowSec())}` : live ? "Ningún bus viene ahora" : "Sin datos en vivo"}</Text></View>
                     </Card>
                   </Tap>
@@ -123,12 +123,12 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space[5], paddingTop: space[2] },
   hero: { paddingHorizontal: space[5], marginTop: space[2] },
   searchWrap: { marginHorizontal: space[5], marginTop: space[5] },
-  search: { flexDirection: "row", alignItems: "center", gap: space[3], height: 58, borderRadius: radius.xl, borderCurve: "continuous", paddingLeft: space[4], paddingRight: space[2], shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
+  search: { flexDirection: "row", alignItems: "center", gap: space[3], minHeight: 58, borderRadius: radius.xl, borderCurve: "continuous", paddingLeft: space[4], paddingRight: space[2], shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
   filter: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
   quickRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: space[5] },
   quick: { alignItems: "center", gap: space[2], width: 76 },
   bigRow: { flexDirection: "row", gap: space[3], paddingHorizontal: space[5], marginTop: space[6] },
-  big: { height: 128, justifyContent: "space-between" },
+  big: { minHeight: 128, justifyContent: "space-between" },
   favRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
   favRoutes: { flexDirection: "row", flexWrap: "wrap", gap: space[2] },
   liveRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
