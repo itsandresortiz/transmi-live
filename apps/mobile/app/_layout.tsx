@@ -17,9 +17,9 @@ export default function RootLayout() {
         <Stack.Screen name="route/[id]" options={{ headerShown: true, title: "Ruta", headerBackTitle: "Atrás", headerTintColor: "#e11d2e", presentation: "card" }} />
         <Stack.Screen name="bus/[id]" options={{ presentation: "formSheet", sheetAllowedDetents: "fitToContents", sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: "last", sheetCornerRadius: 28, headerShown: false }} />
         <Stack.Screen name="stop/[id]" options={{ presentation: "formSheet", sheetAllowedDetents: [0.5, 0.92], sheetInitialDetentIndex: 0, sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 0, sheetCornerRadius: 28, headerShown: false }} />
-        <Stack.Screen name="avisos" options={{ presentation: "formSheet", sheetAllowedDetents: [0.92], sheetGrabberVisible: true, sheetCornerRadius: 28, headerShown: false }} />
+        <Stack.Screen name="avisos" options={{ presentation: "formSheet", sheetAllowedDetents: [0.6, 0.95], sheetInitialDetentIndex: 1, sheetGrabberVisible: true, sheetCornerRadius: 28, headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
-        <Stack.Screen name="card" options={{ presentation: "formSheet", sheetAllowedDetents: [0.92], sheetGrabberVisible: true, sheetCornerRadius: 28, headerShown: false }} />
+        <Stack.Screen name="card" options={{ presentation: "formSheet", sheetAllowedDetents: [0.6, 0.95], sheetInitialDetentIndex: 1, sheetGrabberVisible: true, sheetCornerRadius: 28, headerShown: false }} />
       </Stack>
     </>
   );
