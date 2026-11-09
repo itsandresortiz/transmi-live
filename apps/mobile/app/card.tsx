@@ -50,8 +50,11 @@ export default function CardScreen() {
     <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={[PAGE, styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
       <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">Mi tarjeta</Text>
       {!Tullave || !available ? (
-        <Card><Text style={[type.headline, { color: c.text }]}>Este teléfono no puede leer tarjetas</Text>
-          <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>La lectura necesita un iPhone con NFC (7 o más nuevo) y la app instalada desde TestFlight o la App Store; no funciona en el simulador.</Text></Card>
+        <Card><Text style={[type.headline, { color: c.text }]}>{!Tullave ? "Esta versión no trae el lector de tarjetas" : "No pudimos activar el NFC"}</Text>
+          <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{!Tullave
+            ? "Instala la última compilación desde TestFlight: el lector solo viene en las versiones nuevas."
+            : "iOS dice que no puede leer tarjetas ahora. Pasa si el teléfono es anterior al iPhone 7, si es un iPad o si la app se compiló sin el permiso «NFC Tag Reading» en developer.apple.com (Identifiers › com.transmilive.app). No funciona en el simulador."}</Text></Card>
+
       ) : (
         <>
           <Card dark style={styles.hero}>
