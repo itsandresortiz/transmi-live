@@ -6,13 +6,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { startData } from "@/bootstrap";
 import { RideWatcher } from "@/RideWatcher";
+import { Launch, useLaunch } from "@/ui/Launch";
 
 const close = () => <Text onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Cerrar" style={{ color: "#e11d2e", fontSize: 17, fontWeight: "600" }}>Cerrar</Text>;
 
 export default function RootLayout() {
   useEffect(() => startData(), []);
   // la primera vez se explica qué es la app y qué hace con los datos
-  useEffect(() => { void AsyncStorage.getItem("tm.onboarded.v1").then((v) => { if (!v) setTimeout(() => router.push("/onboarding"), 400); }).catch(() => undefined); }, []);
+  const launched = useLaunch((s) => s.done);
+  useEffect(() => { if (launched) void AsyncStorage.getItem("tm.onboarded.v1").then((v) => { if (!v) setTimeout(() => router.push("/onboarding"), 200); }).catch(() => undefined); }, [launched]);
   return (
     <>
       <StatusBar style="auto" />
@@ -27,6 +29,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="card" options={{ presentation: "modal", headerShown: true, title: "Mi tarjeta", headerTintColor: "#e11d2e", headerRight: close }} />
       </Stack>
+      <Launch />
     </>
   );
 }
