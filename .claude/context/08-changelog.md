@@ -5,6 +5,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 
 ## Sin commit (pendiente de decisión del dueño)
 
+- 2026-11-10 · app · Interruptores («Buses de ejemplo», capas del mapa) descentrados en su fila: nuevo `Toggle` en `kit.tsx` que le da al interruptor nativo su tamaño real de iOS 26 (63×28) y lo centra. **Sin ver en simulador (?)**: si sigue corrido, pedir captura.
 - 2026-11-10 · app · Tocar un aviso del viaje («Faltan 3 paradas», etc.) **abre ese viaje** (`notify.ts` `onAlertTap`, cada aviso lleva `busId`, `alightId`, `total`; `RideWatcher` lo escucha). Si la app se había cerrado, recupera dónde te bajas. Sin probar en teléfono.
 - 2026-11-10 · app · «Voy en este bus» ahora también **sigue** al bus: al cerrar la ventana, el mapa lo acompaña y deja arriba la tarjeta fija (dice «Vas en este bus» y «Te bajas en …» si marcaste parada; la X termina el viaje y deja de seguir). `app/ride/[id].tsx`, `app/(tabs)/mapa.tsx`. Sin probar en teléfono.
 - 2026-11-10 · La memoria del proyecto se movió de `docs/context/` + `CLAUDE.md` (raíz) a **`.claude/context/` + `.claude/CLAUDE.md`** y se subió a `main` por decisión del dueño, tras quitar nombres de repos de terceros, de otros proyectos del dueño y detalles de la cuenta de Apple. El repo es público: aquí no va nada privado. El `TEAM_ID` quedó guardado en el Mac del dueño (no en el repo).

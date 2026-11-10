@@ -21,6 +21,7 @@
 - App: **no usar `formSheet`** (en iOS 27.2 con listas se ve en negro); todas las ventanas son `modal` con encabezado nativo y la X nativa (`CloseToolbar`). Un `card` empujado sobre un `modal` queda detrás: toda ventana que se abra desde otra debe ser `modal`.
 - App/mapa: **no agregar ni quitar capas en caliente** (cierra la app): capas siempre montadas, cambiar `visibility`. No pasar un solo punto a `fitBounds` (cierra la app): usar `flyTo`.
 - App: efectos de cristal solo sobre contenido (mapa); sobre el mapa usar `Glass scheme="light"` con texto oscuro. Botones principales: `PrimaryButton`. Cerrar = **X** (icono), no la palabra «Cerrar».
+- App: interruptores con `Toggle` (de `kit.tsx`), no con `Switch` directo (en iOS 26 queda descentrado).
 - App: las filas que se deslizan de lado deben llegar a los bordes de la pantalla (`marginHorizontal` negativo + `paddingHorizontal` en el contenido); si no, las fichas se recortan en seco en el margen.
 - App: pantallas ocultas no deben repintarse (`useTransitVersion`/`useNow` ya dependen de `useIsFocused`); no calcular cosas pesadas en cada segundo.
 - No tocar el motor de movimiento para «inventar» paradas cuando el bus no trae ninguna.

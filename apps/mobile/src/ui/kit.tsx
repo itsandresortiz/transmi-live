@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { AppState, Platform, Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
+import { AppState, Platform, Pressable, StyleSheet, Switch, Text, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
@@ -50,6 +50,18 @@ export function Glass({ children, style, interactive = false, tint, scheme }: { 
 }
 
 /** Botón redondo de vidrio con un símbolo de iOS (volver, ubicación, avisos…). */
+/** Interruptor del sistema, centrado en su fila. En iOS 26 el interruptor nativo mide 63×28 (antes 51×31) y React Native le sigue reservando
+ *  el tamaño viejo, así que queda corrido; aquí se le da su caja real y se centra dentro de un espacio fijo. */
+export function Toggle({ value, onChange, label, disabled = false }: { value: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  const glass = Platform.OS === "ios" && isLiquidGlassAvailable();
+  const w = glass ? 63 : 51, h = glass ? 28 : 31;
+  return (
+    <View style={{ width: w, height: 44, alignItems: "center", justifyContent: "center" }}>
+      <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel={label} style={{ width: w, height: h }} />
+    </View>
+  );
+}
+
 export function RoundButton({ symbol, label, onPress, size = 46, tint, light = false }: { symbol: SFSymbol; label: string; onPress: () => void; size?: number; tint?: string; light?: boolean }) {
   const c = useColors();
   return (

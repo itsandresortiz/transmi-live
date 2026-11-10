@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Constants from "expo-constants";
@@ -13,7 +13,7 @@ import { useAppearance, type AppearanceMode } from "@/appearance";
 import { useSaved } from "@/favorites";
 import { useDemo } from "@/demo";
 import { usePlanner } from "@/planner/store";
-import { Tap, PAGE } from "@/ui/kit";
+import { Tap, PAGE, Toggle } from "@/ui/kit";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -118,7 +118,7 @@ export default function Mas() {
             <View style={[styles.tile, { backgroundColor: "#8b5cf6" }]}><SymbolView name="play.fill" tintColor="#ffffff" size={15} /></View>
             <View style={styles.rowBody}>
               <Text style={[type.body, { color: c.text, flex: 1 }]}>{demo.loading ? "Descargando buses de ejemplo…" : "Buses de ejemplo"}</Text>
-              <Switch value={demo.on} disabled={demo.loading} onValueChange={(v) => { if (v) void demo.start(); else demo.stop(); }} accessibilityLabel="Buses de ejemplo (demostración)" />
+              <Toggle value={demo.on} disabled={demo.loading} onChange={(v) => { if (v) void demo.start(); else demo.stop(); }} label="Buses de ejemplo (demostración)" />
             </View>
           </View>
         </Group>

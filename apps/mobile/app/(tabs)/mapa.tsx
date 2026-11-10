@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Location from "expo-location";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,7 +23,7 @@ import { RouteBadge } from "@/ui/RouteBadge";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { locateMe } from "@/location";
 import { FeedStatus } from "@/ui/FeedStatus";
-import { Glass, RoundButton, Tap } from "@/ui/kit";
+import { Glass, RoundButton, Tap, Toggle } from "@/ui/kit";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { SYSTEM_COLOR, space, type, useColors } from "@/ui/theme";
 
@@ -129,7 +129,7 @@ export default function Mapa() {
               {([["signals", "Semáforos"], ["stations", "Estaciones con sus vagones"]] as const).map(([k, label]) => (
                 <View key={k} style={styles.panelRow}>
                   <Text style={[type.body, { color: "#111114", flex: 1 }]}>{label}</Text>
-                  <Switch value={layers[k]} onValueChange={(v) => layers.set(k, v)} accessibilityLabel={label} />
+                  <Toggle value={layers[k]} onChange={(v) => layers.set(k, v)} label={label} />
                 </View>
               ))}
             </View>
