@@ -33,10 +33,14 @@ function body(c: CanvasRenderingContext2D, y: number, h: number, front: boolean,
 export function drawTopBus(c: CanvasRenderingContext2D, color: string, long: boolean, ratio = 1): void {
   const L = long ? L_LONG : L_STD, top = -L / 2, x = -BW / 2;
   c.save();
-  c.shadowColor = "rgba(0,0,0,.3)"; c.shadowBlur = 3 * ratio; c.shadowOffsetX = 1.1 * ratio; c.shadowOffsetY = 1.5 * ratio;
-  c.lineWidth = 1.1; c.strokeStyle = "#fff"; c.fillStyle = color;
-  if (!long) { rounded(c, x, top, BW, L, 3.4); c.fill(); c.stroke(); }
-  else { rounded(c, x, top, BW, FRONT, 3.4); c.fill(); c.stroke(); rounded(c, x, top + FRONT + GAP, BW, REAR, 3.4); c.fill(); c.stroke(); }
+  c.shadowColor = "rgba(0,0,0,.38)"; c.shadowBlur = 3.4 * ratio; c.shadowOffsetX = 1.1 * ratio; c.shadowOffsetY = 1.5 * ratio;
+  c.fillStyle = color;      // sin borde blanco: el bus se separa del mapa con su sombra y un filo oscuro muy fino
+  if (!long) { rounded(c, x, top, BW, L, 3.4); c.fill(); }
+  else { rounded(c, x, top, BW, FRONT, 3.4); c.fill(); rounded(c, x, top + FRONT + GAP, BW, REAR, 3.4); c.fill(); }
+  c.restore();
+  c.save(); c.lineWidth = 0.55; c.strokeStyle = "rgba(0,0,0,.32)";
+  if (!long) { rounded(c, x, top, BW, L, 3.4); c.stroke(); }
+  else { rounded(c, x, top, BW, FRONT, 3.4); c.stroke(); rounded(c, x, top + FRONT + GAP, BW, REAR, 3.4); c.stroke(); }
   c.restore();
   c.save();
   if (!long) body(c, top, L, true, true, 2);

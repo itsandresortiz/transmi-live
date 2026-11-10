@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -18,6 +18,7 @@ import { useMapFocus } from "@/map/focus";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
+import { RideScene } from "@/ui/RideScene";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
 const MAX_STOPS = 30;
@@ -27,11 +28,13 @@ export default function Ride() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   useTransitVersion();
   const now = useNow() / 1000;
   const rideBus = useRide((st) => st.busId), rideStop = useRide((st) => st.alightId);
   const alightId = rideBus === id ? rideStop : null;      // el destino marcado solo cuenta si es para este bus
-  const setAlightId = (stop: string | null) => { if (stop) { void allowAlerts(); useRide.getState().set(id, stop); } else useRide.getState().clear(); };
+  const rideTotal = useRide((st) => st.total);
+  const setAlightId = (stop: string | null, total = 0) => { if (stop) { void allowAlerts(); useRide.getState().set(id, stop, total); } else useRide.getState().clear(); };
   const v = transit.fleet.get(id);
   const r = v ? transit.routeOf(v) : undefined;
   const seq = v ? transit.sequenceForDisplay(v) : undefined;
@@ -51,41 +54,63 @@ export default function Ride() {
   if (!v) return <View style={[styles.screen, { backgroundColor: c.bg }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>Este bus dejó de reportar</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido. Revisa por la ventana del bus.</Text></View>;
   const silent = now - v.reportedAt > 120;
   const next = stops[0];
+  const nextStop = next ? transit.stopById(next.id) : undefined;
+  const arrived = left != null && left <= 0;
+  // barra de avance: paradas desde que marcaste dónde bajas (como mucho 14 segmentos a la vista)
+  const segments = Math.max(rideTotal, left ?? 0), done = Math.max(0, segments - Math.max(0, left ?? 0)), shown = Math.min(14, segments);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
-        <View style={styles.head}>
-          {r ? <RouteBadge route={r} /> : null}
-          <View style={{ flex: 1 }}>
-            <Text style={[type.title, { color: c.text, paddingRight: space[10] }]} numberOfLines={2}>{seq?.shape.headsign ? `Hacia ${seq.shape.headsign}` : r ? routeTitle(r) : SYSTEM_LABEL[v.system]}</Text>
-            <Text style={[type.caption, { color: c.muted }]}>Voy en este bus · {v.plate || v.label || v.id}</Text>
-          </View>
-        </View>
-
-        {silent ? <Card><Text style={[type.headline, { color: "#d97706" }]}>Perdimos la señal de este bus</Text><Text style={[type.body, { color: c.muted }]}>Hace {Math.round((now - v.reportedAt) / 60)} min que no reporta. Los tiempos son aproximados.</Text></Card> : null}
-
         {!seq || !next ? (
-          <Card><Text style={[type.headline, { color: c.text }]}>No podemos ubicar este bus en su ruta</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>TransMilenio no nos da suficiente información de este viaje para calcular sus próximas paradas.</Text></Card>
+          <>
+            <View style={styles.head}>
+              {r ? <RouteBadge route={r} /> : null}
+              <Text style={[type.title, { color: c.text, flex: 1 }]} numberOfLines={2}>{r ? routeTitle(r) : SYSTEM_LABEL[v.system]}</Text>
+            </View>
+            <Card><Text style={[type.headline, { color: c.text }]}>No podemos ubicar este bus en su ruta</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>TransMilenio no nos da suficiente información de este viaje para calcular sus próximas paradas.</Text></Card>
+          </>
         ) : (
           <>
-            <View style={[styles.hero, { backgroundColor: color }]}>
-              <Text style={[type.eyebrow, { color: "#ffffff", opacity: 0.8 }]}>PRÓXIMA PARADA</Text>
-              <Text style={[type.title, { color: "#ffffff" }]} numberOfLines={2}>{stopText(transit.stopById(next.id), next.id)}</Text>
-              <Text style={[type.hero, { color: "#ffffff" }]}>{etaText(next.at, now)}</Text>
+            {/* como un tablero de a bordo: a dónde llegas, la vía corriendo y lo que falta */}
+            <View style={{ alignItems: "center", gap: 4 }}>
+              <Text style={[type.title, { color: c.text, textAlign: "center" }]} numberOfLines={2}>{arrived ? "¡Llegaste!" : `Llegando a ${transit.labelOf(nextStop ?? { id: next.id, code: "", name: next.id, position: v.position }).title}`}</Text>
+              <View style={styles.sub}>
+                {r ? <RouteBadge route={r} /> : null}
+                <Text style={[type.body, { color: c.muted }]} numberOfLines={1}>{seq.shape.headsign ? `hacia ${seq.shape.headsign} · ` : ""}<Text style={{ color: c.accent, fontWeight: "700" }}>{etaText(next.at, now)}</Text></Text>
+              </View>
             </View>
 
-            {alightId && left != null ? (
-              <Card style={{ borderWidth: 1.5, borderColor: left <= 1 ? "#d97706" : c.accent, gap: space[1] }}>
-                <Text style={[type.eyebrow, { color: c.muted }]}>BAJAS EN</Text>
-                <Text style={[type.headline, { color: c.text }]}>{stopText(transit.stopById(alightId), alightId)}</Text>
-                <Text style={[type.body, { color: left <= 1 ? "#d97706" : c.muted, fontWeight: left <= 1 ? "700" : "400" }]}>
-                  {left <= 0 ? "¡Es tu parada! Prepárate para bajar." : left === 1 ? "La siguiente parada es la tuya." : `Faltan ${left} paradas · ${etaText(arrivalAtIndex(transit, v, seq.shape, seq.index, seq.index + left, nowMs()), now)}`}
-                </Text>
-                <Tap onPress={() => setAlightId(null)} accessibilityRole="button" accessibilityLabel="Quitar mi parada de bajada"><Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>Quitar</Text></Tap>
-              </Card>
-            ) : <Text style={[type.caption, { color: c.muted }]}>Toca una parada para marcar dónde bajas. Te avisamos (notificación y vibración) 3 paradas antes, 1 antes y al llegar. Deja la app abierta para que los avisos sean más exactos.</Text>}
+            <View style={{ marginHorizontal: -space[5], marginTop: -space[2] }}>
+              <RideScene system={v.system} color={color} moving={!arrived && !silent} width={width} />
+            </View>
+
+            {silent ? <Card><Text style={[type.headline, { color: "#d97706" }]}>Perdimos la señal de este bus</Text><Text style={[type.body, { color: c.muted }]}>Hace {Math.round((now - v.reportedAt) / 60)} min que no reporta. Los tiempos son aproximados.</Text></Card> : null}
+
+            <View style={[styles.info, { backgroundColor: c.cardAlt }]}>
+              <SymbolView name="info.circle.fill" tintColor={c.muted} size={22} />
+              <Text style={[type.body, { color: c.text, flex: 1 }]}>
+                {alightId && left != null
+                  ? left <= 0 ? "Es tu parada. Prepárate para bajar." : left === 1 ? `La siguiente es la tuya: ${stopText(transit.stopById(alightId), alightId)}.` : `Bajas en ${stopText(transit.stopById(alightId), alightId)}: faltan ${left} paradas, ${etaText(arrivalAtIndex(transit, v, seq.shape, seq.index, seq.index + left, nowMs()), now)}.`
+                  : `${stopText(nextStop, next.id)} es la próxima parada. Toca en la lista la parada donde bajas y te avisamos antes de llegar.`}
+              </Text>
+            </View>
+
+            {alightId && left != null && segments > 0 ? (
+              <View style={{ gap: space[2] }}>
+                <View style={styles.progressTop}>
+                  <Text style={[type.headline, { color: c.text }]}>Trayecto</Text>
+                  <Text style={[type.headline, { color: c.text, fontVariant: ["tabular-nums"] }]}>{done} / {segments} paradas</Text>
+                </View>
+                <View style={styles.segments} accessible accessibilityLabel={`Llevas ${done} de ${segments} paradas`}>
+                  {Array.from({ length: shown }, (_, i) => <View key={i} style={[styles.segment, { backgroundColor: i < Math.round((done / segments) * shown) ? color : c.cardAlt }]} />)}
+                </View>
+                <Tap onPress={() => setAlightId(null)} accessibilityRole="button" accessibilityLabel="Quitar mi parada de bajada" style={[styles.pillBtn, { backgroundColor: c.cardAlt }]}>
+                  <SymbolView name="bell.slash" tintColor={c.text} size={16} /><Text style={[type.headline, { color: c.text }]}>Quitar el aviso</Text>
+                </Tap>
+              </View>
+            ) : null}
 
             <Text style={[type.eyebrow, { color: c.muted, marginTop: space[2] }]}>PRÓXIMAS PARADAS</Text>
             <View>
@@ -93,7 +118,7 @@ export default function Ride() {
                 const lastRow = i === stops.length - 1, mine = s.id === alightId;
                 const stop = transit.stopById(s.id);
                 return (
-                  <Tap key={s.id + s.index} onPress={() => { setAlightId(mine ? null : s.id); void Haptics.selectionAsync(); }} accessibilityRole="button" accessibilityState={{ selected: mine }}
+                  <Tap key={s.id + s.index} onPress={() => { setAlightId(mine ? null : s.id, i + 1); void Haptics.selectionAsync(); }} accessibilityRole="button" accessibilityState={{ selected: mine }}
                     accessibilityLabel={`${stopText(stop, s.id)}, ${etaText(s.at, now)}${mine ? ", aquí bajas" : ", tocar para marcarla como donde bajas"}`} style={styles.tl}>
                     <View style={styles.tlRail}>
                       <View style={[styles.tlLine, { backgroundColor: color, top: i === 0 ? "50%" : 0, bottom: lastRow ? "50%" : 0 }]} />
@@ -124,7 +149,12 @@ export default function Ride() {
 const styles = StyleSheet.create({
   screen: { padding: space[5], gap: space[3] },
   head: { flexDirection: "row", alignItems: "center", gap: space[3] },
-  hero: { borderRadius: radius.xl, borderCurve: "continuous", padding: space[5], gap: space[1] },
+  sub: { flexDirection: "row", alignItems: "center", gap: space[2] },
+  info: { flexDirection: "row", alignItems: "center", gap: space[3], padding: space[4], borderRadius: radius.lg, borderCurve: "continuous" },
+  progressTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  segments: { flexDirection: "row", gap: 5 },
+  segment: { flex: 1, height: 26, borderRadius: 7, borderCurve: "continuous" },
+  pillBtn: { minHeight: 50, borderRadius: radius.pill, flexDirection: "row", gap: space[2], alignItems: "center", justifyContent: "center", marginTop: space[1] },
   btn: { minHeight: 54, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: space[2], marginTop: space[2] },
   tl: { flexDirection: "row", gap: space[3], minHeight: 52 },
   tlRail: { width: 18, alignItems: "center" },

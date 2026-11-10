@@ -8,11 +8,13 @@ import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { reportProblem } from "@/report";
-import { Card, Tap, PAGE } from "@/ui/kit";
+import { useAppearance, type AppearanceMode } from "@/appearance";
+import { Card, Chip, Tap, PAGE } from "@/ui/kit";
 import { space, type, useColors } from "@/ui/theme";
 
 export default function Mas() {
   const c = useColors();
+  const appearance = useAppearance();
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
   const live = transit.fleet.size >= 50, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
@@ -30,6 +32,14 @@ export default function Mas() {
               {live ? `Se actualizan solos${ageMin != null && ageMin >= 2 ? ` · último dato hace ${ageMin} min` : ""}.`
                 : "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: puedes consultar horarios y planear viajes."}
             </Text>
+          </Card>
+        </View>
+        <View style={{ marginHorizontal: space[5] }}>
+          <Card style={{ gap: space[3] }}>
+            <View><Text style={[type.headline, { color: c.text }]}>Apariencia</Text><Text style={[type.body, { color: c.muted }]}>Automático usa la del teléfono.</Text></View>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space[2] }}>
+              {([["auto", "Automático"], ["light", "Claro"], ["dark", "Oscuro"]] as [AppearanceMode, string][]).map(([m, label]) => <Chip key={m} label={label} selected={appearance.mode === m} onPress={() => appearance.setMode(m)} />)}
+            </View>
           </Card>
         </View>
         <Tap onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel="Avisos del servicio" style={{ marginHorizontal: space[5] }}>

@@ -8,6 +8,7 @@ import { RideWatcher } from "@/RideWatcher";
 import { WidgetSync } from "@/widgetSync";
 import { Launch, useLaunch } from "@/ui/Launch";
 import { useColors } from "@/ui/theme";
+import "@/appearance";      // aplica al abrir la apariencia que la persona eligió
 
 /** Si la app se abre directo en una parada o una ruta (por el widget, por ejemplo), debajo siempre queda el inicio: así se puede cerrar y volver. */
 export const unstable_settings = { anchor: "(tabs)", initialRouteName: "(tabs)" };
