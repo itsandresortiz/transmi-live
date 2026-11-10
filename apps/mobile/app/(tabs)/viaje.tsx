@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SymbolView } from "expo-symbols";
 import { type Itinerary, type PlanPlace, type PlanSort, searchPlanPlaces } from "@transmi/application";
@@ -215,7 +216,7 @@ function TripCard({ it, open, onPress, now }: { it: Itinerary; open: boolean; on
             {it.legs.map((l, i) => isWalk(l) ? (
               <View key={i} style={styles.step}><SymbolView name="figure.walk" tintColor={c.muted} size={18} /><View style={{ flex: 1 }}><Text style={[type.headline, { color: c.text }]}>Camina {durText(l.seconds)} ({meters(l.meters)})</Text><Text style={[type.caption, { color: c.muted }]}>hasta {l.toName}</Text></View></View>
             ) : (
-              <View key={i} style={styles.step}>
+              <Tap key={i} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: l.board.id, route: l.routeId } })} accessibilityRole="button" accessibilityLabel={`Ver el bus ${l.shortName} en vivo y sus paradas`} style={styles.step}>
                 {transit.routeById(l.routeId) ? <RouteBadge route={transit.routeById(l.routeId)!} /> : null}
                 <View style={{ flex: 1 }}>
                   <Text style={[type.headline, { color: c.text }]}>{l.headsign ? `Hacia ${l.headsign}` : `${SYSTEM_LABEL[l.system]} ${l.shortName}`}</Text>
@@ -224,8 +225,9 @@ function TripCard({ it, open, onPress, now }: { it: Itinerary; open: boolean; on
                   <Text style={[type.caption, { color: c.muted }]}>{l.stops} {l.stops === 1 ? "parada" : "paradas"} · {durText(l.rideSeconds)}</Text>
                   <Text style={[type.caption, { color: c.muted }]}>Baja en {l.alight.name}</Text>
                   {l.lowFrequency ? <Text style={[type.caption, { color: "#d97706" }]}>Pasa con poca frecuencia (cada ~{mins(l.headwaySeconds)} min).</Text> : null}
+                  <Text style={[type.caption, { color: c.accent, marginTop: 2 }]}>Ver bus más cercano, seguirlo en vivo y sus paradas ›</Text>
                 </View>
-              </View>
+              </Tap>
             ))}
             <View style={styles.step}><SymbolView name="mappin.circle.fill" tintColor={c.accent} size={18} /><Text style={[type.headline, { color: c.text }]}>Llegas a las {hm(it.arriveAt)}</Text></View>
           </View>

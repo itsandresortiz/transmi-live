@@ -21,12 +21,12 @@ import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
 /** Hoja de una parada: lo mismo que la web. Rutas que vienen, hora de cada una, de dónde viene el bus y los horarios si no hay datos en vivo. */
 export default function StopSheet() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, route: routeParam } = useLocalSearchParams<{ id: string; route?: string }>();
   const c = useColors();
   const insets = useSafeAreaInsets();
   useTransitVersion();
   const now = useNow() / 1000;
-  const [sel, setSel] = useState<{ routeId: string; direction: string } | null>(null);
+  const [sel, setSel] = useState<{ routeId: string; direction: string } | null>(routeParam ? { routeId: routeParam, direction: "" } : null);   // desde «Cómo llegar» se abre directo el detalle de esa ruta
   const stop = transit.stopById(id);
 
   const fav = useSaved((f) => f.stops.includes(id)), toggle = useSaved((f) => f.toggleStop);
@@ -50,7 +50,7 @@ export default function StopSheet() {
   const share = () => void Share.share({ message: `${stopLabelText(label)} en TransMi LIVE`, url: `https://transmilive.com/#/parada/${encodeURIComponent(id)}` });
 
   // la hoja pasa de la lista de rutas al detalle de una ruta (como en la web)
-  const row = sel ? rows.find((r) => r.route.id === sel.routeId && r.direction === sel.direction) : undefined;
+  const row = sel ? rows.find((r) => r.route.id === sel.routeId && (!sel.direction || r.direction === sel.direction)) : undefined;
   if (sel) return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <SheetClose onPress={() => router.back()} />
@@ -146,7 +146,7 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
   const stop = transit.stopById(stopId);
   const route = transit.routeById(sel.routeId);
   const color = route ? SYSTEM_COLOR[route.system] : c.accent;
-  const shape = transit.network.shapes.get(sel.routeId)?.find((s) => s.direction === sel.direction);
+  const shape = transit.network.shapes.get(sel.routeId)?.find((s) => s.direction === (row?.direction ?? sel.direction)) ?? (sel.direction ? undefined : transit.network.shapes.get(sel.routeId)?.find((s) => s.stopIds.includes(stopId)));
   const j = shape ? shape.stopIds.indexOf(stopId) : -1;
   const hero: UpcomingBus | undefined = row?.buses[0];
   const heroNext = hero ? transit.nextStopOf(hero.vehicle, nowMs())?.stop : undefined;
