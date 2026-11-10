@@ -2,13 +2,14 @@ import { AppState } from "react-native";
 import { gunzipSync } from "fflate";
 import { CONFIG, liveData, networkSource, transit } from "./composition-root";
 import { isDemo } from "./demo";
+import { cachedBytes } from "./offline";
 
 /** Hermes (el motor de JavaScript del teléfono) no trae DecompressionStream: los archivos .gz se abren con fflate. */
-async function gz<T>(url: string): Promise<T | null> {
+async function gz<T>(url: string, name: string): Promise<T | null> {
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    return JSON.parse(new TextDecoder().decode(gunzipSync(new Uint8Array(await res.arrayBuffer())))) as T;
+    // los horarios cambian poco: copia del teléfono si tiene menos de 6 h y, sin conexión, la que haya
+    const hit = await cachedBytes(url, name, 6 * 3_600_000);
+    return hit ? JSON.parse(new TextDecoder().decode(gunzipSync(hit.data))) as T : null;
   } catch { return null; }
 }
 
@@ -22,8 +23,8 @@ export function startData(): () => void {
   const hour = Math.floor(Date.now() / 3_600_000);
 
   void networkSource.load().then((n) => transit.setNetwork(n)).catch(() => undefined);
-  void gz<Parameters<typeof transit.setServiceEnds>[0]>(`${CONFIG.scheduleBase}service-ends.json.gz?t=${hour}`).then((d) => d && transit.setServiceEnds(d));
-  void gz<Parameters<typeof transit.setDepartures>[0]>(`${CONFIG.scheduleBase}departures.json.gz?t=${hour}`).then((d) => d && transit.setDepartures(d));
+  void gz<Parameters<typeof transit.setServiceEnds>[0]>(`${CONFIG.scheduleBase}service-ends.json.gz?t=${hour}`, "service-ends.json.gz").then((d) => d && transit.setServiceEnds(d));
+  void gz<Parameters<typeof transit.setDepartures>[0]>(`${CONFIG.scheduleBase}departures.json.gz?t=${hour}`, "departures.json.gz").then((d) => d && transit.setDepartures(d));
 
   const poll = () => { if (AppState.currentState === "active" && !isDemo()) void liveData.refresh().catch(() => undefined); };      // en demostración no se piden datos reales (se mezclarían)
   poll();

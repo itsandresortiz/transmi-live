@@ -42,7 +42,6 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 ## Deuda técnica
 - `packages/application/src/trunk-data.ts` copia `apps/web/src/data/troncales.json` y los portales de `estaciones.json`: hacer que la web lea del mismo sitio.
 - Duplicados: `apps/mobile/src/format.ts`, `stopname.ts`, `lastService.ts`, `planner/format.ts` vs sus equivalentes en `apps/web/src/ui/` → mover a `packages/application`.
-- La app no tiene caché propia de red (la web sí).
 - `apps/web/src/map/sprites.ts` conserva `busSprite` (bus de lado, ya sin uso) y `MapController.ts` lo importa sin llamarlo: limpiar.
 - Se necesita revisar `apps/web/public/privacidad.html` (escrita por Claude; el dueño debe revisarla; menciona NFC/ubicación).
 - `app.json` + `app.config.js` conviven (el segundo extiende al primero).

@@ -3,7 +3,7 @@ import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SymbolView } from "expo-symbols";
-import { alertsFor, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
+import { alertsFor, frequencyText, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEM_LABEL, alertTitle, routeTitle, stopLabelText, type Route } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs, nowSec } from "@/clock";
@@ -191,6 +191,7 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
             <Text style={[type.hero, { color: "#ffffff" }]}>{etaText(hero.etaAt, now)}{!hero.official ? <Text style={type.title}> aprox.</Text> : null}</Text>
             {now - hero.vehicle.reportedAt > 90 ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.85 }]}>Dato de hace {Math.round((now - hero.vehicle.reportedAt) / 60)} min</Text> : null}
             <Text style={[type.body, { color: "#ffffff" }]}>{hero.stopsAway <= 1 ? "Ya va hacia esta parada." : `Ahora va hacia ${stopText(heroNext, "su próxima parada")}, ${stopsAwayText(hero.stopsAway)} de aquí.`}</Text>
+            {frequencyText(row.buses.map((b) => b.etaAt), now) ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.9 }]}>{frequencyText(row.buses.map((b) => b.etaAt), now)}</Text> : null}
             <View style={styles.heroActs}>
               <Tap onPress={() => onMap(ids, hero.vehicle.id)} accessibilityRole="button" accessibilityLabel="Seguir este bus" style={[styles.heroBtn, { backgroundColor: "#ffffff" }]}><Text style={[type.headline, { color: "#111111" }]}>Seguir este bus</Text></Tap>
               <Tap onPress={() => onMap(ids, null)} accessibilityRole="button" accessibilityLabel="Ver en el mapa" style={[styles.heroBtn, { backgroundColor: "rgba(255,255,255,0.22)" }]}><Text style={[type.headline, { color: "#ffffff" }]}>Ver en el mapa</Text></Tap>

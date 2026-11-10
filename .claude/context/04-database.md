@@ -35,6 +35,7 @@ Las ramas de datos (`live-data`, `schedule-data`, `hop-stats`, `signal-stats`) s
 | `tm.layers.v1` | app | capas del mapa (semáforos, estaciones, tráfico) |
 | `tm.appearance.v1` | app | apariencia elegida: automático, claro u oscuro |
 | `tm.onboarded.v1` | app | ya vio la bienvenida |
+| `tm.cache.v1` + archivos `tm-gtfs-lite.zip`, `tm-service-ends.json.gz`, `tm-departures.json.gz` (carpeta de documentos) | app | copia de rutas y horarios para abrir rápido y sin conexión; `tm.cache.v1` guarda cuándo se bajó cada uno |
 | `tm.trip.v1` | app | viaje de «Cómo llegar» que se está siguiendo (sin trazados), paso actual y atraso medido; se descarta si ya debió terminar hace 30 min |
 | `tm-data-v1` | web (Cache Storage) | última respuesta buena de cada fuente (modo sin conexión) |
 | App Group `group.com.transmilive.app`, clave `snapshot` | app → widget (UserDefaults compartido) | JSON `{at, demo, stops:[{id,name,arrivals:[{r,h,t,c}],sched:[{r,h,t,c}]}]}` (`sched` = pasadas programadas de respaldo) con lo que viene a hasta 3 paradas favoritas; solo con `WIDGET=1` |

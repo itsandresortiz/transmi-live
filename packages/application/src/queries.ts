@@ -281,3 +281,21 @@ export function trunkStations(state: TransitState): Station[] {
   }
   return out;
 }
+
+/* ---------- cada cuánto está pasando una ruta ahora ---------- */
+
+/** Con las horas de llegada de los próximos buses de una ruta a una parada (en vivo), dice cada cuánto están pasando y si hay un hueco antes del primero.
+ *  Devuelve un texto listo para mostrar, o `undefined` si con un solo bus cercano no hay nada que decir. */
+export function frequencyText(etas: readonly number[], nowSec: number): string | undefined {
+  const t = etas.filter((e) => e >= nowSec - 30).slice().sort((a, b) => a - b);
+  if (!t.length) return undefined;
+  const mins = (s: number) => Math.max(1, Math.round(s / 60));
+  const gaps = t.slice(1).map((e, i) => e - t[i]!).sort((a, b) => a - b);
+  const every = gaps.length ? gaps[gaps.length >> 1]! : undefined;                 // intervalo típico entre los que vienen
+  const wait = t[0]! - nowSec;
+  // hueco: el primero tarda bastante y mucho más que el ritmo de los que vienen detrás (o es el único que viene)
+  if (wait >= 12 * 60 && (every == null || wait >= every * 2)) return every != null ? `Hay un hueco: el próximo tarda ~${mins(wait)} min; después pasan cada ~${mins(every)} min.` : `Hay un hueco: el próximo tarda ~${mins(wait)} min y no viene otro cerca.`;
+  if (every == null) return undefined;
+  if (every < 90) return "Ahora vienen varios seguidos.";
+  return `Ahora pasa cada ~${mins(every)} min.`;
+}

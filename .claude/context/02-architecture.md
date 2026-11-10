@@ -54,7 +54,7 @@ Ubica el bus en el trazado, calcula cuánto del tramo hacia la siguiente parada 
 
 ## Caché y funcionamiento sin conexión
 - Web: `offline-cache.ts` (`tm-data-v1`, última respuesta buena) + `public/sw.js` (app instalable). La caché del GTFS reducido se renueva por hora (`?t=`).
-- App: sin caché propia de red todavía **(?)**; el GTFS reducido y los horarios se descargan al abrir.
+- App: `src/offline.ts` guarda rutas y horarios en el teléfono (rutas: se reutilizan 12 h; horarios: 6 h; sin red, lo que haya). Nunca se guardan buses en vivo.
 
 ## Seguridad y privacidad
 - Sin cuentas, sin base de datos de usuarios, sin analítica. Favoritos, casa/trabajo, apodos y capas viven solo en el aparato.

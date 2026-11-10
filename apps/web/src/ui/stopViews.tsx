@@ -11,7 +11,7 @@ import { nowMs } from "../clock";
 import { FirstBadge, LastBadge, clockOfDay } from "./lastService";
 import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, liveDown } from "./liveStatus";
 import { labelOf, stopCode, stopKind, stopTag, stopText } from "./stopname";
-import { routesAtStop, siblingStops } from "@transmi/application";
+import { routesAtStop, siblingStops, frequencyText } from "@transmi/application";
 import { useMemo } from "react";
 import { useTransitVersion } from "./hooks";
 import { etaText, stopsAwayText } from "./format";
@@ -142,6 +142,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
             <span>
               {hero.stopsAway <= 1 ? `Ya va hacia esta parada.` : `Ahora va hacia ${stopText(heroNext, "su próxima parada")}, ${stopsAwayText(hero.stopsAway)} de aquí.`}
             </span>
+            {frequencyText(row.buses.map((b) => b.etaAt), nowSec) && <span className="rs">{frequencyText(row.buses.map((b) => b.etaAt), nowSec)}</span>}
             <div className="acts">
               <button className="btn primary" onClick={() => act.followBus(hero.vehicle.id)}>Seguir este bus</button>
               <button className="btn" onClick={() => act.focusBus(hero.vehicle.id, true)}>Ver en el mapa</button>
