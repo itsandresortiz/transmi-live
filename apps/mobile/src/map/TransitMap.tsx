@@ -16,7 +16,7 @@ const MAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
 const BOGOTA: [number, number] = [-74.075, 4.65];
 const STOP_ZOOM = 15.2;
 
-export interface TransitMapHandle { flyTo(lat: number, lon: number, zoom?: number): void; fit(points: { lat: number; lon: number }[], padding?: number, bottomExtra?: number): void }
+export interface TransitMapHandle { flyTo(lat: number, lon: number, zoom?: number): void; resetNorth(): void; fit(points: { lat: number; lon: number }[], padding?: number, bottomExtra?: number): void }
 interface Props {
   system?: SystemType | null;
   /** Si se da, solo se ven los buses de esa ruta y se dibuja su trazado. */
@@ -27,7 +27,7 @@ interface Props {
   /** Si es falso (otra pestaña al frente), los buses dejan de recalcularse para no gastar batería. */
   active?: boolean;
   /** Avisa dónde quedó el centro del mapa y su zoom cada vez que termina de moverse. */
-  onView?(v: { lat: number; lon: number; zoom: number }): void;
+  onView?(v: { lat: number; lon: number; zoom: number; bearing: number }): void;
   /** Mapa pequeño dentro de otra pantalla: sin brújula. */
   compact?: boolean;
   attributionPosition?: ComponentProps<typeof Map>["attributionPosition"];
@@ -42,10 +42,12 @@ interface Props {
 export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
   const c = useColors();
   const camera = useRef<CameraRef>(null);
+  const lastCenter = useRef<[number, number]>(BOGOTA);      // el centro actual, para girar a norte sin moverse
   const [view, setView] = useState<Viewport | null>(null);
   useTransitVersion();
 
   useImperativeHandle(ref, () => ({
+    resetNorth: () => camera.current?.easeTo({ center: lastCenter.current, bearing: 0, duration: 350 }),
     flyTo: (lat, lon, zoom = 15.5) => camera.current?.flyTo({ center: [lon, lat], zoom, duration: 900 }),
     fit: (pts, padding = 60, bottomExtra = 220) => {
       if (!pts.length) return;
@@ -112,14 +114,15 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     return JSON.stringify({ type: "FeatureCollection", features: st ? [{ type: "Feature", geometry: { type: "Point", coordinates: [st.position.lon, st.position.lat] }, properties: {} }] : [] });
   }, [focusStopId, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onRegion = useCallback((e: { nativeEvent: { bounds: [number, number, number, number]; zoom: number } }) => {
-    const { bounds, zoom } = e.nativeEvent;
+  const onRegion = useCallback((e: { nativeEvent: { bounds: [number, number, number, number]; zoom: number; bearing?: number } }) => {
+    const { bounds, zoom, bearing } = e.nativeEvent;
     setView({ west: bounds[0], south: bounds[1], east: bounds[2], north: bounds[3], zoom });
-    onView?.({ lat: (bounds[1] + bounds[3]) / 2, lon: (bounds[0] + bounds[2]) / 2, zoom });
+    lastCenter.current = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+    onView?.({ lat: (bounds[1] + bounds[3]) / 2, lon: (bounds[0] + bounds[2]) / 2, zoom, bearing: bearing ?? 0 });
   }, [onView]);
 
   return (
-    <Map style={StyleSheet.absoluteFill} mapStyle={MAP_STYLE} logo={false} attribution attributionPosition={attributionPosition} compass={!compact} compassPosition={{ top: 120, right: 12 }} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
+    <Map style={StyleSheet.absoluteFill} mapStyle={MAP_STYLE} logo={false} attribution attributionPosition={attributionPosition} compass={false} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
       <Camera ref={camera} initialViewState={{ center: BOGOTA, zoom: 11.6 }} minZoom={9} maxZoom={19} />
       <Images images={BUS_SPRITES} />
       <UserLocation />

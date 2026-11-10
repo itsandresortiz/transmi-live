@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import { Text } from "react-native";
+import { useRef } from "react";
+import { Pressable } from "react-native";
+import { SymbolView } from "expo-symbols";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -9,7 +11,19 @@ import { RideWatcher } from "@/RideWatcher";
 import { Launch, useLaunch } from "@/ui/Launch";
 import { useColors } from "@/ui/theme";
 
-const close = () => <Text onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Cerrar" style={{ color: "#e11d2e", fontSize: 17, fontWeight: "600" }}>Cerrar</Text>;
+/** La X de cerrar, como la de iOS: sin texto. iOS 26 la envuelve solo en su cápsula de vidrio. */
+function CloseX() {
+  const c = useColors();
+  const closing = useRef(false);
+  // un solo cierre por toque: si el teléfono tarda y la persona insiste, no se cierran más pantallas de las que toca
+  const close = () => { if (closing.current) return; closing.current = true; router.back(); setTimeout(() => { closing.current = false; }, 800); };
+  return (
+    <Pressable onPress={close} hitSlop={12} accessibilityRole="button" accessibilityLabel="Cerrar" style={{ width: 28, height: 28, alignItems: "center", justifyContent: "center" }}>
+      <SymbolView name="xmark" weight="semibold" tintColor={c.text} size={15} />
+    </Pressable>
+  );
+}
+const close = () => <CloseX />;
 
 export default function RootLayout() {
   const c = useColors();

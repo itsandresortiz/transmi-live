@@ -15,7 +15,7 @@ import { etaText } from "@/format";
 import { hm } from "@/planner/format";
 import { stopText } from "@/stopname";
 import { useMapFocus } from "@/map/focus";
-import { Card, Tap } from "@/ui/kit";
+import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
@@ -113,9 +113,7 @@ export default function Ride() {
           </>
         )}
 
-        <Tap onPress={showOnMap} accessibilityRole="button" accessibilityLabel="Seguir este bus en el mapa" style={[styles.btn, { backgroundColor: c.ink }]}>
-          <SymbolView name="location.fill" tintColor={c.onInk} size={16} /><Text style={[type.headline, { color: c.onInk }]}>Seguir en el mapa</Text>
-        </Tap>
+        <PrimaryButton tone="ink" symbol="location.fill" label="Seguir en el mapa" onPress={showOnMap} />
       </ScrollView>
     </View>
   );

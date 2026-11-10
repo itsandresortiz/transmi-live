@@ -75,7 +75,7 @@ export default function RouteScreen() {
       <View style={{ height: mapH, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, overflow: "hidden" }}>
         <TransitMap ref={map} routeId={id} compact attributionPosition={{ bottom: 6, left: 8 }}
           onBus={(bid) => router.push({ pathname: "/bus/[id]", params: { id: bid } })} onStop={(sid) => router.push({ pathname: "/stop/[id]", params: { id: sid, route: id } })} />
-        <View style={styles.mapBtn}><RoundButton symbol="arrow.up.left.and.arrow.down.right" label="Ver la ruta en el mapa grande" onPress={showAll} size={40} /></View>
+        <View style={styles.mapBtn}><RoundButton symbol="arrow.up.left.and.arrow.down.right" label="Ver la ruta en el mapa grande" onPress={showAll} size={40} light /></View>
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>

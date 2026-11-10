@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
+import { SymbolView } from "expo-symbols";
 import { router, useIsFocused, usePathname } from "expo-router";
 import { hav } from "@transmi/application";
 import { SYSTEMS, SYSTEM_LABEL, type SystemType } from "@transmi/domain";
@@ -15,7 +16,7 @@ import { useMapFocus } from "@/map/focus";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { locateMe } from "@/location";
 import { FeedStatus } from "@/ui/FeedStatus";
-import { Chip, Glass, RoundButton } from "@/ui/kit";
+import { Chip, Glass, RoundButton, Tap } from "@/ui/kit";
 import { SYSTEM_COLOR, space, type, useColors } from "@/ui/theme";
 
 /** El mapa se centra en tu ubicación solo la primera vez que se abre en cada sesión (después respeta por dónde lo dejaste). */
@@ -29,8 +30,7 @@ export default function Mapa() {
   const focused = useIsFocused();
   const c = useColors();
   const focus = useMapFocus();
-  const overlay = c.dark ? "rgba(20,20,24,0.42)" : "rgba(255,255,255,0.4)";      // vidrio con un velo suave: se ve el mapa detrás pero el texto se lee
-  const calm = usePathname() !== "/mapa";   // hay una hoja abierta encima del mapa
+    const calm = usePathname() !== "/mapa";   // hay una hoja abierta encima del mapa
 
   // al llegar con una parada elegida: se encuadra la parada y los buses que se acercan; si se sigue un bus, el mapa lo acompaña
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function Mapa() {
 
   // tu ubicación mientras el mapa está a la vista (solo con la app abierta; no se guarda)
   const [me, setMe] = useState<{ lat: number; lon: number } | null>(null);
-  const [center, setCenter] = useState<{ lat: number; lon: number; zoom: number } | null>(null);
+  const [center, setCenter] = useState<{ lat: number; lon: number; zoom: number; bearing: number } | null>(null);
   const [denied, setDenied] = useState(false);
   useEffect(() => {
     if (!focused) return;
@@ -72,7 +72,8 @@ export default function Mapa() {
     if (hav(me, BOGOTA) < 60_000) setTimeout(() => map.current?.flyTo(me.lat, me.lon, 15.6), 250);
   }, [me, focused, focus.stopId, focus.routeId, focus.followBusId, focus.busIds.length, focus.locate]);
 
-  const onView = useCallback((v: { lat: number; lon: number; zoom: number }) => setCenter(v), []);
+  const onView = useCallback((v: { lat: number; lon: number; zoom: number; bearing: number }) => setCenter(v), []);
+  const rotated = !!center && Math.abs(((center.bearing + 180) % 360) - 180) > 1.5;      // la brújula solo se muestra cuando el mapa está girado
   const away = !me || !center || hav(center, me) > AWAY_METERS || center.zoom < 12.5;       // el botón solo hace falta cuando te alejaste (o aún no sabemos dónde estás)
   const locate = async () => {
     const here = me ?? (await locateMe());
@@ -96,16 +97,25 @@ export default function Mapa() {
         {[0.3, 0.2, 0.12, 0.06].map((o, i) => <View key={i} style={{ flex: 1, backgroundColor: c.dark ? `rgba(0,0,0,${o})` : `rgba(255,255,255,${o + 0.2})` }} />)}
       </View>
       <View pointerEvents="box-none" style={[styles.top, { top: insets.top + space[2] }]}>
-        <Glass tint={overlay} style={styles.chipsGlass}>
+        <Glass scheme="light" style={styles.chipsGlass}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            <Chip glass label="Todos" selected={!system} onPress={() => setSystem(null)} />
-            {SYSTEMS.map((s) => <Chip glass key={s} dot={SYSTEM_COLOR[s]} label={SYSTEM_LABEL[s]} selected={system === s} onPress={() => setSystem(system === s ? null : s)} />)}
+            <Chip glass onLight label="Todos" selected={!system} onPress={() => setSystem(null)} />
+            {SYSTEMS.map((s) => <Chip glass onLight key={s} dot={SYSTEM_COLOR[s]} label={SYSTEM_LABEL[s]} selected={system === s} onPress={() => setSystem(system === s ? null : s)} />)}
           </ScrollView>
         </Glass>
       </View>
+      {rotated ? (
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(160)} style={[styles.compass, { top: insets.top + (focus.stopId || focus.routeId || focus.followBusId ? 132 : 82) }]}>
+          <Tap onPress={() => map.current?.resetNorth()} accessibilityRole="button" accessibilityLabel="Orientar el mapa hacia el norte">
+            <Glass interactive scheme="light" style={styles.compassGlass}>
+              <View style={{ transform: [{ rotate: `${-(center?.bearing ?? 0)}deg` }] }}><SymbolView name="location.north.fill" tintColor="#d4162a" size={20} /></View>
+            </Glass>
+          </Tap>
+        </Animated.View>
+      ) : null}
       {focus.stopId || focus.routeId || focus.followBusId ? (
         <View style={[styles.focusChip, { top: insets.top + 72 }]}>
-          <Glass interactive tint={overlay} style={styles.focusGlass}>
+          <Glass interactive scheme="light" style={styles.focusGlass}>
             <View style={styles.focusRow}>
               <Text style={[type.caption, { color: c.text, flex: 1 }]} numberOfLines={1}>
                 {focus.followBusId ? "Siguiendo un bus" : focus.stopId ? `Parada: ${transit.stopById(focus.stopId)?.name ?? ""}` : "Ruta seleccionada"}
@@ -117,8 +127,8 @@ export default function Mapa() {
       ) : null}
       {/* el estado del servicio y el botón de ubicación van en una fila de vidrio justo encima de la barra inferior (en estas pantallas el margen de abajo ya cuenta la barra) */}
       <View pointerEvents="box-none" style={[styles.bottomRow, { bottom: insets.bottom + 12 }]}>
-        <View pointerEvents="none"><FeedStatus tint={overlay} /></View>
-        {away ? <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)}><RoundButton symbol={denied ? "location.slash.fill" : "location.fill"} label={denied ? "Activar mi ubicación" : "Volver a mi ubicación"} onPress={() => void locate()} size={52} tint={overlay} /></Animated.View> : <View style={{ width: 52, height: 52 }} />}
+        <View pointerEvents="none"><FeedStatus light /></View>
+        {away ? <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)}><RoundButton symbol={denied ? "location.slash.fill" : "location.fill"} label={denied ? "Activar mi ubicación" : "Volver a mi ubicación"} onPress={() => void locate()} size={52} light /></Animated.View> : <View style={{ width: 52, height: 52 }} />}
       </View>
     </View>
   );
@@ -130,6 +140,8 @@ const styles = StyleSheet.create({
   chipsGlass: { borderRadius: 28, overflow: "hidden" },
   chips: { gap: space[2], padding: space[2] },
   bottomRow: { position: "absolute", left: space[4], right: space[4], flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  compass: { position: "absolute", right: space[4] },
+  compassGlass: { width: 46, height: 46, borderRadius: 23, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   scrim: { position: "absolute", top: 0, left: 0, right: 0 },
   focusChip: { position: "absolute", left: space[4], right: space[4] },
   focusGlass: { borderRadius: 24, overflow: "hidden" },

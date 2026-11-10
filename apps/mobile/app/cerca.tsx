@@ -12,7 +12,7 @@ import { locateMe } from "@/location";
 import { stopKind, stopTag } from "@/stopname";
 import { useMapFocus } from "@/map/focus";
 import { meters } from "@/planner/format";
-import { Card, Tap } from "@/ui/kit";
+import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -21,7 +21,7 @@ export default function Cerca() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   useTransitVersion();
-  const now = useNow() / 1000;
+  const now = useNow(5000) / 1000;
   const [me, setMe] = useState<{ lat: number; lon: number } | null | undefined>(undefined);
   useEffect(() => { void locateMe().then(setMe); }, []);
 
@@ -73,9 +73,7 @@ export default function Cerca() {
                 </Tap>
               );
             })}
-            <Tap onPress={showOnMap} accessibilityRole="button" accessibilityLabel="Ver dónde estoy en el mapa" style={[styles.btn, { backgroundColor: c.ink }]}>
-              <SymbolView name="location.fill" tintColor={c.onInk} size={16} /><Text style={[type.headline, { color: c.onInk }]}>Verme en el mapa</Text>
-            </Tap>
+            <PrimaryButton tone="ink" symbol="location.fill" label="Verme en el mapa" onPress={showOnMap} />
           </>
         )}
     </ScrollView>

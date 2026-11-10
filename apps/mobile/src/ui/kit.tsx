@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
+import { useEffect, useState, type ReactNode } from "react";
+import { AppState, Platform, Pressable, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
@@ -37,21 +37,37 @@ export function Card({ children, style, dark = false }: { children: ReactNode; s
 }
 
 /** Superficie de vidrio líquido en iOS 26; en lo demás, un fondo translúcido. Con «Reducir transparencia» del teléfono, un fondo sólido. */
-export function Glass({ children, style, interactive = false, tint }: { children?: ReactNode; style?: StyleProp<ViewStyle>; interactive?: boolean; tint?: string }) {
+export function Glass({ children, style, interactive = false, tint, scheme }: { children?: ReactNode; style?: StyleProp<ViewStyle>; interactive?: boolean; tint?: string; /** Fuerza vidrio claro u oscuro (sobre el mapa, que es claro, conviene claro con texto oscuro). */ scheme?: "light" | "dark" }) {
   const c = useColors();
   const { reduceTransparency } = useAccessibility();
-  if (reduceTransparency) return <View style={[{ backgroundColor: c.card }, style]}>{children}</View>;
-  if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView glassEffectStyle="regular" isInteractive={interactive} tintColor={tint} style={style}>{children}</GlassView>;
-  return <View style={[{ backgroundColor: tint ?? (c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)") }, style]}>{children}</View>;
+  // iOS 26 a veces pierde el efecto de vidrio tras volver del segundo plano: se vuelve a crear la superficie
+  const [fresh, setFresh] = useState(0);
+  useEffect(() => { const sub = AppState.addEventListener("change", (st) => { if (st === "active") setFresh((n) => n + 1); }); return () => sub.remove(); }, []);
+  if (reduceTransparency) return <View style={[{ backgroundColor: scheme === "light" ? "rgba(255,255,255,0.94)" : c.card }, style]}>{children}</View>;
+  if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView key={fresh} glassEffectStyle="regular" colorScheme={scheme ?? "auto"} isInteractive={interactive} tintColor={tint} style={style}>{children}</GlassView>;
+  return <View style={[{ backgroundColor: tint ?? (scheme === "light" ? "rgba(255,255,255,0.86)" : c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)") }, style]}>{children}</View>;
 }
 
 /** Botón redondo de vidrio con un símbolo de iOS (volver, ubicación, avisos…). */
-export function RoundButton({ symbol, label, onPress, size = 46, tint }: { symbol: SFSymbol; label: string; onPress: () => void; size?: number; tint?: string }) {
+export function RoundButton({ symbol, label, onPress, size = 46, tint, light = false }: { symbol: SFSymbol; label: string; onPress: () => void; size?: number; tint?: string; light?: boolean }) {
   const c = useColors();
   return (
     <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={{ width: size, height: size }}>
-      <Glass interactive tint={tint} style={[styles.round, { width: size, height: size, borderRadius: size / 2 }]}>
-        <SymbolView name={symbol} tintColor={c.text} size={size * 0.42} />
+      <Glass interactive tint={tint} scheme={light ? "light" : undefined} style={[styles.round, { width: size, height: size, borderRadius: size / 2 }]}>
+        <SymbolView name={symbol} tintColor={light ? "#111114" : c.text} size={size * 0.42} />
+      </Glass>
+    </Tap>
+  );
+}
+
+/** Botón principal: una cápsula de vidrio líquido teñida (como los botones prominentes de iOS 26); sin vidrio, una cápsula sólida. */
+export function PrimaryButton({ label, onPress, symbol, tone = "accent", disabled = false, a11y }: { label: string; onPress: () => void; symbol?: SFSymbol; tone?: "accent" | "ink"; disabled?: boolean; a11y?: string }) {
+  const c = useColors();
+  const bg = tone === "accent" ? c.accent : c.ink, fg = tone === "accent" ? c.onAccent : c.onInk;
+  return (
+    <Tap onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={a11y ?? label} accessibilityState={{ disabled }} style={{ opacity: disabled ? 0.6 : 1 }}>
+      <Glass interactive tint={bg} style={styles.primary}>
+        <View style={styles.primaryRow}>{symbol ? <SymbolView name={symbol} tintColor={fg} size={17} /> : null}<Text style={[type.headline, { color: fg }]}>{label}</Text></View>
       </Glass>
     </Tap>
   );
@@ -66,10 +82,10 @@ export function SheetClose({ onPress }: { onPress: () => void }) {
 export const PAGE: StyleProp<ViewStyle> = { width: "100%", maxWidth: 680, alignSelf: "center" };
 
 /** Etiqueta redonda para elegir (ordenar, filtrar). Con `glass` va sobre una superficie de vidrio (como en el mapa): sin fondo propio, y la elegida se marca con un relleno suave. `dot` pone un punto de color antes del texto. */
-export function Chip({ label, selected, onPress, glass = false, dot }: { label: string; selected?: boolean; onPress: () => void; glass?: boolean; dot?: string }) {
+export function Chip({ label, selected, onPress, glass = false, dot, onLight = false }: { label: string; selected?: boolean; onPress: () => void; glass?: boolean; dot?: string; /** Sobre vidrio claro: texto oscuro. */ onLight?: boolean }) {
   const c = useColors();
-  const bg = glass ? (selected ? (c.dark ? "rgba(255,255,255,0.26)" : "rgba(0,0,0,0.13)") : "transparent") : selected ? c.ink : c.card;
-  const fg = glass ? c.text : selected ? c.onInk : c.text;
+  const bg = glass ? (selected ? (c.dark && !onLight ? "rgba(255,255,255,0.26)" : "rgba(0,0,0,0.12)") : "transparent") : selected ? c.ink : c.card;
+  const fg = glass ? (onLight ? "#111114" : c.text) : selected ? c.onInk : c.text;
   return (
     <Tap onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!selected }} accessibilityLabel={label}
       style={[styles.chip, glass ? { minHeight: 40, borderWidth: 0 } : { borderColor: c.line }, { backgroundColor: bg }]}>
@@ -98,6 +114,8 @@ export function IconDot({ symbol, tint, bg }: { symbol: SFSymbol; tint: string; 
 
 const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, borderCurve: "continuous", padding: space[4], shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
+  primary: { minHeight: 54, borderRadius: radius.pill, borderCurve: "continuous", overflow: "hidden", justifyContent: "center", alignItems: "center" },
+  primaryRow: { flexDirection: "row", alignItems: "center", gap: space[2], paddingHorizontal: space[5], minHeight: 54 },
   round: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
   chip: { paddingHorizontal: space[4], minHeight: 44, borderRadius: radius.pill, borderCurve: "continuous", alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
   sectionRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: space[6], marginBottom: space[3], paddingHorizontal: space[5] },

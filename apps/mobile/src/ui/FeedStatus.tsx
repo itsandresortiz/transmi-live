@@ -8,7 +8,7 @@ import { Glass } from "./kit";
 import { space, type, useColors } from "./theme";
 
 /** Dice de dónde sale lo que se ve: «En vivo» o «Sin datos en vivo». Nunca se presenta un dato viejo como si fuera de ahora. */
-export function FeedStatus({ tint }: { tint?: string }) {
+export function FeedStatus({ tint, light = false }: { tint?: string; light?: boolean }) {
   const c = useColors();
   useTransitVersion(); useNow(5000);
   const st = connectionStatus(transit, nowMs());
@@ -18,11 +18,11 @@ export function FeedStatus({ tint }: { tint?: string }) {
   const title = !hasBuses ? "Sin datos en vivo" : late ? "Datos con retraso" : "En vivo";
   const detail = st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
   return (
-    <Glass tint={tint} style={styles.glass}>
+    <Glass tint={tint} scheme={light ? "light" : undefined} style={styles.glass}>
       <View accessible accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}`} style={styles.pill}>
         <View style={[styles.dot, { backgroundColor: live ? "#22c55e" : "#f59e0b" }]} />
-        <Text style={[type.caption, { color: c.text }]}>{title}</Text>
-        {detail ? <Text style={[type.caption, { color: c.text, opacity: 0.75 }]} numberOfLines={1}>{detail}</Text> : null}
+        <Text style={[type.caption, { color: light ? "#111114" : c.text }]}>{title}</Text>
+        {detail ? <Text style={[type.caption, { color: light ? "#111114" : c.text, opacity: 0.7 }]} numberOfLines={1}>{detail}</Text> : null}
       </View>
     </Glass>
   );

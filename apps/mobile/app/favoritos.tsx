@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,10 +19,12 @@ export default function Favoritos() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   useTransitVersion();
-  const now = useNow() / 1000;
+  const now = useNow(5000) / 1000;
   const saved = useSaved();
-  const stops = saved.stops.map((id) => transit.stopById(id)).filter((s) => !!s);
   const routes = saved.routes.map((id) => transit.routeById(id)).filter((r) => !!r);
+  // lo que viene a cada parada se calcula cada pocos segundos, no en cada pintada: así los toques (cerrar, abrir) responden al instante
+  const version = transit.version;
+  const stops = useMemo(() => saved.stops.map((id) => transit.stopById(id)).filter((s) => !!s).map((stop) => ({ stop: stop!, next: upcomingAtStop(transit, stop!.id, nowSec(), 1).slice(0, 3) })), [saved.stops, version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
   const live = transit.fleet.size >= 50;
 
   return (
@@ -35,9 +38,7 @@ export default function Favoritos() {
       ) : null}
 
       {stops.length ? <Text style={[type.eyebrow, { color: c.muted }]}>PARADAS</Text> : null}
-      {stops.map((stop) => {
-        if (!stop) return null;
-        const next = upcomingAtStop(transit, stop.id, nowSec(), 1).slice(0, 3);
+      {stops.map(({ stop, next }) => {
         return (
           <Tap key={stop.id} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: stop.id } })} accessibilityRole="button" accessibilityLabel={saved.nicknames[stop.id] || stopLabelText(transit.labelOf(stop))}>
             <Card style={{ gap: space[2] }}>

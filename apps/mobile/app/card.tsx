@@ -7,7 +7,7 @@ import { SymbolView, type SFSymbol } from "expo-symbols";
 import { type CardMovement, type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, movementsByMonth, parseTuLlave } from "@transmi/domain";
 import { Tullave } from "../modules/tullave/src";
 import { useAccessibility } from "@/accessibility";
-import { Card, Tap } from "@/ui/kit";
+import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 const pesos = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("es-CO")}`;
@@ -129,10 +129,7 @@ export default function CardScreen() {
             </Text>
             {error ? <Text style={[type.body, { color: "#dc2626", textAlign: "center" }]} accessibilityRole="alert">{error}</Text> : null}
 
-            <Tap onPress={() => void read()} disabled={busy} accessibilityRole="button" accessibilityLabel={card ? "Leer de nuevo" : "Leer mi tarjeta"} style={[styles.btn, { backgroundColor: c.accent, opacity: busy ? 0.6 : 1 }]}>
-              <SymbolView name="wave.3.right" tintColor={c.onAccent} size={18} />
-              <Text style={[type.headline, { color: c.onAccent }]}>{busy ? "Esperando la tarjeta…" : card ? "Leer de nuevo" : "Leer mi tarjeta"}</Text>
-            </Tap>
+            <PrimaryButton symbol="wave.3.right" disabled={busy} label={busy ? "Esperando la tarjeta…" : card ? "Leer de nuevo" : "Leer mi tarjeta"} onPress={() => void read()} />
 
             {card ? (
               <>
