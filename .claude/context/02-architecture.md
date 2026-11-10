@@ -25,7 +25,7 @@ Medido el 2026-11-10: solo ~8 % de los buses estaban a <1 km de su `lastStopId`;
 - `TransitState.reconcileLastStops()` reemplaza `v.lastStopId` por la última parada realmente pasada, calculada con la **posición** del bus sobre el trazado (`sequenceByPosition`), solo si el dato informado no concuerda con dónde está el bus (y nunca inventa una si el bus no trae ninguna). Se memoriza por reporte.
 - `sequenceByStop` prueba la ruta del feed y, si falla, la ruta que nombra el `tripId` (último tramo del código).
 - `sequenceForDisplay(v)` = por parada y, si no, por posición (lo usan «próxima parada», «Voy en este bus» y la ficha de ruta). El motor de movimiento llama `nextStopOf(v, now, false)` (solo la parada informada) para no inventar movimiento.
-- Aún quedan ~1.000 buses sin recorrido en el GTFS (sin próxima parada). Ver `09-open-items.md`.
+- El GTFS trae **un solo trazado por ruta**, y en alimentadores/zonales ese trazado va y vuelve por la misma calle: las paradas se proyectan **en orden** (`RoadPath.projectAfter`, en `shapeStops`) y el bus según su rumbo (`projectAlong`). Si el bus va a >300 m del recorrido o su parada no concuerda y no se puede ubicar, `lastStopId` se **borra** (no se anuncia una parada lejana).
 
 ## Motor de movimiento (`MotionEngine`)
 Pega cada bus a su trazado y lo hace avanzar entre reportes: ganancia 0,5 de la velocidad medida, corrección suave sin retroceder (hasta 3× su ritmo), desliza los saltos en ~2 s, desde el primer lote deduce velocidad de la ruta y la parada siguiente. Medido en la web (README raíz): error mediano ~87 m, 0 m a lo ancho. `step(v, nowSec)` se llama cuadro a cuadro (web, canvas) o a 4 Hz como máximo (app).

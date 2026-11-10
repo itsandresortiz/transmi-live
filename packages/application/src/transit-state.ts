@@ -83,21 +83,24 @@ export class TransitState {
   /** La «última parada» que informa TransMilenio suele estar mal (hoy, ~9 de cada 10 buses van a más de 1 km de ella, a veces a más de 10 km: es la de otro tramo del día).
    *  Si no concuerda con dónde está el bus sobre el recorrido, se reemplaza por la última parada que de verdad pasó, calculada con su posición; así todo lo que se apoya en ella
    *  (próxima parada, llegadas, tiempos aprendidos) parte de un dato verdadero. */
-  private fixedStops = new Map<string, { reportedAt: number; stopId?: string }>();
+  private fixedStops = new Map<string, { reportedAt: number; stopId?: string; clear?: boolean }>();
   private reconcileLastStops(): void {
     if (!this.network.shapes.size) return;
     for (const v of this.fleet.values()) {
       if (!v.lastStopId) continue;      // sin parada informada no se inventa una: solo se corrige la que viene mal
       const memo = this.fixedStops.get(v.id);
-      if (memo && memo.reportedAt === v.reportedAt) { if (memo.stopId) v.lastStopId = memo.stopId; continue; }      // mismo reporte: ya se revisó
+      if (memo && memo.reportedAt === v.reportedAt) { if (memo.stopId) v.lastStopId = memo.stopId; else if (memo.clear) v.lastStopId = undefined; continue; }      // mismo reporte: ya se revisó
       let fix: string | undefined;
       const reported = this.sequenceByStop(v);
       const info = reported ? shapeStops(this, reported.shape) : null;
-      const hit = info ? info.path.project(v.world, 0, 0, 80) : null;
-      const agrees = reported && info && hit ? hit.s >= info.s[reported.index]! - 150 && hit.s <= (info.s[reported.index + 1] ?? Infinity) + 150 : !!reported;     // sin poder comprobarlo, se deja la informada
+      const hit = info ? info.path.project(v.world, 0, 0, 300) : null;
+      // concuerda si el bus va por el tramo que sigue a esa parada. Si el recorrido existe pero el bus anda a más de 300 m de él (va a un patio, cambió de ruta), la parada informada no es creíble.
+      const agrees = reported && info ? !!hit && hit.s >= info.s[reported.index]! - 150 && hit.s <= (info.s[reported.index + 1] ?? Infinity) + 150 : !!reported;     // sin recorrido con qué comprobarlo, se deja la informada
       if (!agrees) { const pos = this.sequenceByPosition(v); if (pos) fix = pos.shape.stopIds[pos.index]; }
-      if (fix) v.lastStopId = fix;
-      this.fixedStops.set(v.id, { reportedAt: v.reportedAt, stopId: fix });
+      // si no concuerda y tampoco se pudo ubicar por su posición, el dato está mal y no hay con qué reemplazarlo: se quita (mejor «sin próxima parada» que anunciar una a kilómetros)
+      const clear = !agrees && !fix;
+      if (fix) v.lastStopId = fix; else if (clear) v.lastStopId = undefined;
+      this.fixedStops.set(v.id, { reportedAt: v.reportedAt, stopId: fix, clear });
     }
     if (this.fixedStops.size > this.fleet.size * 2) for (const id of this.fixedStops.keys()) if (!this.fleet.get(id)) this.fixedStops.delete(id);
   }
@@ -116,7 +119,7 @@ export class TransitState {
     for (const rid of tripRoute && tripRoute !== v.routeId ? [v.routeId, tripRoute] : [v.routeId]) {
       for (const shape of this.network.shapes.get(rid) ?? []) {
         const info = shapeStops(this, shape);
-        const hit = info?.path.project(v.world, ux, uy, 40);
+        const hit = info?.path.projectAlong(v.world, ux, uy, 40);      // la pasada que va en el sentido del bus (ida y vuelta por la misma calle)
         if (!info || !hit || (v.bearing != null && !hit.forward)) continue;      // sin rumbo conocido se acepta el sentido que sea; con rumbo, solo el que coincide
         let index = -1;
         for (let i = 0; i < info.s.length; i++) if (info.s[i]! <= hit.s + 10) index = i; else break;

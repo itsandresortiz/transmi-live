@@ -38,7 +38,7 @@ export function shapeStops(state: TransitState, shape: RouteShape): ShapeStops |
     let last = 0, ok = true;
     for (const id of shape.stopIds) {
       const p = state.stopById(id)?.position;
-      const hit = p ? path.project(toWorld(p), 0, 0, 120) : null;
+      const hit = p ? path.projectAfter(toWorld(p), last, 120) : null;      // en orden: la primera pasada cercana después de la parada anterior
       if (!hit) { ok = false; break; }
       last = Math.max(last, hit.s);            // las paradas van en orden a lo largo del recorrido
       s.push(last);

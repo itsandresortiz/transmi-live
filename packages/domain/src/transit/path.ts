@@ -41,6 +41,52 @@ export class RoadPath {
     return dist <= maxMeters ? { s: bs, dist, forward: bdot >= 0 } : null;
   }
 
+  /** Como `project`, pero solo cuenta los tramos que van en el mismo sentido que (ux,uy). Hace falta en los recorridos de ida y vuelta por la misma calle
+   *  (alimentadores y zonales): el punto más cercano puede ser el de la otra pasada, que va al revés. Sin rumbo (0,0) equivale a `project`. */
+  projectAlong(p: WorldPoint, ux: number, uy: number, maxMeters: number): { s: number; dist: number; forward: boolean } | null {
+    if (!ux && !uy) return this.project(p, ux, uy, maxMeters);
+    const pad = maxMeters / METERS_PER_WORLD_UNIT;
+    if (this.size < 2 || p.x < this.minX - pad || p.x > this.maxX + pad || p.y < this.minY - pad || p.y > this.maxY + pad) return null;
+    let best = Infinity, bs = 0;
+    for (let i = 0; i < this.size - 1; i++) {
+      const ax = this.xs[i]!, ay = this.ys[i]!, dx = this.xs[i + 1]! - ax, dy = this.ys[i + 1]! - ay;
+      if (dx * ux + dy * uy < 0) continue;
+      const l2 = dx * dx + dy * dy;
+      let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
+      if (d2 < best) { best = d2; bs = this.cum[i]! + t * (this.cum[i + 1]! - this.cum[i]!); }
+    }
+    const dist = Math.sqrt(best) * METERS_PER_WORLD_UNIT;
+    return dist <= maxMeters ? { s: bs, dist, forward: true } : null;
+  }
+
+  /** Proyecta un punto que se sabe que viene DESPUÉS de `minS` metros (las paradas van en orden): elige la primera pasada del trazado que queda cerca (≤ `nearMeters`),
+   *  no la más cercana de todas. En un recorrido de ida y vuelta por la misma calle, la más cercana puede ser la pasada de regreso. Si ninguna pasada posterior queda cerca,
+   *  devuelve la más cercana después de `minS` y, si tampoco, la más cercana de todas. */
+  projectAfter(p: WorldPoint, minS: number, maxMeters: number, nearMeters = 40): { s: number; dist: number } | null {
+    const pad = maxMeters / METERS_PER_WORLD_UNIT;
+    if (this.size < 2 || p.x < this.minX - pad || p.x > this.maxX + pad || p.y < this.minY - pad || p.y > this.maxY + pad) return null;
+    const near2 = (nearMeters / METERS_PER_WORLD_UNIT) ** 2;
+    let all = Infinity, allS = 0, after = Infinity, afterS = 0, run = Infinity, runS = 0, inRun = false;
+    for (let i = 0; i < this.size - 1; i++) {
+      const ax = this.xs[i]!, ay = this.ys[i]!, dx = this.xs[i + 1]! - ax, dy = this.ys[i + 1]! - ay;
+      const l2 = dx * dx + dy * dy;
+      let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2, s = this.cum[i]! + t * (this.cum[i + 1]! - this.cum[i]!);
+      if (d2 < all) { all = d2; allS = s; }
+      if (s < minS) continue;
+      if (d2 < after) { after = d2; afterS = s; }
+      if (d2 <= near2) { inRun = true; if (d2 < run) { run = d2; runS = s; } }
+      else if (inRun) break;                       // terminó la primera pasada cercana: es esa
+    }
+    const pick = run < Infinity ? { d2: run, s: runS } : after < Infinity ? { d2: after, s: afterS } : { d2: all, s: allS };
+    let dist = Math.sqrt(pick.d2) * METERS_PER_WORLD_UNIT;
+    if (dist > maxMeters && pick.d2 !== all) { pick.d2 = all; pick.s = allS; dist = Math.sqrt(all) * METERS_PER_WORLD_UNIT; }
+    return dist <= maxMeters ? { s: pick.s, dist } : null;
+  }
+
   /** Dirección (vector unitario en coordenadas de mundo) del trazado a `s` metros del inicio. */
   tangentAt(s: number): { ux: number; uy: number } {
     const n = this.size;
