@@ -163,12 +163,20 @@ export function siblingStops(state: TransitState, stop: Stop): Stop[] {
   return sortStationStops(state, cluster);
 }
 
+const routesAtStopCache = new WeakMap<object, Map<string, Route[]>>();
+/** Rutas que paran en una parada. Se arma una sola vez por red (antes se recorrían todos los recorridos en cada consulta, y las pantallas de parada lo piden cada segundo). */
 export function routesAtStop(state: TransitState, stopId: string): Route[] {
-  const out: Route[] = [];
-  for (const [routeId, shapes] of state.network.shapes) {
-    if (shapes.some((s) => s.stopIds.includes(stopId))) { const r = state.routeById(routeId); if (r) out.push(r); }
+  let index = routesAtStopCache.get(state.network);
+  if (!index) {
+    index = new Map();
+    for (const [routeId, shapes] of state.network.shapes) {
+      const r = state.routeById(routeId); if (!r) continue;
+      const seen = new Set<string>();
+      for (const sh of shapes) for (const id of sh.stopIds) { if (seen.has(id)) continue; seen.add(id); (index.get(id) ?? index.set(id, []).get(id)!).push(r); }
+    }
+    routesAtStopCache.set(state.network, index);
   }
-  return out;
+  return index.get(stopId) ?? [];
 }
 
 export function searchAlerts(state: TransitState, query = ""): { alert: ServiceAlert; index: number }[] {

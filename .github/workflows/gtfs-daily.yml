@@ -22,6 +22,15 @@ jobs:
           python3 scripts/build_schedule.py GTFS.zip sched/schedule.json
           gzip -9 sched/schedule.json sched/service-ends.json sched/departures.json
           ls -lh out sched
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Red ya procesada para la app (abre más rápido en teléfonos modestos)
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsx tools/network-dto.ts out/gtfs-lite.zip out/network.json.gz
+          ls -lh out
       - name: Publicar el GTFS reducido en la rama live-data
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

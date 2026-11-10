@@ -10,6 +10,7 @@
 | Avisos de servicio | `alerts.pb` | TransMilenio | ídem | `decodeAlerts` → `ServiceAlert` |
 | Huellas del lote | `meta.json` `{pos,tu,al,at}` | `scripts/live_loop.sh` | rama `live-data` | `ProxyLiveFeed` |
 | Red (rutas, paradas, trazados) | `gtfs-lite.zip` (routes, trips, stops, shapes, stop_times del viaje representativo de cada ruta y sentido) | `scripts/slim_gtfs.py` sobre `GTFS.zip` de TransMilenio (~116 MB) | rama `live-data` (workflow `GTFS diario`, 04:30 Bogotá) | `parseGtfsLite` + `buildNetwork` (+ `applyStopPatches`) |
+| Red ya procesada para la app | `network.json.gz` (`{v:1, routes, stops, headsigns, shapes}`, ~2 MB) | `tools/network-dto.ts` sobre `gtfs-lite.zip` | rama `live-data` (workflow `GTFS diario`) | app (`composition-root.ts`; si falta, usa `gtfs-lite.zip`) |
 | Horarios (primer/último viaje, salidas por parada) | `schedule.json.gz`, `service-ends.json.gz`, `departures.json.gz` | `scripts/build_schedule.py` | rama `schedule-data` | `ServiceEnds`, `Departures` |
 | Semáforos de Bogotá | `semaforos.json` `{v, at, rows:[[lon,lat,dirección,localidad,tipo]]}` | Secretaría de Movilidad (datos abiertos, CC BY 4.0) vía `tools/semaforos.ts` | despliegue de la web (`transmilive.com/semaforos.json`) | web y app |
 | Mapa base y calles | teselas vectoriales / JSON OSM | OpenFreeMap (app) · `apps/web/src/data/*.json` (web: estaciones, localidades, roads, streets, troncales) | — | MapLibre |
