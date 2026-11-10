@@ -91,7 +91,7 @@ export default function StopSheet() {
         </Tap>
 
         {siblings.length > 1 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2], paddingVertical: space[1] }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[5] }} contentContainerStyle={{ gap: space[2], paddingVertical: space[1], paddingHorizontal: space[5] }}>
             {siblings.map(({ x, names }) => {
               const t = stopTag(x) || stopCode(x) || "Parada";
               const dup = siblings.filter((y) => (stopTag(y.x) || stopCode(y.x)) === t).length > 1;      // varias paradas del mismo vagón (una por sentido): se distinguen por sus rutas

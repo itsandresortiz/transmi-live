@@ -94,7 +94,7 @@ export default function RouteScreen() {
         </Text>
 
         {shapes.length > 1 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2] }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[5] }} contentContainerStyle={{ gap: space[2], paddingHorizontal: space[5] }}>
             {shapes.map((s) => <Chip key={s.direction} label={s.headsign ? `Hacia ${s.headsign}` : `Sentido ${Number(s.direction) + 1}`} selected={cur?.direction === s.direction} onPress={() => setDir(s.direction)} />)}
           </ScrollView>
         ) : null}
