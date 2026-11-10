@@ -16,7 +16,7 @@ const MAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
 const BOGOTA: [number, number] = [-74.075, 4.65];
 const STOP_ZOOM = 15.2;
 
-export interface TransitMapHandle { flyTo(lat: number, lon: number, zoom?: number): void; fit(points: { lat: number; lon: number }[], padding?: number): void }
+export interface TransitMapHandle { flyTo(lat: number, lon: number, zoom?: number): void; fit(points: { lat: number; lon: number }[], padding?: number, bottomExtra?: number): void }
 interface Props {
   system?: SystemType | null;
   /** Si se da, solo se ven los buses de esa ruta y se dibuja su trazado. */
@@ -26,6 +26,8 @@ interface Props {
   highlightIds?: string[];
   /** Si es falso (otra pestaña al frente), los buses dejan de recalcularse para no gastar batería. */
   active?: boolean;
+  /** Mapa pequeño dentro de otra pantalla: sin brújula. */
+  compact?: boolean;
   attributionPosition?: ComponentProps<typeof Map>["attributionPosition"];
   /** Mientras una hoja se abre encima, los buses se recalculan más despacio para que la hoja salga al instante. */
   calm?: boolean;
@@ -35,7 +37,7 @@ interface Props {
 }
 
 /** El mapa de buses en vivo: base, trazado de la ruta, paradas (al acercarse), buses y tu ubicación. */
-export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
+export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
   const c = useColors();
   const camera = useRef<CameraRef>(null);
   const [view, setView] = useState<Viewport | null>(null);
@@ -43,10 +45,10 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
 
   useImperativeHandle(ref, () => ({
     flyTo: (lat, lon, zoom = 15.5) => camera.current?.flyTo({ center: [lon, lat], zoom, duration: 900 }),
-    fit: (pts, padding = 60) => {
+    fit: (pts, padding = 60, bottomExtra = 220) => {
       if (!pts.length) return;
       const lons = pts.map((p) => p.lon), lats = pts.map((p) => p.lat);
-      camera.current?.fitBounds([Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)], { padding: { top: padding, right: padding, bottom: padding + 220, left: padding }, duration: 900 });
+      camera.current?.fitBounds([Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)], { padding: { top: padding, right: padding, bottom: padding + bottomExtra, left: padding }, duration: 900 });
     },
   }), []);
 
@@ -114,7 +116,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   }, []);
 
   return (
-    <Map style={StyleSheet.absoluteFill} mapStyle={MAP_STYLE} logo={false} attribution attributionPosition={attributionPosition} compass compassPosition={{ top: 120, right: 12 }} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
+    <Map style={StyleSheet.absoluteFill} mapStyle={MAP_STYLE} logo={false} attribution attributionPosition={attributionPosition} compass={!compact} compassPosition={{ top: 120, right: 12 }} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
       <Camera ref={camera} initialViewState={{ center: BOGOTA, zoom: 11.6 }} minZoom={9} maxZoom={19} />
       <Images images={BUS_SPRITES} />
       <UserLocation />
