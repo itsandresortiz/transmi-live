@@ -3,13 +3,21 @@ import { Image, StyleSheet, View } from "react-native";
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import type { SystemType } from "@transmi/domain";
 import { useAccessibility } from "@/accessibility";
-import { BUS_SPRITES } from "@/map/sprites";
+
 import { useColors } from "./theme";
 
 /** Escena del viaje: una avenida en perspectiva que corre hacia ti con el bus visto desde atrás y arriba, y los bordes fundidos con el fondo.
  *  No es un mapa: es la sensación de ir andando. El suelo se mueve mientras el bus va en camino y se detiene al llegar. */
 const H = 290, GROUND_W = 700, GROUND_H = 1500, PERIOD = 352, ROAD_W = 200, DASH = 88;
 const STRIPS = 10;
+/** Buses en 3/4 desde atrás, con volumen (tools/bus-sprites.ts los genera). `s` = corto, `l` = articulado. */
+const REAR: Record<string, number> = {
+  "troncal-s": require("../../assets/sprites-rear/rear-troncal-s.png"), "troncal-l": require("../../assets/sprites-rear/rear-troncal-l.png"),
+  "dual-s": require("../../assets/sprites-rear/rear-dual-s.png"), "dual-l": require("../../assets/sprites-rear/rear-dual-l.png"),
+  "alimentador-s": require("../../assets/sprites-rear/rear-alimentador-s.png"), "alimentador-l": require("../../assets/sprites-rear/rear-alimentador-l.png"),
+  "zonal-s": require("../../assets/sprites-rear/rear-zonal-s.png"), "zonal-l": require("../../assets/sprites-rear/rear-zonal-l.png"),
+  "otro-s": require("../../assets/sprites-rear/rear-otro-s.png"), "otro-l": require("../../assets/sprites-rear/rear-otro-l.png"),
+};
 
 /** Manzanas y árboles a los lados: dos filas que se repiten cada PERIOD para que el bucle no tenga saltos. */
 function useSides() {
@@ -34,13 +42,13 @@ export function RideScene({ system, color, moving = true, width }: { system: Sys
     sway.value = withRepeat(withSequence(withTiming(1, { duration: 1700, easing: Easing.inOut(Easing.sin) }), withTiming(-1, { duration: 1700, easing: Easing.inOut(Easing.sin) })), -1, true);
   }, [run, scroll, sway]);
   const scroller = useAnimatedStyle(() => ({ transform: [{ translateY: (scroll.value % 1) * PERIOD }] }));
-  const busStyle = useAnimatedStyle(() => ({ transform: [{ translateX: sway.value * 2.2 }] }));
+  const busStyle = useAnimatedStyle(() => ({ transform: [{ translateX: sway.value * 1.4 }] }));
 
   const road = c.dark ? "#2b2e36" : "#dfe3ea", curb = c.dark ? "#4a4e58" : "#ffffff", block = c.dark ? "#1d2026" : "#e9ecf1", tree = c.dark ? "#20382a" : "#cfe6d6", dash = c.dark ? "#666a74" : "#ffffff";
   const roadX = (GROUND_W - ROAD_W) / 2, rows = Math.ceil(GROUND_H / PERIOD) + 1;
-  const long = system === "troncal", sprite = BUS_SPRITES[`top-${system}-${long ? "l" : "s"}`];
-  // el bus va DENTRO del plano inclinado, sobre su carril: comparte la perspectiva de la vía. Se alarga porque la inclinación lo acorta a la vista
-  const busW = 70, busH = long ? 290 : 200, busTop = GROUND_H - 335;
+  const long = system === "troncal", sprite = REAR[`${system}-${long ? "l" : "s"}`];
+  // el bus se dibuja de pie sobre su carril, en 3/4 desde atrás (un dibujo con volumen), no acostado en el plano
+  const busW = 64, busH = busW * ((long ? 250 : 190) / 120), busTop = GROUND_H - 335;
   const fade = Array.from({ length: STRIPS }, (_, i) => 1 - i / STRIPS);
 
   return (
@@ -61,10 +69,10 @@ export function RideScene({ system, color, moving = true, width }: { system: Sys
             </View>
           )))}
         </Animated.View>
-        <Animated.View style={[{ position: "absolute", left: roadX + ROAD_W / 2 + 15, top: busTop, width: busW, height: busH }, busStyle]}>
-          <Image source={sprite} style={{ width: busW, height: busH }} resizeMode="stretch" />
-        </Animated.View>
       </View>
+      <Animated.View style={[{ position: "absolute", left: width / 2 + 43 - busW / 2, top: 251 - busH, width: busW, height: busH }, busStyle]}>
+        <Image source={sprite} style={{ width: busW, height: busH }} resizeMode="contain" />
+      </Animated.View>
       {/* bordes fundidos con el fondo */}
       {fade.map((o, i) => <View key={"t" + i} pointerEvents="none" style={[styles.h, { top: i * 11, height: 11, opacity: Math.min(1, o * 1.35), backgroundColor: c.bg }]} />)}
       {fade.map((o, i) => <View key={"b" + i} pointerEvents="none" style={[styles.h, { bottom: i * 5, height: 5, opacity: o, backgroundColor: c.bg }]} />)}

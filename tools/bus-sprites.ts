@@ -1,5 +1,6 @@
 /**
- * Genera las imágenes de los buses vistos desde arriba para la app (apps/mobile/assets/sprites-top).
+ * Genera las imágenes de los buses para la app: vistos desde arriba (apps/mobile/assets/sprites-top, para el mapa)
+ * y en 3/4 desde atrás (apps/mobile/assets/sprites-rear, para la escena del viaje; dibujo en tools/bus-rear-draw.js).
  * Usa el mismo dibujo que la web (apps/web/src/map/busTop.ts), renderizado en un navegador.
  * Uso: npx tsx tools/bus-sprites.ts
  */
@@ -32,6 +33,21 @@ async function main() {
       return cv.toDataURL("image/png");
     }, { color, long, RATIO });
     writeFileSync(`${OUT}/top-${system}-${long ? "l" : "s"}.png`, Buffer.from(url.split(",")[1]!, "base64"));
+  }
+  // buses en 3/4 desde atrás (escena de «Voy en este bus»)
+  const REAR = "apps/mobile/assets/sprites-rear";
+  mkdirSync(REAR, { recursive: true });
+  await page.addScriptTag({ content: readFileSync("tools/bus-rear-draw.js", "utf8") });
+  for (const [system, color] of Object.entries(COLORS)) for (const long of [false, true]) {
+    const url = await page.evaluate(({ color, long }) => {
+      const cv = document.getElementById("c") as HTMLCanvasElement, R = 4;
+      cv.width = 120 * R; cv.height = (long ? 250 : 190) * R;
+      const c = cv.getContext("2d")!; c.clearRect(0, 0, cv.width, cv.height); c.scale(R, R);
+      // @ts-expect-error drawRearBus lo define el script
+      drawRearBus(c, color, long);
+      return cv.toDataURL("image/png");
+    }, { color, long });
+    writeFileSync(`${REAR}/rear-${system}-${long ? "l" : "s"}.png`, Buffer.from(url.split(",")[1]!, "base64"));
   }
   await browser.close();
   console.log("Imágenes listas en", OUT);

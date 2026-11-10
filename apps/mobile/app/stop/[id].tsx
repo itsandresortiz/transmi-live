@@ -230,7 +230,12 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
                       <View style={{ flex: 1, paddingVertical: space[2] }}>
                         <Text style={[type.body, { color: c.text, fontWeight: last || at.length ? "700" : "400" }]}>{stopText(transit.stopById(sid), sid)}</Text>
                         {last ? <Text style={[type.caption, { color: color }]}>tu parada</Text> : null}
-                        {at.map((b) => <Text key={b.vehicle.id} style={[type.caption, { color: c.accent }]}>🚌 un bus va hacia aquí</Text>)}
+                        {at.length ? (
+                          <View style={[styles.busHere, { backgroundColor: color + "22" }]}>
+                            <SymbolView name="bus.fill" tintColor={color} size={13} />
+                            <Text style={[type.caption, { color, fontWeight: "700" }]}>{at.length === 1 ? "Un bus va hacia aquí" : `${at.length} buses van hacia aquí`}</Text>
+                          </View>
+                        ) : null}
                       </View>
                     </View>
                   );
@@ -363,6 +368,7 @@ function NoBuses({ stopId, here, down, now }: { stopId: string; here: Route[]; d
 const styles = StyleSheet.create({
   screen: { padding: space[5], gap: space[3] },
   actions: { flexDirection: "row", gap: space[3], marginVertical: space[2] },
+  busHere: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 9, height: 24, borderRadius: 12, marginTop: 4 },
   custom: { flexDirection: "row", alignItems: "center", gap: space[3], padding: space[3] },
   customIcon: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: space[3] },
