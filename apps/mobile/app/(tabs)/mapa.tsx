@@ -22,7 +22,8 @@ import { RouteBadge } from "@/ui/RouteBadge";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { locateMe } from "@/location";
 import { FeedStatus } from "@/ui/FeedStatus";
-import { Chip, Glass, RoundButton, Tap } from "@/ui/kit";
+import { Glass, RoundButton, Tap } from "@/ui/kit";
+import { GlassSegments } from "@/ui/GlassSegments";
 import { SYSTEM_COLOR, space, type, useColors } from "@/ui/theme";
 
 /** El mapa se centra en tu ubicación solo la primera vez que se abre en cada sesión (después respeta por dónde lo dejaste). */
@@ -111,12 +112,8 @@ export default function Mapa() {
         {[0.3, 0.2, 0.12, 0.06].map((o, i) => <View key={i} style={{ flex: 1, backgroundColor: c.dark ? `rgba(0,0,0,${o})` : `rgba(255,255,255,${o + 0.2})` }} />)}
       </View>
       <View pointerEvents="box-none" style={[styles.top, { top: insets.top + space[2] }]}>
-        <Glass scheme="light" style={styles.chipsGlass}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            <Chip glass onLight label="Todos" selected={!system} onPress={() => setSystem(null)} />
-            {SYSTEMS.map((s) => <Chip glass onLight key={s} dot={SYSTEM_COLOR[s]} label={SYSTEM_LABEL[s]} selected={system === s} onPress={() => setSystem(system === s ? null : s)} />)}
-          </ScrollView>
-        </Glass>
+        <GlassSegments value={system ?? "todos"} onChange={(k) => setSystem(k === "todos" ? null : k)}
+          items={[{ key: "todos", label: "Todos" }, ...SYSTEMS.map((x) => ({ key: x, label: SYSTEM_LABEL[x], dot: SYSTEM_COLOR[x] }))]} />
       </View>
       {panel ? (
         <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(140)} style={[styles.panel, { bottom: insets.bottom + (away ? 140 : 80) }]}>
