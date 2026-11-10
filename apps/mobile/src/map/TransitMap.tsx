@@ -149,7 +149,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <Layer id="station-dot" type="circle" minzoom={11.5} maxzoom={14.5} style={{ circleRadius: ["case", ["get", "portal"], 7, 4.5], circleColor: "#ffffff", circleStrokeColor: "#e11d2e", circleStrokeWidth: 2.2 }} />
         <Layer id="station-label" type="symbol" minzoom={12.8} maxzoom={14.5} style={{ textField: ["get", "title"], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 12.8, 10, 16, 13], textOffset: [0, 1.1], textAnchor: "top", textColor: c.dark ? "#f4f4f5" : "#1f2430", textHaloColor: c.dark ? "#18181b" : "#ffffff", textHaloWidth: 1.8, textMaxWidth: 7 }} />
       </GeoJSONSource>
-      {routeId && (
+      {(
         <GeoJSONSource id="route-line" data={lineJson}>
           <Layer id="route-line-casing" type="line" style={{ lineColor: "#ffffff", lineWidth: 9, lineCap: "round", lineJoin: "round" }} />
           <Layer id="route-line-fill" type="line" style={{ lineColor: "#e11d2e", lineWidth: 5, lineCap: "round", lineJoin: "round" }} />
@@ -157,38 +157,38 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       )}
 
 
-      {showStations && stationGeo ? (
+      {stationGeo ? (
         <>
           <GeoJSONSource id="station-bases" data={stationGeo.bases} onPress={(e) => { const ids = (e.nativeEvent.features[0]?.properties?.all as string | undefined)?.split(",")[0]; if (ids) onStop?.(ids); }}>
-            <Layer id="station-base-fill" type="fill" minzoom={14.5} style={{ fillColor: "#dde2ea", fillOpacity: ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] }} />
-            <Layer id="station-base-line" type="line" minzoom={14.5} style={{ lineColor: lineColor("#a9b2c1") as never, lineWidth: ["interpolate", ["linear"], ["zoom"], 14.5, 1.4, 18, 2.6] }} />
+            <Layer id="station-base-fill" type="fill" minzoom={14.5} style={{ visibility: showStations ? "visible" : "none", fillColor: "#dde2ea", fillOpacity: ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] }} />
+            <Layer id="station-base-line" type="line" minzoom={14.5} style={{ visibility: showStations ? "visible" : "none", lineColor: lineColor("#a9b2c1") as never, lineWidth: ["interpolate", ["linear"], ["zoom"], 14.5, 1.4, 18, 2.6] }} />
           </GeoJSONSource>
           <GeoJSONSource id="station-links" data={stationGeo.links}>
-            <Layer id="station-links-fill" type="fill" minzoom={15.6} style={{ fillColor: "#c4ccd9" }} />
-            <Layer id="station-links-line" type="line" minzoom={15.6} style={{ lineColor: lineColor("#6f7a8d") as never, lineWidth: 1, lineOpacity: 0.75 }} />
+            <Layer id="station-links-fill" type="fill" minzoom={15.6} style={{ visibility: showStations ? "visible" : "none", fillColor: "#c4ccd9" }} />
+            <Layer id="station-links-line" type="line" minzoom={15.6} style={{ visibility: showStations ? "visible" : "none", lineColor: lineColor("#6f7a8d") as never, lineWidth: 1, lineOpacity: 0.75 }} />
           </GeoJSONSource>
           <GeoJSONSource id="station-capsules" data={stationGeo.capsules} onPress={(e) => { const ids = (e.nativeEvent.features[0]?.properties?.ids as string | undefined)?.split(",")[0]; if (ids) onStop?.(ids); }}>
-            <Layer id="station-capsule-fill" type="fill" minzoom={15.6} style={{ fillColor: "#ffffff", fillOpacity: 0.98 }} />
-            <Layer id="station-capsule-line" type="line" minzoom={15.6} style={{ lineColor: lineColor("#6f7a8d") as never, lineWidth: 1.8 }} />
+            <Layer id="station-capsule-fill" type="fill" minzoom={15.6} style={{ visibility: showStations ? "visible" : "none", fillColor: "#ffffff", fillOpacity: 0.98 }} />
+            <Layer id="station-capsule-line" type="line" minzoom={15.6} style={{ visibility: showStations ? "visible" : "none", lineColor: lineColor("#6f7a8d") as never, lineWidth: 1.8 }} />
           </GeoJSONSource>
           <GeoJSONSource id="station-doors" data={stationGeo.doors}>
-            <Layer id="station-doors-line" type="line" minzoom={17} style={{ lineColor: "#6f7a8d", lineWidth: 1, lineOpacity: 0.55 }} />
+            <Layer id="station-doors-line" type="line" minzoom={17} style={{ visibility: showStations ? "visible" : "none", lineColor: "#6f7a8d", lineWidth: 1, lineOpacity: 0.55 }} />
           </GeoJSONSource>
           <GeoJSONSource id="station-labels" data={stationGeo.labels}>
-            <Layer id="station-wagon-labels" type="symbol" minzoom={16.3} style={{ textField: ["step", ["zoom"], ["get", "text"], 17.3, ["concat", "Vagón ", ["get", "text"]]], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 16.3, 10, 18.5, 13], textAllowOverlap: true, textIgnorePlacement: true, textColor: "#1c1c1e" }} />
+            <Layer id="station-wagon-labels" type="symbol" minzoom={16.3} style={{ visibility: showStations ? "visible" : "none", textField: ["step", ["zoom"], ["get", "text"], 17.3, ["concat", "Vagón ", ["get", "text"]]], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 16.3, 10, 18.5, 13], textAllowOverlap: true, textIgnorePlacement: true, textColor: "#1c1c1e" }} />
           </GeoJSONSource>
           <GeoJSONSource id="station-chips" data={stationGeo.chips}>
-            <Layer id="station-chip-labels" type="symbol" minzoom={14.5} style={{ textField: ["get", "title"], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 14.5, 11, 18, 14], textAnchor: "bottom", textOffset: [0, -0.45], textMaxWidth: 12, textColor: "#1c1c1e", textHaloColor: "#ffffff", textHaloWidth: 1.8 }} />
+            <Layer id="station-chip-labels" type="symbol" minzoom={14.5} style={{ visibility: showStations ? "visible" : "none", textField: ["get", "title"], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 14.5, 11, 18, 14], textAnchor: "bottom", textOffset: [0, -0.45], textMaxWidth: 12, textColor: "#1c1c1e", textHaloColor: "#ffffff", textHaloWidth: 1.8 }} />
           </GeoJSONSource>
         </>
       ) : null}
-      {showSignals ? (
+      {(
         <GeoJSONSource id="semaforos" data={signalsJson}>
-          <Layer id="semaforos-dots" type="circle" minzoom={13.2} maxzoom={15.4} style={{ circleRadius: ["interpolate", ["linear"], ["zoom"], 13.2, 1.6, 15.4, 3.2], circleColor: "#e8503f", circleStrokeColor: "#ffffff", circleStrokeWidth: 1 }} />
-          <Layer id="semaforos-icons" type="symbol" minzoom={15.4} style={{ iconImage: "semaforo", iconSize: ["interpolate", ["linear"], ["zoom"], 15.4, 0.2, 18, 0.36], iconAllowOverlap: true, iconIgnorePlacement: true }} />
-          <Layer id="semaforos-labels" type="symbol" minzoom={17.2} style={{ textField: ["get", "dir"], textFont: ["Noto Sans Regular"], textSize: 10.5, textOffset: [0, 1.35], textAnchor: "top", textOptional: true, textColor: "#6c6c70", textHaloColor: "#eef0f3", textHaloWidth: 1.2 }} />
+          <Layer id="semaforos-dots" type="circle" minzoom={13.2} maxzoom={15.4} style={{ visibility: showSignals ? "visible" : "none", circleRadius: ["interpolate", ["linear"], ["zoom"], 13.2, 1.6, 15.4, 3.2], circleColor: "#e8503f", circleStrokeColor: "#ffffff", circleStrokeWidth: 1 }} />
+          <Layer id="semaforos-icons" type="symbol" minzoom={15.4} style={{ visibility: showSignals ? "visible" : "none", iconImage: "semaforo", iconSize: ["interpolate", ["linear"], ["zoom"], 15.4, 0.2, 18, 0.36], iconAllowOverlap: true, iconIgnorePlacement: true }} />
+          <Layer id="semaforos-labels" type="symbol" minzoom={17.2} style={{ visibility: showSignals ? "visible" : "none", textField: ["get", "dir"], textFont: ["Noto Sans Regular"], textSize: 10.5, textOffset: [0, 1.35], textAnchor: "top", textOptional: true, textColor: "#6c6c70", textHaloColor: "#eef0f3", textHaloWidth: 1.2 }} />
         </GeoJSONSource>
-      ) : null}
+      )}
       <GeoJSONSource id="focus-stop" data={focusJson}>
         <Layer id="focus-stop-halo" type="circle" style={{ circleRadius: 20, circleColor: "#e11d2e", circleOpacity: 0.18 }} />
         <Layer id="focus-stop-dot" type="circle" style={{ circleRadius: 8, circleColor: "#e11d2e", circleStrokeColor: "#ffffff", circleStrokeWidth: 3 }} />
@@ -199,7 +199,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       </GeoJSONSource>
 
       <GeoJSONSource id="buses" data={busesJson} onPress={(e) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onBus?.(id); }}>
-        {highlightIds.length ? <Layer id="bus-ring" type="circle" filter={["in", ["get", "id"], ["literal", highlightIds]]} style={{ circleRadius: 22, circleColor: "#e11d2e", circleOpacity: 0.12, circleStrokeColor: "#e11d2e", circleStrokeWidth: 3 }} /> : null}
+        {<Layer id="bus-ring" type="circle" filter={["in", ["get", "id"], ["literal", highlightIds.length ? highlightIds : ["__ninguno__"]]]} style={{ circleRadius: 22, circleColor: "#e11d2e", circleOpacity: 0.12, circleStrokeColor: "#e11d2e", circleStrokeWidth: 3 }} />}
         <Layer id="bus-hit" type="circle" style={{ circleRadius: 20, circleColor: "#000000", circleOpacity: 0.01 }} />
         <Layer id="bus-dot" type="circle" maxzoom={11.8} style={{ circleRadius: ["interpolate", ["linear"], ["zoom"], 9, 2.6, 11.8, 4], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 1 }} />
         <Layer id="bus-sprite" type="symbol" minzoom={11.8} style={{
