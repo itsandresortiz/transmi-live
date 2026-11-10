@@ -323,6 +323,7 @@ function build(state: TransitState, ix: Index, live: Live, run: RunResult, k: nu
   if (egress.meters > 20) legs.push(egress);
   let round = k, s = stop;
   const rev: Leg[] = [];
+  let firstRide: { pat: Pattern; bi: number; ai: number; dep: number; live: boolean } | null = null;
   for (;;) {
     const par = run.parents[round]![s];
     if (!par) return null;
@@ -355,14 +356,16 @@ function build(state: TransitState, ix: Index, live: Live, run: RunResult, k: nu
       headwaySeconds: headway, busId: par.bus?.id, busLabel: par.bus?.label, between,
       alerts: state.alertsByRoute.get(pat.routeId)?.length ?? 0, lowFrequency: headway > 900,
     });
+    firstRide = { pat, bi: par.bi, ai: par.ai, dep: par.dep, live: !!par.liveWait };      // el último que se recorre hacia atrás es el primer bus del viaje
     s = par.from; round--;
     if (round < 0) return null;
   }
   const all = [...rev.reverse(), ...legs.reverse()];
+  const shift = firstRide ? boardNearer(state, ix, all, firstRide, origin, nowSec) : 0;
   const rides = all.filter((l): l is RideLeg => l.kind === "ride");
   if (!rides.length) return null;
   if (rides.length > 1 && rides.some((r) => r.stops < 2)) return null;           // cambiar de bus para avanzar una sola parada no tiene sentido
-  const arriveAt = run.best.find((b) => b.k === k && b.stop === stop)!.arrive;
+  const arriveAt = run.best.find((b) => b.k === k && b.stop === stop)!.arrive + shift;
   const walk = all.filter((l): l is WalkLeg => l.kind === "walk");
   return {
     legs: all, departAt: nowSec, arriveAt, seconds: arriveAt - nowSec,
@@ -372,6 +375,55 @@ function build(state: TransitState, ix: Index, live: Live, run: RunResult, k: nu
 }
 
 const sig = (it: Itinerary) => it.legs.filter((l): l is RideLeg => l.kind === "ride").map((l) => `${l.shortName}:${l.board.id}>${l.alight.id}`).join("|");
+
+/** Subir más cerca. El buscador elige la parada que da la llegada más temprana, aunque sea por segundos; así, quien está al lado de un portal puede terminar
+ *  enviado a la estación siguiente, más lejos, para tomar el mismo bus. Si la primera ruta del viaje pasa antes por una parada bastante más cercana a la persona
+ *  (≥60 m menos de caminata) y subir ahí no la hace llegar más de 3 min tarde (o es el mismo bus en vivo y alcanza a llegar), se cambia a esa parada.
+ *  Modifica `legs` y devuelve cuántos segundos se corre la llegada (0 si no cambió nada o si es el mismo bus). */
+const portalGroups = new WeakMap<object, Map<string, number[]>>();
+/** Metros de caminata hasta la plataforma más cercana del portal al que pertenece la parada `s` (o infinito si no es de un portal). */
+function portalMeters(state: TransitState, ix: Index, s: number, from: GeoPoint): number {
+  const stop = state.stopById(ix.stopIds[s]!), label = stop ? state.labelOf(stop) : undefined;
+  if (!stop || !label?.platform) return Infinity;
+  let groups = portalGroups.get(ix);
+  if (!groups) {
+    groups = new Map();
+    ix.stopIds.forEach((id, i) => { const st = state.stopById(id), l = st ? state.labelOf(st) : undefined; if (l?.platform) (groups!.get(l.title) ?? groups!.set(l.title, []).get(l.title)!).push(i); });
+    portalGroups.set(ix, groups);
+  }
+  let best = Infinity;
+  for (const i of groups.get(label.title) ?? []) best = Math.min(best, hav(from, { lat: ix.lat[i]!, lon: ix.lon[i]! }) * WALK_DETOUR);
+  return best;
+}
+function boardNearer(state: TransitState, ix: Index, legs: Leg[], fr: { pat: Pattern; bi: number; ai: number; dep: number; live: boolean }, origin: PlanPlace, nowSec: number): number {
+  const ri = legs.findIndex((l) => l.kind === "ride"), ride = legs[ri];
+  if (!ride || ride.kind !== "ride" || ri > 1 || fr.bi <= 0) return 0;
+  const curWalk = ri === 1 && legs[0]!.kind === "walk" ? legs[0]!.meters : 0;
+  let best: { u: number; walk: WalkLeg; dep: number; delta: number; wait: number } | null = null;
+  for (let u = fr.bi - 1; u >= 0; u--) {
+    const ref = stopRef(state, ix, fr.pat.stops[u]!), w = walkLeg(origin.position, ref.position, origin.name, ref.name);
+    // un portal cuenta como un solo lugar: lo que se compara es qué tan lejos queda su plataforma más cercana (adentro se camina bajo techo hasta la propia)
+    if (Math.min(w.meters, portalMeters(state, ix, fr.pat.stops[u]!, origin.position)) > curWalk - 60) continue;
+    const ridePart = fr.pat.cum[fr.bi]! - fr.pat.cum[u]!, there = nowSec + w.seconds;
+    let dep: number, delta: number, wait: number;
+    if (fr.live) { dep = fr.dep - ridePart; if (there + 30 > dep) continue; delta = 0; wait = dep - there; }      // el mismo bus pasa antes por ahí: hay que alcanzarlo
+    else { wait = ride.waitSeconds; dep = there + wait; delta = dep + ridePart - fr.dep; if (delta > 180) continue; }
+    if (!best || w.meters < best.walk.meters) best = { u, walk: w, dep, delta, wait };
+  }
+  if (!best) return 0;
+  const board = stopRef(state, ix, fr.pat.stops[best.u]!), extra: StopRef[] = [];
+  for (let q = best.u + 1; q <= fr.bi; q++) extra.push(stopRef(state, ix, fr.pat.stops[q]!));
+  const path = pathOf(fr.pat.shape);
+  let line = ride.line;
+  if (path) { const h0 = path.project(toWorld(board.position), 0, 0, 150), h1 = path.project(toWorld(ride.alight.position), 0, 0, 150); if (h0 && h1 && h1.s > h0.s) line = path.slice(h0.s, h1.s); }
+  const arriveAt = ride.arriveAt + best.delta;
+  legs[ri] = { ...ride, board, stops: ride.stops + (fr.bi - best.u), between: [...extra, ...ride.between], departAt: best.dep, arriveAt, rideSeconds: arriveAt - best.dep, waitSeconds: best.wait, line };
+  if (ri === 1) { if (best.walk.meters > 20) legs[0] = best.walk; else { legs.splice(0, 1); } }
+  else if (best.walk.meters > 20) legs.unshift(best.walk);
+  // lo que sigue del viaje se corre lo mismo
+  if (best.delta) for (const l of legs) if (l.kind === "ride" && l !== legs[legs.findIndex((x) => x.kind === "ride")]) { l.departAt += best.delta; l.arriveAt += best.delta; }
+  return best.delta;
+}
 
 /** Planifica un viaje desde `origin` hasta `dest`, saliendo ahora. Devuelve de 0 a `limit` opciones ordenadas por llegada. */
 export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace, opts: PlanOptions = {}): Itinerary[] {

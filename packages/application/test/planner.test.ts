@@ -87,3 +87,19 @@ describe("elegir con qué viajar", () => {
     expect(systemsOf(planTrip(world(), at(0, 0.0003), at(6, 0.0003), { nowMs: now, systems: ["zonal"] })).has("troncal")).toBe(false);
   });
 });
+
+describe("subir en la parada más cercana", () => {
+  const now = Date.parse("2026-03-04T17:00:00Z");
+  it("quien está claramente más cerca de una parada anterior de la misma ruta sube ahí, no en la siguiente", () => {
+    // a 35 % del camino entre A0 y A1 (≈155 m de A0, ≈285 m de A1)
+    const r = planTrip(world(), at(0.35, 0.0003), at(6, 0.0003), { nowMs: now });
+    const ride = r[0]!.legs.find((l) => l.kind === "ride") as { board: { id: string }; departAt: number; arriveAt: number; rideSeconds: number };
+    expect(ride.board.id).toBe("A0");
+    expect(ride.arriveAt - ride.departAt).toBe(ride.rideSeconds);
+    expect(r[0]!.arriveAt).toBeGreaterThanOrEqual(ride.arriveAt);
+  });
+  it("quien ya está al lado de la parada siguiente sube en esa", () => {
+    const r = planTrip(world(), at(0.95, 0.0003), at(6, 0.0003), { nowMs: now });
+    expect((r[0]!.legs.find((l) => l.kind === "ride") as { board: { id: string } }).board.id).toBe("A1");
+  });
+});

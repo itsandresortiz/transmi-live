@@ -100,7 +100,7 @@ export default function Viaje() {
           <>
             <SavePlace dest={p.dest} />
             <WhenRow when={p.when} onChange={p.setWhen} />
-            <View style={styles.pad}>
+            <View style={[styles.pad, { marginBottom: space[4] }]}>
               <Text style={[type.caption, { color: c.muted, marginBottom: space[2] }]}>Viajar en</Text>
               <View style={styles.chips}>
                 {TRAVEL_MODES.map((m) => <Chip key={m.key} label={m.label} selected={p.modes[m.key]} dot={SYSTEM_COLOR[m.systems[0]!]} onPress={() => p.toggleMode(m.key)} />)}
