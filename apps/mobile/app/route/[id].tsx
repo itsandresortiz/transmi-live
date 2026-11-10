@@ -183,7 +183,7 @@ export default function RouteScreen() {
 
 const styles = StyleSheet.create({
   empty: { flex: 1, padding: space[5], gap: space[2] },
-  mapBtn: { position: "absolute", right: space[3], top: space[3] },
+  mapBtn: { position: "absolute", right: space[3], bottom: space[3] },      // abajo: arriba a la derecha está la X de cerrar de la ventana
   scroll: { padding: space[5], gap: space[3] },
   head: { flexDirection: "row", alignItems: "center", gap: space[3] },
   busRow: { flexDirection: "row", alignItems: "center", gap: space[3], padding: space[3], minHeight: 56 },
