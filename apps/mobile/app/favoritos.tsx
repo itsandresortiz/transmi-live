@@ -1,7 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import Animated, { LinearTransition } from "react-native-reanimated";
 import { SymbolView } from "expo-symbols";
 import { upcomingAtStop } from "@transmi/application";
 import { routeTitle, stopLabelText } from "@transmi/domain";
@@ -27,6 +29,8 @@ export default function Favoritos() {
   const version = transit.version;
   const stops = useMemo(() => saved.stops.map((id) => transit.stopById(id)).filter((s) => !!s).map((stop) => ({ stop: stop!, next: upcomingAtStop(transit, stop!.id, nowSec(), 1).slice(0, 3) })), [saved.stops, version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
   const live = transit.fleet.size >= 50;
+  const [sorting, setSorting] = useState(false);
+  const move = (id: string, by: -1 | 1) => { void Haptics.selectionAsync(); saved.moveStop(id, by); };
 
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
@@ -39,10 +43,17 @@ export default function Favoritos() {
         </Card>
       ) : null}
 
-      {stops.length ? <Text style={[type.eyebrow, { color: c.muted }]}>PARADAS</Text> : null}
-      {stops.map(({ stop, next }) => {
+      {stops.length ? (
+        <View style={styles.sectionRow}>
+          <Text style={[type.eyebrow, { color: c.muted }]}>PARADAS</Text>
+          {stops.length > 1 ? <Tap onPress={() => setSorting((x) => !x)} accessibilityRole="button" accessibilityLabel={sorting ? "Terminar de ordenar" : "Ordenar las paradas"}><Text style={[type.caption, { color: c.accent, fontSize: 15, fontWeight: "600" }]}>{sorting ? "Listo" : "Ordenar"}</Text></Tap> : null}
+        </View>
+      ) : null}
+      {sorting ? <Text style={[type.caption, { color: c.muted }]}>Sube las que más usas: en Inicio se muestran en este orden (y la primera es la del widget).</Text> : null}
+      {stops.map(({ stop, next }, i) => {
         return (
-          <Tap key={stop.id} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: stop.id } })} accessibilityRole="button" accessibilityLabel={saved.nicknames[stop.id] || stopLabelText(transit.labelOf(stop))}>
+          <Animated.View key={stop.id} layout={LinearTransition.springify().damping(18).stiffness(220)}>
+          <Tap onPress={() => { if (!sorting) router.push({ pathname: "/stop/[id]", params: { id: stop.id } }); }} haptic={!sorting} accessibilityRole="button" accessibilityLabel={saved.nicknames[stop.id] || stopLabelText(transit.labelOf(stop))}>
             <Card style={{ gap: space[2] }}>
               <View style={styles.top}>
                 <SymbolView name="mappin.circle.fill" tintColor={c.accent} size={24} />
@@ -50,12 +61,18 @@ export default function Favoritos() {
                   <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{saved.nicknames[stop.id] || stopLabelText(transit.labelOf(stop))}</Text>
                   {saved.nicknames[stop.id] ? <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{stopLabelText(transit.labelOf(stop))}</Text> : null}
                 </View>
-                <SymbolView name="chevron.right" tintColor={c.muted} size={12} />
+                {sorting ? (
+                  <View style={styles.arrows}>
+                    <Tap onPress={() => move(stop.id, -1)} disabled={i === 0} haptic={false} accessibilityRole="button" accessibilityLabel="Subir" style={[styles.arrow, { backgroundColor: c.cardAlt, opacity: i === 0 ? 0.35 : 1 }]}><SymbolView name="chevron.up" tintColor={c.text} size={14} /></Tap>
+                    <Tap onPress={() => move(stop.id, 1)} disabled={i === stops.length - 1} haptic={false} accessibilityRole="button" accessibilityLabel="Bajar" style={[styles.arrow, { backgroundColor: c.cardAlt, opacity: i === stops.length - 1 ? 0.35 : 1 }]}><SymbolView name="chevron.down" tintColor={c.text} size={14} /></Tap>
+                  </View>
+                ) : <SymbolView name="chevron.right" tintColor={c.muted} size={12} />}
               </View>
-              {next.length ? <View style={styles.next}>{next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Text style={[type.headline, { color: c.text }]}>{etaText(u.buses[0]!.etaAt, now)}</Text></View>)}</View>
+              {sorting ? null : next.length ? <View style={styles.next}>{next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Text style={[type.headline, { color: c.text }]}>{etaText(u.buses[0]!.etaAt, now)}</Text></View>)}</View>
                 : <Text style={[type.caption, { color: c.muted }]}>{live ? "Ningún bus viene ahora" : "Sin datos en vivo por ahora"}</Text>}
             </Card>
           </Tap>
+          </Animated.View>
         );
       })}
 
@@ -75,6 +92,9 @@ export default function Favoritos() {
 
 const styles = StyleSheet.create({
   screen: { padding: space[5], gap: space[3] },
+  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  arrows: { flexDirection: "row", gap: space[2] },
+  arrow: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   top: { flexDirection: "row", alignItems: "center", gap: space[3] },
   next: { flexDirection: "row", flexWrap: "wrap", gap: space[3] },
   chip: { flexDirection: "row", alignItems: "center", gap: space[2] },
