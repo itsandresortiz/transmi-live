@@ -12,6 +12,7 @@ import { reportProblem } from "@/report";
 import { useAppearance, type AppearanceMode } from "@/appearance";
 import { useSaved } from "@/favorites";
 import { Tap, PAGE } from "@/ui/kit";
+import { GlassSegments } from "@/ui/GlassSegments";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 /** Una fila de lista al estilo de Ajustes de iOS: icono en un cuadro de color, título, un valor opcional a la derecha y la flecha. */
@@ -90,15 +91,9 @@ export default function Mas() {
         </Group>
 
         <Group title="APARIENCIA" footer="Automático usa la del teléfono.">
-          <View style={[styles.segment, { backgroundColor: c.cardAlt }]} accessibilityRole="radiogroup">
-            {([["auto", "Automático"], ["light", "Claro"], ["dark", "Oscuro"]] as [AppearanceMode, string][]).map(([m, label]) => {
-              const on = appearance.mode === m;
-              return (
-                <Tap key={m} onPress={() => appearance.setMode(m)} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={label} style={[styles.segItem, on && { backgroundColor: c.card, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } }]}>
-                  <Text style={[type.caption, { color: c.text, fontSize: 14, fontWeight: on ? "700" : "500" }]}>{label}</Text>
-                </Tap>
-              );
-            })}
+          <View style={{ padding: space[2] }}>
+            <GlassSegments variant="plain" value={appearance.mode} onChange={(m) => appearance.setMode(m)}
+              items={[{ key: "auto", label: "Automático" }, { key: "light", label: "Claro" }, { key: "dark", label: "Oscuro" }] as { key: AppearanceMode; label: string }[]} />
           </View>
         </Group>
 
