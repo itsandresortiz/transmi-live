@@ -53,11 +53,15 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
 
   useImperativeHandle(ref, () => ({
     resetNorth: () => camera.current?.easeTo({ center: lastCenter.current, bearing: 0, duration: 350 }),
-    flyTo: (lat, lon, zoom = 15.5) => camera.current?.flyTo({ center: [lon, lat], zoom, duration: 900 }),
+    flyTo: (lat, lon, zoom = 15.5) => { if (Number.isFinite(lat) && Number.isFinite(lon)) camera.current?.flyTo({ center: [lon, lat], zoom, duration: 900 }); },
     fit: (pts, padding = 60, bottomExtra = 220) => {
-      if (!pts.length) return;
-      const lons = pts.map((p) => p.lon), lats = pts.map((p) => p.lat);
-      camera.current?.fitBounds([Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)], { padding: { top: padding, right: padding, bottom: padding + bottomExtra, left: padding }, duration: 900 });
+      const ok = pts.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+      if (!ok.length) return;
+      const lons = ok.map((p) => p.lon), lats = ok.map((p) => p.lat);
+      const w = Math.min(...lons), s = Math.min(...lats), e = Math.max(...lons), n = Math.max(...lats);
+      // un solo punto (o varios casi juntos) no es un recuadro válido: iOS rechaza el encuadre y la app se cae; se acerca a ese punto en su lugar
+      if (e - w < 0.0006 && n - s < 0.0006) { camera.current?.flyTo({ center: [(w + e) / 2, (s + n) / 2], zoom: 16.3, duration: 900 }); return; }
+      camera.current?.fitBounds([w, s, e, n], { padding: { top: padding, right: padding, bottom: padding + bottomExtra, left: padding }, duration: 900 });
     },
   }), []);
 
