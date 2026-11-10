@@ -1,10 +1,14 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo } from "react";
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SymbolView } from "expo-symbols";
 import { router } from "expo-router";
 import { transit } from "@/composition-root";
 import { useNow, useTransitVersion } from "@/hooks";
 import { upcomingAtStop } from "@transmi/application";
+import type { Route } from "@transmi/domain";
+import { clockOfDay } from "@/lastService";
+import { stopKind, stopTag } from "@/stopname";
 import { stopLabelText } from "@transmi/domain";
 import { nowSec } from "@/clock";
 import { etaText } from "@/format";
@@ -21,11 +25,31 @@ const greeting = () => {
 
 export default function Inicio() {
   const c = useColors();
-  useTransitVersion(); useNow(15_000);
+  const { width } = useWindowDimensions();
+  const version = useTransitVersion();
+  const now = useNow(5000) / 1000;
   // «en vivo» = hay buses reportando. TransMilenio publica con ~1–3 min de retraso, así que la edad del lote solo sirve para decir «hace X min», no para negar el servicio
   const live = transit.fleet.size >= 50;
 
   const saved = useSaved();
+  const alerts = transit.alerts.length;
+  // tus paradas con los próximos buses de cada una (los 3 más cercanos, de cualquier ruta); sin buses, la próxima hora del horario
+  const favStops = useMemo(() => saved.stops.slice(0, 6).flatMap((id) => {
+    const stop = transit.stopById(id);
+    if (!stop) return [];
+    const arrivals = upcomingAtStop(transit, id, nowSec(), 2)
+      .flatMap((u) => u.buses.map((b) => ({ key: `${u.route.id}|${u.direction}|${b.vehicle.id}`, route: u.route as Route, headsign: u.headsign, at: b.etaAt })))
+      .sort((a, b) => a.at - b.at).slice(0, 3);
+    let scheduled: { route: Route; time: number } | undefined;
+    if (!arrivals.length && transit.departures.size) {
+      const day = transit.serviceEnds.dayAt(nowSec() * 1000);
+      const nx = transit.departures.nextAt(id, day.type, day.secs, 1).filter((x) => x.times[0] != null).sort((a, b) => a.times[0]! - b.times[0]!)[0];
+      const r = nx ? transit.routeById(nx.routeId) : undefined;
+      if (nx && r) scheduled = { route: r, time: nx.times[0]! };
+    }
+    return [{ id, stop, name: saved.nicknames[id] || transit.labelOf(stop).title, sub: [stopKind(stop), stopTag(stop)].filter(Boolean).join(" · "), arrivals, scheduled }];
+  }), [saved.stops, saved.nicknames, version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const cardW = favStops.length > 1 ? Math.min(330, Math.round(width * 0.8)) : width - space[5] * 2;
   const askPlace = (slot: "home" | "work") => { usePlanner.getState().setSaveAs(slot); router.navigate("/viaje"); };
   const goTo = (p: typeof saved.home) => { if (p) usePlanner.getState().setDest(p); router.navigate("/viaje"); };
   const quick: { symbol: Parameters<typeof IconDot>[0]["symbol"]; label: string; go: () => void }[] = [
@@ -40,7 +64,15 @@ export default function Inicio() {
       <ScrollView contentContainerStyle={[PAGE, { paddingBottom: space[10] * 3 }]} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
           <Text style={[type.body, { color: c.muted }]}>{greeting()}</Text>
-          <RoundButton symbol="bell" label="Avisos del servicio" onPress={() => router.push("/avisos")} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: space[2] }}>
+            <Tap onPress={() => router.navigate("/mapa")} accessibilityRole="button" accessibilityLabel={live ? `${transit.fleet.size} buses en vivo. Abrir el mapa` : "Abrir el mapa"} style={[styles.livePill, { backgroundColor: c.card }]}>
+              <View style={[styles.liveDot, { backgroundColor: live ? "#22c55e" : "#f59e0b" }]} />
+              <Text style={[type.caption, { color: c.text, fontVariant: ["tabular-nums"] }]}>{live ? `${transit.fleet.size.toLocaleString("es-CO")} en vivo` : "Sin datos en vivo"}</Text>
+            </Tap>
+            <View>
+              <RoundButton symbol={alerts ? "bell.badge.fill" : "bell"} label={alerts ? `Avisos del servicio: ${alerts}` : "Avisos del servicio"} onPress={() => router.push("/avisos")} />
+            </View>
+          </View>
         </View>
         <Text style={[type.hero, styles.hero, { color: c.text }]} accessibilityRole="header">¿A dónde{"\n"}vamos hoy?</Text>
 
@@ -51,6 +83,52 @@ export default function Inicio() {
             <View style={[styles.filter, { backgroundColor: c.ink }]}><SymbolView name="slider.horizontal.3" tintColor={c.onInk} size={16} /></View>
           </View>
         </Tap>
+
+
+        <SectionTitle title="Tus paradas" action={favStops.length ? "Ver todas" : undefined} onAction={() => router.push("/favoritos")} />
+        {favStops.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} decelerationRate="fast" snapToInterval={cardW + space[3]} contentContainerStyle={{ paddingHorizontal: space[5], gap: space[3] }}>
+            {favStops.map((f) => (
+              <Tap key={f.id} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: f.id } })} accessibilityRole="button"
+                accessibilityLabel={`${f.name}. ${f.arrivals.length ? f.arrivals.map((a) => `${a.route.shortName} ${etaText(a.at, now)}`).join(", ") : "sin buses acercándose"}`} style={{ width: cardW }}>
+                <Card style={styles.favCard}>
+                  <View style={styles.favHead}>
+                    <View style={[styles.favIcon, { backgroundColor: c.dark ? "#2a1114" : "#fde8ea" }]}><SymbolView name="mappin" tintColor={c.accent} size={16} /></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{f.name}</Text>
+                      <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{f.sub}</Text>
+                    </View>
+                    <SymbolView name="chevron.right" tintColor={c.muted} size={12} />
+                  </View>
+                  <View style={[styles.favBody, { borderColor: c.line }]}>
+                    {f.arrivals.length ? f.arrivals.map((a, i) => (
+                      <View key={a.key} style={styles.arrival}>
+                        <RouteBadge route={a.route} />
+                        <Text style={[type.caption, { color: c.muted, flex: 1, fontSize: 14 }]} numberOfLines={1}>{a.headsign ? `Hacia ${a.headsign}` : ""}</Text>
+                        <Text style={[type.headline, { color: i === 0 ? c.accent : c.text, fontVariant: ["tabular-nums"] }]}>{etaText(a.at, now)}</Text>
+                      </View>
+                    )) : f.scheduled ? (
+                      <View style={styles.arrival}>
+                        <RouteBadge route={f.scheduled.route} />
+                        <Text style={[type.caption, { color: c.muted, flex: 1, fontSize: 14 }]} numberOfLines={1}>Según el horario</Text>
+                        <Text style={[type.headline, { color: c.text }]}>{clockOfDay(f.scheduled.time)}</Text>
+                      </View>
+                    ) : <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>{live ? "Ningún bus viene ahora" : "Sin datos en vivo por ahora"}</Text>}
+                  </View>
+                </Card>
+              </Tap>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={{ paddingHorizontal: space[5] }}>
+            <Card style={{ gap: space[2] }}>
+              <View style={[styles.favIcon, { backgroundColor: c.dark ? "#2a1114" : "#fde8ea" }]}><SymbolView name="star.fill" tintColor={c.accent} size={16} /></View>
+              <Text style={[type.headline, { color: c.text }]}>Tus paradas, a un vistazo</Text>
+              <Text style={[type.body, { color: c.muted }]}>Marca una parada con la estrella y aquí verás qué buses llegan y en cuánto.</Text>
+              <Tap onPress={() => router.push("/cerca")} accessibilityRole="button" accessibilityLabel="Buscar paradas cerca de mí"><Text style={[type.headline, { color: c.accent }]}>Buscar cerca de mí</Text></Tap>
+            </Card>
+          </View>
+        )}
 
         <SectionTitle title="Acceso rápido" />
         <View style={styles.quickRow}>
@@ -76,25 +154,11 @@ export default function Inicio() {
             </Card>
           </Tap>
         </View>
-
-        {saved.stops.length || saved.routes.length ? (
+        {saved.routes.length ? (
           <>
-            <SectionTitle title="Tus favoritos" />
-            <View style={{ paddingHorizontal: space[5], gap: space[3] }}>
-              {saved.stops.slice(0, 4).map((id) => {
-                const stop = transit.stopById(id); if (!stop) return null;
-                const next = upcomingAtStop(transit, id, nowSec(), 1)[0];
-                return (
-                  <Tap key={id} onPress={() => router.push({ pathname: "/stop/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={stopLabelText(transit.labelOf(stop))}>
-                    <Card style={styles.favRow}>
-                      <SymbolView name="mappin.circle.fill" tintColor={c.accent} size={24} />
-                      <View style={{ flex: 1 }}><Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{saved.nicknames[id] || stopLabelText(transit.labelOf(stop))}</Text>
-                        <Text style={[type.caption, { color: c.muted }]}>{next ? `${next.route.shortName} · ${etaText(next.buses[0]!.etaAt, nowSec())}` : live ? "Ningún bus viene ahora" : "Sin datos en vivo"}</Text></View>
-                    </Card>
-                  </Tap>
-                );
-              })}
-              {saved.routes.length ? <View style={styles.favRoutes}>{saved.routes.slice(0, 12).map((id) => { const r = transit.routeById(id); return r ? <Tap key={id} onPress={() => router.push({ pathname: "/route/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${r.shortName}`}><RouteBadge route={r} /></Tap> : null; })}</View> : null}
+            <SectionTitle title="Tus rutas" />
+            <View style={[styles.favRoutes, { paddingHorizontal: space[5] }]}>
+              {saved.routes.slice(0, 16).map((id) => { const r = transit.routeById(id); return r ? <Tap key={id} onPress={() => router.push({ pathname: "/route/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${r.shortName}`}><RouteBadge route={r} /></Tap> : null; })}
             </View>
           </>
         ) : null}
@@ -114,6 +178,12 @@ const styles = StyleSheet.create({
   quick: { alignItems: "center", gap: space[2], width: 76 },
   bigRow: { flexDirection: "row", gap: space[3], paddingHorizontal: space[5], marginTop: space[6] },
   big: { minHeight: 128, justifyContent: "space-between" },
-  favRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
+  livePill: { flexDirection: "row", alignItems: "center", gap: space[2], paddingHorizontal: space[3], height: 34, borderRadius: 17 },
+  liveDot: { width: 8, height: 8, borderRadius: 4 },
+  favCard: { gap: space[3], minHeight: 176 },
+  favHead: { flexDirection: "row", alignItems: "center", gap: space[3] },
+  favIcon: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  favBody: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space[3], gap: space[3] },
+  arrival: { flexDirection: "row", alignItems: "center", gap: space[3] },
   favRoutes: { flexDirection: "row", flexWrap: "wrap", gap: space[2] },
 });
