@@ -106,19 +106,25 @@ function clusterStops(state: TransitState, stops: Stop[]): Stop[][] {
 /** Nombres nuevos de estaciones: a veces TransMilenio agrega una parada sin rutas (p. ej. «Calle 53 - Universidad Manuela Beltrán») justo donde ya está una estación con otro nombre («Calle 53»).
  *  Si el nombre de esa parada empieza por el de la estación y queda a menos de 80 m de uno de sus vagones, se usa como nombre completo de la estación. */
 const aliasCache = new WeakMap<object, Map<string, string>>();
+/** Otros nombres con los que TransMilenio conoce el lugar de una estación (paradas sin rutas pegadas a ella, p. ej. «Marly» donde hoy está «Calle 53»): solo sirven para encontrarla al buscar. */
+const otherNamesCache = new WeakMap<object, Map<string, string[]>>();
+const otherNames = (state: TransitState, title: string): string[] => { stationAliases(state); return otherNamesCache.get(state.network)?.get(normalize(title)) ?? []; };
 function stationAliases(state: TransitState): Map<string, string> {
   let out = aliasCache.get(state.network);
   if (out) return out;
   out = new Map();
+  const others = new Map<string, string[]>();
+  otherNamesCache.set(state.network, others);
   if (state.network.shapes.size) {
     const wagons = [...state.network.stops.values()].filter((s) => state.isServed(s.id) && state.labelOf(s).wagon);
     for (const stop of state.network.stops.values()) {
-      if (state.isServed(stop.id) || !stop.name || stop.name.length < 8) continue;
+      if (state.isServed(stop.id) || !stop.name || stop.code) continue;      // solo registros nuevos sin código y sin rutas (las paradas del SITP siempre traen código)
       const alias = stop.name.trim(), a = normalize(alias);
       for (const w of wagons) {
         if (Math.abs(w.position.lat - stop.position.lat) > 80 / 111_000 || hav(w.position, stop.position) > 80) continue;
         const title = state.labelOf(w).title, t = normalize(title);
         if (t && a.length > t.length && a.startsWith(t) && !out.has(t)) out.set(t, alias);
+        else if (t && a !== t && hav(w.position, stop.position) <= 40) { const l = others.get(t) ?? others.set(t, []).get(t)!; if (!l.includes(alias)) l.push(alias); }
       }
     }
   }
@@ -134,7 +140,7 @@ export function searchStopGroups(state: TransitState, query: string, limit = 40)
   const hits: Stop[] = [];
   for (const stop of state.network.stops.values()) {
     if (state.network.shapes.size && !state.isServed(stop.id)) continue;      // sin ninguna ruta: no sirve para el usuario
-    if (normalize(`${stop.name} ${stop.code}`).includes(q) || (state.labelOf(stop).wagon && normalize(stationTitle(state, state.labelOf(stop).title)).includes(q))) hits.push(stop);
+    if (normalize(`${stop.name} ${stop.code}`).includes(q) || (state.labelOf(stop).wagon && normalize(`${stationTitle(state, state.labelOf(stop).title)} ${otherNames(state, state.labelOf(stop).title).join(" ")}`).includes(q))) hits.push(stop);
   }
   const groups = clusterStops(state, hits).map((stops): StopGroup => {
     const sorted = sortStationStops(state, stops);
