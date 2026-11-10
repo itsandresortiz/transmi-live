@@ -8,6 +8,7 @@ import { stopLabelText } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { useSaved } from "@/favorites";
 import { Card, Chip, PrimaryButton, Tap } from "@/ui/kit";
+import { CloseToolbar } from "@/ui/CloseToolbar";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 const SUGGESTIONS = ["Casa", "Trabajo", "Colegio", "Universidad", "Gimnasio", "Mamá"];
@@ -34,6 +35,7 @@ export default function Personalizar() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: c.bg }}>
+      <CloseToolbar />
       <ScrollView keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingBottom: insets.bottom + space[8] }]} showsVerticalScrollIndicator={false}>
         <Text style={[type.eyebrow, { color: c.muted }]}>ASÍ SE VERÁ EN TUS FAVORITOS</Text>
         <Card style={styles.preview}>

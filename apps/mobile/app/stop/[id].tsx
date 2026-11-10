@@ -16,6 +16,7 @@ import { useMapFocus } from "@/map/focus";
 import { usePlanner } from "@/planner/store";
 import { reportProblem } from "@/report";
 import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
+import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
@@ -54,6 +55,7 @@ export default function StopSheet() {
   const row = sel ? rows.find((r) => r.route.id === sel.routeId && (!sel.direction || r.direction === sel.direction)) : undefined;
   if (sel) return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <CloseToolbar />
       <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <RouteAtStop stopId={id} sel={sel} row={row} now={now} onBack={() => setSel(null)} onMap={(buses, follow) => showOnMap({ routeId: sel.routeId, busIds: buses, followBusId: follow })} />
       </ScrollView>
@@ -62,6 +64,7 @@ export default function StopSheet() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <CloseToolbar />
       <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
         <Text style={[type.largeTitle, { color: c.text }]}>{nick || label.title}</Text>

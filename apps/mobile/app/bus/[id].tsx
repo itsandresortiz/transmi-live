@@ -9,6 +9,7 @@ import { delayClass, delayText, untilText } from "@/format";
 import { stopText } from "@/stopname";
 import { reportProblem } from "@/report";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
+import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -25,6 +26,7 @@ export default function BusSheet() {
   const tone = delayClass(d) === "bad" ? "#dc2626" : delayClass(d) === "warn" ? "#d97706" : delayClass(d) === "ok" ? "#16a34a" : c.muted;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <CloseToolbar />
       <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] }]} showsVerticalScrollIndicator={false}>
       <View style={styles.head}>
         {r ? <RouteBadge route={r} /> : null}

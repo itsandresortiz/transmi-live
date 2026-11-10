@@ -8,6 +8,7 @@ import { type CardMovement, type CardReading, type TuLlaveCard, NotTuLlaveError,
 import { Tullave } from "../modules/tullave/src";
 import { useAccessibility } from "@/accessibility";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
+import { CloseToolbar } from "@/ui/CloseToolbar";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 const pesos = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("es-CO")}`;
@@ -114,6 +115,7 @@ export default function CardScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <CloseToolbar />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         {!Tullave || !available ? (
           <Card><Text style={[type.headline, { color: c.text }]}>{!Tullave ? "Esta versión no trae el lector de tarjetas" : "No pudimos activar el NFC"}</Text>

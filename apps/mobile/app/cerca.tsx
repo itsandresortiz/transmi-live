@@ -13,6 +13,7 @@ import { stopKind, stopTag } from "@/stopname";
 import { useMapFocus } from "@/map/focus";
 import { meters } from "@/planner/format";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
+import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -39,6 +40,7 @@ export default function Cerca() {
 
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <CloseToolbar />
       {me === undefined ? <Card><Text style={[type.headline, { color: c.text }]}>Buscando dónde estás</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>Si es la primera vez, iOS te pide permiso para usar tu ubicación mientras tienes la app abierta.</Text></Card>
         : me === null ? (
           <Card style={{ gap: space[2] }}>

@@ -5,6 +5,7 @@ import { ALERT_EFFECT_LABEL, alertTitle, alertValidity, describeAlert } from "@t
 import { transit } from "@/composition-root";
 import { useTransitVersion } from "@/hooks";
 import { Card } from "@/ui/kit";
+import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -16,6 +17,7 @@ export default function Avisos() {
   const list = transit.alerts;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <CloseToolbar />
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
       {!list.length ? <Card><Text style={[type.headline, { color: c.text }]}>Sin avisos</Text><Text style={[type.body, { color: c.muted }]}>No hay novedades del servicio en este momento.</Text></Card> : null}
       {list.map((a, i) => {

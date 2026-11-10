@@ -11,6 +11,7 @@ import { useNow, useTransitVersion } from "@/hooks";
 import { etaText } from "@/format";
 import { useSaved } from "@/favorites";
 import { Card, Tap } from "@/ui/kit";
+import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { space, type, useColors } from "@/ui/theme";
 
@@ -29,6 +30,7 @@ export default function Favoritos() {
 
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <CloseToolbar />
       {!stops.length && !routes.length ? (
         <Card style={{ gap: space[2] }}>
           <SymbolView name="star" tintColor={c.accent} size={26} />
