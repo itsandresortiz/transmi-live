@@ -6,7 +6,10 @@ function quad(c, x0, x1, y0, x2, x3, y1, r) { // trapecio: arriba (x0..x1 en y0)
   c.beginPath(); c.moveTo(x0 + r, y0); c.lineTo(x1 - r, y0); c.quadraticCurveTo(x1, y0, x1 + (x3 - x1) * 0.06, y0 + r); c.lineTo(x3, y1); c.lineTo(x2, y1); c.lineTo(x0 - (x0 - x2) * 0.06, y0 + r); c.quadraticCurveTo(x0, y0, x0 + r, y0); c.closePath(); }
 function drawRearBus(c, color, long) {
   const H = long ? 250 : 190, faceH = 62, faceY = H - faceH - 12, x0 = 12, x1 = 108;   // cara trasera
-  const at = (t) => ({ l: x0 + 20 * t, r: x1 - 20 * t, y: faceY - (faceY - 14) * t });   // techo: t=0 atrás, t=1 al frente (más angosto y arriba)
+  // techo: t=0 atrás, t=1 al frente (más angosto y arriba). El bus va por el carril derecho y la vía se cierra hacia el centro de la pantalla:
+  // el frente se corre a la izquierda (LEAN) para fugar hacia el mismo punto que la vía
+  const LEAN = 22;
+  const at = (t) => ({ l: x0 + 18 * t - LEAN * t, r: x1 - 18 * t - LEAN * t, y: faceY - (faceY - 14) * t });
   // sombra en el piso
   c.save(); c.fillStyle = "rgba(0,0,0,.28)"; c.filter = "blur(5px)"; c.beginPath(); c.ellipse(60, H - 10, 54, 9, 0, 0, 6.3); c.fill(); c.restore();
   const roof = (ta, tb) => { const a = at(ta), b = at(tb);
@@ -15,8 +18,11 @@ function drawRearBus(c, color, long) {
     // costados del techo: un filo más oscuro que da volumen
     c.strokeStyle = shade(color, -0.25); c.lineWidth = 1.6; c.beginPath(); c.moveTo(a.l, a.y); c.lineTo(b.l, b.y + 6); c.moveTo(a.r, a.y); c.lineTo(b.r, b.y + 6); c.stroke();
     // equipos del techo (aire y claraboyas)
-    for (const t of [0.22, 0.5, 0.78]) { const m = at(ta + (tb - ta) * t), w = (m.r - m.l) * 0.42, h = 9 * (1 - 0.35 * (ta + (tb - ta) * t)); c.fillStyle = "rgba(255,255,255,.22)"; rr(c, 60 - w / 2, m.y - h / 2, w, h, 2.5); c.fill(); c.fillStyle = "rgba(0,0,0,.14)"; rr(c, 60 - w / 2 + 2, m.y - h / 2 + 2, w - 4, h - 4, 1.5); c.fill(); }
+    for (const t of [0.22, 0.5, 0.78]) { const m = at(ta + (tb - ta) * t), w = (m.r - m.l) * 0.42, h = 9 * (1 - 0.35 * (ta + (tb - ta) * t)); c.fillStyle = "rgba(255,255,255,.22)"; const cx = (m.l + m.r) / 2; rr(c, cx - w / 2, m.y - h / 2, w, h, 2.5); c.fill(); c.fillStyle = "rgba(0,0,0,.14)"; rr(c, cx - w / 2 + 2, m.y - h / 2 + 2, w - 4, h - 4, 1.5); c.fill(); }
   };
+  // costado derecho (el que queda a la vista al fugar a la izquierda): una cara más oscura con ventanas
+  { const a = at(0), b = at(1); c.fillStyle = shade(color, -0.38); c.beginPath(); c.moveTo(a.r, a.y); c.lineTo(b.r, b.y + 4); c.lineTo(b.r + 5, b.y + 16); c.lineTo(x1, faceY + faceH - 12); c.closePath(); c.fill();
+    c.fillStyle = "rgba(20,25,34,.85)"; c.beginPath(); c.moveTo(a.r - 0.5, a.y + 6); c.lineTo(b.r + 0.5, b.y + 9); c.lineTo(b.r + 3.5, b.y + 15); c.lineTo(x1 - 1, a.y + 26); c.closePath(); c.fill(); }
   if (long) { roof(0.52, 1); const a = at(0.46), b = at(0.52); c.fillStyle = "#1b1f27"; quad(c, b.l + 2, b.r - 2, b.y, a.l + 2, a.r - 2, a.y, 1); c.fill(); c.strokeStyle = "rgba(255,255,255,.3)"; c.lineWidth = 0.8; for (const t of [0.475, 0.49, 0.505]) { const m = at(t); c.beginPath(); c.moveTo(m.l + 4, m.y); c.lineTo(m.r - 4, m.y); c.stroke(); } roof(0, 0.46); }
   else roof(0, 1);
   // cara trasera

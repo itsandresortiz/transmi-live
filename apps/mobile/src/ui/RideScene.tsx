@@ -48,7 +48,7 @@ export function RideScene({ system, color, moving = true, width }: { system: Sys
   const roadX = (GROUND_W - ROAD_W) / 2, rows = Math.ceil(GROUND_H / PERIOD) + 1;
   const long = system === "troncal", sprite = REAR[`${system}-${long ? "l" : "s"}`];
   // el bus se dibuja de pie sobre su carril, en 3/4 desde atrás (un dibujo con volumen), no acostado en el plano
-  const busW = 64, busH = busW * ((long ? 250 : 190) / 120), busTop = GROUND_H - 335;
+  const busW = 74, busH = busW * ((long ? 250 : 190) / 120), busTop = GROUND_H - 335;
   const fade = Array.from({ length: STRIPS }, (_, i) => 1 - i / STRIPS);
 
   return (
@@ -70,7 +70,7 @@ export function RideScene({ system, color, moving = true, width }: { system: Sys
           )))}
         </Animated.View>
       </View>
-      <Animated.View style={[{ position: "absolute", left: width / 2 + 43 - busW / 2, top: 251 - busH, width: busW, height: busH }, busStyle]}>
+      <Animated.View style={[{ position: "absolute", left: width / 2 + 43 - busW / 2, top: 257 - busH, width: busW, height: busH }, busStyle]}>
         <Image source={sprite} style={{ width: busW, height: busH }} resizeMode="contain" />
       </Animated.View>
       {/* bordes fundidos con el fondo */}
