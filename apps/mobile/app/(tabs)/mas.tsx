@@ -1,66 +1,135 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import type { ReactNode } from "react";
+import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Constants from "expo-constants";
-import { Linking } from "react-native";
+import { SymbolView, type SFSymbol } from "expo-symbols";
 import { connectionStatus } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { reportProblem } from "@/report";
 import { useAppearance, type AppearanceMode } from "@/appearance";
-import { Card, Chip, Tap, PAGE } from "@/ui/kit";
-import { space, type, useColors } from "@/ui/theme";
+import { useSaved } from "@/favorites";
+import { Tap, PAGE } from "@/ui/kit";
+import { radius, space, type, useColors } from "@/ui/theme";
 
+/** Una fila de lista al estilo de Ajustes de iOS: icono en un cuadro de color, título, un valor opcional a la derecha y la flecha. */
+function Row({ symbol, tint, title, value, onPress, last = false, link = false }: { symbol: SFSymbol; tint: string; title: string; value?: string; onPress(): void; last?: boolean; link?: boolean }) {
+  const c = useColors();
+  return (
+    <Tap onPress={onPress} accessibilityRole={link ? "link" : "button"} accessibilityLabel={value ? `${title}, ${value}` : title}>
+      <View style={styles.row}>
+        <View style={[styles.tile, { backgroundColor: tint }]}><SymbolView name={symbol} tintColor="#ffffff" size={17} /></View>
+        <View style={[styles.rowBody, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.line }]}>
+          <Text style={[type.body, { color: c.text, flex: 1 }]} numberOfLines={1}>{title}</Text>
+          {value ? <Text style={[type.body, { color: c.muted }]} numberOfLines={1}>{value}</Text> : null}
+          <SymbolView name={link ? "arrow.up.right" : "chevron.right"} tintColor={c.muted} size={12} />
+        </View>
+      </View>
+    </Tap>
+  );
+}
+
+function Group({ title, children, footer }: { title: string; children: ReactNode; footer?: string }) {
+  const c = useColors();
+  return (
+    <View style={styles.group}>
+      <Text style={[type.eyebrow, { color: c.muted, marginLeft: space[4] }]}>{title}</Text>
+      <View style={[styles.groupCard, { backgroundColor: c.card }]}>{children}</View>
+      {footer ? <Text style={[type.caption, { color: c.muted, marginHorizontal: space[4] }]}>{footer}</Text> : null}
+    </View>
+  );
+}
+
+/** «Más»: la tarjeta TuLlave arriba, con su propio lugar, y lo demás agrupado como en Ajustes (servicio, tus cosas, apariencia, ayuda). */
 export default function Mas() {
   const c = useColors();
   const appearance = useAppearance();
+  const saved = useSaved();
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
-  const live = transit.fleet.size >= 50, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
+  const hasBuses = transit.fleet.size >= 50, late = (st.ageSeconds ?? 0) > 300, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
+  const alerts = transit.alerts.length, favs = saved.stops.length + saved.routes.length;
+
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
-      <ScrollView contentContainerStyle={[PAGE, { gap: space[3], paddingBottom: space[10] * 3 }]}>
-        <Text style={[type.largeTitle, { color: c.text, paddingHorizontal: space[5] }]} accessibilityRole="header">Más</Text>
-        <View style={{ marginHorizontal: space[5] }}>
-          <Card>
-            <View style={styles.liveRow}>
-              <View style={[styles.liveDot, { backgroundColor: live && (st.ageSeconds ?? 0) <= 300 ? "#22c55e" : "#f59e0b" }]} />
-              <Text style={[type.headline, { color: c.text, flex: 1 }]}>{live ? `${transit.fleet.size.toLocaleString("es-CO")} buses en la calle` : "Sin datos en vivo por ahora"}</Text>
+      <ScrollView contentContainerStyle={[PAGE, styles.content]} showsVerticalScrollIndicator={false}>
+        <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">Más</Text>
+
+        {/* la tarjeta TuLlave: lo más útil de esta pestaña, con su propia tarjeta */}
+        <Tap onPress={() => router.push("/card")} accessibilityRole="button" accessibilityLabel="Mi tarjeta TuLlave. Consultar el saldo acercando la tarjeta al teléfono">
+          <View style={styles.hero}>
+            <View style={styles.glowA} /><View style={styles.glowB} />
+            <View style={styles.heroTop}>
+              <Text style={styles.brand}>TuLlave</Text>
+              <SymbolView name="wave.3.right" tintColor="#ffffff" size={22} />
             </View>
-            <Text style={[type.body, { color: c.muted, marginTop: space[2] }]}>
-              {live ? `Se actualizan solos${ageMin != null && ageMin >= 2 ? ` · último dato hace ${ageMin} min` : ""}.`
-                : "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: puedes consultar horarios y planear viajes."}
-            </Text>
-          </Card>
-        </View>
-        <View style={{ marginHorizontal: space[5] }}>
-          <Card style={{ gap: space[3] }}>
-            <View><Text style={[type.headline, { color: c.text }]}>Apariencia</Text><Text style={[type.body, { color: c.muted }]}>Automático usa la del teléfono.</Text></View>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space[2] }}>
-              {([["auto", "Automático"], ["light", "Claro"], ["dark", "Oscuro"]] as [AppearanceMode, string][]).map(([m, label]) => <Chip key={m} label={label} selected={appearance.mode === m} onPress={() => appearance.setMode(m)} />)}
+            <View style={{ gap: 2 }}>
+              <Text style={styles.heroTitle}>Consulta tu saldo</Text>
+              <Text style={styles.heroSub}>Acerca la tarjeta al teléfono. Se lee aquí y no se guarda.</Text>
             </View>
-          </Card>
-        </View>
-        <Tap onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel="Avisos del servicio" style={{ marginHorizontal: space[5] }}>
-          <Card><Text style={[type.headline, { color: c.text }]}>Avisos del servicio</Text><Text style={[type.body, { color: c.muted }]}>Desvíos, cierres de estaciones y cambios de operación.</Text></Card>
+            <View style={styles.heroBtn}><Text style={styles.heroBtnText}>Leer mi tarjeta</Text><SymbolView name="arrow.right" tintColor="#111114" size={13} /></View>
+          </View>
         </Tap>
-        <Tap onPress={() => router.push("/card")} accessibilityRole="button" accessibilityLabel="Mi tarjeta TuLlave" style={{ marginHorizontal: space[5] }}>
-          <Card><Text style={[type.headline, { color: c.text }]}>Mi tarjeta TuLlave</Text><Text style={[type.body, { color: c.muted }]}>Lee tu saldo acercando la tarjeta al teléfono.</Text></Card>
-        </Tap>
-        <Tap onPress={() => reportProblem({ what: "la app en general" })} accessibilityRole="button" accessibilityLabel="Reportar un problema o dar una idea" style={{ marginHorizontal: space[5] }}>
-          <Card><Text style={[type.headline, { color: c.text }]}>Reportar un problema o dar una idea</Text><Text style={[type.body, { color: c.muted }]}>Se abre un reporte ya redactado en GitHub.</Text></Card>
-        </Tap>
-        <Tap onPress={() => void Linking.openURL("https://transmilive.com/privacidad.html")} accessibilityRole="link" accessibilityLabel="Política de privacidad" style={{ marginHorizontal: space[5] }}>
-          <Card><Text style={[type.headline, { color: c.text }]}>Política de privacidad</Text><Text style={[type.body, { color: c.muted }]}>Qué datos usamos y cuáles no.</Text></Card>
-        </Tap>
-        <Text style={[type.caption, { color: c.muted, textAlign: "center", marginTop: space[4] }]}>TransMi LIVE {Constants.expoConfig?.version} · compilación {Constants.nativeBuildVersion ?? "—"}</Text>
+
+        <Group title="SERVICIO" footer={!hasBuses ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: puedes consultar horarios y planear viajes." : late && ageMin != null ? `El último dato de los buses tiene ${ageMin} min.` : undefined}>
+          <View style={styles.row}>
+            <View style={[styles.tile, { backgroundColor: hasBuses && !late ? "#22c55e" : "#f59e0b" }]}><SymbolView name="dot.radiowaves.left.and.right" tintColor="#ffffff" size={17} /></View>
+            <View style={[styles.rowBody, { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.line }]} accessible accessibilityLabel={hasBuses ? `${transit.fleet.size} buses en la calle` : "Sin datos en vivo por ahora"}>
+              <Text style={[type.body, { color: c.text, flex: 1 }]}>{hasBuses ? "Buses en la calle" : "Datos en vivo"}</Text>
+              <Text style={[type.body, { color: c.muted, fontVariant: ["tabular-nums"] }]}>{hasBuses ? transit.fleet.size.toLocaleString("es-CO") : "Sin datos por ahora"}</Text>
+            </View>
+          </View>
+          <Row last symbol="bell.fill" tint="#ef4444" title="Avisos del servicio" value={alerts ? String(alerts) : "Ninguno"} onPress={() => router.push("/avisos")} />
+        </Group>
+
+        <Group title="TUS COSAS">
+          <Row symbol="star.fill" tint="#f59e0b" title="Favoritos" value={favs ? String(favs) : undefined} onPress={() => router.push("/favoritos")} />
+          <Row last symbol="location.fill" tint="#3b82f6" title="Cerca de mí" onPress={() => router.push("/cerca")} />
+        </Group>
+
+        <Group title="APARIENCIA" footer="Automático usa la del teléfono.">
+          <View style={[styles.segment, { backgroundColor: c.cardAlt }]} accessibilityRole="radiogroup">
+            {([["auto", "Automático"], ["light", "Claro"], ["dark", "Oscuro"]] as [AppearanceMode, string][]).map(([m, label]) => {
+              const on = appearance.mode === m;
+              return (
+                <Tap key={m} onPress={() => appearance.setMode(m)} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={label} style={[styles.segItem, on && { backgroundColor: c.card, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } }]}>
+                  <Text style={[type.caption, { color: c.text, fontSize: 14, fontWeight: on ? "700" : "500" }]}>{label}</Text>
+                </Tap>
+              );
+            })}
+          </View>
+        </Group>
+
+        <Group title="AYUDA">
+          <Row symbol="exclamationmark.bubble.fill" tint="#8b5cf6" title="Reportar un problema o dar una idea" onPress={() => reportProblem({ what: "la app en general" })} link />
+          <Row last symbol="hand.raised.fill" tint="#64748b" title="Política de privacidad" onPress={() => void Linking.openURL("https://transmilive.com/privacidad.html")} link />
+        </Group>
+
+        <Text style={[type.caption, { color: c.muted, textAlign: "center", marginTop: space[2] }]}>TransMi LIVE {Constants.expoConfig?.version} · compilación {Constants.nativeBuildVersion ?? "—"}{"\n"}Con datos abiertos de TransMilenio. No es una app oficial.</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  liveRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
-  liveDot: { width: 10, height: 10, borderRadius: 5 },
+  content: { paddingHorizontal: space[5], gap: space[5], paddingBottom: space[10] * 3 },
+  hero: { borderRadius: 26, borderCurve: "continuous", backgroundColor: "#16161a", padding: space[5], gap: space[4], overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
+  glowA: { position: "absolute", right: -70, top: -90, width: 260, height: 260, borderRadius: 130, backgroundColor: "#e11d2e", opacity: 0.55 },
+  glowB: { position: "absolute", left: -90, bottom: -120, width: 260, height: 260, borderRadius: 130, backgroundColor: "#ffffff", opacity: 0.06 },
+  heroTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  brand: { color: "#ffffff", fontSize: 20, fontWeight: "800", letterSpacing: -0.4 },
+  heroTitle: { color: "#ffffff", fontSize: 26, fontWeight: "800", letterSpacing: -0.6 },
+  heroSub: { color: "#ffffff", opacity: 0.72, fontSize: 14, fontWeight: "500" },
+  heroBtn: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: space[2], backgroundColor: "#ffffff", paddingHorizontal: space[4], minHeight: 40, borderRadius: radius.pill },
+  heroBtnText: { color: "#111114", fontSize: 15, fontWeight: "700" },
+  group: { gap: space[2] },
+  groupCard: { borderRadius: radius.lg, borderCurve: "continuous", overflow: "hidden" },
+  row: { flexDirection: "row", alignItems: "center", paddingLeft: space[4], gap: space[3] },
+  tile: { width: 30, height: 30, borderRadius: 8, borderCurve: "continuous", alignItems: "center", justifyContent: "center" },
+  rowBody: { flex: 1, flexDirection: "row", alignItems: "center", gap: space[2], minHeight: 50, paddingRight: space[4] },
+  segment: { flexDirection: "row", margin: space[2], padding: 3, borderRadius: 12, borderCurve: "continuous" },
+  segItem: { flex: 1, minHeight: 36, borderRadius: 9, borderCurve: "continuous", alignItems: "center", justifyContent: "center" },
 });
