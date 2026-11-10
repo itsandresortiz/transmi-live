@@ -5,6 +5,7 @@
 #   UPLOAD=transporter (por defecto) | api   (con api: ASC_KEY_ID, ASC_ISSUER, ASC_KEY=ruta al .p8)
 #   BUNDLE_ID                       opcional (por defecto com.transmilive.app)
 set -euo pipefail
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"      # ruta completa: más abajo se cambia de carpeta y hay que poder relanzarse
 cd "$(dirname "$0")/.."
 ROOT="$(git rev-parse --show-toplevel)"
 # Un solo comando: se pone al día con GitHub por su cuenta (y se vuelve a lanzar, porque este mismo archivo pudo cambiar), cierra el servidor de pruebas y limpia la compilación anterior.
@@ -17,7 +18,7 @@ if [ "${BEHIND:-0}" -gt 0 ] && [ -z "${SKIP_PULL_CHECK:-}" ] && [ -z "${TM_PULLE
     echo "No se pudo bajar lo nuevo (¿hay cambios tuyos sin guardar?). Corre  git status  y mándale el resultado a Claude."
     exit 1
   fi
-  TM_PULLED=1 exec bash "$0" "$@"
+  TM_PULLED=1 exec bash "$SELF" "$@"
 fi
 pkill -f "expo start" 2>/dev/null || true
 rm -rf ios build
