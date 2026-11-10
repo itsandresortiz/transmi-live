@@ -141,7 +141,7 @@ export default function Mapa() {
       ) : null}
       {focus.followBusId ? (
         <View style={[styles.focusChip, { top: insets.top + 72 }]}>
-          <Glass interactive scheme="light" style={styles.focusGlass}>
+          <Glass interactive scheme="light" style={styles.followGlass}>
             <View style={styles.followBox}>
               {followV ? (
                 <>
@@ -197,18 +197,17 @@ export default function Mapa() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   top: { position: "absolute", left: space[4], right: space[4] },
-  chipsGlass: { borderRadius: 28, overflow: "hidden" },
-  chips: { gap: space[2], padding: space[2] },
   bottomRow: { position: "absolute", left: space[4], right: space[4], flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   rightCol: { alignItems: "center", gap: space[3] },
   panel: { position: "absolute", right: space[4], width: 270 },
-  panelGlass: { borderRadius: 24, overflow: "hidden" },
+  panelGlass: { borderRadius: 28, overflow: "hidden" },
   panelRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
   compass: { position: "absolute", right: space[4] },
   compassGlass: { width: 46, height: 46, borderRadius: 23, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   scrim: { position: "absolute", top: 0, left: 0, right: 0 },
   focusChip: { position: "absolute", left: space[4], right: space[4] },
-  focusGlass: { borderRadius: 24, overflow: "hidden" },
+  focusGlass: { borderRadius: 20, overflow: "hidden" },       // fila de 40 de alto: píldora, concéntrica con su botón (radio 16 + margen 4)
+  followGlass: { borderRadius: 28, overflow: "hidden" },      // margen 12 + botón de radio 16 en la esquina
   followBox: { padding: space[3], gap: space[2] },
   followTop: { flexDirection: "row", alignItems: "center", gap: space[2] },
   followNext: { flexDirection: "row", alignItems: "center", gap: space[3] },

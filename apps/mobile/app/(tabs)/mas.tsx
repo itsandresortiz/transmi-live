@@ -125,6 +125,4 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", paddingLeft: space[4], gap: space[3] },
   tile: { width: 30, height: 30, borderRadius: 8, borderCurve: "continuous", alignItems: "center", justifyContent: "center" },
   rowBody: { flex: 1, flexDirection: "row", alignItems: "center", gap: space[2], minHeight: 50, paddingRight: space[4] },
-  segment: { flexDirection: "row", margin: space[2], padding: 3, borderRadius: 12, borderCurve: "continuous" },
-  segItem: { flex: 1, minHeight: 36, borderRadius: 9, borderCurve: "continuous", alignItems: "center", justifyContent: "center" },
 });
