@@ -29,7 +29,7 @@ export function estimateTravelSeconds(state: TransitState, v: Vehicle, stopIds: 
 /** El trazado de una ruta y a cuántos metros del inicio queda cada una de sus paradas (se calcula una vez por recorrido). */
 interface ShapeStops { path: RoadPath; s: number[] }
 const shapeCache = new WeakMap<RouteShape, ShapeStops | null>();
-function shapeStops(state: TransitState, shape: RouteShape): ShapeStops | null {
+export function shapeStops(state: TransitState, shape: RouteShape): ShapeStops | null {
   let c = shapeCache.get(shape);
   if (c !== undefined) return c;
   c = null;

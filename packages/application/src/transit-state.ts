@@ -2,7 +2,7 @@ import {
   Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle, type RouteShape,
   type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, isAlertActive, parseStopName, MAX_REPORT_AGE_S,
 } from "@transmi/domain";
-import { arrivalAtIndex } from "./eta";
+import { arrivalAtIndex, shapeStops } from "./eta";
 import { type RouteDayStatus, ServiceEnds, type ServiceMark } from "./service-ends";
 import { Departures } from "./departures";
 import { TravelTimes } from "./travel-times";
@@ -82,6 +82,28 @@ export class TransitState {
 
   /** Dónde va el bus dentro del recorrido de su ruta: su última parada, la lista de paradas y su posición en ella. */
   sequenceOf(v: Vehicle): { shape: RouteShape; index: number } | undefined {
+    return this.sequenceByStop(v);
+  }
+  /** Si la última parada informada no sirve (no está en el trazado de su ruta), se ubica al bus por dónde va: el recorrido más cercano a él y la última parada que ya pasó. */
+  private sequenceByPosition(v: Vehicle): { shape: RouteShape; index: number } | undefined {
+    const tripRoute = v.tripId?.split(".").pop();
+    const ux = v.bearing != null ? Math.sin((v.bearing * Math.PI) / 180) : 0, uy = v.bearing != null ? -Math.cos((v.bearing * Math.PI) / 180) : 0;
+    let best: { shape: RouteShape; index: number; dist: number } | undefined;
+    for (const rid of tripRoute && tripRoute !== v.routeId ? [v.routeId, tripRoute] : [v.routeId]) {
+      for (const shape of this.network.shapes.get(rid) ?? []) {
+        const info = shapeStops(this, shape);
+        const hit = info?.path.project(v.world, ux, uy, 40);
+        if (!info || !hit || (v.bearing != null && !hit.forward)) continue;      // sin rumbo conocido se acepta el sentido que sea; con rumbo, solo el que coincide
+        let index = -1;
+        for (let i = 0; i < info.s.length; i++) if (info.s[i]! <= hit.s + 10) index = i; else break;
+        if (index < 0 || index >= shape.stopIds.length - 1) continue;
+        if (!best || hit.dist < best.dist) best = { shape, index, dist: hit.dist };
+      }
+      if (best) break;
+    }
+    return best ? { shape: best.shape, index: best.index } : undefined;
+  }
+  private sequenceByStop(v: Vehicle): { shape: RouteShape; index: number } | undefined {
     if (!v.lastStopId) return undefined;
     const key = `${v.routeId}|${v.lastStopId}|${v.tripId?.split(".").pop() ?? ""}`;
     let hit = this.seq.get(key);
@@ -101,8 +123,8 @@ export class TransitState {
     return hit ?? undefined;
   }
   /** La parada que sigue (la última que informa TransMilenio ya la pasó) y la hora estimada de llegada, en segundos desde 1970. */
-  nextStopOf(v: Vehicle, nowMs = Date.now()): { stopId: string; stop?: Stop; arrivalAt?: number } | undefined {
-    const seq = this.sequenceOf(v);
+  nextStopOf(v: Vehicle, nowMs = Date.now(), byPosition = true): { stopId: string; stop?: Stop; arrivalAt?: number } | undefined {
+    const seq = this.sequenceOf(v) ?? (byPosition ? this.sequenceByPosition(v) : undefined);   // por posición solo para mostrar; el movimiento de los buses pide solo la parada informada
     const stopId = seq?.shape.stopIds[seq.index + 1];
     if (!seq || !stopId) return undefined;
     return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape, seq.index, seq.index + 1, nowMs) };

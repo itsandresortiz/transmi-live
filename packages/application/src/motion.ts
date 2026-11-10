@@ -182,7 +182,7 @@ export class MotionEngine {
     if (!paths.length) return { lock: null, speed: v.velocity?.speedMps ?? 0 };
     const vel = v.velocity;
     if (vel) return { lock: lockToRoute(paths, v.world, vel, this.params.lockMeters, prefer), speed: vel.speedMps };
-    const next = this.state.nextStopOf(v, nowSec * 1000);     // la parada que sigue a la última que informó el bus
+    const next = this.state.nextStopOf(v, nowSec * 1000, false);     // la parada que sigue a la última que informó el bus
     const stop = next?.stop;
     if (!next || !stop) return { lock: null, speed: 0 };
     const sw = toWorld(stop.position);
@@ -206,7 +206,7 @@ export class MotionEngine {
   /** Distancia de la próxima parada del bus sobre su trazado; `Infinity` si no se conoce o queda atrás. */
   private stopS(v: Vehicle, lock: RouteLock | null): number {
     if (!lock || !v.lastStopId) return Infinity;
-    const stop = this.state.nextStopOf(v)?.stop;
+    const stop = this.state.nextStopOf(v, Date.now(), false)?.stop;
     if (!stop) return Infinity;
     const hit = lock.path.project(toWorld(stop.position), 0, 0, 40);
     return hit && hit.s >= lock.s - 25 ? hit.s : Infinity;
