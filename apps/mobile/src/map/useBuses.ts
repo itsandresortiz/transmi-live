@@ -16,7 +16,7 @@ const EMPTY: FeatureCollection<Point> = { type: "FeatureCollection", features: [
 /** Buses de la pantalla como puntos para el mapa, recalculados dos veces por segundo con el motor de movimiento. Solo los que se ven. */
 export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; enabled?: boolean; everyMs?: number } = {}): FeatureCollection<Point> {
   const [data, setData] = useState<FeatureCollection<Point>>(EMPTY);
-  const { system = null, routeId = null, enabled = true, everyMs = 500 } = opts;
+  const { system = null, routeId = null, enabled = true, everyMs = 250 } = opts;
   useEffect(() => {
     if (!enabled || !view) { setData(EMPTY); return; }
     const build = () => {
@@ -40,9 +40,15 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       }
       setData({ type: "FeatureCollection", features });
     };
-    build();
-    const timer = setInterval(build, everyMs);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setTimeout>, stopped = false;
+    const loop = () => {
+      const t0 = Date.now();
+      build();
+      const spent = Date.now() - t0;
+      if (!stopped) timer = setTimeout(loop, Math.max(everyMs, spent * 3));      // si calcular tarda mucho, se espacia: los toques tienen prioridad sobre el movimiento
+    };
+    loop();
+    return () => { stopped = true; clearTimeout(timer); };
   }, [view, system, routeId, enabled, everyMs]);
   return data;
 }

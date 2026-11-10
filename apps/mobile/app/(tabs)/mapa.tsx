@@ -21,6 +21,7 @@ export default function Mapa() {
   const focused = useIsFocused();
   const c = useColors();
   const focus = useMapFocus();
+  const overlay = c.dark ? "rgba(24,24,28,0.82)" : "rgba(255,255,255,0.88)";
   const calm = usePathname() !== "/mapa";   // hay una hoja abierta encima del mapa
 
   // al llegar con una parada elegida: se encuadra la parada y los buses que se acercan; si se sigue un bus, el mapa lo acompaña
@@ -44,9 +45,13 @@ export default function Mapa() {
       {focused ? <StatusBar style="dark" /> : null}
       {/* el mapa no se lee con VoiceOver: las pestañas Rutas y Cómo llegar dicen lo mismo con texto */}
       <View style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <TransitMap ref={map} system={system} active={focused} calm={calm} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
+      <TransitMap ref={map} system={system} active={focused} calm={calm} attributionPosition={{ bottom: insets.bottom + 88, right: 10 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
         onBus={(id) => { void Haptics.selectionAsync(); router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
         onStop={(id) => router.navigate({ pathname: "/stop/[id]", params: { id } })} />
+      </View>
+      {/* velo bajo la hora y la batería: el mapa es claro y el texto del sistema no siempre contrasta */}
+      <View pointerEvents="none" style={[styles.scrim, { height: insets.top + 6 }]}>
+        {[0.3, 0.2, 0.12, 0.06].map((o, i) => <View key={i} style={{ flex: 1, backgroundColor: c.dark ? `rgba(0,0,0,${o})` : `rgba(255,255,255,${o + 0.2})` }} />)}
       </View>
       <View pointerEvents="box-none" style={[styles.top, { top: insets.top + space[2] }]}>
         <Glass style={styles.chipsGlass}>
@@ -68,9 +73,10 @@ export default function Mapa() {
           </Glass>
         </View>
       ) : null}
-      <View pointerEvents="none" style={[styles.status, { bottom: insets.bottom + 118 }]}><FeedStatus /></View>
-      <View pointerEvents="box-none" style={[styles.side, { bottom: insets.bottom + 110 }]}>
-        <RoundButton symbol="location.fill" label="Mi ubicación" onPress={() => void locate()} size={52} />
+      {/* el estado del servicio y el botón de ubicación van en la misma fila, sobre la barra inferior, con fondo propio para leerse sobre cualquier mapa */}
+      <View pointerEvents="box-none" style={[styles.bottomRow, { bottom: insets.bottom + 128 }]}>
+        <View pointerEvents="none"><FeedStatus tint={overlay} /></View>
+        <RoundButton symbol="location.fill" label="Mi ubicación" onPress={() => void locate()} size={52} tint={overlay} />
       </View>
     </View>
   );
@@ -81,8 +87,8 @@ const styles = StyleSheet.create({
   top: { position: "absolute", left: space[4], right: space[4] },
   chipsGlass: { borderRadius: 28, overflow: "hidden" },
   chips: { gap: space[2], padding: space[2] },
-  side: { position: "absolute", right: space[4] },
-  status: { position: "absolute", left: space[4] },
+  bottomRow: { position: "absolute", left: space[4], right: space[4], flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  scrim: { position: "absolute", top: 0, left: 0, right: 0 },
   focusChip: { position: "absolute", left: space[4], right: space[4] },
   focusGlass: { borderRadius: 24, overflow: "hidden" },
   focusRow: { flexDirection: "row", alignItems: "center", gap: space[2], paddingLeft: space[4], paddingRight: space[1], paddingVertical: space[1] },

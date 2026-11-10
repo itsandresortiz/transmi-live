@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
+import { type ComponentProps, forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import { Camera, GeoJSONSource, Images, Layer, Map, UserLocation, type CameraRef } from "@maplibre/maplibre-react-native";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
@@ -26,6 +26,7 @@ interface Props {
   highlightIds?: string[];
   /** Si es falso (otra pestaña al frente), los buses dejan de recalcularse para no gastar batería. */
   active?: boolean;
+  attributionPosition?: ComponentProps<typeof Map>["attributionPosition"];
   /** Mientras una hoja se abre encima, los buses se recalculan más despacio para que la hoja salga al instante. */
   calm?: boolean;
   onBus?(id: string): void;
@@ -34,7 +35,7 @@ interface Props {
 }
 
 /** El mapa de buses en vivo: base, trazado de la ruta, paradas (al acercarse), buses y tu ubicación. */
-export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, calm = false, onBus, onStop, children }, ref) {
+export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
   const c = useColors();
   const camera = useRef<CameraRef>(null);
   const [view, setView] = useState<Viewport | null>(null);
@@ -49,7 +50,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     },
   }), []);
 
-  const buses = useBusFeatures(view, { system, routeId, enabled: active, everyMs: calm ? 2000 : 500 });
+  const buses = useBusFeatures(view, { system, routeId, enabled: active, everyMs: calm ? 2000 : 250 });
 
   const stops = useMemo<FeatureCollection<Point>>(() => {
     const features: Feature<Point>[] = [];
@@ -113,7 +114,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   }, []);
 
   return (
-    <Map style={StyleSheet.absoluteFill} mapStyle={MAP_STYLE} logo={false} attribution attributionPosition={{ bottom: 100, right: 8 }} compass compassPosition={{ top: 120, right: 12 }} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
+    <Map style={StyleSheet.absoluteFill} mapStyle={MAP_STYLE} logo={false} attribution attributionPosition={attributionPosition} compass compassPosition={{ top: 120, right: 12 }} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
       <Camera ref={camera} initialViewState={{ center: BOGOTA, zoom: 11.6 }} minZoom={9} maxZoom={19} />
       <Images images={BUS_SPRITES} />
       <UserLocation />

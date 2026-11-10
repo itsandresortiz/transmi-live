@@ -37,20 +37,20 @@ export function Card({ children, style, dark = false }: { children: ReactNode; s
 }
 
 /** Superficie de vidrio líquido en iOS 26; en lo demás, un fondo translúcido. Con «Reducir transparencia» del teléfono, un fondo sólido. */
-export function Glass({ children, style, interactive = false }: { children?: ReactNode; style?: StyleProp<ViewStyle>; interactive?: boolean }) {
+export function Glass({ children, style, interactive = false, tint }: { children?: ReactNode; style?: StyleProp<ViewStyle>; interactive?: boolean; tint?: string }) {
   const c = useColors();
   const { reduceTransparency } = useAccessibility();
   if (reduceTransparency) return <View style={[{ backgroundColor: c.card }, style]}>{children}</View>;
-  if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView glassEffectStyle="regular" isInteractive={interactive} style={style}>{children}</GlassView>;
-  return <View style={[{ backgroundColor: c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)" }, style]}>{children}</View>;
+  if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView glassEffectStyle="regular" isInteractive={interactive} tintColor={tint} style={style}>{children}</GlassView>;
+  return <View style={[{ backgroundColor: tint ?? (c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)") }, style]}>{children}</View>;
 }
 
 /** Botón redondo de vidrio con un símbolo de iOS (volver, ubicación, avisos…). */
-export function RoundButton({ symbol, label, onPress, size = 46 }: { symbol: SFSymbol; label: string; onPress: () => void; size?: number }) {
+export function RoundButton({ symbol, label, onPress, size = 46, tint }: { symbol: SFSymbol; label: string; onPress: () => void; size?: number; tint?: string }) {
   const c = useColors();
   return (
     <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={{ width: size, height: size }}>
-      <Glass interactive style={[styles.round, { width: size, height: size, borderRadius: size / 2 }]}>
+      <Glass interactive tint={tint} style={[styles.round, { width: size, height: size, borderRadius: size / 2 }]}>
         <SymbolView name={symbol} tintColor={c.text} size={size * 0.42} />
       </Glass>
     </Tap>
