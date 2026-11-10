@@ -12,9 +12,11 @@ export function FeedStatus({ tint }: { tint?: string }) {
   const c = useColors();
   useTransitVersion(); useNow(5000);
   const st = connectionStatus(transit, nowMs());
-  const live = st.connection === "live" || st.connection === "waiting";
-  const title = live ? "En vivo" : "Sin datos en vivo";
-  const detail = live ? (st.ageSeconds != null ? `hace ${agoShort(st.ageSeconds)}` : "") : (st.ageSeconds != null ? `último dato hace ${agoShort(st.ageSeconds)}` : "");
+  // hay buses reportando = en vivo; solo si el último dato tiene más de 5 min se avisa del retraso, y «sin datos» solo si casi no hay buses
+  const hasBuses = transit.fleet.size >= 50, late = (st.ageSeconds ?? 0) > 300;
+  const live = hasBuses && !late;
+  const title = !hasBuses ? "Sin datos en vivo" : late ? "Datos con retraso" : "En vivo";
+  const detail = st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
   return (
     <Glass tint={tint} style={styles.glass}>
       <View accessible accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}`} style={styles.pill}>

@@ -25,7 +25,9 @@ export default function Inicio() {
   const c = useColors();
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
-  const live = st.connection === "live" || st.connection === "waiting";
+  // «en vivo» = hay buses reportando. TransMilenio publica con ~1–3 min de retraso, así que la edad del lote solo sirve para decir «hace X min», no para negar el servicio
+  const live = transit.fleet.size >= 50;
+  const ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
 
   const saved = useSaved();
   const askPlace = (slot: "home" | "work") => { usePlanner.getState().setSaveAs(slot); router.navigate("/viaje"); };
@@ -105,11 +107,11 @@ export default function Inicio() {
         <View style={{ paddingHorizontal: space[5] }}>
           <Card>
             <View style={styles.liveRow}>
-              <View style={[styles.liveDot, { backgroundColor: live ? "#22c55e" : "#f59e0b" }]} />
+              <View style={[styles.liveDot, { backgroundColor: live && (st.ageSeconds ?? 0) <= 300 ? "#22c55e" : "#f59e0b" }]} />
               <Text style={[type.headline, { color: c.text, flex: 1 }]}>{live ? `${transit.fleet.size.toLocaleString("es-CO")} buses en la calle` : "Sin datos en vivo por ahora"}</Text>
             </View>
             <Text style={[type.body, { color: c.muted, marginTop: space[2] }]}>
-              {live ? "Se actualizan solos. Abre el mapa para verlos moverse."
+              {live ? `Se actualizan solos${ageMin != null && ageMin >= 2 ? ` · último dato hace ${ageMin} min` : ""}. Abre el mapa para verlos moverse.`
                 : "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: puedes consultar horarios y planear viajes."}
             </Text>
           </Card>
