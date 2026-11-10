@@ -18,6 +18,8 @@ echo "Compilando la versión $(git -C "$ROOT" rev-parse --short HEAD) ($(git -C 
 [ "$(uname)" = "Darwin" ] || { echo "Esto solo corre en un Mac con Xcode."; exit 1; }
 : "${TEAM_ID:?falta TEAM_ID}"
 UPLOAD="${UPLOAD:-transporter}"; BUNDLE_ID="${BUNDLE_ID:-com.transmilive.app}"
+# con el widget (WIDGET=1) el identificador de cada parte ya viene del proyecto: forzar uno solo lo rompería
+BUNDLE_OVERRIDE=(); if [ "${WIDGET:-}" != "1" ]; then BUNDLE_OVERRIDE=(PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID"); fi
 if [ "$UPLOAD" = api ]; then
   : "${ASC_KEY_ID:?falta ASC_KEY_ID}" "${ASC_ISSUER:?falta ASC_ISSUER}" "${ASC_KEY:?falta ASC_KEY}"
   AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER"); DEST=upload
@@ -34,7 +36,7 @@ BUILD="$(date +%y%m%d%H%M)"; OUT="build/ios"; rm -rf "$OUT"; mkdir -p "$OUT"
 show_errors() { echo; echo "=== ERRORES ($1) ==="; grep -a "error:" "$OUT/$1.log" | sort -u | head -25; echo "Registro completo: $OUT/$1.log"; }
 if ! xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -destination 'generic/platform=iOS' \
   -archivePath "$OUT/App.xcarchive" "${AUTH[@]}" \
-  DEVELOPMENT_TEAM="$TEAM_ID" PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" CURRENT_PROJECT_VERSION="$BUILD" archive > "$OUT/archive.log" 2>&1; then
+  DEVELOPMENT_TEAM="$TEAM_ID" ${BUNDLE_OVERRIDE[@]+"${BUNDLE_OVERRIDE[@]}"} CURRENT_PROJECT_VERSION="$BUILD" archive > "$OUT/archive.log" 2>&1; then
   show_errors archive; exit 1
 fi
 echo "Compilación lista."

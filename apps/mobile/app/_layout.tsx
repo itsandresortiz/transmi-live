@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { startData } from "@/bootstrap";
 import { RideWatcher } from "@/RideWatcher";
+import { WidgetSync } from "@/widgetSync";
 import { Launch, useLaunch } from "@/ui/Launch";
 import { useColors } from "@/ui/theme";
 
@@ -35,6 +36,7 @@ export default function RootLayout() {
     <>
       <StatusBar style="auto" />
       <RideWatcher />
+      <WidgetSync />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="route/[id]" options={{ headerShown: true, title: "Ruta", headerBackTitle: "Atrás", headerTintColor: "#e11d2e", presentation: "card" }} />
