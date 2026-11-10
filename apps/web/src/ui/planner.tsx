@@ -189,9 +189,9 @@ function Suggestions({ field }: { field: Field }) {
       {!q && favs.length > 0 && <div className="sec">Tus paradas favoritas</div>}
       {!q && favs.map((r) => <Row key={r.name + r.position.lat} title={r.name} icon={<Pin />} onClick={() => pick(r)} />)}
       {local.length > 0 && <div className="sec">Estaciones y paradas</div>}
-      {local.map((r) => <Row key={r.name + r.position.lat} title={r.name} icon={<Directions />} onClick={() => pick(r)} />)}
+      {local.map((r) => <Row key={r.name + r.position.lat} title={r.name} sub={r.detail} icon={<Directions />} onClick={() => pick(r)} />)}
       {(remote.length > 0 || busy) && <div className="sec">Direcciones y lugares</div>}
-      {remote.map((r) => <Row key={r.name + r.position.lat} title={r.name.split(" · ")[0]!} sub={r.name.split(" · ").slice(1).join(" · ") || "Bogotá"} icon={<Pin />} onClick={() => pick(r)} />)}
+      {remote.map((r) => <Row key={r.name + r.position.lat} title={r.name.split(" · ")[0]!} sub={`Dirección o lugar · ${r.name.split(" · ").slice(1).join(" · ") || "Bogotá"}`} icon={<Pin />} onClick={() => pick(r)} />)}
       {busy && remote.length === 0 && <p className="hint" style={{ padding: "6px 4px" }}>Buscando lugares…</p>}
       {q.length >= 3 && !busy && !local.length && !remote.length && <p className="hint" style={{ padding: "10px 4px" }}>No encontramos «{q}». Prueba con el nombre de una estación, una calle con número («Cra 7 # 72») o un lugar conocido.</p>}
       <button className="btn" style={{ margin: "10px 0 4px" }} onClick={() => setEditing(null)}>Listo</button>

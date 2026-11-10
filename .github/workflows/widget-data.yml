@@ -1,0 +1,32 @@
+name: Llegadas para el widget
+# Publica en la rama widget-data los próximos buses de cada parada, para que el widget del teléfono se actualice aunque la app esté cerrada.
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # respaldo: GitHub retrasa o salta estos horarios
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: widget-data
+  cancel-in-progress: false
+jobs:
+  loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Calcular y publicar cada ~50 s durante ~5 min
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx tsx tools/widget-arrivals.ts
+      - name: Relanzar para seguir sin pausa
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run widget-data.yml --repo "$GITHUB_REPOSITORY" --ref main || true

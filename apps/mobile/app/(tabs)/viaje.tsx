@@ -91,8 +91,8 @@ export default function Viaje() {
         {editing ? (
           <View style={styles.pad}>
             {editing === "origin" ? <Row symbol="location.fill" title="Mi ubicación" sub="Usar donde estoy ahora" onPress={useMe} /> : null}
-            {local.map((r) => <Row key={`l${r.name}${r.position.lat}`} symbol="bus" title={r.name} onPress={() => choose(r)} />)}
-            {remote.map((r) => <Row key={`r${r.name}${r.position.lat}`} symbol="mappin.circle.fill" title={r.name.split(" · ")[0]!} sub={r.name.split(" · ").slice(1).join(" · ") || "Bogotá"} onPress={() => choose(r)} />)}
+            {local.map((r) => <Row key={`l${r.name}${r.position.lat}`} symbol={r.kind === "Portal" ? "building.2.fill" : r.kind === "Estación" ? "tram.fill" : "signpost.right.fill"} tint={r.kind === "Paradero" ? SYSTEM_COLOR.zonal : SYSTEM_COLOR.troncal} title={r.name} sub={r.detail} onPress={() => choose(r)} />)}
+            {remote.map((r) => <Row key={`r${r.name}${r.position.lat}`} symbol="mappin.circle.fill" title={r.name.split(" · ")[0]!} sub={`Dirección o lugar · ${r.name.split(" · ").slice(1).join(" · ") || "Bogotá"}`} onPress={() => choose(r)} />)}
             {busy ? <ActivityIndicator style={{ marginTop: space[3] }} /> : null}
             {text.trim().length >= 3 && !busy && !local.length && !remote.length ? <Text style={[type.body, { color: c.muted, padding: space[3] }]}>No encontramos «{text.trim()}». Prueba con una estación, una calle con número o un lugar conocido.</Text> : null}
           </View>
@@ -132,11 +132,11 @@ function FieldRow({ dot, label, value, placeholder, active, text, onFocus, onCha
   );
 }
 
-function Row({ symbol, title, sub, onPress }: { symbol: React.ComponentProps<typeof SymbolView>["name"]; title: string; sub?: string; onPress(): void }) {
+function Row({ symbol, title, sub, tint, onPress }: { symbol: React.ComponentProps<typeof SymbolView>["name"]; title: string; sub?: string; /** Color del círculo del icono (rojo: TransMilenio; azul: paradero). */ tint?: string; onPress(): void }) {
   const c = useColors();
   return (
     <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={sub ? `${title}, ${sub}` : title} style={styles.sugg}>
-      <View style={[styles.sico, { backgroundColor: c.cardAlt }]}><SymbolView name={symbol} tintColor={c.text} size={16} /></View>
+      <View style={[styles.sico, { backgroundColor: tint ?? c.cardAlt }]}><SymbolView name={symbol} tintColor={tint ? "#ffffff" : c.text} size={16} /></View>
       <View style={{ flex: 1 }}><Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{title}</Text>{sub ? <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{sub}</Text> : null}</View>
     </Tap>
   );

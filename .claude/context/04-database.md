@@ -14,9 +14,10 @@
 | Semáforos de Bogotá | `semaforos.json` `{v, at, rows:[[lon,lat,dirección,localidad,tipo]]}` | Secretaría de Movilidad (datos abiertos, CC BY 4.0) vía `tools/semaforos.ts` | despliegue de la web (`transmilive.com/semaforos.json`) | web y app |
 | Mapa base y calles | teselas vectoriales / JSON OSM | OpenFreeMap (app) · `apps/web/src/data/*.json` (web: estaciones, localidades, roads, streets, troncales) | — | MapLibre |
 | Buses de ejemplo (demostración) | 8 × `positions-N.pb` (lotes reales del 2026-11-09 por la noche, ~80 s entre ellos) | recogidos de la rama `live-data` | carpeta `demo/` en `main` | `apps/mobile/src/demo.ts` |
+| Llegadas por parada para el widget | 64 × `a/N.json` `{at, stops:{id:[{r,h,t,c}]}}` (N = `widgetShard(id)`) | workflow `Llegadas para el widget` (`tools/widget-arrivals.ts`, cada ~50 s) | rama `widget-data` | el widget de iOS (`Widget.swift`) |
 | Estadísticas de calidad | JSON de tiempos por tramo y comportamiento en semáforos | workflows `hop-stats` y `signal-stats` | ramas `hop-stats` y `signal-stats` | `tools/hopstats.ts`, `tools/signalstats.ts` |
 
-Las ramas de datos (`live-data`, `schedule-data`, `hop-stats`, `signal-stats`) son **huérfanas y se reescriben con `--force`**: tienen un solo commit. Con `git fetch` hay que usar `+rama:refs/remotes/origin/rama` o falla en silencio.
+Las ramas de datos (`live-data`, `widget-data`, `schedule-data`, `hop-stats`, `signal-stats`) son **huérfanas y se reescriben con `--force`**: tienen un solo commit. Con `git fetch` hay que usar `+rama:refs/remotes/origin/rama` o falla en silencio.
 
 ## Particularidades del GTFS que hay que recordar
 - Un solo recorrido por ruta y sentido en el GTFS publicado; `direction_id` suele venir vacío.

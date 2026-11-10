@@ -63,7 +63,21 @@ struct Provider: TimelineProvider {
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<StopEntry>) -> Void) {
-    let snap = loadSnapshot()
+    let local = loadSnapshot()
+    // con una parada favorita (y sin modo demostración) se piden las llegadas publicadas en internet: así el widget se actualiza aunque la app esté cerrada
+    guard let stop = local?.stops.first, local?.demo != true else { completion(makeTimeline(local)); return }
+    fetchRemote(stopId: stop.id) { remote in
+      var snap = local
+      // se usa lo publicado solo si es reciente (menos de 10 min) y más nuevo que lo que dejó la app
+      if let remote, Date().timeIntervalSince1970 - remote.at < 600, remote.at > (local?.at ?? 0) {
+        let fresh = StopData(id: stop.id, name: stop.name, arrivals: remote.stops[stop.id] ?? [], sched: stop.sched)
+        snap = Snapshot(at: remote.at, stops: [fresh] + Array((local?.stops ?? []).dropFirst()), demo: false)
+      }
+      completion(makeTimeline(snap))
+    }
+  }
+
+  private func makeTimeline(_ snap: Snapshot?) -> Timeline<StopEntry> {
     let now = Date()
     // una entrada por cada llegada próxima: al pasar un bus, el widget ya muestra los siguientes sin pedir más datos
     var dates: Set<Date> = [now]
@@ -72,8 +86,35 @@ struct Provider: TimelineProvider {
       if d > now { dates.insert(d) }
     }
     let entries = dates.sorted().prefix(12).map { StopEntry(date: $0, snapshot: snap) }
-    completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(10 * 60))))
+    // iOS decide cada cuánto deja refrescar; se le pide cada 5 min
+    return Timeline(entries: entries, policy: .after(now.addingTimeInterval(5 * 60)))
   }
+}
+
+// MARK: - Llegadas publicadas (rama widget-data del repositorio; las calcula el workflow «Llegadas para el widget»)
+
+private struct RemoteShard: Codable {
+  let at: Double
+  let stops: [String: [Arrival]]
+}
+
+/// En qué archivo está una parada. La misma cuenta está en `packages/application/src/widget-feed.ts` (`widgetShard`): si cambia allá, cambia aquí.
+private func widgetShard(_ id: String) -> Int {
+  var h = 0
+  for u in id.utf16 { h = (h * 31 + Int(u)) % 1_000_003 }
+  return h % 64
+}
+
+private func fetchRemote(stopId: String, done: @escaping (RemoteShard?) -> Void) {
+  let bucket = Int(Date().timeIntervalSince1970 / 120)
+  guard let url = URL(string: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/widget-data/a/\(widgetShard(stopId)).json?t=\(bucket)") else { done(nil); return }
+  var request = URLRequest(url: url)
+  request.timeoutInterval = 8
+  request.cachePolicy = .reloadIgnoringLocalCacheData
+  URLSession.shared.dataTask(with: request) { data, response, _ in
+    guard let data = data, (response as? HTTPURLResponse)?.statusCode == 200 else { done(nil); return }
+    done(try? JSONDecoder().decode(RemoteShard.self, from: data))
+  }.resume()
 }
 
 // MARK: - Vistas

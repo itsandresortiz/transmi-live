@@ -1,7 +1,7 @@
 import { type GeoPoint, type Route, type RouteShape, RoadPath, type SystemType, toWorld } from "@transmi/domain";
 import { hav } from "./eta";
 import type { TransitState } from "./transit-state";
-import { searchStopGroups, upcomingAtStop } from "./queries";
+import { searchStopGroups, upcomingAtStop, routesAtStop } from "./queries";
 
 /* ====================================================================================================
  *  Planificador de viajes.
@@ -16,7 +16,13 @@ import { searchStopGroups, upcomingAtStop } from "./queries";
  *  Para dar varias opciones distintas se repite la búsqueda prohibiendo la ruta que más se usa en la mejor opción.
  * ==================================================================================================== */
 
-export interface PlanPlace { name: string; position: GeoPoint }
+export interface PlanPlace {
+  name: string; position: GeoPoint;
+  /** Qué es, cuando sale de la red de transporte: así quien busca distingue una estación de un paradero con nombre parecido. */
+  kind?: "Estación" | "Portal" | "Paradero";
+  /** Una línea que lo describe («Estación de TransMilenio · 3 vagones», «Paradero del SITP · pasan 12, 291, T25»). */
+  detail?: string;
+}
 export interface StopRef { id: string; name: string; position: GeoPoint }
 
 export interface WalkLeg { kind: "walk"; from: GeoPoint; to: GeoPoint; fromName: string; toName: string; meters: number; seconds: number; line: GeoPoint[] }
@@ -469,10 +475,25 @@ export function searchPlanPlaces(state: TransitState, text: string, limit = 6): 
   if (q.length < 2) return [];
   return searchStopGroupsLite(state, q, limit);
 }
+/** «PORTAL 20 DE JULIO» → «Portal 20 de Julio»: algunos nombres vienen en mayúsculas sostenidas. */
+function tidyName(name: string): string {
+  if (name !== name.toUpperCase() || !/[A-ZÁÉÍÓÚÑ]{4}/.test(name)) return name;
+  const small = new Set(["de", "del", "la", "las", "el", "los", "y", "con"]);
+  return name.toLowerCase().split(" ").map((w, i) => (i > 0 && small.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
+}
 function searchStopGroupsLite(state: TransitState, q: string, limit: number): PlanPlace[] {
   return searchStopGroups(state, q, limit).map((g) => {
-    const kind = g.stops.some((s) => state.labelOf(s).platform) ? "Portal" : g.stops.some((s) => state.labelOf(s).wagon) ? "Estación" : "Parada";
-    return { name: kind === "Parada" ? g.title : `${kind} ${g.title}`.replace(/^(Portal|Estación) (Portal|Estación)\b/i, "$2"), position: g.position };
+    const portal = g.stops.some((s) => state.labelOf(s).platform), station = !portal && g.stops.some((s) => state.labelOf(s).wagon);
+    const title = tidyName(g.title);
+    if (portal) return { name: /^(portal|terminal)\b/i.test(title) ? title : `Portal ${title}`, position: g.position, kind: "Portal" as const, detail: "Portal de TransMilenio" };
+    if (station) {
+      const wagons = new Set(g.stops.map((s) => state.labelOf(s).wagon).filter(Boolean)).size;
+      return { name: /^estaci[oó]n\b/i.test(title) ? title : `Estación ${title}`, position: g.position, kind: "Estación" as const, detail: `Estación de TransMilenio${wagons > 1 ? ` · ${wagons} vagones` : ""}` };
+    }
+    // paradero de la calle: las rutas que pasan ayudan a reconocerlo
+    const names = [...new Set(g.stops.flatMap((s) => routesAtStop(state, s.id).map((r) => r.shortName)))];
+    // un paradero de la calle frente a una estación suele llamarse igual que ella: se rotula para no confundirlos
+    return { name: /^(estaci[oó]n|portal)\b/i.test(title) ? `Paradero ${title}` : title, position: g.position, kind: "Paradero" as const, detail: names.length ? `Paradero · pasan ${names.slice(0, 4).join(", ")}${names.length > 4 ? "…" : ""}` : "Paradero" };
   });
 }
 
