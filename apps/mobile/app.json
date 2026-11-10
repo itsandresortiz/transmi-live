@@ -34,7 +34,8 @@
         {
           "locationWhenInUsePermission": "TransMi LIVE usa tu ubicación para mostrarte las paradas cercanas y cómo llegar. No se guarda ni se comparte."
         }
-      ]
+      ],
+      "./plugins/sin-push"
     ],
     "experiments": {
       "typedRoutes": true

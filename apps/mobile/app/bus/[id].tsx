@@ -43,6 +43,9 @@ export default function BusSheet() {
         <Text style={[type.title, { color: c.text }]}>{ns?.stop ? stopText(ns.stop) : "—"}</Text>
         {ns?.arrivalAt ? <Text style={[type.body, { color: c.muted }]}>{untilText(ns.arrivalAt, now)}</Text> : null}
       </Card>
+      <Tap onPress={() => router.replace({ pathname: "/ride/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel="Voy en este bus: ver sus próximas paradas y tiempos" style={[styles.btn, { backgroundColor: c.accent }]}>
+        <Text style={[type.headline, { color: c.onAccent }]}>Voy en este bus</Text>
+      </Tap>
       {r ? (
         <Tap onPress={() => router.replace({ pathname: "/route/[id]", params: { id: r.id } })} accessibilityRole="button" accessibilityLabel="Ver la ruta" style={[styles.btn, { backgroundColor: c.ink }]}>
           <Text style={[type.headline, { color: c.onInk }]}>Ver la ruta</Text>

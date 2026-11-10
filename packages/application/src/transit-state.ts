@@ -106,6 +106,8 @@ export class TransitState {
   sequenceOf(v: Vehicle): { shape: RouteShape; index: number } | undefined {
     return this.sequenceByStop(v);
   }
+  /** Dónde va el bus para mostrárselo al usuario: por su última parada y, si esa no sirve, por su posición sobre el recorrido. */
+  sequenceForDisplay(v: Vehicle): { shape: RouteShape; index: number } | undefined { return this.sequenceOf(v) ?? this.sequenceByPosition(v); }
   /** Si la última parada informada no sirve (no está en el trazado de su ruta), se ubica al bus por dónde va: el recorrido más cercano a él y la última parada que ya pasó. */
   private sequenceByPosition(v: Vehicle): { shape: RouteShape; index: number } | undefined {
     const tripRoute = v.tripId?.split(".").pop();
@@ -146,7 +148,7 @@ export class TransitState {
   }
   /** La parada que sigue (la última que informa TransMilenio ya la pasó) y la hora estimada de llegada, en segundos desde 1970. */
   nextStopOf(v: Vehicle, nowMs = Date.now(), byPosition = true): { stopId: string; stop?: Stop; arrivalAt?: number } | undefined {
-    const seq = this.sequenceOf(v) ?? (byPosition ? this.sequenceByPosition(v) : undefined);   // por posición solo para mostrar; el movimiento de los buses pide solo la parada informada
+    const seq = byPosition ? this.sequenceForDisplay(v) : this.sequenceOf(v);   // por posición solo para mostrar; el movimiento de los buses pide solo la parada informada
     const stopId = seq?.shape.stopIds[seq.index + 1];
     if (!seq || !stopId) return undefined;
     return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape, seq.index, seq.index + 1, nowMs) };

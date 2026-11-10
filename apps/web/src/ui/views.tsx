@@ -299,9 +299,10 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
   const bus = routeBusId ? transit.fleet.get(routeBusId) : undefined;
   const shapes = transit.network.shapes.get(id) ?? [];
   // si se abrió desde un bus, se muestra el sentido en el que va ese bus
-  const busShape = bus?.lastStopId ? shapes.find((sh) => sh.stopIds.includes(bus.lastStopId!)) : undefined;
+  const busSeq = bus ? transit.sequenceForDisplay(bus) : undefined;      // por su última parada y, si no sirve, por dónde va sobre el recorrido
+  const busShape = busSeq?.shape;
   const cur = busShape ?? shapes.find((s) => s.direction === direction) ?? shapes[0];
-  const k = bus && cur ? cur.stopIds.indexOf(bus.lastStopId ?? "") : -1;      // última parada a la que llegó; la que sigue es k + 1
+  const k = busSeq && cur === busSeq.shape ? busSeq.index : -1;      // última parada a la que llegó; la que sigue es k + 1
   useEffect(() => {
     const el = nextRef.current, box = el?.closest(".view") as HTMLElement | null;
     if (!el || !box) return;

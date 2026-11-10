@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { startData } from "@/bootstrap";
+import { RideWatcher } from "@/RideWatcher";
 
 const close = () => <Text onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Cerrar" style={{ color: "#e11d2e", fontSize: 17, fontWeight: "600" }}>Cerrar</Text>;
 
@@ -15,10 +16,12 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="auto" />
+      <RideWatcher />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="route/[id]" options={{ headerShown: true, title: "Ruta", headerBackTitle: "Atrás", headerTintColor: "#e11d2e", presentation: "card" }} />
         <Stack.Screen name="bus/[id]" options={{ presentation: "formSheet", sheetAllowedDetents: "fitToContents", sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: "last", sheetCornerRadius: 28, headerShown: false }} />
+        <Stack.Screen name="ride/[id]" options={{ presentation: "formSheet", sheetAllowedDetents: [0.5, 0.92], sheetInitialDetentIndex: 1, sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 0, sheetCornerRadius: 28, headerShown: false }} />
         <Stack.Screen name="stop/[id]" options={{ presentation: "formSheet", sheetAllowedDetents: [0.5, 0.92], sheetInitialDetentIndex: 0, sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 0, sheetCornerRadius: 28, headerShown: false }} />
         <Stack.Screen name="avisos" options={{ presentation: "modal", headerShown: true, title: "Avisos del servicio", headerTintColor: "#e11d2e", headerRight: close }} />
         <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
