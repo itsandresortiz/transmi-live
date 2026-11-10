@@ -20,12 +20,12 @@ export default function BusSheet() {
   useTransitVersion();
   const now = useNow() / 1000;
   const v = transit.fleet.get(id);
-  if (!v) return <View style={[styles.screen, { flex: 1, backgroundColor: c.bg, paddingTop: space[2], paddingBottom: insets.bottom + space[6] }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>Este bus dejó de reportar</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
+  if (!v) return <View style={[styles.screen, { flex: 1, backgroundColor: c.bg, paddingTop: space[4], paddingBottom: insets.bottom + space[6] }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>Este bus dejó de reportar</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
   const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
   const tone = delayClass(d) === "bad" ? "#dc2626" : delayClass(d) === "warn" ? "#d97706" : delayClass(d) === "ok" ? "#16a34a" : c.muted;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[2], paddingBottom: insets.bottom + space[10] }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] }]} showsVerticalScrollIndicator={false}>
       <View style={styles.head}>
         {r ? <RouteBadge route={r} /> : null}
         <View style={{ flex: 1 }}>

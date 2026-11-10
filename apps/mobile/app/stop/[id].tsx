@@ -39,6 +39,7 @@ export default function StopSheet() {
   const down = liveDown(transit.fleet.size);
   const label = transit.labelOf(stop), tag = stopTag(stop);
   const here = routesAtStop(transit, id);
+  const hereCount = new Set(here.map((r) => r.shortName)).size;
   const alerts = alertsFor(transit, new Set(here.map((r) => r.id)), new Set([id])).slice(0, 2);
 
   const showOnMap = (focus: { routeId?: string | null; busIds?: string[]; followBusId?: string | null }) => {
@@ -53,7 +54,7 @@ export default function StopSheet() {
   const row = sel ? rows.find((r) => r.route.id === sel.routeId && (!sel.direction || r.direction === sel.direction)) : undefined;
   if (sel) return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[2], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <RouteAtStop stopId={id} sel={sel} row={row} now={now} onBack={() => setSel(null)} onMap={(buses, follow) => showOnMap({ routeId: sel.routeId, busIds: buses, followBusId: follow })} />
       </ScrollView>
     </View>
@@ -61,12 +62,12 @@ export default function StopSheet() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[2], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
         <Text style={[type.largeTitle, { color: c.text }]}>{nick || label.title}</Text>
         {nick ? <Text style={[type.caption, { color: c.muted }]}>{label.title}</Text> : null}
         <Text style={[type.body, { color: c.muted }]}>
-          {tag ? `${tag} · ` : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : down ? "Sin datos en vivo por ahora" : "Sin buses acercándose"}
+          {tag ? `${tag} · ` : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta con bus en camino" : "rutas con bus en camino"}${hereCount > rows.length ? ` · ${hereCount} paran aquí` : ""}` : down ? "Sin datos en vivo por ahora" : "Sin buses acercándose"}
         </Text>
 
         <View style={styles.actions}>
@@ -75,7 +76,16 @@ export default function StopSheet() {
           <RoundButton symbol="square.and.arrow.up" label="Compartir" onPress={share} />
           <RoundButton symbol={fav ? "star.fill" : "star"} label={fav ? "Quitar de favoritos" : "Guardar en favoritos"} onPress={() => toggle(id)} />
         </View>
-        {fav ? <Tap onPress={() => Alert.prompt("Ponerle nombre", "Por ejemplo: «La del colegio»", (t) => setNick(id, t ?? ""), "plain-text", nick ?? "")} accessibilityRole="button" accessibilityLabel={nick ? "Cambiar el nombre de esta parada" : "Ponerle nombre a esta parada"}><Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>{nick ? "Cambiar nombre" : "Ponerle nombre"}</Text></Tap> : null}
+        <Tap onPress={() => router.push({ pathname: "/personalizar/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={nick ? `Personalizar parada. Nombre actual: ${nick}` : "Personalizar parada"}>
+          <Card style={styles.custom}>
+            <View style={[styles.customIcon, { backgroundColor: c.dark ? "#2a1114" : "#fde8ea" }]}><SymbolView name="pencil" tintColor={c.accent} size={16} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.headline, { color: c.text }]}>{nick ? "Personalizar parada" : "Personalizar parada"}</Text>
+              <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{nick ? `Se muestra como «${nick}»` : "Ponle un nombre, como «La del colegio»"}</Text>
+            </View>
+            <SymbolView name="chevron.right" tintColor={c.muted} size={12} />
+          </Card>
+        </Tap>
 
         {siblings.length > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2], paddingVertical: space[1] }}>
@@ -100,6 +110,7 @@ export default function StopSheet() {
           <>
             <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>TOCA UNA RUTA PARA VER DE DÓNDE VIENE</Text>
             {rows.map((r) => <ArrivalRow key={r.route.id + r.direction} r={r} now={now} onPress={() => setSel({ routeId: r.route.id, direction: r.direction })} />)}
+            <OtherRoutes stopId={id} skipKeys={rows.map((r) => `${r.route.id}|${r.direction}`).join(",")} />
           </>
         ) : <NoBuses stopId={id} here={here} down={down} now={now} />}
 
@@ -242,6 +253,57 @@ function RouteEmpty({ route }: { route?: Route }) {
   return <Card><Text style={[type.headline, { color: c.text }]}>{title}</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{text}</Text></Card>;
 }
 
+/** Las demás rutas que paran aquí aunque ahora no tengan un bus acercándose: así siempre se sabe cuáles pasan, y cuándo según el horario. */
+function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string }) {
+  const c = useColors();
+  const skip = useMemo(() => new Set(skipKeys.split(",")), [skipKeys]);
+  const items = useMemo(() => {
+    const day = transit.serviceEnds.dayAt(nowSec() * 1000);
+    const sched = new Map<string, number>();
+    if (transit.departures.size) for (const p of transit.departures.nextAt(stopId, day.type, day.secs, 1)) if (p.times[0] != null) sched.set(`${p.routeId}|${p.direction}`, p.times[0]);
+    const seen = new Set<string>(), out: { route: Route; headsign: string; key: string; state?: string; next?: number; lastStart?: number; firstStart?: number }[] = [];
+    for (const [routeId, shapes] of transit.network.shapes) {
+      const route = transit.routeById(routeId);
+      if (!route) continue;
+      for (const sh of shapes) {
+        const key = `${routeId}|${sh.direction}`;
+        if (!sh.stopIds.includes(stopId) || skip.has(key)) continue;
+        const dup = `${route.shortName}|${sh.headsign}`;
+        if (seen.has(dup)) continue;
+        seen.add(dup);
+        const st = transit.routeStatus(routeId, nowMs());
+        out.push({ route, headsign: sh.headsign, key, state: st?.state, next: sched.get(key), lastStart: st?.state === "ended" ? st.lastStart : undefined, firstStart: st?.state === "before" ? st.firstStart : undefined });
+      }
+    }
+    const rank = (x: { state?: string }) => (x.state === "ended" || x.state === "before" ? 1 : 0);
+    return out.sort((a, b) => rank(a) - rank(b) || a.route.shortName.localeCompare(b.route.shortName, "es", { numeric: true })).slice(0, 40);
+  }, [stopId, skip, transit.version]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!items.length) return null;
+  return (
+    <>
+      <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>TAMBIÉN PARAN AQUÍ</Text>
+      {items.map((x) => {
+        const off = x.state === "ended" || x.state === "before";
+        const sub = x.state === "ended" ? `Ya no hay más buses hoy${x.lastStart != null ? ` · el último salió a las ${clockOfDay(x.lastStart)}` : ""}`
+          : x.state === "before" ? `Aún no empieza${x.firstStart != null ? ` · primer bus a las ${clockOfDay(x.firstStart)}` : ""}`
+          : x.next != null ? `Sin bus acercándose · según el horario, ${clockOfDay(x.next)}` : "Sin bus acercándose ahora";
+        return (
+          <Tap key={x.key} onPress={() => router.push({ pathname: "/route/[id]", params: { id: x.route.id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${x.route.shortName}${x.headsign ? ` hacia ${x.headsign}` : ""}. ${sub}`} style={{ opacity: off ? 0.55 : 1 }}>
+            <Card style={styles.row}>
+              <RouteBadge route={x.route} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{x.headsign ? `Hacia ${x.headsign}` : routeTitle(x.route)}</Text>
+                <Text style={[type.caption, { color: c.muted }]} numberOfLines={2}>{sub}</Text>
+              </View>
+              <SymbolView name="chevron.right" tintColor={c.muted} size={13} />
+            </Card>
+          </Tap>
+        );
+      })}
+    </>
+  );
+}
+
 /** Parada sin buses acercándose: se explica, se muestra el horario programado y las rutas que pasan (las que no están en servicio, atenuadas). */
 function NoBuses({ stopId, here, down, now }: { stopId: string; here: Route[]; down: boolean; now: number }) {
   const c = useColors();
@@ -298,6 +360,8 @@ function NoBuses({ stopId, here, down, now }: { stopId: string; here: Route[]; d
 const styles = StyleSheet.create({
   screen: { padding: space[5], gap: space[3] },
   actions: { flexDirection: "row", gap: space[3], marginVertical: space[2] },
+  custom: { flexDirection: "row", alignItems: "center", gap: space[3], padding: space[3] },
+  customIcon: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: space[3] },
   pill: { alignSelf: "flex-start", borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: space[2], minHeight: 20, justifyContent: "center" },
   back: { flexDirection: "row", alignItems: "center", gap: space[1], alignSelf: "flex-start" },
