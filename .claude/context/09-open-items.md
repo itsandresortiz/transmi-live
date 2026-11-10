@@ -22,7 +22,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - Nombres de estaciones/portales con color de línea en el mapa de la app: si **no aparecen los nombres**, el mapa base no tiene «Noto Sans Bold»: volver a «Noto Sans Regular» en `TransitMap.tsx`.
 
 - Buses más fluidos (hasta 15 veces/s de cerca): revisar que el teléfono no se caliente; si vuelve el aviso de CPU, subir los valores de `cadenceMs`.
-- Mapa oscuro y capa de tráfico en la app: revisar lectura de controles y textos sobre el mapa oscuro.
+- Mapa oscuro y capa de tráfico en la app: revisar lectura de controles y textos sobre el mapa oscuro. Tráfico animado: revisar que no se cierre la app al encenderlo ni caliente el teléfono.
 
 - **Actividad en vivo del viaje** (pantalla de bloqueo / isla dinámica): código nativo nuevo sin compilar. Si la compilación falla, mandar el bloque de errores; el módulo `modules/tripactivity` se compila siempre (también sin `WIDGET=1`).
 

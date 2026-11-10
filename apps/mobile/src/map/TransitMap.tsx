@@ -1,4 +1,4 @@
-import { type ComponentProps, forwardRef, memo, useCallback, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
+import { type ComponentProps, forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import { Camera, GeoJSONSource, Images, Layer, Map, UserLocation, type CameraRef } from "@maplibre/maplibre-react-native";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
@@ -8,7 +8,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { CORRIDORS, PORTALS, buildStationGeometry, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { CORRIDORS, PORTALS, buildStationGeometry, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { BUS_SPRITES } from "./sprites";
@@ -169,10 +169,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       <GeoJSONSource id="network" data={networkJson}>
         <Layer id="network-line" type="line" {...sp({ lineColor: lineColor(c.dark ? "#ff5a5e" : "#e30613") as never, lineOpacity: showTraffic ? 0.25 : 0.7, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 3, 17, 6], lineCap: "round", lineJoin: "round" })} />
       </GeoJSONSource>
-      <GeoJSONSource id="trafico" data={trafficJson}>
-        <Layer id="trafico-casing" type="line" minzoom={11.5} {...sp({ visibility: showTraffic ? "visible" : "none", lineColor: c.dark ? "#0b0b0d" : "#ffffff", lineOpacity: 0.55, lineWidth: ["interpolate", ["linear"], ["zoom"], 11.5, 3, 16, 7.5, 18.5, 12], lineCap: "round", lineJoin: "round" })} />
-        <Layer id="trafico-lines" type="line" minzoom={11.5} {...sp({ visibility: showTraffic ? "visible" : "none", lineColor: ["match", ["get", "b"], 0, "#e5484d", 1, "#f08a24", 2, "#f5c518", "#2fbf71"], lineOpacity: 0.92, lineWidth: ["interpolate", ["linear"], ["zoom"], 11.5, 1.8, 16, 5, 18.5, 8.5], lineCap: "round", lineJoin: "round" })} />
-      </GeoJSONSource>
+      <TrafficLayer json={trafficJson} show={showTraffic} moving={showTraffic && active && !calm && (view?.zoom ?? 0) >= 12.5} dark={c.dark} />
       <GeoJSONSource id="stations" data={stationsJson}>
         {/* cada estación es una ficha del color de su línea con su letra; los portales, más grandes y visibles desde más lejos */}
         <Layer id="portal-dot" type="circle" minzoom={10.5} maxzoom={14.5} filter={isPortal as never} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 10.5, 6, 14.5, 11], circleColor: lineColor("#e11d2e") as never, circleStrokeColor: nameHalo, circleStrokeWidth: 2 })} />
@@ -265,6 +262,35 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, active, calm, h
       <Layer id="bus-dot" type="circle" maxzoom={11.8} {...st.dot} />
       <Layer id="bus-sprite" type="symbol" minzoom={11.8} {...st.sprite} />
       <Layer id="bus-label" type="symbol" minzoom={15} {...st.label} />
+    </GeoJSONSource>
+  );
+});
+
+/** El tráfico: cada tramo con el color de su velocidad y, encima, rayitas blancas que avanzan en el sentido de la marcha (rápidas donde fluye, casi quietas en el trancón).
+ *  Va aparte para que la animación (unas 10 veces por segundo) solo repinte estas capas. Las capas están siempre montadas: solo cambian `visibility` y el patrón de las rayas. */
+const BANDS = [0, 1, 2, 3] as const;
+const TrafficLayer = memo(function TrafficLayer({ json, show, moving, dark }: { json: string; show: boolean; moving: boolean; dark: boolean }) {
+  const { reduceMotion } = useAccessibility();
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    if (!moving || reduceMotion) return;
+    const id = setInterval(() => setT(Date.now()), 100);
+    return () => clearInterval(id);
+  }, [moving, reduceMotion]);
+  const vis = show ? "visible" : "none";
+  const base = useMemo(() => ({
+    casing: sp({ visibility: vis, lineColor: dark ? "#0b0b0d" : "#ffffff", lineOpacity: 0.55, lineWidth: ["interpolate", ["linear"], ["zoom"], 11.5, 3, 16, 7.5, 18.5, 12], lineCap: "round", lineJoin: "round" }),
+    lines: sp({ visibility: vis, lineColor: ["match", ["get", "b"], 0, "#e5484d", 1, "#f08a24", 2, "#f5c518", "#2fbf71"], lineOpacity: 0.92, lineWidth: ["interpolate", ["linear"], ["zoom"], 11.5, 1.8, 16, 5, 18.5, 8.5], lineCap: "round", lineJoin: "round" }),
+    filters: BANDS.map((b) => ["==", ["get", "b"], b] as never),
+  }), [vis, dark]);
+  return (
+    <GeoJSONSource id="trafico" data={json}>
+      <Layer id="trafico-casing" type="line" minzoom={11.5} {...base.casing} />
+      <Layer id="trafico-lines" type="line" minzoom={11.5} {...base.lines} />
+      {BANDS.map((b) => (
+        <Layer key={b} id={`trafico-flow-${b}`} type="line" minzoom={12.5} filter={base.filters[b]}
+          {...sp({ visibility: vis, lineColor: "#ffffff", lineOpacity: b === 0 ? 0.65 : 0.88, lineWidth: ["interpolate", ["linear"], ["zoom"], 12.5, 0.9, 16, 2.6, 18.5, 4.6], lineDasharray: flowDashAt(b, t), lineCap: "butt", lineJoin: "round" })} />
+      ))}
     </GeoJSONSource>
   );
 });

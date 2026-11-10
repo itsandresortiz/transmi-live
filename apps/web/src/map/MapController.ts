@@ -1,7 +1,7 @@
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
-import { trafficBand } from "@transmi/application";
+import { flowDash, trafficBand } from "@transmi/application";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
@@ -407,10 +407,7 @@ export class MapController {
   private static readonly DASH = 1.5; private static readonly GAP = 4.5;
   /** Arreglo de rayas del patrón «raya + hueco» visto desde la fase `phase` (en anchos de línea): al bajar la fase las rayas avanzan por la línea. */
   static dashAt(phase: number): number[] {
-    const d = MapController.DASH, g = MapController.GAP, P = d + g;
-    const ph = ((phase % P) + P) % P;
-    const r = (x: number) => Math.round(x * 100) / 100;
-    return ph < d ? [r(d - ph), g, r(ph), 0] : [0, r(g - (ph - d)), d, r(ph - d)];
+    return flowDash(phase);      // la cuenta vive en @transmi/application (la comparte la app)
   }
   private setFlow(on: boolean) {
     if (on === (this.flowRaf !== 0)) return;

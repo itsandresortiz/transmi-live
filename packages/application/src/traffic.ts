@@ -59,3 +59,21 @@ export function trafficSegments(state: TransitState, nowSec: number): TrafficSeg
   }
   return out;
 }
+
+/* ---------- rayitas que avanzan sobre el tráfico ---------- */
+
+/** Sobre cada tramo de tráfico se dibujan rayitas blancas que avanzan en el sentido de la marcha: rápidas donde fluye, casi quietas en el trancón.
+ *  Por banda (0 detenido … 3 fluido): cuántas veces por segundo recorre la raya su ciclo. Lo usan la web y la app. */
+export const TRAFFIC_FLOW: readonly { cycles: number; fps: number }[] = [{ cycles: 0.12, fps: 5 }, { cycles: 0.4, fps: 8 }, { cycles: 0.8, fps: 12 }, { cycles: 1.3, fps: 15 }];
+const FLOW_DASH = 1.5, FLOW_GAP = 4.5;
+/** Patrón «raya + hueco» visto desde la fase `phase` (en anchos de línea): al bajar la fase, las rayas avanzan por la línea. */
+export function flowDash(phase: number): number[] {
+  const d = FLOW_DASH, g = FLOW_GAP, P = d + g, ph = ((phase % P) + P) % P;
+  const r = (x: number) => Math.round(x * 100) / 100;
+  return ph < d ? [r(d - ph), g, r(ph), 0] : [0, r(g - (ph - d)), d, r(ph - d)];
+}
+/** El patrón de la banda `band` en el instante `tMs`. */
+export function flowDashAt(band: number, tMs: number): number[] {
+  const P = FLOW_DASH + FLOW_GAP;
+  return flowDash(P - (((tMs / 1000) * TRAFFIC_FLOW[band]!.cycles) % 1) * P);
+}
