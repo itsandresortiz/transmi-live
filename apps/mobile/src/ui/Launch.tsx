@@ -16,28 +16,33 @@ export const useLaunch = create<{ done: boolean }>(() => ({ done: false }));
 const MIN_MS = 1500;       // no parpadea si todo carga muy rápido
 const MAX_MS = 7000;       // si no hay datos en vivo, igual se entra a la app
 const BUSES = [
-  { sprite: "troncal-l-R", lane: 3, dur: 5200, offset: 0.1 },
-  { sprite: "dual-l-R", lane: 3, dur: 6400, offset: 0.62 },
-  { sprite: "troncal-l-L", lane: 0, dur: 5800, offset: 0.35 },
-  { sprite: "alimentador-s-L", lane: 1, dur: 4300, offset: 0.8 },
-  { sprite: "zonal-s-R", lane: 2, dur: 4800, offset: 0.45 },
-  { sprite: "troncal-s-R", lane: 2, dur: 7000, offset: 0.9 },
+  { sprite: "top-troncal-l", dir: "R", lane: 3, dur: 5200, offset: 0.1 },
+  { sprite: "top-dual-l", dir: "R", lane: 3, dur: 6400, offset: 0.62 },
+  { sprite: "top-troncal-l", dir: "L", lane: 0, dur: 5800, offset: 0.35 },
+  { sprite: "top-alimentador-s", dir: "L", lane: 1, dur: 4300, offset: 0.8 },
+  { sprite: "top-zonal-s", dir: "R", lane: 2, dur: 4800, offset: 0.45 },
+  { sprite: "top-troncal-s", dir: "R", lane: 2, dur: 7000, offset: 0.9 },
 ] as const;
-const LANE_H = 50, LANES = 4, BUS_W = 104, EDGE = 9;
+const LANE_H = 50, LANES = 4, EDGE = 9;
 
-/** Un bus que cruza la pantalla una y otra vez. El desfase inicial reparte los buses para que no salgan todos juntos. */
-function RoadBus({ sprite, lane, dur, offset, width, still }: { sprite: string; lane: number; dur: number; offset: number; width: number; still: boolean }) {
+/** Un bus visto desde arriba que cruza la avenida una y otra vez. El desfase inicial reparte los buses para que no salgan todos juntos. */
+function RoadBus({ sprite, dir, lane, dur, offset, width, still }: { sprite: string; dir: "R" | "L"; lane: number; dur: number; offset: number; width: number; still: boolean }) {
   const p = useSharedValue(offset);
+  const long = sprite.endsWith("-l"), len = long ? 100 : 64, wid = len * (114 / (long ? 318 : 204));
   useEffect(() => {
     if (still) return;
     p.value = withRepeat(withTiming(offset + 1, { duration: dur, easing: Easing.linear }), -1, false);   // al terminar vuelve a «offset», que es lo mismo que offset + 1: sin saltos
   }, [still, dur, offset, p]);
-  const toRight = sprite.endsWith("-R");
+  const toRight = dir === "R";
   const style = useAnimatedStyle(() => {
-    const t = p.value % 1, span = width + BUS_W * 2;
-    return { transform: [{ translateX: toRight ? -BUS_W + t * span : width + BUS_W - t * span }] };
+    const t = p.value % 1, span = width + len * 2;
+    return { transform: [{ translateX: toRight ? -len + t * span : width + len - t * span }] };
   });
-  return <Animated.View style={[styles.bus, { top: lane * LANE_H + 4 }, style]}><Image source={BUS_SPRITES[sprite]} style={{ width: BUS_W, height: 44 }} resizeMode="contain" /></Animated.View>;
+  return (
+    <Animated.View style={[styles.bus, { top: lane * LANE_H + (LANE_H - wid) / 2, width: len, height: wid, alignItems: "center", justifyContent: "center" }, style]}>
+      <Image source={BUS_SPRITES[sprite]} style={{ position: "absolute", width: wid, height: len, transform: [{ rotate: toRight ? "90deg" : "-90deg" }] }} resizeMode="contain" />
+    </Animated.View>
+  );
 }
 
 /** Rayas de la calle que corren, para que el piso también se sienta en movimiento. */
@@ -138,7 +143,7 @@ export function Launch() {
         <View style={[styles.road, { width, height: LANE_H * LANES }]}>
           {[1, 3].map((i) => <View key={i} style={[styles.laneLine, { top: i * LANE_H, backgroundColor: c.line }]} />)}
           <Dashes width={width} y={LANE_H * 2 - 1} still={reduceMotion} />
-          {BUSES.map((b) => <RoadBus key={b.sprite + b.lane} {...b} width={width} still={reduceMotion} />)}
+          {BUSES.map((b) => <RoadBus key={b.sprite + b.lane + b.dir} {...b} width={width} still={reduceMotion} />)}
           {strips.map((o, i) => <View key={"l" + i} pointerEvents="none" style={[styles.strip, { left: i * 7, opacity: o, backgroundColor: c.bg }]} />)}
           {strips.map((o, i) => <View key={"r" + i} pointerEvents="none" style={[styles.strip, { right: i * 7, opacity: o, backgroundColor: c.bg }]} />)}
         </View>

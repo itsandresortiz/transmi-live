@@ -36,8 +36,7 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
         // a lo lejos se deja una muestra estable de buses (siempre los mismos), no una al azar
         if (++seen > cap && hash(v.id) % 3 !== 0) continue;
         const h = (((motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;
-        const left = h >= 180;       // como en la web: el bus se voltea para no quedar de cabeza
-        features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `${v.system}-${v.system === "troncal" ? "l" : "s"}-${left ? "L" : "R"}`, rot: left ? h - 270 : h - 90, route: labels ? transit.routeOf(v)?.shortName ?? "" : "" } });
+        features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `top-${v.system}-${v.system === "troncal" ? "l" : "s"}`, rot: h, route: labels ? transit.routeOf(v)?.shortName ?? "" : "" } });
         if (features.length >= cap * 1.4) break;
       }
       setData({ type: "FeatureCollection", features });

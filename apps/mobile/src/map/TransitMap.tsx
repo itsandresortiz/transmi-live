@@ -208,7 +208,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <Layer id="bus-hit" type="circle" {...sp({ circleRadius: 20, circleColor: "#000000", circleOpacity: 0.01 })} />
         <Layer id="bus-dot" type="circle" maxzoom={11.8} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 9, 2.6, 11.8, 4], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 1 })} />
         <Layer id="bus-sprite" type="symbol" minzoom={11.8} {...sp({
-          iconImage: ["get", "sprite"], iconSize: ["interpolate", ["linear"], ["zoom"], 11.8, 0.3, 14, 0.5, 16, 0.78, 18, 1.15],
+          iconImage: ["get", "sprite"], iconSize: ["interpolate", ["linear"], ["zoom"], 11.8, 0.115, 14, 0.19, 16, 0.3, 18, 0.45],
           iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconPitchAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true,
         })} />
         <Layer id="bus-label" type="symbol" minzoom={15} {...sp({
