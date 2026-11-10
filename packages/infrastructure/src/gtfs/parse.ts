@@ -1,3 +1,4 @@
+import { applyStopPatches } from "./patches";
 import JSZip from "jszip";
 import { type GeoPoint, TransitNetwork, classifyRoute } from "@transmi/domain";
 import { csvRows } from "./csv";
@@ -89,6 +90,7 @@ export async function parseGtfsLite(data: ArrayBuffer | Uint8Array): Promise<Net
 
 /** Convierte lo leído en la entidad de dominio. */
 export function buildNetwork(dto: NetworkDto): TransitNetwork {
+  applyStopPatches(dto);
   const net = new TransitNetwork();
   for (const r of dto.routes) {
     net.routes.set(r.id, {
