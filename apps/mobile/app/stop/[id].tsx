@@ -37,7 +37,7 @@ export default function StopSheet() {
   if (!stop) return <View style={[styles.screen, { backgroundColor: c.bg }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>No encontramos esa parada</Text></View>;
 
   const rows = upcomingAtStop(transit, id, nowSec(), 6);
-  const down = liveDown(transit.fleet.size);
+  const down = liveDown();
   const label = transit.labelOf(stop), tag = stopTag(stop);
   const here = routesAtStop(transit, id);
   const hereCount = new Set(here.map((r) => r.shortName)).size;
@@ -253,7 +253,7 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
 function RouteEmpty({ route }: { route?: Route }) {
   const c = useColors();
   const st = route ? transit.routeStatus(route.id, nowMs()) : undefined;
-  const down = liveDown(transit.fleet.size);
+  const down = liveDown();
   const [title, text] = st?.state === "ended" ? ["Ya no hay más buses hoy", down ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`]
     : st?.state === "before" ? ["Aún no empieza el servicio", `El primer bus sale a las ${clockOfDay(st.firstStart)}.`]
     : down ? ["Sin datos en vivo por ahora", "TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio."]

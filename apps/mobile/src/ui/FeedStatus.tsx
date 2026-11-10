@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { connectionStatus } from "@transmi/application";
+import { connectionStatus, liveLevel } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
@@ -14,11 +14,12 @@ export function FeedStatus({ tint, light = false }: { tint?: string; light?: boo
   useTransitVersion(); useNow(5000);
   const st = connectionStatus(transit, nowMs());
   // hay buses reportando = en vivo; solo si el último dato tiene más de 5 min se avisa del retraso, y «sin datos» solo si casi no hay buses
-  const hasBuses = transit.fleet.size >= 50, late = (st.ageSeconds ?? 0) > 300;
-  const live = hasBuses && !late;
+  // de madrugada reportan pocos buses, pero si su dato es reciente sigue siendo en vivo: se dice cuántos, no «sin datos»
+  const level = liveLevel(transit, nowMs()), n = transit.fleet.size;
+  const live = level === "live" || level === "few";
   const demo = useDemo((d) => d.on);
-  const title = demo ? "Demostración" : !hasBuses ? "Sin datos en vivo" : late ? "Datos con retraso" : "En vivo";
-  const detail = demo ? "buses de ejemplo" : st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
+  const title = demo ? "Demostración" : level === "none" ? "Sin datos en vivo" : level === "late" ? "Datos con retraso" : "En vivo";
+  const detail = demo ? "buses de ejemplo" : level === "few" ? `${n} ${n === 1 ? "bus" : "buses"} a esta hora` : st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
   return (
     <Glass tint={tint} scheme={light ? "light" : undefined} style={styles.glass}>
       <View accessible accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}`} style={styles.pill}>

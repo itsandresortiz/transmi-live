@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { liveDown } from "@/lastService";
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -134,7 +135,7 @@ export default function RouteScreen() {
             })}
             {buses.length > MAX_BUSES ? <Text style={[type.caption, { color: c.muted, padding: space[3] }]}>y {buses.length - MAX_BUSES} buses más, en el mapa.</Text> : null}
           </Card>
-        ) : <Card><Text style={[type.headline, { color: c.text }]}>{transit.fleet.size < 50 ? "Sin datos en vivo por ahora" : "Sin buses en este sentido ahora"}</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{transit.fleet.size < 50 ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: mira el horario abajo." : "Ningún bus de esta ruta va en este sentido en este momento."}</Text></Card>}
+        ) : <Card><Text style={[type.headline, { color: c.text }]}>{liveDown() ? "Sin datos en vivo por ahora" : "Sin buses en este sentido ahora"}</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{liveDown() ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: mira el horario abajo." : "Ningún bus de esta ruta va en este sentido en este momento."}</Text></Card>}
 
         {cur && cur.stopIds.length ? (
           <>

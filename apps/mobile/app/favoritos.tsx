@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { liveDown } from "@/lastService";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -28,7 +29,7 @@ export default function Favoritos() {
   // lo que viene a cada parada se calcula cada pocos segundos, no en cada pintada: así los toques (cerrar, abrir) responden al instante
   const version = transit.version;
   const stops = useMemo(() => saved.stops.map((id) => transit.stopById(id)).filter((s) => !!s).map((stop) => ({ stop: stop!, next: upcomingAtStop(transit, stop!.id, nowSec(), 1).slice(0, 3) })), [saved.stops, version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const live = transit.fleet.size >= 50;
+  const live = !liveDown();
   const [sorting, setSorting] = useState(false);
   const move = (id: string, by: -1 | 1) => { void Haptics.selectionAsync(); saved.moveStop(id, by); };
 

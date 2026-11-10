@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { liveDown } from "@/lastService";
 import Constants from "expo-constants";
 import { SymbolView, type SFSymbol } from "expo-symbols";
 import { connectionStatus } from "@transmi/application";
@@ -64,7 +65,7 @@ export default function Mas() {
   };
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
-  const hasBuses = transit.fleet.size >= 50, late = (st.ageSeconds ?? 0) > 300, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
+  const hasBuses = !liveDown(), late = (st.ageSeconds ?? 0) > 300, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
   const alerts = transit.alerts.length, favs = saved.stops.length + saved.routes.length;
 
   return (

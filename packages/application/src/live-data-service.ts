@@ -14,6 +14,17 @@ export function connectionStatus(state: TransitState, nowMs: number): Connection
   return { connection: age <= 45 ? "live" : age <= 180 ? "waiting" : answering ? "idle" : "stale", ageSeconds: age };
 }
 
+/** Qué decirle a la persona sobre los datos en vivo.
+ *  `live`: hay buses y el dato es reciente · `few`: el dato es reciente pero reportan pocos buses (típico de madrugada): sigue siendo en vivo ·
+ *  `late`: hay buses pero el último dato tiene más de 5 min · `none`: no llega nada reciente. */
+export type LiveLevel = "live" | "few" | "late" | "none";
+export const LIVE_MANY = 50, LIVE_LATE_S = 300;
+export function liveLevel(state: TransitState, nowMs: number): LiveLevel {
+  const n = state.fleet.size, age = state.lastBatchAt == null ? Infinity : nowMs / 1000 - state.lastBatchAt;
+  if (n >= LIVE_MANY) return age > LIVE_LATE_S ? "late" : "live";
+  return n > 0 && age <= LIVE_LATE_S ? "few" : "none";
+}
+
 /** Caso de uso: pedir a la fuente lo nuevo y aplicarlo al estado. */
 export class LiveDataService {
   private signature: FeedSignature = {};

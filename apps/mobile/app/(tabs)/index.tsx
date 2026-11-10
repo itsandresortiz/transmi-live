@@ -13,6 +13,7 @@ import { stopLabelText } from "@transmi/domain";
 import { nowSec } from "@/clock";
 import { etaText } from "@/format";
 import { useSaved } from "@/favorites";
+import { liveDown } from "@/lastService";
 import { useDemo } from "@/demo";
 import { usePlanner } from "@/planner/store";
 import { RouteBadge } from "@/ui/RouteBadge";
@@ -30,7 +31,7 @@ export default function Inicio() {
   const version = useTransitVersion();
   const now = useNow(5000) / 1000;
   // «en vivo» = hay buses reportando. TransMilenio publica con ~1–3 min de retraso, así que la edad del lote solo sirve para decir «hace X min», no para negar el servicio
-  const live = transit.fleet.size >= 50;
+  const live = !liveDown();      // pocos buses con dato reciente (madrugada) también es en vivo
 
   const saved = useSaved();
   const demo = useDemo((d) => d.on);

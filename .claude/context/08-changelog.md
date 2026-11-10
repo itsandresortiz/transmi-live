@@ -5,6 +5,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 
 ## Sin commit (pendiente de decisión del dueño)
 
+- 2026-11-10 · web+app · **«Sin datos en vivo» de madrugada**: con datos llegando pero pocos buses (medido 02:47: 85 en el lote, solo 7 con reporte de <5 min) la app decía «Sin datos en vivo». Nuevo `liveLevel()` en `packages/application` (`live`/`few`/`late`/`none`, prueba `live-level.test.ts`): pocos buses con dato reciente = «En vivo · N buses a esta hora». `liveDown()` de web y app lo usan.
 - 2026-11-10 · `testflight-local.sh` hace todo solo: baja lo nuevo (`git pull --ff-only`, restaurando antes `package-lock.json`) y se relanza, cierra `expo start`, borra `ios/` y `build/`. El dueño ya solo corre un comando. No probado en Mac (?).
 - 2026-11-10 · app · Interruptores («Buses de ejemplo», capas del mapa) descentrados en su fila: nuevo `Toggle` en `kit.tsx` que le da al interruptor nativo su tamaño real de iOS 26 (63×28) y lo centra. **Sin ver en simulador (?)**: si sigue corrido, pedir captura.
 - 2026-11-10 · app · Tocar un aviso del viaje («Faltan 3 paradas», etc.) **abre ese viaje** (`notify.ts` `onAlertTap`, cada aviso lleva `busId`, `alightId`, `total`; `RideWatcher` lo escucha). Si la app se había cerrado, recupera dónde te bajas. Sin probar en teléfono.
