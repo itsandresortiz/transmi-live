@@ -6,6 +6,7 @@ import { stopLabelText } from "@transmi/domain";
 import { transit } from "./composition-root";
 import { nowSec } from "./clock";
 import { useSaved } from "./favorites";
+import { isDemo } from "./demo";
 import { SYSTEM_COLOR } from "./ui/theme";
 
 /** Deja en el App Group lo que el widget necesita: tus paradas favoritas con la hora de llegada de los próximos buses. Solo existe en las compilaciones con el widget (WIDGET=1). */
@@ -24,7 +25,7 @@ if (Platform.OS === "ios" && extra.widget && extra.widgetGroup) {
 
 let last = "";
 export function syncWidget(): void {
-  if (!storage || !transit.network.stops.size) return;
+  if (!storage || !transit.network.stops.size || isDemo()) return;      // los buses de ejemplo nunca llegan al widget
   const saved = useSaved.getState();
   const now = nowSec();
   const stops = saved.stops.slice(0, 3).flatMap((id) => {

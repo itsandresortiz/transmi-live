@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Constants from "expo-constants";
@@ -11,6 +11,7 @@ import { useNow, useTransitVersion } from "@/hooks";
 import { reportProblem } from "@/report";
 import { useAppearance, type AppearanceMode } from "@/appearance";
 import { useSaved } from "@/favorites";
+import { useDemo } from "@/demo";
 import { Tap, PAGE } from "@/ui/kit";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { radius, space, type, useColors } from "@/ui/theme";
@@ -48,6 +49,7 @@ export default function Mas() {
   const c = useColors();
   const appearance = useAppearance();
   const saved = useSaved();
+  const demo = useDemo();
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
   const hasBuses = transit.fleet.size >= 50, late = (st.ageSeconds ?? 0) > 300, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
@@ -78,7 +80,7 @@ export default function Mas() {
           <View style={styles.row}>
             <View style={[styles.tile, { backgroundColor: hasBuses && !late ? "#22c55e" : "#f59e0b" }]}><SymbolView name="dot.radiowaves.left.and.right" tintColor="#ffffff" size={17} /></View>
             <View style={[styles.rowBody, { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.line }]} accessible accessibilityLabel={hasBuses ? `${transit.fleet.size} buses en la calle` : "Sin datos en vivo por ahora"}>
-              <Text style={[type.body, { color: c.text, flex: 1 }]}>{hasBuses ? "Buses en la calle" : "Datos en vivo"}</Text>
+              <Text style={[type.body, { color: c.text, flex: 1 }]}>{demo.on ? "Buses de ejemplo" : hasBuses ? "Buses en la calle" : "Datos en vivo"}</Text>
               <Text style={[type.body, { color: c.muted, fontVariant: ["tabular-nums"] }]}>{hasBuses ? transit.fleet.size.toLocaleString("es-CO") : "Sin datos por ahora"}</Text>
             </View>
           </View>
@@ -94,6 +96,16 @@ export default function Mas() {
           <View>
             <GlassSegments variant="plain" value={appearance.mode} onChange={(m) => appearance.setMode(m)}
               items={[{ key: "auto", label: "Automático" }, { key: "light", label: "Claro" }, { key: "dark", label: "Oscuro" }] as { key: AppearanceMode; label: string }[]} />
+          </View>
+        </Group>
+
+        <Group title="PRUEBAS" footer={demo.error ?? (demo.on ? "Estás viendo buses de ejemplo (lotes reales de una noche anterior). No son datos en vivo: apágalo para volver a los datos reales." : "Muestra buses de ejemplo para probar el mapa, las paradas y «Voy en este bus» cuando no hay servicio. No son datos en vivo.")}>
+          <View style={styles.row}>
+            <View style={[styles.tile, { backgroundColor: "#8b5cf6" }]}><SymbolView name="play.fill" tintColor="#ffffff" size={15} /></View>
+            <View style={styles.rowBody}>
+              <Text style={[type.body, { color: c.text, flex: 1 }]}>{demo.loading ? "Descargando buses de ejemplo…" : "Buses de ejemplo"}</Text>
+              <Switch value={demo.on} disabled={demo.loading} onValueChange={(v) => { if (v) void demo.start(); else demo.stop(); }} accessibilityLabel="Buses de ejemplo (demostración)" />
+            </View>
           </View>
         </Group>
 

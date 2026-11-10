@@ -13,6 +13,7 @@ import { stopLabelText } from "@transmi/domain";
 import { nowSec } from "@/clock";
 import { etaText } from "@/format";
 import { useSaved } from "@/favorites";
+import { useDemo } from "@/demo";
 import { usePlanner } from "@/planner/store";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { Card, IconDot, RoundButton, SectionTitle, Tap, PAGE } from "@/ui/kit";
@@ -32,6 +33,7 @@ export default function Inicio() {
   const live = transit.fleet.size >= 50;
 
   const saved = useSaved();
+  const demo = useDemo((d) => d.on);
   const alerts = transit.alerts.length;
   // tus paradas con los próximos buses de cada una (los 3 más cercanos, de cualquier ruta); sin buses, la próxima hora del horario
   const favStops = useMemo(() => saved.stops.slice(0, 6).flatMap((id) => {
@@ -66,8 +68,8 @@ export default function Inicio() {
           <Text style={[type.body, { color: c.muted }]}>{greeting()}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: space[2] }}>
             <Tap onPress={() => router.navigate("/mapa")} accessibilityRole="button" accessibilityLabel={live ? `${transit.fleet.size} buses en vivo. Abrir el mapa` : "Abrir el mapa"} style={[styles.livePill, { backgroundColor: c.card }]}>
-              <View style={[styles.liveDot, { backgroundColor: live ? "#22c55e" : "#f59e0b" }]} />
-              <Text style={[type.caption, { color: c.text, fontVariant: ["tabular-nums"] }]}>{live ? `${transit.fleet.size.toLocaleString("es-CO")} en vivo` : "Sin datos en vivo"}</Text>
+              <View style={[styles.liveDot, { backgroundColor: demo ? "#8b5cf6" : live ? "#22c55e" : "#f59e0b" }]} />
+              <Text style={[type.caption, { color: c.text, fontVariant: ["tabular-nums"] }]}>{demo ? "Demostración" : live ? `${transit.fleet.size.toLocaleString("es-CO")} en vivo` : "Sin datos en vivo"}</Text>
             </Tap>
             <View>
               <RoundButton symbol={alerts ? "bell.badge.fill" : "bell"} label={alerts ? `Avisos del servicio: ${alerts}` : "Avisos del servicio"} onPress={() => router.push("/avisos")} />

@@ -4,6 +4,7 @@ import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { agoShort } from "@/format";
+import { useDemo } from "@/demo";
 import { Glass } from "./kit";
 import { space, type, useColors } from "./theme";
 
@@ -15,12 +16,13 @@ export function FeedStatus({ tint, light = false }: { tint?: string; light?: boo
   // hay buses reportando = en vivo; solo si el último dato tiene más de 5 min se avisa del retraso, y «sin datos» solo si casi no hay buses
   const hasBuses = transit.fleet.size >= 50, late = (st.ageSeconds ?? 0) > 300;
   const live = hasBuses && !late;
-  const title = !hasBuses ? "Sin datos en vivo" : late ? "Datos con retraso" : "En vivo";
-  const detail = st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
+  const demo = useDemo((d) => d.on);
+  const title = demo ? "Demostración" : !hasBuses ? "Sin datos en vivo" : late ? "Datos con retraso" : "En vivo";
+  const detail = demo ? "buses de ejemplo" : st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
   return (
     <Glass tint={tint} scheme={light ? "light" : undefined} style={styles.glass}>
       <View accessible accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}`} style={styles.pill}>
-        <View style={[styles.dot, { backgroundColor: live ? "#22c55e" : "#f59e0b" }]} />
+        <View style={[styles.dot, { backgroundColor: demo ? "#8b5cf6" : live ? "#22c55e" : "#f59e0b" }]} />
         <Text style={[type.caption, { color: light ? "#111114" : c.text }]}>{title}</Text>
         {detail ? <Text style={[type.caption, { color: light ? "#111114" : c.text, opacity: 0.7 }]} numberOfLines={1}>{detail}</Text> : null}
       </View>
