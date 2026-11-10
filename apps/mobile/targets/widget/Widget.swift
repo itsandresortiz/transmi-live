@@ -190,3 +190,10 @@ struct FavoriteStopWidget: Widget {
 struct TransMiWidgets: WidgetBundle {
   var body: some Widget { FavoriteStopWidget() }
 }
+
+// MARK: - Vistas previas (Xcode › Editor › Canvas): se ve el widget sin correr la app
+
+#Preview("Pequeño", as: .systemSmall) { FavoriteStopWidget() } timeline: { StopEntry(date: .now, snapshot: sample) }
+#Preview("Mediano", as: .systemMedium) { FavoriteStopWidget() } timeline: { StopEntry(date: .now, snapshot: sample) }
+#Preview("Pantalla de bloqueo", as: .accessoryRectangular) { FavoriteStopWidget() } timeline: { StopEntry(date: .now, snapshot: sample) }
+#Preview("Sin favoritas", as: .systemSmall) { FavoriteStopWidget() } timeline: { StopEntry(date: .now, snapshot: nil) }
