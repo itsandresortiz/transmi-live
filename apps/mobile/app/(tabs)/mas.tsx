@@ -1,18 +1,37 @@
-import { ScrollView, StyleSheet, Text } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Constants from "expo-constants";
 import { Linking } from "react-native";
+import { connectionStatus } from "@transmi/application";
+import { transit } from "@/composition-root";
+import { nowMs } from "@/clock";
+import { useNow, useTransitVersion } from "@/hooks";
 import { reportProblem } from "@/report";
 import { Card, Tap, PAGE } from "@/ui/kit";
 import { space, type, useColors } from "@/ui/theme";
 
 export default function Mas() {
   const c = useColors();
+  useTransitVersion(); useNow(15_000);
+  const st = connectionStatus(transit, nowMs());
+  const live = transit.fleet.size >= 50, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
       <ScrollView contentContainerStyle={[PAGE, { gap: space[3], paddingBottom: space[10] * 3 }]}>
         <Text style={[type.largeTitle, { color: c.text, paddingHorizontal: space[5] }]} accessibilityRole="header">Más</Text>
+        <View style={{ marginHorizontal: space[5] }}>
+          <Card>
+            <View style={styles.liveRow}>
+              <View style={[styles.liveDot, { backgroundColor: live && (st.ageSeconds ?? 0) <= 300 ? "#22c55e" : "#f59e0b" }]} />
+              <Text style={[type.headline, { color: c.text, flex: 1 }]}>{live ? `${transit.fleet.size.toLocaleString("es-CO")} buses en la calle` : "Sin datos en vivo por ahora"}</Text>
+            </View>
+            <Text style={[type.body, { color: c.muted, marginTop: space[2] }]}>
+              {live ? `Se actualizan solos${ageMin != null && ageMin >= 2 ? ` · último dato hace ${ageMin} min` : ""}.`
+                : "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: puedes consultar horarios y planear viajes."}
+            </Text>
+          </Card>
+        </View>
         <Tap onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel="Avisos del servicio" style={{ marginHorizontal: space[5] }}>
           <Card><Text style={[type.headline, { color: c.text }]}>Avisos del servicio</Text><Text style={[type.body, { color: c.muted }]}>Desvíos, cierres de estaciones y cambios de operación.</Text></Card>
         </Tap>
@@ -30,4 +49,8 @@ export default function Mas() {
     </SafeAreaView>
   );
 }
-const styles = StyleSheet.create({ screen: { flex: 1 } });
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  liveRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
+  liveDot: { width: 10, height: 10, borderRadius: 5 },
+});

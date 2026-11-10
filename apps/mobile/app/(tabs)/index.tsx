@@ -2,9 +2,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SymbolView } from "expo-symbols";
 import { router } from "expo-router";
-import { connectionStatus } from "@transmi/application";
 import { transit } from "@/composition-root";
-import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { upcomingAtStop } from "@transmi/application";
 import { stopLabelText } from "@transmi/domain";
@@ -24,10 +22,8 @@ const greeting = () => {
 export default function Inicio() {
   const c = useColors();
   useTransitVersion(); useNow(15_000);
-  const st = connectionStatus(transit, nowMs());
   // «en vivo» = hay buses reportando. TransMilenio publica con ~1–3 min de retraso, así que la edad del lote solo sirve para decir «hace X min», no para negar el servicio
   const live = transit.fleet.size >= 50;
-  const ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
 
   const saved = useSaved();
   const askPlace = (slot: "home" | "work") => { usePlanner.getState().setSaveAs(slot); router.navigate("/viaje"); };
@@ -102,20 +98,6 @@ export default function Inicio() {
             </View>
           </>
         ) : null}
-
-        <SectionTitle title="En vivo" />
-        <View style={{ paddingHorizontal: space[5] }}>
-          <Card>
-            <View style={styles.liveRow}>
-              <View style={[styles.liveDot, { backgroundColor: live && (st.ageSeconds ?? 0) <= 300 ? "#22c55e" : "#f59e0b" }]} />
-              <Text style={[type.headline, { color: c.text, flex: 1 }]}>{live ? `${transit.fleet.size.toLocaleString("es-CO")} buses en la calle` : "Sin datos en vivo por ahora"}</Text>
-            </View>
-            <Text style={[type.body, { color: c.muted, marginTop: space[2] }]}>
-              {live ? `Se actualizan solos${ageMin != null && ageMin >= 2 ? ` · último dato hace ${ageMin} min` : ""}. Abre el mapa para verlos moverse.`
-                : "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: puedes consultar horarios y planear viajes."}
-            </Text>
-          </Card>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -134,6 +116,4 @@ const styles = StyleSheet.create({
   big: { minHeight: 128, justifyContent: "space-between" },
   favRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
   favRoutes: { flexDirection: "row", flexWrap: "wrap", gap: space[2] },
-  liveRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
-  liveDot: { width: 10, height: 10, borderRadius: 5 },
 });
