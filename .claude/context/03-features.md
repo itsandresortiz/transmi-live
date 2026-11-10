@@ -9,6 +9,7 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 | Parada / estación / ruta en una parada | `ui/stopViews.tsx` | Rutas que vienen, de dónde viene el próximo, «luego», último/primer servicio, vagones hermanos, horario programado si no hay buses |
 | Favoritos y «cerca de ti» | `ui/mine.tsx`, `ui/favorites.ts` (`tm.favorites.v1`) | Paradas y rutas guardadas |
 | Cómo llegar | `ui/planner.tsx`, `plannerStore.ts` (`tm.recents.v1`), `packages/application/src/planner.ts` | Itinerarios con caminata + buses en vivo + horarios; casa/trabajo en `places.ts` (`tm.places.v1`) |
+| Seguir este viaje (Cómo llegar) | `ui/trip.tsx` (`TripBar`) | Guía paso a paso en pantalla con la lógica compartida `trip-guide`; sin notificaciones del sistema; se pierde al recargar |
 | Seguir bus y modo viaje | `ui/FollowBar.tsx`, `ui/ride.tsx` | «Voy en este bus»: elige la parada donde bajas y avisa en pantalla (sin notificaciones del sistema) |
 | Mi tarjeta TuLlave | `ui/card.tsx` | Solo funciona si la página está dentro de una app nativa que exponga `window.TransmiNative.tullave`; en el navegador explica que hace falta la app |
 | Ajustes | `ui/Settings.tsx` | Estado del servicio, capas (calles, paradas, red, buses, **semáforos**, tráfico), color de buses, movimiento, tamaño de texto, contraste, instalar |

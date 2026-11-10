@@ -13,6 +13,7 @@ import { currentScheme, routeBadgeColor, themeOf, type Scheme } from "./map/them
 import estaciones from "./data/estaciones.json";
 import { FollowBar } from "./ui/FollowBar";
 import { RideBar } from "./ui/ride";
+import { TripBar } from "./ui/trip";
 import { Settings } from "./ui/Settings";
 import { Sheet } from "./ui/Sheet";
 import { Bell, Compass, Locate, Mark, Sliders } from "./ui/icons";
@@ -401,6 +402,7 @@ export function App() {
           : <AlertsView th={th} act={act} />}
       </Sheet>
       <RideBar th={th} />
+      <TripBar th={th} />
       <FollowBar th={th} onResume={() => { useUi.getState().setFollowPaused(false); }} />
       <Settings th={th} />
       <div className={`toast glass${toastOn ? " on" : ""}`} role="status" aria-live="polite">{ui.toast?.text}</div>

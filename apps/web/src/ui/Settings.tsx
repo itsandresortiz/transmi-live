@@ -72,6 +72,10 @@ export function Settings({ th }: { th: MapTheme }) {
               : <p className="hint">En iPhone: toca el botón Compartir y luego «Añadir a pantalla de inicio».</p>}
           </div>
         )}
+        <div className="grp"><h3>Ayuda</h3>
+          <a className="btn" href={"mailto:info@transmilive.com?subject=" + encodeURIComponent("TransMi LIVE: problema o idea") + "&body=" + encodeURIComponent("¿Qué pasó o qué idea tienes? (cuéntalo con tus palabras)\n\n\n---\nDesde la web de TransMi LIVE")}>Reportar un problema o dar una idea</a>
+          <p className="hint">Se abre un correo a info@transmilive.com. También puedes leer la <a href="privacidad.html">política de privacidad</a>.</p>
+        </div>
         <p className="credits">Datos en tiempo real de TransMilenio (GTFS-realtime). Mapa: © OpenStreetMap contributors. Semáforos: Secretaría Distrital de Movilidad (CC BY 4.0).</p>
       </section>
     </>

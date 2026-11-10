@@ -12,6 +12,7 @@ import { useFavs } from "./favorites";
 import { useLocation } from "./location";
 import { type Field, type SortBy, nowMode, sortedResults, timeToMs, usePlanner } from "./plannerStore";
 import { useRide } from "./ride";
+import { useTrip } from "./trip";
 import { SLOT_LABEL, type Slot, usePlaces } from "./places";
 import { shareUrl } from "../deeplink";
 import { useNow } from "./hooks";
@@ -369,7 +370,10 @@ function Steps({ it, th, act, nowS }: { it: Itinerary; th: MapTheme; act: Action
           </div>
         </li>
       ))}
-      <li className="step end"><span className="sico"><Pin /></span><div><b>Llegas a las {hm(it.arriveAt)}</b></div></li>
+      <li className="step end"><span className="sico"><Pin /></span><div><b>Llegas a las {hm(it.arriveAt)}</b>
+        {it.legs.some(isRide) && <div className="sbtns"><button className="btn sm primary" onClick={() => useTrip.getState().start(it, usePlanner.getState().dest?.name ?? "")}>Seguir este viaje</button></div>}
+        {it.legs.some(isRide) && <div className="sd">Te vamos diciendo en pantalla cuándo subir, cuándo bajar y qué sigue, mientras tengas esta página abierta.</div>}
+      </div></li>
     </ol>
   );
 }
