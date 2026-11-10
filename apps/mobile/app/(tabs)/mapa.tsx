@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import * as Location from "expo-location";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
 import { router, useIsFocused, usePathname } from "expo-router";
+import { hav } from "@transmi/application";
 import { SYSTEMS, SYSTEM_LABEL, type SystemType } from "@transmi/domain";
 import { toGeo } from "@transmi/domain";
 import { transit } from "@/composition-root";
@@ -14,6 +17,11 @@ import { locateMe } from "@/location";
 import { FeedStatus } from "@/ui/FeedStatus";
 import { Chip, Glass, RoundButton } from "@/ui/kit";
 import { SYSTEM_COLOR, space, type, useColors } from "@/ui/theme";
+
+/** El mapa se centra en tu ubicación solo la primera vez que se abre en cada sesión (después respeta por dónde lo dejaste). */
+let centeredOnce = false;
+const BOGOTA = { lat: 4.65, lon: -74.08 };
+const AWAY_METERS = 150;      // más lejos de esto, aparece el botón para volver
 
 export default function Mapa() {
   const insets = useSafeAreaInsets();
@@ -38,7 +46,39 @@ export default function Mapa() {
   }, [focused, focus.followBusId]);
   const [system, setSystem] = useState<SystemType | null>(null);
 
-  const locate = async () => { const me = await locateMe(); if (me) map.current?.flyTo(me.lat, me.lon, 15.8); };
+  // tu ubicación mientras el mapa está a la vista (solo con la app abierta; no se guarda)
+  const [me, setMe] = useState<{ lat: number; lon: number } | null>(null);
+  const [center, setCenter] = useState<{ lat: number; lon: number; zoom: number } | null>(null);
+  const [denied, setDenied] = useState(false);
+  useEffect(() => {
+    if (!focused) return;
+    let sub: Location.LocationSubscription | undefined, gone = false;
+    void (async () => {
+      const first = await locateMe();
+      if (gone) return;
+      if (!first) { const p = await Location.getForegroundPermissionsAsync().catch(() => null); if (p && !p.granted) setDenied(true); return; }
+      setDenied(false); setMe(first);
+      sub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.Balanced, distanceInterval: 15, timeInterval: 4000 }, (p) => { if (!gone) setMe({ lat: p.coords.latitude, lon: p.coords.longitude }); }).catch(() => undefined);
+      if (gone) sub?.remove();
+    })();
+    return () => { gone = true; sub?.remove(); };
+  }, [focused]);
+
+  // la primera vez, el mapa abre ya sobre ti con zoom de calle (si estás en Bogotá y no vienes a ver una parada, ruta o bus)
+  useEffect(() => {
+    if (centeredOnce || !me || !focused) return;
+    if (focus.stopId || focus.routeId || focus.followBusId || focus.busIds.length || focus.locate) return;
+    centeredOnce = true;
+    if (hav(me, BOGOTA) < 60_000) setTimeout(() => map.current?.flyTo(me.lat, me.lon, 15.6), 250);
+  }, [me, focused, focus.stopId, focus.routeId, focus.followBusId, focus.busIds.length, focus.locate]);
+
+  const onView = useCallback((v: { lat: number; lon: number; zoom: number }) => setCenter(v), []);
+  const away = !me || !center || hav(center, me) > AWAY_METERS || center.zoom < 12.5;       // el botón solo hace falta cuando te alejaste (o aún no sabemos dónde estás)
+  const locate = async () => {
+    const here = me ?? (await locateMe());
+    if (here) { setMe(here); map.current?.flyTo(here.lat, here.lon, 15.8); return; }
+    Alert.alert("No pudimos ubicarte", "Activa la ubicación para TransMi LIVE en Ajustes y vuelve a intentarlo. Solo se usa con la app abierta y no se guarda.", [{ text: "Ahora no", style: "cancel" }, { text: "Abrir Ajustes", onPress: () => void Linking.openSettings() }]);
+  };
   // «Cerca de mí» pide que el mapa te ubique al llegar
   useEffect(() => { if (focused && focus.locate) { useMapFocus.setState({ locate: false }); setTimeout(() => void locate(), 300); } }, [focused, focus.locate]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -47,7 +87,7 @@ export default function Mapa() {
       {focused ? <StatusBar style="dark" /> : null}
       {/* el mapa no se lee con VoiceOver: las pestañas Rutas y Cómo llegar dicen lo mismo con texto */}
       <View style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <TransitMap ref={map} system={system} active={focused} calm={calm} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
+      <TransitMap ref={map} system={system} active={focused} calm={calm} onView={onView} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
         onBus={(id) => { void Haptics.selectionAsync(); router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
         onStop={(id) => router.navigate({ pathname: "/stop/[id]", params: { id } })} />
       </View>
@@ -78,7 +118,7 @@ export default function Mapa() {
       {/* el estado del servicio y el botón de ubicación van en una fila de vidrio justo encima de la barra inferior (en estas pantallas el margen de abajo ya cuenta la barra) */}
       <View pointerEvents="box-none" style={[styles.bottomRow, { bottom: insets.bottom + 12 }]}>
         <View pointerEvents="none"><FeedStatus tint={overlay} /></View>
-        <RoundButton symbol="location.fill" label="Mi ubicación" onPress={() => void locate()} size={52} tint={overlay} />
+        {away ? <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)}><RoundButton symbol={denied ? "location.slash.fill" : "location.fill"} label={denied ? "Activar mi ubicación" : "Volver a mi ubicación"} onPress={() => void locate()} size={52} tint={overlay} /></Animated.View> : <View style={{ width: 52, height: 52 }} />}
       </View>
     </View>
   );

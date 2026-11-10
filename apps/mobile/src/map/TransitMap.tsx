@@ -26,6 +26,8 @@ interface Props {
   highlightIds?: string[];
   /** Si es falso (otra pestaña al frente), los buses dejan de recalcularse para no gastar batería. */
   active?: boolean;
+  /** Avisa dónde quedó el centro del mapa y su zoom cada vez que termina de moverse. */
+  onView?(v: { lat: number; lon: number; zoom: number }): void;
   /** Mapa pequeño dentro de otra pantalla: sin brújula. */
   compact?: boolean;
   attributionPosition?: ComponentProps<typeof Map>["attributionPosition"];
@@ -37,7 +39,7 @@ interface Props {
 }
 
 /** El mapa de buses en vivo: base, trazado de la ruta, paradas (al acercarse), buses y tu ubicación. */
-export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
+export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
   const c = useColors();
   const camera = useRef<CameraRef>(null);
   const [view, setView] = useState<Viewport | null>(null);
@@ -113,7 +115,8 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   const onRegion = useCallback((e: { nativeEvent: { bounds: [number, number, number, number]; zoom: number } }) => {
     const { bounds, zoom } = e.nativeEvent;
     setView({ west: bounds[0], south: bounds[1], east: bounds[2], north: bounds[3], zoom });
-  }, []);
+    onView?.({ lat: (bounds[1] + bounds[3]) / 2, lon: (bounds[0] + bounds[2]) / 2, zoom });
+  }, [onView]);
 
   return (
     <Map style={StyleSheet.absoluteFill} mapStyle={MAP_STYLE} logo={false} attribution attributionPosition={attributionPosition} compass={!compact} compassPosition={{ top: 120, right: 12 }} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
