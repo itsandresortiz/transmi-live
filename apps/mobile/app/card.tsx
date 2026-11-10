@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { SymbolView } from "expo-symbols";
-import { type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, maskedReading, movementsByMonth, parseTuLlave } from "@transmi/domain";
+import { type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, movementsByMonth, parseTuLlave } from "@transmi/domain";
 import { Tullave } from "../modules/tullave/src";
 import { Card, Tap } from "@/ui/kit";
 import { radius, space, type, useColors } from "@/ui/theme";
@@ -24,12 +23,11 @@ export default function CardScreen() {
   const [card, setCard] = useState<{ data: TuLlaveCard; at: number; raw: CardReading } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const available = (() => { try { return Tullave?.isAvailable() ?? false; } catch { return false; } })();
 
   const read = async () => {
     if (!Tullave) return;
-    setBusy(true); setError(null); setCopied(false);
+    setBusy(true); setError(null);
     try {
       const raw = await Tullave.read(PROMPTS);
       const data = parseTuLlave(raw);
@@ -82,9 +80,6 @@ export default function CardScreen() {
                   </Card>
                 </View>
               ))}
-              <Tap onPress={() => void Clipboard.setStringAsync(maskedReading(card.raw)).then(() => setCopied(true))} accessibilityRole="button" accessibilityLabel="Copiar lectura técnica" style={{ marginTop: space[3] }}>
-                <Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>{copied ? "Copiado" : "Copiar lectura técnica (sin el número de la tarjeta)"}</Text>
-              </Tap>
             </>
           ) : null}
         </>
