@@ -6,7 +6,7 @@ module.exports = {
   displayName: "TransMi LIVE",
   bundleIdentifier: ".widget",
   deploymentTarget: "17.0",
-  frameworks: ["SwiftUI", "WidgetKit"],
+  frameworks: ["SwiftUI", "WidgetKit", "ActivityKit"],
   entitlements: { "com.apple.security.application-groups": ["group.com.transmilive.app"] },
   colors: { $accent: "#e11d2e", $widgetBackground: { color: "#ffffff", darkColor: "#16161a" } },
 };

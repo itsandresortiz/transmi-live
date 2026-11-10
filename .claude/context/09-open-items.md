@@ -24,7 +24,10 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - Buses más fluidos (hasta 15 veces/s de cerca): revisar que el teléfono no se caliente; si vuelve el aviso de CPU, subir los valores de `cadenceMs`.
 - Mapa oscuro y capa de tráfico en la app: revisar lectura de controles y textos sobre el mapa oscuro.
 
+- **Actividad en vivo del viaje** (pantalla de bloqueo / isla dinámica): código nativo nuevo sin compilar. Si la compilación falla, mandar el bloque de errores; el módulo `modules/tripactivity` se compila siempre (también sin `WIDGET=1`).
+
 ## Bugs conocidos / limitaciones
+- La actividad en vivo del viaje no cambia de paso con la app cerrada (no hay push): muestra el último paso y su cuenta regresiva.
 - «Seguir este viaje»: solo se conoce el bus real del primer tramo (los demás van por hora estimada); con la app cerrada no se corrige el atraso.
 - ✅ (2026-11-10) Buses sin próxima parada: era un error de ubicación en rutas de ida y vuelta, no falta de rutas. Hoy ~3 % sin próxima parada (fuera de recorrido, final de ruta). Queda ~1,7 % con tramos absurdos entre paradas (>3 km) en rutas largas circulares (`projectAfter` no encuentra la primera pasada a ≤40 m). Solo ~5 % de los buses trae puntualidad.
 - Otras rutas con orden de paradas desactualizado (como H15/Calle 57): agregar a `STOP_PATCHES` cuando el dueño lo confirme (H20, H27, A60… paran en Calle 53; **no verificado** si paran en Calle 57).
@@ -48,7 +51,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 ## Ideas / próximos pasos
 1. **Rediseño «más pro» (en curso: hecha la pantalla «Voy en este bus»; faltan bienvenida ilustrada, cabeceras ilustradas de ruta/estación y hojas de consejo)**: referencia de otra app de trenes con (a) pantalla de bienvenida con ilustración e imagen grande, (b) cabecera ilustrada en la ficha del viaje, (c) hoja «Llegando a …» con **fondo que se mueve como si el vehículo avanzara** y **bordes desvanecidos**, barra de progreso en segmentos, recordatorio «avísame a 5 min», (d) hoja de consejo con ilustración y «Entendido». Aplicar a: pantalla de arranque, «Voy en este bus» (fondo animado + progreso por paradas), ficha de ruta/estación, avisos. Pedir al dueño capturas o descripciones (Claude no ve video).
 2. Widget: más tamaños (varias paradas), configuración por parada, y datos frescos (publicar llegadas por parada desde un workflow, o refresco en segundo plano).
-3. Live Activity / Dynamic Island para «Voy en este bus».
+3. Live Activity también para «Voy en este bus» (hoy solo para «Seguir este viaje») y actualizarla con la app cerrada (requiere push y servidor).
 4. Aprender el orden de paradas de cada ruta desde el feed (arregla el desfase del GTFS sin parches).
 5. Capa de tráfico en vivo en la app (la web la tiene), modo oscuro del mapa base, modo «seguir mi ubicación».
 6. Android (NFC, widgets) y publicación en App Store.

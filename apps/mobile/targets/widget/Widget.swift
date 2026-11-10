@@ -192,7 +192,10 @@ struct FavoriteStopWidget: Widget {
 
 @main
 struct TransMiWidgets: WidgetBundle {
-  var body: some Widget { FavoriteStopWidget() }
+  var body: some Widget {
+    FavoriteStopWidget()
+    TripLiveActivity()
+  }
 }
 
 // MARK: - Vistas previas (Xcode › Editor › Canvas): se ve el widget sin correr la app

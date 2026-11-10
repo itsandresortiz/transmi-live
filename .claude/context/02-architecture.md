@@ -48,6 +48,7 @@ Ubica el bus en el trazado, calcula cuánto del tramo hacia la siguiente parada 
 ## Módulos nativos y extensiones
 - **`modules/tullave`** (Swift, Core NFC ISO7816): solo lee y devuelve respuestas de la tarjeta; el análisis vive en `packages/domain/src/card/tullave.ts`. Requiere el permiso «NFC Tag Reading» en el App ID y un iPhone real.
 - **`targets/widget`** (SwiftUI/WidgetKit, vía `@bacons/apple-targets`): lee un JSON que la app deja en el **App Group** `group.com.transmilive.app` (`src/widgetSync.tsx`). Solo existe con `WIDGET=1` (`app.config.js`).
+- **`modules/tripactivity`** (Swift, ActivityKit): crea/actualiza/termina la actividad en vivo del viaje. Su estructura `TripActivityAttributes` está **repetida idéntica** en `targets/widget/TripActivity.swift` (iOS las empareja por nombre): cambiar una exige cambiar la otra. Sin push: solo se actualiza con la app abierta; la cuenta regresiva corre sola.
 - **`plugins/sin-push.js`**: quita `aps-environment` (instalar `expo-notifications` lo agregaba y exigiría el permiso de push en la cuenta de Apple). Los avisos del viaje son **locales**.
 - **Parches al GTFS** (`packages/infrastructure/src/gtfs/patches.ts`): correcciones declarativas que se apagan solas cuando TransMilenio publique el dato (hoy: H15 para en «Calle 57» antes de la estación Calle 53).
 
