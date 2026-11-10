@@ -21,7 +21,7 @@ export default function Personalizar() {
   const stop = transit.stopById(id);
   const saved = useSaved();
   const [name, setName] = useState(saved.nicknames[id] ?? "");
-  if (!stop) return <View style={{ flex: 1, backgroundColor: c.bg, padding: space[5] }}><Text style={[type.headline, { color: c.text }]}>No encontramos esa parada</Text></View>;
+  if (!stop) return <View style={{ flex: 1, backgroundColor: c.bg, padding: space[5] }}><Text style={[type.headline, { color: c.text }]}>{transit.network.stops.size ? "No encontramos esa parada" : "Cargando la parada…"}</Text></View>;
   const real = stopLabelText(transit.labelOf(stop));
   const shown = name.trim() || real;
 

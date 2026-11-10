@@ -53,7 +53,7 @@ export default function Ride() {
   const left = alightId && seq ? seq.shape.stopIds.indexOf(alightId, Math.max(0, seq.index)) - seq.index : null;
   const showOnMap = () => { useMapFocus.getState().set({ stopId: null, routeId: r?.id ?? null, busIds: v ? [v.id] : [], followBusId: v?.id ?? null }); router.dismissAll(); router.navigate("/mapa"); };
 
-  if (!v) return <View style={[styles.screen, { backgroundColor: c.bg }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>Este bus dejó de reportar</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido. Revisa por la ventana del bus.</Text></View>;
+  if (!v) return <View style={[styles.screen, { backgroundColor: c.bg }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>{transit.lastBatchAt == null ? "Cargando el bus…" : "Este bus dejó de reportar"}</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido. Revisa por la ventana del bus.</Text></View>;
   const silent = now - v.reportedAt > 120;
   const next = stops[0];
   const nextStop = next ? transit.stopById(next.id) : undefined;

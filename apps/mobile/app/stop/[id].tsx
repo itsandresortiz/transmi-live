@@ -34,7 +34,16 @@ export default function StopSheet() {
   const nick = useSaved((f) => f.nicknames[id]), setNick = useSaved((f) => f.setNickname);
   const siblings = useMemo(() => (stop ? siblingStops(transit, stop).map((x) => ({ x, names: [...new Set(routesAtStop(transit, x.id).map((r) => r.shortName))].slice(0, 2).join(" ") })) : []), [stop, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!stop) return <View style={[styles.screen, { backgroundColor: c.bg }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>No encontramos esa parada</Text></View>;
+  // al abrir la app directo en una parada (desde el widget, por ejemplo) las rutas aún se están cargando: eso no es «no existe»
+  if (!stop) return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <CloseToolbar />
+      <View style={[styles.screen, { paddingTop: space[10] * 2 }]}>
+        <Text style={[type.headline, { color: c.text }]}>{transit.network.stops.size ? "No encontramos esa parada" : "Cargando la parada…"}</Text>
+        <Text style={[type.body, { color: c.muted }]}>{transit.network.stops.size ? "Puede que ya no exista o que haya cambiado de código." : "Estamos trayendo las rutas y paradas. Un momento."}</Text>
+      </View>
+    </View>
+  );
 
   const rows = upcomingAtStop(transit, id, nowSec(), 6);
   const down = liveDown();
