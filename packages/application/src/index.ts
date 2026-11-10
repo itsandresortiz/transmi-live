@@ -9,3 +9,4 @@ export * from "./service-ends";
 export * from "./departures";
 export * from "./traffic";
 export * from "./planner";
+export * from "./station-geometry";

@@ -20,4 +20,5 @@ export const BUS_SPRITES: Record<string, number> = {
   "otro-s-L": require("../../assets/sprites/otro-s-L.png"),
   "otro-l-R": require("../../assets/sprites/otro-l-R.png"),
   "otro-l-L": require("../../assets/sprites/otro-l-L.png"),
+  semaforo: require("../../assets/semaforo.png"),
 };

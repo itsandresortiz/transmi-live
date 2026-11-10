@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import * as Location from "expo-location";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ import { toGeo } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { motion } from "@/map/engine";
 import { useMapFocus } from "@/map/focus";
+import { useMapLayers } from "@/map/layers";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { locateMe } from "@/location";
 import { FeedStatus } from "@/ui/FeedStatus";
@@ -50,6 +51,8 @@ export default function Mapa() {
   const [me, setMe] = useState<{ lat: number; lon: number } | null>(null);
   const [center, setCenter] = useState<{ lat: number; lon: number; zoom: number; bearing: number } | null>(null);
   const [denied, setDenied] = useState(false);
+  const [panel, setPanel] = useState(false);
+  const layers = useMapLayers();
   useEffect(() => {
     if (!focused) return;
     let sub: Location.LocationSubscription | undefined, gone = false;
@@ -88,7 +91,7 @@ export default function Mapa() {
       {focused ? <StatusBar style="dark" /> : null}
       {/* el mapa no se lee con VoiceOver: las pestañas Rutas y Cómo llegar dicen lo mismo con texto */}
       <View style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <TransitMap ref={map} system={system} active={focused} calm={calm} onView={onView} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
+      <TransitMap ref={map} system={system} active={focused} calm={calm} showSignals={layers.signals} showStations={layers.stations} onView={onView} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
         onBus={(id) => { void Haptics.selectionAsync(); router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
         onStop={(id) => router.navigate({ pathname: "/stop/[id]", params: { id } })} />
       </View>
@@ -104,6 +107,21 @@ export default function Mapa() {
           </ScrollView>
         </Glass>
       </View>
+      {panel ? (
+        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(140)} style={[styles.panel, { bottom: insets.bottom + (away ? 140 : 80) }]}>
+          <Glass scheme="light" style={styles.panelGlass}>
+            <View style={{ padding: space[4], gap: space[3] }}>
+              <Text style={[type.eyebrow, { color: "#5c5c63" }]}>CAPAS DEL MAPA</Text>
+              {([["signals", "Semáforos"], ["stations", "Estaciones con sus vagones"]] as const).map(([k, label]) => (
+                <View key={k} style={styles.panelRow}>
+                  <Text style={[type.body, { color: "#111114", flex: 1 }]}>{label}</Text>
+                  <Switch value={layers[k]} onValueChange={(v) => layers.set(k, v)} accessibilityLabel={label} />
+                </View>
+              ))}
+            </View>
+          </Glass>
+        </Animated.View>
+      ) : null}
       {rotated ? (
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(160)} style={[styles.compass, { top: insets.top + (focus.stopId || focus.routeId || focus.followBusId ? 132 : 82) }]}>
           <Tap onPress={() => map.current?.resetNorth()} accessibilityRole="button" accessibilityLabel="Orientar el mapa hacia el norte">
@@ -128,7 +146,10 @@ export default function Mapa() {
       {/* el estado del servicio y el botón de ubicación van en una fila de vidrio justo encima de la barra inferior (en estas pantallas el margen de abajo ya cuenta la barra) */}
       <View pointerEvents="box-none" style={[styles.bottomRow, { bottom: insets.bottom + 12 }]}>
         <View pointerEvents="none"><FeedStatus light /></View>
-        {away ? <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)}><RoundButton symbol={denied ? "location.slash.fill" : "location.fill"} label={denied ? "Activar mi ubicación" : "Volver a mi ubicación"} onPress={() => void locate()} size={52} light /></Animated.View> : <View style={{ width: 52, height: 52 }} />}
+        <View pointerEvents="box-none" style={styles.rightCol}>
+          <RoundButton symbol="square.3.layers.3d" label="Capas del mapa" onPress={() => setPanel((p) => !p)} size={46} light />
+          {away ? <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)}><RoundButton symbol={denied ? "location.slash.fill" : "location.fill"} label={denied ? "Activar mi ubicación" : "Volver a mi ubicación"} onPress={() => void locate()} size={52} light /></Animated.View> : null}
+        </View>
       </View>
     </View>
   );
@@ -139,7 +160,11 @@ const styles = StyleSheet.create({
   top: { position: "absolute", left: space[4], right: space[4] },
   chipsGlass: { borderRadius: 28, overflow: "hidden" },
   chips: { gap: space[2], padding: space[2] },
-  bottomRow: { position: "absolute", left: space[4], right: space[4], flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  bottomRow: { position: "absolute", left: space[4], right: space[4], flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  rightCol: { alignItems: "center", gap: space[3] },
+  panel: { position: "absolute", right: space[4], width: 270 },
+  panelGlass: { borderRadius: 24, overflow: "hidden" },
+  panelRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
   compass: { position: "absolute", right: space[4] },
   compassGlass: { width: 46, height: 46, borderRadius: 23, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   scrim: { position: "absolute", top: 0, left: 0, right: 0 },
