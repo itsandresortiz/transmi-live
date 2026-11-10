@@ -22,6 +22,7 @@
 - App/mapa: no cambiar `mapStyle` en caliente: el mapa se vuelve a montar con `key` al cambiar de apariencia.
 - App/mapa: **no agregar ni quitar capas en caliente** (cierra la app): capas siempre montadas, cambiar `visibility`. No pasar un solo punto a `fitBounds` (cierra la app): usar `flyTo`.
 - App: efectos de cristal solo sobre contenido (mapa); sobre el mapa usar `Glass scheme="light"` (significa «sobre el mapa»: sigue al mapa claro u oscuro) y los colores de `useOnMap()` para el texto, nunca `#111114` fijo. Botones principales: `PrimaryButton`. Cerrar = **X** (icono), no la palabra «Cerrar».
+- Swift: no escribir en una misma condición `a < b, c > d` (se interpreta como genérico y no compila): calcular cada comparación en una variable.
 - App: interruptores con `Toggle` (de `kit.tsx`), no con `Switch` directo (en iOS 26 queda descentrado).
 - App: las filas que se deslizan de lado deben llegar a los bordes de la pantalla (`marginHorizontal` negativo + `paddingHorizontal` en el contenido); si no, las fichas se recortan en seco en el margen.
 - App: pantallas ocultas no deben repintarse (`useTransitVersion`/`useNow` ya dependen de `useIsFocused`); no calcular cosas pesadas en cada segundo.

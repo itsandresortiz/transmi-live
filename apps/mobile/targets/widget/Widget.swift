@@ -69,7 +69,10 @@ struct Provider: TimelineProvider {
     fetchRemote(stopId: stop.id) { remote in
       var snap = local
       // se usa lo publicado solo si es reciente (menos de 10 min) y más nuevo que lo que dejó la app
-      if let remote, Date().timeIntervalSince1970 - remote.at < 600, remote.at > (local?.at ?? 0) {
+      // (cada comparación va entre paréntesis: `a < b, c > d` seguido lo lee Swift como un tipo genérico y no compila)
+      let age = Date().timeIntervalSince1970 - (remote?.at ?? 0)
+      let newer = (remote?.at ?? 0) > (local?.at ?? 0)
+      if let remote = remote, (age < 600), newer {
         let fresh = StopData(id: stop.id, name: stop.name, arrivals: remote.stops[stop.id] ?? [], sched: stop.sched)
         snap = Snapshot(at: remote.at, stops: [fresh] + Array((local?.stops ?? []).dropFirst()), demo: false)
       }
