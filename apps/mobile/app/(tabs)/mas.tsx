@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState, type ReactNode } from "react";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { liveDown } from "@/lastService";
@@ -47,6 +48,9 @@ function Group({ title, children, footer, bare = false }: { title: string; child
 }
 
 /** «Más»: la tarjeta TuLlave arriba, con su propio lugar, y lo demás agrupado como en Ajustes (servicio, tus cosas, apariencia, ayuda). */
+/** Se recuerda mientras la app siga abierta. */
+let testsShown = false, secretTaps = 0;
+
 export default function Mas() {
   const c = useColors();
   const appearance = useAppearance();
@@ -63,6 +67,9 @@ export default function Mas() {
       { text: "Cancelar", style: "cancel" },
     ]);
   };
+  // «Buses de ejemplo» es una herramienta de pruebas: queda escondida y aparece al tocar 8 veces la fila de buses en la calle
+  const [tests, setTests] = useState(testsShown);
+  const secretTap = () => { if (tests) return; if (++secretTaps >= 8) { testsShown = true; setTests(true); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } };
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
   const hasBuses = !liveDown(), late = (st.ageSeconds ?? 0) > 300, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
@@ -90,6 +97,7 @@ export default function Mas() {
         </Tap>
 
         <Group title="SERVICIO" footer={!hasBuses ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: puedes consultar horarios y planear viajes." : late && ageMin != null ? `El último dato de los buses tiene ${ageMin} min.` : undefined}>
+          <Pressable onPress={secretTap} accessible={false}>
           <View style={styles.row}>
             <View style={[styles.tile, { backgroundColor: hasBuses && !late ? "#22c55e" : "#f59e0b" }]}><SymbolView name="dot.radiowaves.left.and.right" tintColor="#ffffff" size={17} /></View>
             <View style={[styles.rowBody, { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.line }]} accessible accessibilityLabel={hasBuses ? `${transit.fleet.size} buses en la calle` : "Sin datos en vivo por ahora"}>
@@ -97,6 +105,7 @@ export default function Mas() {
               <Text style={[type.body, { color: c.muted, fontVariant: ["tabular-nums"] }]}>{hasBuses ? transit.fleet.size.toLocaleString("es-CO") : "Sin datos por ahora"}</Text>
             </View>
           </View>
+          </Pressable>
           <Row last symbol="bell.fill" tint="#ef4444" title="Avisos del servicio" value={alerts ? String(alerts) : "Ninguno"} onPress={() => router.push("/avisos")} />
         </Group>
 
@@ -114,6 +123,7 @@ export default function Mas() {
           </View>
         </Group>
 
+{tests || demo.on ? (
         <Group title="PRUEBAS" footer={demo.error ?? (demo.on ? "Estás viendo buses de ejemplo (lotes reales de una noche anterior). No son datos en vivo: apágalo para volver a los datos reales." : "Muestra buses de ejemplo para probar el mapa, las paradas y «Voy en este bus» cuando no hay servicio. No son datos en vivo.")}>
           <View style={styles.row}>
             <View style={[styles.tile, { backgroundColor: "#8b5cf6" }]}><SymbolView name="play.fill" tintColor="#ffffff" size={15} /></View>
@@ -123,6 +133,7 @@ export default function Mas() {
             </View>
           </View>
         </Group>
+        ) : null}
 
         <Group title="AYUDA">
           <Row symbol="exclamationmark.bubble.fill" tint="#8b5cf6" title="Reportar un problema o dar una idea" onPress={() => reportProblem({ what: "la app en general" })} link />

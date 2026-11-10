@@ -18,6 +18,7 @@ import { useDemo } from "@/demo";
 import { usePlanner } from "@/planner/store";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { Card, IconDot, RoundButton, SectionTitle, Tap, PAGE } from "@/ui/kit";
+import { TripBanner } from "@/ui/TripBanner";
 import { radius, space, type, useColors } from "@/ui/theme";
 
 const greeting = () => {
@@ -88,6 +89,7 @@ export default function Inicio() {
         </Tap>
 
 
+        <View style={{ paddingHorizontal: space[5], marginTop: space[4] }}><TripBanner /></View>
         <SectionTitle title="Tus paradas" action={favStops.length ? "Ver todas" : undefined} onAction={() => router.push("/favoritos")} />
         {favStops.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} decelerationRate="fast" snapToInterval={cardW + space[3]} contentContainerStyle={{ paddingHorizontal: space[5], gap: space[3] }}>

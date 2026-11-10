@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { startData } from "@/bootstrap";
 import { RideWatcher } from "@/RideWatcher";
+import { TripWatcher } from "@/TripWatcher";
 import { WidgetSync } from "@/widgetSync";
 import { Launch, useLaunch } from "@/ui/Launch";
 import { useColors } from "@/ui/theme";
@@ -23,6 +24,7 @@ export default function RootLayout() {
     <>
       <StatusBar style="auto" />
       <RideWatcher />
+      <TripWatcher />
       <WidgetSync />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
@@ -30,6 +32,7 @@ export default function RootLayout() {
         <Stack.Screen name="bus/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="ride/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="stop/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
+        <Stack.Screen name="trip" options={{ presentation: "modal", headerShown: true, title: "Tu viaje", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="avisos" options={{ presentation: "modal", headerShown: true, title: "Avisos del servicio", headerTintColor: "#e11d2e" }} />
         <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="personalizar/[id]" options={{ presentation: "modal", headerShown: true, title: "Personalizar parada", headerShadowVisible: false, contentStyle: { backgroundColor: c.bg } }} />

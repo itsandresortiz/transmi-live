@@ -15,7 +15,10 @@ import { etaText } from "@/format";
 import { durText, hm, isRide, isWalk, meters, mins, transfersText } from "@/planner/format";
 import { nowMode, sorted, usePlanner, type When } from "@/planner/store";
 import { useSaved } from "@/favorites";
-import { Card, Chip, Tap, PAGE } from "@/ui/kit";
+import { Card, Chip, PrimaryButton, Tap, PAGE } from "@/ui/kit";
+import { TripBanner } from "@/ui/TripBanner";
+import { allowAlerts } from "@/notify";
+import { useTrip } from "@/trip";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -63,6 +66,7 @@ export default function Viaje() {
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[PAGE, { paddingBottom: space[10] * 3 }]}>
         <Text style={[type.largeTitle, styles.title, { color: c.text }]} accessibilityRole="header">¿Cómo llegar?</Text>
+        <View style={{ paddingHorizontal: space[5] }}><TripBanner /></View>
         {saveAs ? (
           <View style={styles.pad}>
             <Card style={{ gap: space[1], borderWidth: 1.5, borderColor: c.accent }} >
@@ -248,6 +252,7 @@ function TripCard({ it, open, onPress, now }: { it: Itinerary; open: boolean; on
               </Tap>
             ))}
             <View style={styles.step}><SymbolView name="mappin.circle.fill" tintColor={c.accent} size={18} /><Text style={[type.headline, { color: c.text }]}>Llegas a las {hm(it.arriveAt)}</Text></View>
+            {first ? <PrimaryButton label="Seguir este viaje" symbol="bell.fill" a11y="Seguir este viaje: te avisamos cuándo subir, cuándo bajar y qué sigue" onPress={() => { void allowAlerts(); useTrip.getState().start(it, usePlanner.getState().dest?.name ?? ""); router.push("/trip"); }} /> : null}
           </View>
         ) : null}
       </Card>

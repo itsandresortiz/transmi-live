@@ -56,11 +56,12 @@ export function RideWatcher() {
   const launched = useLaunch((s) => s.done);
   useEffect(() => {
     if (!launched) return;
+    const openTrip = () => { if (pathRef.current !== "/trip") setTimeout(() => router.push("/trip"), 150); };
     return onAlertTap((d) => {
       const ride = useRide.getState();
       if (!ride.busId) ride.set(d.busId, d.alightId, d.total);
       if (pathRef.current !== `/ride/${d.busId}`) setTimeout(() => router.push({ pathname: "/ride/[id]", params: { id: d.busId } }), 150);
-    });
+    }, openTrip);
   }, [launched]);
 
   return null;

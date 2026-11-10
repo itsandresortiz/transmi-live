@@ -5,6 +5,9 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 
 ## Sin commit (pendiente de decisión del dueño)
 
+- 2026-11-10 · app · «Reportar un problema o dar una idea» abre un **correo** a la dirección pública de contacto (`src/report.ts`, `CONTACT`); antes abría GitHub. Si no hay app de correo, muestra la dirección.
+- 2026-11-10 · app · «Buses de ejemplo» queda **escondido**: el grupo «Pruebas» de Más aparece al tocar 8 veces la fila «Buses en la calle» (o si la demostración está encendida). Se recuerda mientras la app siga abierta.
+- 2026-11-10 · app · **«Seguir este viaje»** en Cómo llegar: guía paso a paso con avisos («Ya casi llega el X», «Prepárate para bajar», «Bájate aquí: …» + qué sigue: caminar, siguiente bus y en qué vagón/paradero). Lógica pura en `packages/application/src/trip-guide.ts` (prueba `trip-guide.test.ts`); app: `src/trip.ts` (`tm.trip.v1`), `src/TripWatcher.tsx`, `app/trip.tsx`, `src/ui/TripBanner.tsx` (Inicio y Cómo llegar), `notify.ts` (`scheduleTrip`). Sin probar en teléfono.
 - 2026-11-10 · web+app · **«Sin datos en vivo» de madrugada**: con datos llegando pero pocos buses (medido 02:47: 85 en el lote, solo 7 con reporte de <5 min) la app decía «Sin datos en vivo». Nuevo `liveLevel()` en `packages/application` (`live`/`few`/`late`/`none`, prueba `live-level.test.ts`): pocos buses con dato reciente = «En vivo · N buses a esta hora». `liveDown()` de web y app lo usan.
 - 2026-11-10 · `testflight-local.sh` hace todo solo: baja lo nuevo (`git pull --ff-only`, restaurando antes `package-lock.json`) y se relanza, cierra `expo start`, borra `ios/` y `build/`. El dueño ya solo corre un comando. No probado en Mac (?).
 - 2026-11-10 · app · Interruptores («Buses de ejemplo», capas del mapa) descentrados en su fila: nuevo `Toggle` en `kit.tsx` que le da al interruptor nativo su tamaño real de iOS 26 (63×28) y lo centra. **Sin ver en simulador (?)**: si sigue corrido, pedir captura.

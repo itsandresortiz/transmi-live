@@ -12,13 +12,15 @@ export type RideAlert = (typeof IDS)[number];
 export interface RideData { busId: string; alightId: string; total: number }
 
 /** Llama a `open` cuando la persona toca un aviso del viaje, también si con ese toque se abrió la app. Devuelve cómo dejar de escuchar. */
-export function onAlertTap(open: (d: RideData) => void): () => void {
+export function onAlertTap(open: (d: RideData) => void, openTrip?: () => void): () => void {
   let last = "";
   const handle = (r: Notifications.NotificationResponse | null) => {
-    const req = r?.notification.request, d = req?.content.data as Partial<RideData> | undefined;
-    if (!req || !d || typeof d.busId !== "string" || typeof d.alightId !== "string") return;
+    const req = r?.notification.request, d = req?.content.data as (Partial<RideData> & { trip?: boolean }) | undefined;
+    if (!req || !d) return;
     const key = req.identifier + r!.notification.date;
     if (key === last) return;
+    if (d.trip === true) { last = key; openTrip?.(); return; }
+    if (typeof d.busId !== "string" || typeof d.alightId !== "string") return;
     last = key;
     open({ busId: d.busId, alightId: d.alightId, total: typeof d.total === "number" ? d.total : 0 });
   };
@@ -55,3 +57,24 @@ export async function schedule(id: RideAlert, at: number, title: string, body: s
 export async function cancelAlerts(): Promise<void> {
   try { await Promise.all(IDS.map((i) => Notifications.cancelScheduledNotificationAsync(i))); } catch { /* nada que cancelar */ }
 }
+
+/* ---------- avisos de un viaje de «Cómo llegar» (varios buses y caminatas) ---------- */
+const TRIP = "trip-";
+/** Deja programados exactamente estos avisos del viaje (los que ya pasaron o sobran se quitan). `at` en segundos. */
+export async function scheduleTrip(alerts: readonly { id: string; at: number; title: string; body: string }[]): Promise<void> {
+  try {
+    const keep = new Set<string>();
+    for (const a of alerts) {
+      if (a.at * 1000 < Date.now() + 2000) continue;
+      keep.add(TRIP + a.id);
+      await Notifications.scheduleNotificationAsync({
+        identifier: TRIP + a.id,
+        content: { title: a.title, body: a.body, data: { trip: true }, sound: true, interruptionLevel: "timeSensitive" },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(a.at * 1000) },
+      });
+    }
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(all.filter((n) => n.identifier.startsWith(TRIP) && !keep.has(n.identifier)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+  } catch { /* sin permiso: la pantalla del viaje sigue guiando */ }
+}
+export const cancelTrip = (): Promise<void> => scheduleTrip([]);

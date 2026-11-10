@@ -10,3 +10,4 @@ export * from "./departures";
 export * from "./traffic";
 export * from "./planner";
 export * from "./station-geometry";
+export * from "./trip-guide";

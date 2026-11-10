@@ -16,7 +16,11 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - Cierre de ventanas con la X nativa y enlaces directos (`transmilive:///stop/ID`) con el inicio debajo.
 - Probar todo lo que depende de buses **de día** (de noche el servicio termina): llegadas, «Seguir bus», «Voy en este bus» (avisos), widget con tiempos.
 
+- **«Seguir este viaje»** (nuevo): probar un viaje real con trasbordo; ¿los avisos llegan a tiempo?, ¿avanza de paso al llegar a la parada / subir / bajar?, ¿el aviso abre el viaje?
+- Interruptores centrados (`Toggle`), tarjeta «Vas en este bus» en el mapa, aviso del viaje que abre el viaje: sin ver en teléfono.
+
 ## Bugs conocidos / limitaciones
+- «Seguir este viaje»: solo se conoce el bus real del primer tramo (los demás van por hora estimada); con la app cerrada no se corrige el atraso.
 - ~1.000 buses (≈20 %) sin próxima parada: su ruta no existe en el GTFS publicado (el GTFS va por detrás del feed). Solo ~5 % de los buses trae puntualidad.
 - Otras rutas con orden de paradas desactualizado (como H15/Calle 57): agregar a `STOP_PATCHES` cuando el dueño lo confirme (H20, H27, A60… paran en Calle 53; **no verificado** si paran en Calle 57).
 - ~80 vagones de 602 siguen con «ningún bus viene» aunque hay buses de sus rutas en la calle (sobre todo extremos norte: Toberín, Calle 187); no se confirmó uno por uno.

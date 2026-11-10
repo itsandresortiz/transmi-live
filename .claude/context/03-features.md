@@ -25,7 +25,7 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 | **Mapa** | `mapa.tsx` | Mapa en vivo: abre centrado en ti la primera vez (si estás en Bogotá), filtros de sistema en vidrio, «En vivo», botón de ubicación (solo al alejarte), botón de capas (semáforos, estaciones), brújula propia (solo si el mapa está girado), tarjeta de «siguiendo un bus» con próxima parada |
 | **Rutas** | `rutas.tsx` | Buscador y lista de rutas |
 | **Cómo llegar** | `viaje.tsx` | Origen/destino, salir ahora / salir a las / llegar a las, orden, itinerarios; tocar un tramo de bus abre la parada con esa ruta; modo «guardar casa/trabajo» (`planner/store.ts` `saveAs`) |
-| **Más** | `mas.tsx` | Tarjeta TuLlave destacada arriba (abre `/card`) y listas agrupadas tipo Ajustes: Servicio (buses en la calle, avisos con conteo), Tus cosas (Favoritos, Cerca de mí), Apariencia (Automático/Claro/Oscuro, `src/appearance.ts`), Ayuda (reportar problema → GitHub, privacidad), versión y compilación |
+| **Más** | `mas.tsx` | Tarjeta TuLlave destacada arriba (abre `/card`) y listas agrupadas tipo Ajustes: Servicio (buses en la calle, avisos con conteo), Tus cosas (Favoritos, Cerca de mí), Apariencia (Automático/Claro/Oscuro, `src/appearance.ts`), Pruebas (escondido: 8 toques en «Buses en la calle»), Ayuda (reportar problema → correo de contacto, privacidad), versión y compilación |
 
 ### Ventanas (todas `modal` con X nativa)
 | Ruta | Archivo | Qué hace |
@@ -34,6 +34,7 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 | `/bus/[id]` | `app/bus/[id].tsx` | Bus: estado de puntualidad, próxima parada, «Voy en este bus», «Ver la ruta» |
 | `/ride/[id]` | `app/ride/[id].tsx` | **Voy en este bus**: tablero de a bordo (título «Llegando a…», escena animada `src/ui/RideScene.tsx` con la avenida en perspectiva y bordes fundidos, tarjeta de información, barra «Trayecto» por segmentos cuando hay parada de bajada) y próximas paradas (hasta 30) con cuenta regresiva y hora; tocar una = «aquí bajas»; vibración 3 paradas antes / 1 antes / al llegar y **notificaciones locales** programadas (`src/RideWatcher.tsx`, `notify.ts`); mantiene la pantalla encendida. Tocar un aviso abre esta ventana con ese bus. Abrirla marca el bus como **seguido** (`useMapFocus.followBusId`): al cerrarla, el mapa muestra la tarjeta fija «Vas en este bus» |
 | `/route/[id]` | `app/route/[id].tsx` | Ruta: mapa con trazado y buses, buses en vivo con próxima parada, paradas con buses que van hacia ellas, horario, avisos, favorito |
+| `/trip` | `app/trip.tsx` | **Seguir este viaje** (se inicia desde una opción de «Cómo llegar»): tarjeta «Ahora» (qué hacer y cuenta regresiva), pasos con hora y estado, «Terminar viaje». `TripWatcher` avanza los pasos con la ubicación (solo con la app abierta) y el bus en vivo, y programa avisos locales de cada paso; con la app cerrada salen a la hora estimada. `TripBanner` lo recuerda en Inicio y Cómo llegar |
 | `/avisos` | `app/avisos.tsx` | Avisos vigentes |
 | `/card` | `app/card.tsx` | Mi tarjeta: lee el saldo por NFC (módulo `tullave`), tarjeta oscura con saldo animado, número oculto, resumen del mes, movimientos |
 | `/cerca` | `app/cerca.tsx` | Paradas y estaciones a <1 km con sus próximos buses; «Verme en el mapa» |
