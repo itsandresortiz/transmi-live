@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { toGeo, type SystemType } from "@transmi/domain";
+import { cadenceMs } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";
 import { motion } from "./engine";
@@ -13,10 +14,10 @@ const capFor = (zoom: number) => (zoom < 11 ? 300 : zoom < 13 ? 600 : 900);
 const hash = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0; return Math.abs(h); };
 const EMPTY: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
 
-/** Buses de la pantalla como puntos para el mapa, recalculados hasta 4 veces por segundo (menos si el mapa está lejos y hay muchos) con el motor de movimiento. Solo los que se ven. */
+/** Buses de la pantalla como puntos para el mapa, recalculados con el motor de movimiento a la cadencia de `cadenceMs`. Solo los que se ven. */
 export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; enabled?: boolean; everyMs?: number } = {}): FeatureCollection<Point> {
   const [data, setData] = useState<FeatureCollection<Point>>(EMPTY);
-  const { system = null, routeId = null, enabled = true, everyMs = 250 } = opts;
+  const { system = null, routeId = null, enabled = true, everyMs = 0 } = opts;
   useEffect(() => {
     if (!enabled || !view) { setData(EMPTY); return; }
     const build = () => {
@@ -40,14 +41,15 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
         if (features.length >= cap * 1.4) break;
       }
       setData({ type: "FeatureCollection", features });
+      return features.length;
     };
     let timer: ReturnType<typeof setTimeout>, stopped = false, lastPrune = Date.now();
     const loop = () => {
       const t0 = Date.now();
-      build();
+      const count = build();
       if (Date.now() - lastPrune > 30_000) { lastPrune = Date.now(); motion.prune(); }      // el motor olvida los buses que ya no existen (si no, la memoria crece sin parar)
       const spent = Date.now() - t0;
-      if (!stopped) timer = setTimeout(loop, Math.max(everyMs, view.zoom < 13 ? 700 : view.zoom < 14.5 ? 400 : 250, spent * 3));      // si calcular tarda mucho, se espacia: los toques tienen prioridad sobre el movimiento
+      if (!stopped) timer = setTimeout(loop, Math.max(everyMs, cadenceMs(view.zoom, count), spent * 3));      // si calcular tarda mucho, se espacia: los toques tienen prioridad sobre el movimiento
     };
     loop();
     return () => { stopped = true; clearTimeout(timer); };

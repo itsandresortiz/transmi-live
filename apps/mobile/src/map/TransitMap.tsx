@@ -1,4 +1,4 @@
-import { type ComponentProps, forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
+import { type ComponentProps, forwardRef, memo, useCallback, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import { Camera, GeoJSONSource, Images, Layer, Map, UserLocation, type CameraRef } from "@maplibre/maplibre-react-native";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
@@ -7,6 +7,7 @@ import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
+import { useAccessibility } from "@/accessibility";
 import { CORRIDORS, PORTALS, buildStationGeometry, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
@@ -73,7 +74,6 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     },
   }), []);
 
-  const buses = useBusFeatures(view, { system, routeId, enabled: active, everyMs: calm ? 2000 : 250 });
 
   const stops = useMemo<FeatureCollection<Point>>(() => {
     const features: Feature<Point>[] = [];
@@ -153,7 +153,6 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   const stationsJson = useMemo(() => JSON.stringify(stations), [stations]);
   const lineJson = useMemo(() => JSON.stringify(line), [line]);
   const stopsJson = useMemo(() => JSON.stringify(stops), [stops]);
-  const busesJson = useMemo(() => JSON.stringify(buses), [buses]);
 
   const focusJson = useMemo(() => {
     const st = focusStopId ? transit.stopById(focusStopId) : undefined;
@@ -238,20 +237,41 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <Layer id="stops-dot" type="circle" {...sp({ circleRadius: 5.5, circleColor: "#ffffff", circleStrokeColor: c.dark ? "#d4d4d8" : "#3f3f46", circleStrokeWidth: 2 })} />
       </GeoJSONSource>
 
-      <GeoJSONSource id="buses" data={busesJson} onPress={(e) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onBus?.(id); }}>
-        {<Layer id="bus-ring" type="circle" filter={["in", ["get", "id"], ["literal", highlightIds.length ? highlightIds : ["__ninguno__"]]]} {...sp({ circleRadius: 22, circleColor: "#e11d2e", circleOpacity: 0.12, circleStrokeColor: "#e11d2e", circleStrokeWidth: 3 })} />}
-        <Layer id="bus-hit" type="circle" {...sp({ circleRadius: 20, circleColor: "#000000", circleOpacity: 0.01 })} />
-        <Layer id="bus-dot" type="circle" maxzoom={11.8} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 9, 2.6, 11.8, 4], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 1 })} />
-        <Layer id="bus-sprite" type="symbol" minzoom={11.8} {...sp({
-          iconImage: ["get", "sprite"], iconSize: ["interpolate", ["linear"], ["zoom"], 11.8, 0.115, 14, 0.19, 16, 0.3, 18, 0.45],
-          iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconPitchAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true,
-        })} />
-        <Layer id="bus-label" type="symbol" minzoom={15} {...sp({
-          textField: ["get", "route"], textFont: ["Noto Sans Regular"], textSize: 11, textOffset: [0, -1.5], textColor: c.dark ? "#f4f4f5" : "#111827",
-          textHaloColor: c.dark ? "#18181b" : "#ffffff", textHaloWidth: 1.6, textAllowOverlap: false,
-        })} />
-      </GeoJSONSource>
+      <BusLayer view={view} system={system} routeId={routeId} active={active} calm={calm} highlightIds={highlightIds} dark={c.dark} onBus={onBus} />
       {children}
     </Map>
+  );
+});
+
+/** Los buses, aparte del resto del mapa: se recalculan muchas veces por segundo y así solo se repinta esta capa (no las estaciones, la red ni los semáforos).
+ *  Los estilos de las capas se crean una sola vez: en cada tanda lo único que cambia son los datos. */
+const BusLayer = memo(function BusLayer({ view, system, routeId, active, calm, highlightIds, dark, onBus }: { view: Viewport | null; system: SystemType | null; routeId: string | null; active: boolean; calm: boolean; highlightIds: string[]; dark: boolean; onBus?: (id: string) => void }) {
+  const { reduceMotion } = useAccessibility();
+  const buses = useBusFeatures(view, { system, routeId, enabled: active, everyMs: calm ? 2000 : reduceMotion ? 250 : 0 });
+  const json = useMemo(() => JSON.stringify(buses), [buses]);
+  const ringKey = highlightIds.join(",");
+  const st = useMemo(() => ({
+    ring: sp({ circleRadius: 22, circleColor: "#e11d2e", circleOpacity: 0.12, circleStrokeColor: "#e11d2e", circleStrokeWidth: 3 }),
+    ringFilter: ["in", ["get", "id"], ["literal", highlightIds.length ? highlightIds : ["__ninguno__"]]] as never,
+    hit: sp({ circleRadius: 20, circleColor: "#000000", circleOpacity: 0.01 }),
+    dot: sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 9, 2.6, 11.8, 4], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 1 }),
+    sprite: sp({
+      iconImage: ["get", "sprite"], iconSize: ["interpolate", ["linear"], ["zoom"], 11.8, 0.115, 14, 0.19, 16, 0.3, 18, 0.45],
+      iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconPitchAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true,
+    }),
+    label: sp({
+      textField: ["get", "route"], textFont: ["Noto Sans Regular"], textSize: 11, textOffset: [0, -1.5], textColor: dark ? "#f4f4f5" : "#111827",
+      textHaloColor: dark ? "#18181b" : "#ffffff", textHaloWidth: 1.6, textAllowOverlap: false,
+    }),
+  }), [dark, ringKey]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const press = useCallback((e: { nativeEvent: { features: { properties?: Record<string, unknown> | null }[] } }) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onBus?.(id); }, [onBus]);
+  return (
+    <GeoJSONSource id="buses" data={json} onPress={press as never}>
+      <Layer id="bus-ring" type="circle" filter={st.ringFilter} {...st.ring} />
+      <Layer id="bus-hit" type="circle" {...st.hit} />
+      <Layer id="bus-dot" type="circle" maxzoom={11.8} {...st.dot} />
+      <Layer id="bus-sprite" type="symbol" minzoom={11.8} {...st.sprite} />
+      <Layer id="bus-label" type="symbol" minzoom={15} {...st.label} />
+    </GeoJSONSource>
   );
 });

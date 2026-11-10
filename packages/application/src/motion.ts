@@ -223,3 +223,13 @@ export class MotionEngine {
     return { s: 0, world: v.world };
   }
 }
+
+/** Cada cuánto se recalculan los buses (ms): entre menos buses haya en pantalla y más cerca esté el mapa, más seguido, para que se vean deslizarse y no saltar.
+ *  De cerca con pocos buses ≈15 veces por segundo; lejos y con cientos, 1–2 veces por segundo (ahí no se nota y cuesta mucho). */
+export function cadenceMs(zoom: number, count: number): number {
+  if (zoom >= 14.5 && count <= 40) return 66;
+  if (zoom >= 13.5 && count <= 120) return 110;
+  if (zoom >= 13 && count <= 300) return 180;
+  return zoom < 13 ? 700 : zoom < 14.5 ? 400 : 250;
+}
+

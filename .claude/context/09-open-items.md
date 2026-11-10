@@ -21,6 +21,9 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 
 - Nombres de estaciones/portales con color de línea en el mapa de la app: si **no aparecen los nombres**, el mapa base no tiene «Noto Sans Bold»: volver a «Noto Sans Regular» en `TransitMap.tsx`.
 
+- Buses más fluidos (hasta 15 veces/s de cerca): revisar que el teléfono no se caliente; si vuelve el aviso de CPU, subir los valores de `cadenceMs`.
+- Mapa oscuro y capa de tráfico en la app: revisar lectura de controles y textos sobre el mapa oscuro.
+
 ## Bugs conocidos / limitaciones
 - «Seguir este viaje»: solo se conoce el bus real del primer tramo (los demás van por hora estimada); con la app cerrada no se corrige el atraso.
 - ~1.000 buses (≈20 %) sin próxima parada: su ruta no existe en el GTFS publicado (el GTFS va por detrás del feed). Solo ~5 % de los buses trae puntualidad.

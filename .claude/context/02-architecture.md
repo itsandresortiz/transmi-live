@@ -29,7 +29,7 @@ Medido el 2026-11-10: solo ~8 % de los buses estaban a <1 km de su `lastStopId`;
 
 ## Motor de movimiento (`MotionEngine`)
 Pega cada bus a su trazado y lo hace avanzar entre reportes: ganancia 0,5 de la velocidad medida, corrección suave sin retroceder (hasta 3× su ritmo), desliza los saltos en ~2 s, desde el primer lote deduce velocidad de la ruta y la parada siguiente. Medido en la web (README raíz): error mediano ~87 m, 0 m a lo ancho. `step(v, nowSec)` se llama cuadro a cuadro (web, canvas) o a 4 Hz como máximo (app).
-En la app, `useBuses.ts` **filtra primero por el último reporte** (±3 km del viewport) y solo calcula esos, adapta la frecuencia al zoom (250/400/700 ms) y poda el motor cada 30 s.
+En la app, `useBuses.ts` **filtra primero por el último reporte** (±3 km del viewport) y solo calcula esos, adapta la frecuencia con `cadenceMs(zoom, buses en pantalla)` (66 ms de cerca con pocos buses … 700 ms de lejos) y poda el motor cada 30 s. Los buses se pintan en `BusLayer` (componente aparte y memorizado dentro de `TransitMap.tsx`).
 
 ## ETA (`arrivalAtIndex`)
 Ubica el bus en el trazado, calcula cuánto del tramo hacia la siguiente parada ya recorrió, suma el resto del tramo y ~50–62 s por parada restante (según sistema), contado desde el reporte. Error mediano medido: 26–37 s con 12–16 lotes reales (18–27 s en la ruta C15). Todos los dispositivos muestran el mismo tiempo (sin aprendizaje por aparato).
