@@ -93,19 +93,12 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     features: routeId ? (transit.network.shapes.get(routeId) ?? []).filter((sh) => sh.points.length > 1).map((sh) => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sh.points.map((p) => [p.lon, p.lat]) } })) : [],
   }), [routeId, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Las líneas de las troncales y duales, apenas visibles: dan contexto sin tapar los buses. */
-  const network = useMemo<FeatureCollection<LineString>>(() => {
-    const features: Feature<LineString>[] = [];
-    for (const r of transit.network.routes.values()) {
-      if (r.system !== "troncal" && r.system !== "dual") continue;
-      const sh = transit.network.shapes.get(r.id)?.[0];
-      if (!sh || sh.points.length < 2) continue;
-      const step = Math.max(1, Math.ceil(sh.points.length / 120));
-      const pts = sh.points.filter((_, i) => i % step === 0 || i === sh.points.length - 1);
-      features.push({ type: "Feature", properties: { color: SYSTEM_COLOR[r.system] }, geometry: { type: "LineString", coordinates: pts.map((p) => [p.lon, p.lat]) } });
-    }
-    return { type: "FeatureCollection", features };
-  }, [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  /** Las troncales, cada una con el color de su línea (Suba amarillo, Norte verde, Caracas azul…), como en la web y en el plano oficial.
+   *  Se dibuja el eje de cada avenida (una sola línea limpia), no el recorrido de cada ruta. No dependen de los datos en vivo. */
+  const network = useMemo<FeatureCollection<LineString>>(() => ({
+    type: "FeatureCollection",
+    features: CORRIDORS.map((k) => ({ type: "Feature", properties: { l: k.l }, geometry: { type: "LineString", coordinates: k.p.map(([la, lo]) => [lo, la]) } })),
+  }), []);
 
   /** Las estaciones de la troncal dibujadas como en la web: base, pasillo, vagones con puertas y su número. */
   const geo = useMemo(() => (transit.network.stops.size && transit.network.shapes.size ? buildStationGeometry(transit, trunkStations(transit), CORRIDORS) : null), [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -174,7 +167,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       <UserLocation />
 
       <GeoJSONSource id="network" data={networkJson}>
-        <Layer id="network-line" type="line" {...sp({ lineColor: ["get", "color"], lineOpacity: 0.45, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 3, 17, 6], lineCap: "round", lineJoin: "round" })} />
+        <Layer id="network-line" type="line" {...sp({ lineColor: lineColor(c.dark ? "#ff5a5e" : "#e30613") as never, lineOpacity: showTraffic ? 0.25 : 0.7, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 3, 17, 6], lineCap: "round", lineJoin: "round" })} />
       </GeoJSONSource>
       <GeoJSONSource id="trafico" data={trafficJson}>
         <Layer id="trafico-casing" type="line" minzoom={11.5} {...sp({ visibility: showTraffic ? "visible" : "none", lineColor: c.dark ? "#0b0b0d" : "#ffffff", lineOpacity: 0.55, lineWidth: ["interpolate", ["linear"], ["zoom"], 11.5, 3, 16, 7.5, 18.5, 12], lineCap: "round", lineJoin: "round" })} />
