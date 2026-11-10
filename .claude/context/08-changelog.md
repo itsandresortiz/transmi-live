@@ -1,0 +1,207 @@
+# Historial de cambios
+
+Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de `git log` (área = carpetas que tocó el commit) y se completa a mano con lo que no quede en un commit.
+Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
+
+## Sin commit (pendiente de decisión del dueño)
+
+- 2026-11-10 · La memoria del proyecto se movió de `docs/context/` + `CLAUDE.md` (raíz) a **`.claude/context/` + `.claude/CLAUDE.md`** y se subió a `main` por decisión del dueño, tras quitar nombres de repos de terceros, de otros proyectos del dueño y detalles de la cuenta de Apple. El repo es público: aquí no va nada privado. El `TEAM_ID` quedó guardado en el Mac del dueño (no en el repo).
+- 2026-11-10 · «Voy en este bus»: los buses de la escena son ahora una **caja 3D real** proyectada con la misma cámara de la vía (`tools/bus-rear-draw.js`: techo con equipos de aire, cara trasera, costado izquierdo, fuelle en articulados, sombra). `tools/bus-sprites.ts` genera las 10 imágenes y `assets/sprites-rear/meta.json` (dónde va cada una); `RideScene` las coloca con ese dato. Visto solo en el prototipo del navegador, no en el teléfono.
+- `.claude/context/**`, `CLAUDE.md`, `.claude/hooks/context-guard.sh` y `.claude/settings.json`: memoria persistente del proyecto y su hook de auto-actualización (creados el 2026-11-10, sesión de documentación).
+
+## 2026-11-10
+
+- (commit siguiente a `e563649`) · app · Bus de la escena del viaje: el techo fuga hacia el centro de la vía (misma perspectiva que el carril) y llena su carril.
+- (`bd34b2a` y siguiente) · app · Escena de «Voy en este bus»: bus con volumen en 3/4 desde atrás (cara trasera, luces, techo en perspectiva, fuelle), imágenes en `assets/sprites-rear` generadas por `tools/bus-sprites.ts` con el dibujo de `tools/bus-rear-draw.js`. Recorrido de la parada: etiqueta «Un bus va hacia aquí» con icono del sistema en vez de emoji.
+- (commit siguiente a `cd12343`) · app · Escena de «Voy en este bus»: el bus va dentro del plano inclinado de la vía (misma perspectiva), centrado en su carril y más grande; inclinación 56°.
+- (commit siguiente a `d910633`) · app · Favoritos: modo «Ordenar» con flechas para subir/bajar paradas (`moveStop` en `src/favorites.ts`); ese orden es el de Inicio y la primera es la del widget.
+- (commit siguiente a `297cdda`) · app · Más › Tus cosas: filas Casa y Trabajo para agregar, cambiar o quitar el lugar guardado.
+- (commit siguiente a `62e58fa`) · app+datos · **Modo demostración** («Más › Buses de ejemplo»): reproduce 8 lotes reales guardados en `demo/` (se descargan de `main` al activarlo), con la hora corrida a «ahora»; rotulado como Demostración en mapa, Inicio y Más; pausa los datos reales y no alimenta el widget (`apps/mobile/src/demo.ts`).
+- (commit siguiente a `3063b96`) · app · Inicio: «Tus paradas» arriba, en un carrusel de tarjetas con los 3 próximos buses de cada favorita (ruta, hacia dónde, tiempo; si no hay buses, la próxima hora del horario), píldora «N en vivo» que abre el mapa, campana con punto si hay avisos, «Tus rutas» al final.
+- (`d76a0f1` y siguiente) · app · Curvas concéntricas: selector de apariencia sin tarjeta alrededor; tarjeta de «siguiendo un bus» y panel de capas con radio 28; limpieza de estilos sin uso.
+- (commit siguiente a `6c2fc84`) · app · Apariencia (en «Más») usa `GlassSegments` en variante `plain`: burbuja de vidrio deslizante sobre fondo liso, opciones de igual ancho.
+- (commit siguiente a `1aeec4d`) · app · Filas deslizables de vagones (parada) y de sentidos (ruta) llegan a los bordes de la pantalla: ya no se recortan en el margen.
+- (commit siguiente a `03dfd2c`) · app · Ficha de ruta: el botón «ver en el mapa grande» baja a la esquina inferior derecha del mapa (quedaba debajo de la X de cerrar).
+- (commits `3f09cf7` y siguiente) · app · Filtros del mapa: la burbuja se mueve al instante y el mapa se filtra después. Pestaña «Más» reorganizada: tarjeta TuLlave destacada arriba y listas agrupadas tipo Ajustes (Servicio, Tus cosas, Apariencia, Ayuda).
+- (commit siguiente a `ae4b8cb`) · app · Filtros del mapa como la barra inferior: selector `src/ui/GlassSegments.tsx` con burbuja de vidrio interactiva que se desliza con resorte entre opciones.
+- (commit siguiente a `b141782`) · app · Vidrio sobre el mapa: estilo «clear» de iOS (transparente, refracta el mapa) en filtros, estado, botones, brújula y capas, en vez del esmerilado casi blanco (`Glass` con `scheme="light"`).
+- (commit siguiente a `5f6a0fa`) · app+web · «Voy en este bus» rediseñada como tablero de a bordo: título «Llegando a…», escena de avenida en perspectiva con el suelo en movimiento y bordes fundidos (`src/ui/RideScene.tsx`), tarjeta de información, barra de avance por segmentos (`ride.ts` guarda `total`); buses sin borde blanco (filo oscuro fino + sombra) en `busTop.ts` e imágenes regeneradas. Apariencia de la app (Automático / Claro / Oscuro) en «Más» (`src/appearance.ts`, clave `tm.appearance.v1`).
+- `5f6a0fa` · app+datos/ops+web · Buses vistos desde arriba en la web y la app: un solo dibujo (techo, parabrisas, puertas, fuelle del articulado) que gira con el rumbo; las imágenes de la app salen del mismo dibujo (tools/bus-sprites.ts); la pantalla de arranq…
+- `da5e9ec` · app · Enlaces directos (widget): el inicio siempre queda debajo; cerrar sin pantalla anterior va al inicio; el contenido de las ventanas empieza bajo el encabezado
+- `b64e684` · app · Al seguir un bus, la tarjeta del mapa muestra su próxima parada y la hora de llegada; la ruta se abre como ventana (antes quedaba detrás de otras ventanas); capas del mapa con paint/layout (sin avisos de uso obsoleto)
+- `8b3c3df` · app · Widget: vistas previas para verlo en el canvas de Xcode
+- `94bb2f6` · app · Widget de la parada favorita (opcional, WIDGET=1): próximos buses con cuenta regresiva en vivo, en pantalla de inicio y de bloqueo; la app deja los datos en el App Group; el widget no se incluye en las compilaciones normales
+- `8425a5b` · app · Mapa: menos trabajo del teléfono (el motor de movimiento ya no calcula los miles de buses que están fuera de la pantalla, menos actualizaciones si el mapa está lejos, y se limpia la memoria de buses viejos)
+- `023257a` · app · Mapa: encuadrar un solo punto (seguir un bus) ya no tumba la app; se acerca al punto en vez de pedir un recuadro vacío
+- `ce1a326` · app · Mapa: capas fijas (ruta, aro de buses, estaciones, semáforos) que solo cambian su visibilidad, para no agregar ni quitar capas en caliente al seguir un bus o una ruta
+- `1ccfca6` · app+núcleo+web · Mapa de la app: estaciones dibujadas como en la web (base, pasillo, vagones con puertas y número, nombre) y semáforos con su icono; botón de capas para activarlos o apagarlos; el dibujo de estaciones pasa a código compartido
+- `481dca0` · app · Botón de cerrar nativo de iOS en todas las ventanas (el dibujado por la app respondía a los 4-5 toques)
+- `c8be552` · app · Parada: lista todas las rutas que paran (también las sin bus acercándose, con su horario), título con más margen, pantalla Personalizar parada
+- `903b72d` · app · Inicio más limpio: el estado de los buses en vivo pasa a la pestaña Más
+- `e660132` · app · Mapa y app: vidrio claro con texto oscuro sobre el mapa, brújula propia de vidrio (solo si el mapa está girado), cierre con X en vez de «Cerrar» (un solo cierre por toque), botones principales de vidrio teñido, refresco del vid…
+- `027fb32` · app · Mapa: abre centrado en tu ubicación con zoom de calle (la primera vez de cada sesión, si estás en Bogotá); el botón de ubicación solo aparece cuando te alejas
+- `c42a2bb` · app · Parada, bus y «Voy en este bus» como ventanas modales con encabezado y botón Cerrar (las hojas a media altura con listas salían en negro); sin hojas de media altura en toda la app
+- `45c3eeb` · app · Inicio y mapa: «en vivo» cuando hay buses reportando (la edad del lote solo se muestra como «hace X»); «Sin datos» solo si casi no hay buses
+- `3f14749` · app · Mi tarjeta: pantalla de saldo nueva (tarjeta TuLlave con el saldo que sube hasta su valor, respira mientras se lee, número oculto que se muestra al tocar, resumen del mes y movimientos con iconos y días legibles)
+- `857d63d` · app · App: pantalla de arranque más cuidada (marca con cápsula LIVE, avenida sin caja con bordes fundidos, una sola línea de estado que cambia con animación, contador de buses, vibración al abrir); accesos rápidos que sí cumplen: Cer…
+- `838595b` · app · Mapa: estado en vivo y ubicación en vidrio justo sobre el menú inferior, filtros de vidrio con punto de color por sistema; hoja del bus a pantalla completa de la hoja (sin franja gris abajo)
+- `1476a39` · app · App: pantalla de ruta como la web (mapa con el recorrido y los buses en vivo, buses con su próxima parada y hora, paradas con los buses que van hacia ellas, horario, avisos); fondo de las hojas sin franja gris
+- `a97adfe` · app · Mapa nativo: estado en vivo y botón de ubicación en la misma fila con fondo propio (se leen sobre el mapa), créditos del mapa sin pisar el botón, velo bajo la hora; buses a 4 actualizaciones por segundo que se espacian si el te…
+- `7c46881` · app · App: pantalla de arranque con buses cruzando una avenida mientras cargan los datos; al terminar, una insignia roja se abre como ventana y revela la app
+- `aa9157f` · app · Mi tarjeta: quita «Copiar lectura técnica» (ya se comprobó que el saldo se lee bien)
+- `4cc8ea6` · app+núcleo+web · App: «Voy en este bus» con las próximas paradas y la hora de llegada a cada una, marcar dónde bajas y avisos (notificación local y vibración: 3 paradas antes, 1 antes y al llegar); web: la ruta de un bus usa la posición corregi…
+- `fd15b00` · datos/ops · Quita el diagnóstico temporal del GTFS
+- `23c73e9` · datos/ops · Diagnóstico temporal del GTFS (se borra después)
+- `95ccebd` · núcleo · La última parada que informa TransMilenio suele estar mal (9 de cada 10 buses a más de 1 km): se reemplaza por la que de verdad pasó según su posición; próxima parada y llegada recuperadas en el mapa, listas y llegadas
+- `4e1fddd` · núcleo · Corrección al GTFS: la H15 para en Calle 57 antes de la estación Calle 53 - Universidad Manuela Beltrán (como en la app oficial); mecanismo de correcciones puntuales que se apaga solo cuando TransMilenio publica el dato
+- `2a85bae` · núcleo · Buscar «Marly» encuentra la estación Calle 53 - Universidad Manuela Beltrán (reemplazó a la estación temporal); solo registros nuevos sin código cuentan como nombres alternos
+- `c628dbe` · núcleo · Estaciones con nombre nuevo (p. ej. Calle 53 - Universidad Manuela Beltrán): la parada sin rutas pegada a una estación le da su nombre completo en búsqueda y mapa
+- `3a0b548` · datos/ops · Quita el diagnóstico temporal del GTFS
+- `66e41de` · datos/ops · Diagnóstico temporal del GTFS completo (se borra después)
+- `34e9079` · núcleo · Próxima parada y llegada de los buses: si la última parada informada no sirve, se ubica al bus por su posición sobre el recorrido (3 mil a 3.8 mil buses con dato)
+- `f5a2128` · general · Pruebas: no exigen la configuración de Expo (el despliegue de la web fallaba desde hace varias versiones)
+- `3c343b3` · app · Cómo llegar: al tocar una ruta se abre el bus más cercano en vivo, seguirlo, los siguientes y el recorrido hasta la parada
+- `5ecafd6` · núcleo · Próxima parada de los buses: si la ruta del feed no trae la parada, se prueba con la ruta del viaje (de 1.2 mil a 3 mil buses con llegada)
+- `5627307` · app · Lector NFC: el módulo nativo no se subía al repositorio (el .gitignore ignoraba modules/tullave/ios)
+
+## 2026-11-09
+
+- `709d280` · app · App nativa: las pestañas que no se ven dejan de repintarse (abrir hojas y navegar va más ágil)
+- `aade030` · app · Avisos y Mi tarjeta: contenido debajo del encabezado y diagnóstico del lector NFC
+- `e21ec05` · app · Mi tarjeta: botón Cerrar en el encabezado
+- `7419eb8` · app · Corrige propiedad repetida en el diseño de Avisos
+- `9629bb9` · app · Avisos y Mi tarjeta: ventana modal nativa con título y botón Cerrar (las hojas abrían en negro)
+- `fac0849` · app · Mapa nativo: buses a 2 actualizaciones por segundo para liberar la app y que los toques respondan rápido
+- `04623cf` · app · Avisos y Mi tarjeta: mismo diseño de hoja que la parada y el bus (abrían en negro)
+- `4384edb` · app · Avisos y Mi tarjeta: hojas con dos alturas (con una sola abrían en negro)
+- `9d7f7ae` · app · Mi tarjeta: mensajes distintos cuando falta el lector o el permiso de NFC
+- `9e64bae` · app · Barra inferior siempre visible: al encogerse tapaba el contenido
+- `cb6a3de` · app · Mapa nativo: menos buses y datos por actualización para que se muevan más fluidos
+- `5aa9fe3` · app · App nativa: hoja de parada completa como la web, mapa enfocado, Avisos con salida, hoja de bus más ágil
+- `9d6b249` · app+web · App nativa: arreglos de las hojas (cierre, margen inferior, ajuste al contenido), barra de estado sobre el mapa, accesibilidad de iOS, estado en vivo, primer arranque, apodos y reportes; política de privacidad
+- `07daf17` · app · Mapa nativo: buses como los de la web (articulados en las troncales, girando con su rumbo), red de troncales y estaciones, actualización a 4 Hz sin reserializar capas fijas, áreas de toque amplias
+- `fbdb364` · app · Script de TestFlight avisa si la copia está atrás de GitHub; la app muestra su versión y compilación en «Más»
+- `519358c` · app+núcleo+web · App nativa: Cómo llegar, avisos, favoritos y casa/trabajo, saldo de la tarjeta TuLlave por NFC (módulo Swift)
+- `3391885` · app · App nativa: mapa con buses en vivo (MapLibre + motor de movimiento), paradas, trazado de ruta, hojas de bus y de parada, ubicación
+- `4dfd11e` · app · App nativa: sistema de diseño (vidrio líquido, tarjetas, resortes), barra inferior nativa, pantalla de inicio y rutas con el nuevo estilo
+- `fe4d0ea` · app · App nativa: dependencias para el mapa (MapLibre), ubicación, vibración y cliente de desarrollo
+- `6864b98` · app · Script de TestFlight: guarda el registro y muestra solo los errores si falla
+- `ee35b28` · app · App nativa: guía y script para subir a TestFlight (EAS en la nube o local con Transporter)
+- `c90c603` · app · App nativa (Expo SDK 58 + React Native): esqueleto con arranque de datos, rutas y estructura de pestañas sobre los paquetes compartidos
+- `6cc9d0e` · datos/ops+docs · TestFlight: subida con Transporter (sin llave de la API) o directa por terminal
+- `56d4e19` · datos/ops+docs+web · Preparar la app de iPhone con Capacitor: configuración, íconos, scripts y guía de TestFlight; lectura técnica de la tarjeta sin número
+- `0d0cba1` · núcleo+web · Mi tarjeta TuLlave (lectura NFC solo con app nativa), códigos de rutas pareadas y variantes, ubicación redondeada hacia el buscador de direcciones
+
+## 2026-11-06
+
+- `476356e` · web · Sin datos en vivo: textos que no sugieren «no hay servicio» y horarios programados en las tarjetas de paradas
+- `659eacd` · datos/ops+núcleo+web · Horario: stop_times no viene agrupado por viaje; se lee por viaje (primer/último servicio y horas de paso por variante de recorrido)
+- `deff46a` · datos/ops · Diagnóstico del generador de horas de paso
+- `6441631` · datos/ops+núcleo+web · Horario programado por parada y frecuencia por ruta (según GTFS), para cuando no hay buses en vivo
+- `2570adb` · web · Reloj de la app ya no se congela con el feed detenido; «salir ahora» usa el horario cuando hay servicio pero el feed no reporta
+- `e015afa` · web · Más espacio entre las rutas atenuadas (Buses y Paradas sin servicio)
+- `7cc1e01` · web · Paradas y Buses sin servicio: muestran las rutas que normalmente pasan o funcionan a esa hora, atenuadas en gris
+- `96112e7` · núcleo+web · Panel sube hasta arriba al abrir ruta/parada/viaje; botones del mapa abajo (una mano); «salir ahora» sin buses avisa que no hay servicio y a otra hora usa solo rutas con horario; horario de la ruta en su detalle
+- `3c860b8` · núcleo+web · UX: Casa/Trabajo, planear con hora, modo «voy en el bus», botón atrás, deslizón del panel, explicación sin datos, ETA con dato viejo, contraste alto, esqueletos, última pestaña
+- `5a76114` · web · Avisos: la campana abre y cierra la lista; el contador solo cuenta los avisos que aún no has visto
+- `8aaa3ab` · núcleo · Quita del mapa los buses que llevan más de 10 min sin reportar (feed congelado)
+- `0c7de9a` · núcleo+web · Nombres de ruta legibles conservando el nombre oficial (detalle, búsqueda, tooltips)
+- `a54bf2f` · web · Interfaz: primera pantalla con «cerca de ti», diseño para tablet (panel lateral desde 700 px), accesibilidad del planificador, animación de entrada por pantalla, respuesta al tocar y vibración suave
+- `3066326` · web · Estado de datos más corto en el encabezado (la hora exacta queda en el título)
+- `b485b6a` · web · Interfaz: mapa menos saturado en la vista de ciudad, paneles de detalle sin buscador ni pestañas, estado de datos más corto
+- `b2d73ac` · web · Tráfico: rayitas animadas que avanzan por cada tramo (rápidas donde fluye, casi quietas en un trancón)
+- `06b01d4` · núcleo+web · Cómo llegar: la opción sin trasbordos va primero (aunque llegue un poco después)
+- `7bc09aa` · núcleo+web · Cómo llegar: ordenar opciones, paradas intermedias, seguir el bus real, avisos y poca frecuencia por ruta, enlace para compartir el viaje y explicación cuando no hay resultados
+- `45a66f1` · núcleo+web · Avisos: las fechas de otro año llevan el año; estado sin servicio más corto
+- `adae4dc` · web · Pestañas: «Cómo llegar» primero y destacado; avisos pasan a una campana con contador en la parte de arriba
+- `ae92746` · web · Cómo llegar: separadores de la cadena de rutas y texto de salida
+- `327bdfd` · núcleo+web · Cómo llegar: planificador de viajes (RAPTOR con buses en vivo, trasbordos y caminata), pantalla con opciones y ruta en el mapa
+- `ee3b40e` · web · Mapa: las rutas se ven en gris dentro de los portales aunque la capa de líneas esté apagada; semáforos encendidos por defecto
+
+## 2026-11-05
+
+- `125f480` · web · Estaciones: se centran lateralmente sobre la línea de su corredor (la mediana de la avenida) en vez de quedar pegadas a un carril
+- `87486d2` · web · Paraderos: se dibujan al costado derecho de la vía (según el sentido de la ruta), no en el eje
+- `30c1122` · web · Estaciones: las rutas de cada vagón se muestran con sus recuadros de color
+- `344d1af` · web · Paradas: se quita el sufijo interno _TM de los códigos que se muestran
+- `1d9a052` · web · Buses: se quita el filtro «solo los que van muy tarde»
+- `f7c5978` · web · Las cifras generales (buses, rutas, muy tarde, avisos) pasan a Ajustes, fuera de la lista de rutas
+- `2afd90b` · núcleo+web · Tráfico: los tramos siguen el recorrido de la ruta en vez de cortar en línea recta
+- `960ee70` · datos/ops+núcleo+web · Tráfico en vivo (capa opcional) y grabadora de comportamiento de buses cerca de los semáforos
+- `639c433` · datos/ops+web · Mapa: capa opcional de semáforos (red semafórica oficial de Bogotá, 1.747 puntos)
+- `50f4afe` · datos/ops · Prueba puntual de fuentes públicas de semáforos
+- `dc7ef4a` · docs · README: verificación de la precisión de la posición de los buses con datos reales
+- `25d1a0c` · datos/ops · precision.ts: compara varias políticas de predicción con la misma captura
+- `0243dc7` · datos/ops · precision.ts: usa el id correcto del reporte
+- `dc45415` · datos/ops · Herramienta para medir la precisión de la posición dibujada de los buses
+- `216b498` · web · Barra de seguimiento: el texto largo se desplaza para poder leerse completo
+- `5ccb659` · web · Estaciones: el color de la línea lo decide el corredor por el que pasan (Gratamira y Humedal Córdoba en amarillo, y otras 38 corregidas)
+- `db5266b` · web · Mapa: etiqueta de estación sin espacio sobrante y cápsula propia para los portales
+- `f7b99d2` · núcleo+web · Buses: se orientan según el rumbo de su ruta y los troncales son articulados (más largos)
+- `d220f5d` · datos/ops+núcleo+web · Avisos: solo vigentes, título y descripción legibles, periodo; vigilancia automática de datos con issue
+- `f48a76c` · web · Carga: sin pantalla de texto; el texto para buscadores queda oculto y el fondo coincide con el mapa
+- `9d8e380` · web · Mapa: líneas de Soacha (S) y Av. Ciudad de Cali (Z) y cable aéreo con sus estaciones
+- `a6a21aa` · datos/ops+web · SEO: páginas estáticas por ruta (671) y estación/portal (143), índices, sitemap y regeneración semanal
+- `c0695e6` · web · SEO: meta tags, Open Graph, Twitter, JSON-LD, canonical, robots, sitemap e imagen de vista previa
+- `25bc417` · web · Analytics: Google Tag Manager (GTM-NM7C6973)
+- `5476029` · docs+web · Nombre de la app: vuelve a TransMi LIVE
+- `82a4af5` · docs+web · Nombre de la app: TransMi Go
+- `051bdb1` · núcleo+web · Estado de conexión: 'Sin buses en servicio' cuando la fuente responde pero no publica (madrugada)
+- `b5d26ac` · web · Ubicación: haz de luz hacia donde apunta el celular
+- `bfa9a56` · web · Mapa: giro según hacia dónde miras (brújula o rumbo del GPS) con el botón de ubicación
+- `78c6314` · web · Mapa: giro con dos dedos (o clic derecho) y brújula para volver al norte
+- `571043a` · web · Parada sin buses: 'ya no hay más buses hoy' con el mismo estilo del estado vacío
+- `14ec429` · web · Enlaces: se lee el enlace inicial antes de que la dirección se sincronice (no se borraba y abría la pantalla normal)
+- `59c6405` · datos/ops+núcleo+web · UX: enlaces para compartir, 'ya no hay más buses hoy', primer servicio y tamaño de texto
+- `edc699a` · datos/ops+núcleo+web · Capacidad: sondeo largo /live (1 petición por lote), pausa con pantalla oculta o sin red
+- `c96276c` · web · Último servicio: la hora es la salida programada, no la real
+- `24cd9d0` · docs+núcleo+web · Colores de las líneas de la troncal en los recuadros de las rutas, corredores, estaciones y portales (los buses conservan su color)
+- `15f4407` · docs+núcleo+web · Marca de último servicio de cada ruta (aro en el mapa, etiqueta en la tarjeta y aviso en la parada)
+- `359dc83` · datos/ops · Perfil de horarios: primer y último viaje de cada ruta por tipo de día
+- `fff2c7b` · datos/ops · Grabadora: corrige el nombre de la parada
+- `ff88dc9` · datos/ops · Grabadora de tiempos reales entre paradas (estadísticas por ruta, tramo, día y franja)
+- `48ae71f` · tests · Quita pruebas de laboratorio que dependen de archivos locales
+- `53e337c` · datos/ops · GTFS diario: el perfil de horarios va en su propia rama (sin carreras con el bucle de datos)
+- `1177002` · datos/ops · GTFS diario: grupo propio y verificación de la publicación
+- `a754a1c` · datos/ops · GTFS diario: perfil de tiempos por tramo y hora a partir del horario programado
+- `51716c6` · datos/ops · Inspección temporal del GTFS (horarios por parada)
+- `49472c5` · docs+núcleo+web · Tiempo de llegada con la posición del bus sobre su ruta (error mediano 34-37 s)
+- `ac4ea42` · docs+núcleo+web · Tiempos de llegada iguales en todos los dispositivos: sin tiempos aprendidos por aparato y con la hora del servidor
+- `b07a56d` · web · Se recuperan la línea roja de la troncal y los nombres de portales; las vías se ven más definidas
+- `4816ef8` · núcleo+web · Estaciones: pasillo que une los vagones, base más ajustada al separador y La Campiña como una sola estación
+- `a3c2824` · docs+web · Estación completa con vagones adentro y mapa con jerarquía de vías al estilo de los mapas modernos
+- `4a4604b` · docs+núcleo+web · Estaciones de la troncal dibujadas: píldora y rectángulo por vagón, con el vagón de la ruta iluminado
+- `369c062` · docs+núcleo+web · Vagones de las estaciones y plataformas de los portales: nombres limpios, estación agrupada con sus vagones y rutas por vagón
+- `d19e76f` · núcleo+web · Con datos viejos los buses ya no se salen de la ruta ni flotan: sin trazado conocido no se adelantan
+- `56f340b` · web · Paradas seleccionables con tolerancia al dedo; ubicación en tiempo real con seguimiento que se pausa al mover el mapa
+- `6e1fc38` · docs+núcleo+web · Corrige la próxima parada (el feed informa la última a la que llegó), los buses se mueven desde el primer lote, datos en Web Worker sin tirones, tocar el mapa baja el panel
+- `7678c95` · docs+núcleo+web · Movimiento de los buses: motor por la ruta, sin retroceder, con corrección suave y desfase que se disipa (medido con lotes reales)
+- `fb3b4f8` · datos/ops+docs+núcleo+web · Favoritos, paradas cerca de ti, avisos que te afectan, modo sin conexión, app instalable, tiempos aprendidos; se elimina la versión anterior
+- `2b70a02` · web · Barra de seguimiento: nombre de la ruta destacado y placa en pequeño
+- `0941a4d` · núcleo+web · Parada como vista destacada con sus rutas y tramo resaltado; globo del bus con la ruta primero; ruta del bus con paradas marcadas
+- `fbe5692` · web · Seguir un bus: barra fija, cámara suave, pausa al arrastrar y ruta del bus
+- `395ba84` · web · Próximos buses: tarjetas por ruta, un bus por línea y sin símbolos técnicos
+
+## 2026-11-04
+
+- `47e4cb7` · núcleo · Clasificar las rutas por el color oficial del GTFS (la ruta 7 a Portal Suba es troncal)
+- `67533c9` · núcleo+web · Próximos buses en cada parada, con hora oficial y tiempo calculado para los más lejanos
+- `552ef79` · web · Los globos del mapa quedan por encima de los buses
+- `5614339` · web · Buses dibujados en canvas cuadro a cuadro (movimiento fluido en celular y PC)
+- `a054619` · núcleo+web · Los buses avanzan por el trazado de su ruta entre reportes (no en línea recta)
+- `9cd3f3b` · datos/ops+web · App web nueva (React + Vite + MapLibre) sobre el núcleo DDD
+- `1a57196` · núcleo · Nucleo DDD en TypeScript: dominio, aplicacion e infraestructura
+- `86f81a9` · docs · Rediseno mobile-first: TransMi LIVE
+- `b70dacb` · general · Prediccion entre reportes calibrada con datos reales
+- `b175116` · general · Posicion enviada siempre; huecos de la fuente visibles; lotes incompletos descartados
+- `94fe13e` · datos/ops · Medicion del ritmo real de lotes del intermediario
+- `e982355` · general · La pagina lee de un intermediario en Supabase (datos frescos)
+- `bb8b034` · datos/ops · Prueba del intermediario: verifica CORS y preflight
+- `1e897fa` · datos/ops · Prueba del intermediario de Supabase desde GitHub Actions
+- `c3fa941` · datos/ops · Intermediario de TransMilenio para Supabase Edge Functions
+- `aa89daf` · datos/ops · Movimiento real por defecto y lectura eficiente
+- `5784037` · datos/ops · Datos cada 21 s, segundos en todas las horas, seguir un bus y movimiento al acercar
+- `1856b2b` · general · Camara rapida al seleccionar una ruta para que el movimiento se note
+- `5db8c58` · general · Movimiento continuo al seleccionar una ruta
+- `74df96a` · general · Buses se deslizan entre reportes en vez de saltar; colores del sistema
+- `f2a2f8f` · datos/ops+docs · Bogota en Vivo: mapa en vivo de TransMilenio y SITP
