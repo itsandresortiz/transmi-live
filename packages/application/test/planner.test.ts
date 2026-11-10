@@ -71,3 +71,19 @@ describe("orden de las opciones", () => {
     expect(sortItineraries([a, b, c, d], "caminata")).toEqual([d, a, c, b]);
   });
 });
+
+describe("elegir con qué viajar", () => {
+  const now = Date.parse("2026-03-04T17:00:00Z");
+  const far = { name: "d", position: { lat: lat + 0.0004 + 3 * 0.004, lon: lon0 + 4 * 0.004 + 0.0004 + 3 * 0.004 } };      // solo se llega con X1 (troncal) + Z2 (zonal)
+  const systemsOf = (r: Itinerary[]) => new Set(r.flatMap((it) => it.legs.flatMap((l) => (l.kind === "ride" ? [l.system] : []))));
+  it("sin elegir, combina troncal y zonal", () => {
+    expect([...systemsOf(planTrip(world(), at(0, 0.0003), far, { nowMs: now }))].sort()).toEqual(["troncal", "zonal"]);
+  });
+  it("si solo se permite la troncal, ninguna opción usa el zonal (y viceversa)", () => {
+    const troncal = planTrip(world(), at(0, 0.0003), at(6, 0.0003), { nowMs: now, systems: ["troncal", "dual"] });
+    expect(troncal.length).toBeGreaterThan(0);
+    expect([...systemsOf(troncal)]).toEqual(["troncal"]);
+    expect(systemsOf(planTrip(world(), at(0, 0.0003), far, { nowMs: now, systems: ["zonal"] })).has("troncal")).toBe(false);
+    expect(systemsOf(planTrip(world(), at(0, 0.0003), at(6, 0.0003), { nowMs: now, systems: ["zonal"] })).has("troncal")).toBe(false);
+  });
+});

@@ -37,7 +37,7 @@ Las ramas de datos (`live-data`, `schedule-data`, `hop-stats`, `signal-stats`) s
 | `tm.onboarded.v1` | app | ya vio la bienvenida |
 | `tm.trip.v1` | app | viaje de «Cómo llegar» que se está siguiendo (sin trazados), paso actual y atraso medido; se descarta si ya debió terminar hace 30 min |
 | `tm-data-v1` | web (Cache Storage) | última respuesta buena de cada fuente (modo sin conexión) |
-| App Group `group.com.transmilive.app`, clave `snapshot` | app → widget (UserDefaults compartido) | JSON `{at, stops:[{id,name,arrivals:[{r,h,t,c}]}]}` con lo que viene a hasta 3 paradas favoritas; solo con `WIDGET=1` |
+| App Group `group.com.transmilive.app`, clave `snapshot` | app → widget (UserDefaults compartido) | JSON `{at, demo, stops:[{id,name,arrivals:[{r,h,t,c}],sched:[{r,h,t,c}]}]}` (`sched` = pasadas programadas de respaldo) con lo que viene a hasta 3 paradas favoritas; solo con `WIDGET=1` |
 
 ## Si algún día hubiera base de datos
 Se registraría aquí: tablas, relaciones, RLS, migraciones y funciones. Hoy no aplica.

@@ -33,7 +33,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - Otras rutas con orden de paradas desactualizado (como H15/Calle 57): agregar a `STOP_PATCHES` cuando el dueño lo confirme (H20, H27, A60… paran en Calle 53; **no verificado** si paran en Calle 57).
 - ~80 vagones de 602 siguen con «ningún bus viene» aunque hay buses de sus rutas en la calle (sobre todo extremos norte: Toberín, Calle 187); no se confirmó uno por uno.
 - Notificaciones del viaje en segundo plano: iOS suspende la app, quedan con la última hora calculada (idea: Live Activity / Dynamic Island).
-- El widget envejece si no se abre la app (rotula «Datos de hace X min»).
+- El widget solo recibe datos en vivo con la app abierta; cuando se vencen muestra el horario programado (rotulado). Refresco en segundo plano: pendiente (requiere tarea en segundo plano de iOS o un servidor).
 - Causa raíz de por qué `formSheet` con listas sale en negro en iOS 27.2: **no investigada** (se evitó usándolo).
 - Avisos amarillos inofensivos en la terminal: «Image … is not present in style, cannot remove» (MapLibre) y `style` obsoleto en otras capas si se agregan nuevas (usar `sp()`).
 - El mapa de la app mueve los buses por saltos (GeoJSON a 4 Hz); no hay interpolación nativa. Mejora grande posible: capa nativa o canvas propio.

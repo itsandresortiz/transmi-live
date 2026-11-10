@@ -16,6 +16,7 @@ struct TripActivityAttributes: ActivityAttributes {
     var step: Int
     var steps: Int
     var arrive: Double
+    var link: String         // a dónde lleva al tocarla (transmilive:///trip o transmilive:///ride/ID)
   }
   var dest: String
 }
@@ -83,7 +84,7 @@ struct TripLiveActivity: Widget {
       TripLockView(state: context.state, dest: context.attributes.dest)
         .activityBackgroundTint(Color.black.opacity(0.82))
         .activitySystemActionForegroundColor(.white)
-        .widgetURL(URL(string: "transmilive:///trip"))
+        .widgetURL(URL(string: context.state.link))
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) { TripBadge(state: context.state) }
@@ -104,7 +105,7 @@ struct TripLiveActivity: Widget {
       } minimal: {
         Image(systemName: "bus.fill")
       }
-      .widgetURL(URL(string: "transmilive:///trip"))
+      .widgetURL(URL(string: context.state.link))
     }
   }
 }

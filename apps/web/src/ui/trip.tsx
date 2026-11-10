@@ -9,7 +9,6 @@ import { useNow, useTransitVersion } from "./hooks";
 import { Close } from "./icons";
 import { haptic } from "./haptics";
 import { etaText } from "./format";
-import { stopTag } from "./stopname";
 import { useLocation } from "./location";
 import { useUi } from "./store";
 
@@ -26,8 +25,11 @@ export const useTrip = create<TripState>((set) => ({
 
 /** «Calle 100, vagón 2» / el nombre solo. */
 export function placeText(ref: StopRef): string {
-  const tag = stopTag(transit.stopById(ref.id));
-  return tag ? `${ref.name}, ${tag.charAt(0).toLowerCase()}${tag.slice(1)}` : ref.name;
+  // el nombre que trae el plan ya puede venir con su vagón («Av. Chile · vagón 2»): se arma desde la parada para no repetirlo
+  const stop = transit.stopById(ref.id);
+  if (!stop) return ref.name;
+  const l = transit.labelOf(stop);
+  return l.wagon ? `${l.title}, vagón ${l.wagon}` : l.platform ? `${l.title}, plataforma ${l.platform}` : l.title;
 }
 const buzz = (pattern: number[]) => { try { navigator.vibrate?.(pattern); } catch { /* sin vibración */ } };
 

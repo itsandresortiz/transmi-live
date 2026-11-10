@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { type Itinerary, type PlanPlace, type PlanSort, planTrip, sortItineraries } from "@transmi/application";
+import { type Itinerary, type PlanPlace, type PlanSort, planTrip, sortItineraries, ALL_MODES, type TravelMode, type TravelModes, systemsFor, toggleMode } from "@transmi/application";
+import type { SystemType } from "@transmi/domain";
 import { transit } from "../composition-root";
 import { safeStorage } from "../storage";
 import { nowMs } from "../clock";
@@ -33,6 +34,9 @@ export function timeToMs(hhmm: string, now = Date.now()): number | null {
 interface PlannerState {
   when: When;
   setWhen(w: When): void;
+  /** Con qué quiere viajar la persona (TransMilenio, SITP zonal, alimentador). */
+  modes: TravelModes;
+  toggleMode(k: TravelMode): void;
   /** Origen elegido; `null` + `originMe` = «Mi ubicación». */
   origin: PlanPlace | null; originMe: boolean; dest: PlanPlace | null;
   editing: Field | null; text: Record<Field, string>;
@@ -56,7 +60,8 @@ const samePlace = (a: PlanPlace, b: PlanPlace) => Math.abs(a.position.lat - b.po
 
 export const usePlanner = create<PlannerState>((set, get) => ({
   origin: null, originMe: true, dest: null, editing: null, text: { origin: "", dest: "" },
-  results: null, sel: 0, busy: false, computedAt: 0, error: null, picking: null, sortBy: "mejor", recents: loadRecents(), when: { mode: "now" },
+  results: null, sel: 0, busy: false, computedAt: 0, error: null, picking: null, sortBy: "mejor", recents: loadRecents(), when: { mode: "now" }, modes: ALL_MODES,
+  toggleMode: (k) => { set((c) => ({ modes: toggleMode(c.modes, k), results: null, sel: 0 })); get().plan(); },
   setWhen: (when) => { set({ when, results: null, sel: 0 }); get().plan(); },
   setSort: (sortBy) => set({ sortBy, sel: 0 }),
 
@@ -92,7 +97,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     // un instante después, para que se vea «Buscando…» antes de que el cálculo ocupe el hilo principal
     setTimeout(() => {
       try {
-        const results = planFor(origin, s.dest!, s.when);
+        const results = planFor(origin, s.dest!, s.when, systemsFor(s.modes));
         set((c) => ({ results, busy: false, computedAt: Date.now(), sel: Math.min(c.sel, Math.max(0, results.length - 1)) }));
       } catch (e) { set({ busy: false, results: [], error: e instanceof Error ? e.message : "No pudimos calcular el viaje" }); }
     }, 30);
@@ -100,20 +105,20 @@ export const usePlanner = create<PlannerState>((set, get) => ({
 }));
 
 /** Calcula las opciones según cuándo viaja la persona. «Llegar a las…» busca la hora de salida que lo logra. */
-function planFor(origin: PlanPlace, dest: PlanPlace, when: When): Itinerary[] {
+function planFor(origin: PlanPlace, dest: PlanPlace, when: When, systems?: SystemType[]): Itinerary[] {
   const now = nowMs();
   const isNow = when.mode === "now" || (when.mode === "depart" && when.at - now < 120_000);
   // ahora: con buses en vivo; si el feed no reporta pero el horario dice que hay servicio (de día), se usa el horario; de madrugada, sin servicio, no hay nada que mostrar
   if (isNow) {
     const mode = nowMode();
-    return mode === "none" ? [] : planTrip(transit, origin, dest, { nowMs: now, scheduled: mode === "schedule" });
+    return mode === "none" ? [] : planTrip(transit, origin, dest, { systems, nowMs: now, scheduled: mode === "schedule" });
   }
-  if (when.mode === "depart") return planTrip(transit, origin, dest, { nowMs: when.at, scheduled: true });
+  if (when.mode === "depart") return planTrip(transit, origin, dest, { systems, nowMs: when.at, scheduled: true });
   // llegar a las…: se parte de una salida estimada y se corrige según a qué hora llega realmente la mejor opción
   let depart = Math.max(now, when.at - 45 * 60_000), res: Itinerary[] = [];
   for (let i = 0; i < 3; i++) {
     const scheduled = depart - now > 120_000;
-    res = planTrip(transit, origin, dest, { nowMs: depart, scheduled });
+    res = planTrip(transit, origin, dest, { systems, nowMs: depart, scheduled });
     if (!res.length) break;
     const best = Math.min(...res.map((r) => r.arriveAt * 1000));
     const next = Math.max(now, depart + (when.at - best));

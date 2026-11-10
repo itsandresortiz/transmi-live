@@ -60,6 +60,8 @@ export interface PlanOptions {
   /** Cuánto se está dispuesto a caminar para llegar a la primera parada y desde la última (m). */
   maxAccessMeters?: number;
   maxTransfers?: number;
+  /** Solo usar rutas de estos sistemas (p. ej. solo troncal y dual, o solo zonal). Sin esto, todos. */
+  systems?: readonly SystemType[];
   /** Máximo de opciones a devolver. */
   limit?: number;
 }
@@ -371,7 +373,12 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   const limit = opts.limit ?? 5, maxRounds = (opts.maxTransfers ?? 3) + 1, maxAccess = opts.maxAccessMeters ?? MAX_ACCESS_M;
   const ix = buildIndex(state);
   if (!ix.patterns.length) return [];
-  const live = liveInfo(state, ix, nowMs, opts.scheduled);
+  let live = liveInfo(state, ix, nowMs, opts.scheduled);
+  if (opts.systems) {
+    // la persona eligió con qué viajar: las rutas de los demás sistemas se tratan como si no operaran
+    const ok = new Set<SystemType>(opts.systems);
+    live = { ...live, running: new Set([...live.running].filter((id) => { const r = state.routeById(id); return !!r && ok.has(r.system); })) };
+  }
 
   // llegada real de los buses a las paradas cercanas al origen (para el tiempo de espera del primer bus)
   const liveEtas = new Map<number, Map<number, LiveBus[]>>();
@@ -467,4 +474,25 @@ function searchStopGroupsLite(state: TransitState, q: string, limit: number): Pl
     const kind = g.stops.some((s) => state.labelOf(s).platform) ? "Portal" : g.stops.some((s) => state.labelOf(s).wagon) ? "Estación" : "Parada";
     return { name: kind === "Parada" ? g.title : `${kind} ${g.title}`.replace(/^(Portal|Estación) (Portal|Estación)\b/i, "$2"), position: g.position };
   });
+}
+
+/* ---------- con qué viajar ---------- */
+
+/** Lo que la persona puede elegir en «Cómo llegar»: TransMilenio (troncales y duales), SITP zonal (buses azules) y alimentadores (verdes). */
+export type TravelMode = "troncal" | "zonal" | "alimentador";
+export const TRAVEL_MODES: readonly { key: TravelMode; label: string; systems: readonly SystemType[] }[] = [
+  { key: "troncal", label: "TransMilenio", systems: ["troncal", "dual"] },
+  { key: "zonal", label: "SITP zonal", systems: ["zonal", "otro"] },
+  { key: "alimentador", label: "Alimentador", systems: ["alimentador"] },
+];
+export type TravelModes = Record<TravelMode, boolean>;
+export const ALL_MODES: TravelModes = { troncal: true, zonal: true, alimentador: true };
+/** Los sistemas permitidos para `planTrip`, o `undefined` si están todos (sin filtro). */
+export function systemsFor(modes: TravelModes): SystemType[] | undefined {
+  return TRAVEL_MODES.every((m) => modes[m.key]) ? undefined : TRAVEL_MODES.filter((m) => modes[m.key]).flatMap((m) => [...m.systems]);
+}
+/** Prende o apaga un modo; siempre queda al menos uno prendido. */
+export function toggleMode(modes: TravelModes, k: TravelMode): TravelModes {
+  const next = { ...modes, [k]: !modes[k] };
+  return TRAVEL_MODES.some((m) => next[m.key]) ? next : modes;
 }

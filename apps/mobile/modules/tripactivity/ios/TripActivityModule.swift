@@ -14,6 +14,7 @@ struct TripActivityAttributes: ActivityAttributes {
     var step: Int            // paso actual (1…steps)
     var steps: Int
     var arrive: Double       // hora de llegada al destino (segundos desde 1970)
+    var link: String         // a dónde lleva al tocarla (transmilive:///trip o transmilive:///ride/ID)
   }
   var dest: String
 }

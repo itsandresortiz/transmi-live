@@ -35,7 +35,17 @@ export function syncWidget(): void {
     const arrivals = upcomingAtStop(transit, id, now, 2)
       .flatMap((u) => u.buses.map((b) => ({ r: u.route.shortName, h: u.headsign, t: Math.round(b.etaAt), c: SYSTEM_COLOR[u.route.system] })))
       .sort((a, b) => a.t - b.t).slice(0, 5);
-    return [{ id, name: saved.nicknames[id] || stopLabelText(transit.labelOf(stop)), arrivals }];
+    // respaldo para cuando el dato en vivo se venza y la app no esté abierta: las próximas pasadas según el horario (el widget las rotula «Programado»)
+    const sched: typeof arrivals = [];
+    if (transit.departures.size) {
+      const day = transit.serviceEnds.dayAt(now * 1000), midnight = now - day.secs;
+      for (const p of transit.departures.nextAt(id, day.type, day.secs, 6)) {
+        const route = transit.routeById(p.routeId);
+        if (route) for (const t of p.times) sched.push({ r: route.shortName, h: "", t: Math.round(midnight + t), c: SYSTEM_COLOR[route.system] });
+      }
+      sched.sort((a, b) => a.t - b.t); sched.splice(12);
+    }
+    return [{ id, name: saved.nicknames[id] || stopLabelText(transit.labelOf(stop)), arrivals, sched }];
   });
   const body = JSON.stringify({ at: Math.round(now), stops, demo });
   const key = (demo ? "demo" : "") + JSON.stringify(stops.map((s) => [s.id, s.name, s.arrivals.map((a) => [a.r, Math.round(a.t / 30)])]));   // si casi no cambió, no se recarga el widget

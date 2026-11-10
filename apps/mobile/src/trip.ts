@@ -3,7 +3,6 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type GuideState, type Itinerary, type PlanPlace, type StopRef, startGuide } from "@transmi/application";
 import { transit } from "./composition-root";
-import { stopTag } from "./stopname";
 
 /** El viaje de «Cómo llegar» que la persona está siguiendo paso a paso. Vive fuera de las pantallas (los avisos siguen aunque las cierres)
  *  y se guarda en el teléfono para recuperarlo si la app se cierra a mitad de camino. */
@@ -39,6 +38,9 @@ export const useTrip = create<TripState>()(persist((set) => ({
 
 /** «Calle 100, vagón 2» / «Portal Norte, plataforma T1» / el nombre solo. */
 export function placeText(ref: StopRef): string {
-  const tag = stopTag(transit.stopById(ref.id));
-  return tag ? `${ref.name}, ${tag.charAt(0).toLowerCase()}${tag.slice(1)}` : ref.name;
+  // el nombre que trae el plan ya puede venir con su vagón («Av. Chile · vagón 2»): se arma desde la parada para no repetirlo
+  const stop = transit.stopById(ref.id);
+  if (!stop) return ref.name;
+  const l = transit.labelOf(stop);
+  return l.wagon ? `${l.title}, vagón ${l.wagon}` : l.platform ? `${l.title}, plataforma ${l.platform}` : l.title;
 }

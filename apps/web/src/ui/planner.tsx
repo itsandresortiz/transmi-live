@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
-import { type Itinerary, type Leg, type PlanPlace, type RideLeg, type WalkLeg, diagnosePlan, searchPlanPlaces } from "@transmi/application";
+import { type Itinerary, type Leg, type PlanPlace, type RideLeg, type WalkLeg, diagnosePlan, searchPlanPlaces, TRAVEL_MODES } from "@transmi/application";
 import { SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "../composition-root";
 import { routeBadgeColor, type MapTheme } from "../map/theme";
@@ -110,7 +110,7 @@ function PlaceInput({ field, label, placeholder }: { field: Field; label: string
 const hhmmNow = (ms: number) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Bogota" }).format(new Date(ms));
 
 function WhenRow() {
-  const { when, setWhen } = usePlanner();
+  const { when, setWhen, modes, toggleMode } = usePlanner();
   const [time, setTime] = useState(() => (Number(hhmmNow(Date.now()).slice(0, 2)) < 5 ? "05:00" : hhmmNow(Date.now() + 3600_000)));      // de madrugada se propone la hora en que arranca el servicio
   const apply = (mode: "depart" | "arrive", t: string) => { const at = timeToMs(t); if (at) setWhen({ mode, at }); };
   return (
@@ -119,6 +119,9 @@ function WhenRow() {
         <button className="chip" aria-pressed={when.mode === "now"} onClick={() => { haptic(); setWhen({ mode: "now" }); }}>Salir ahora</button>
         <button className="chip" aria-pressed={when.mode === "depart"} onClick={() => { haptic(); apply("depart", time); }}>Salir a las…</button>
         <button className="chip" aria-pressed={when.mode === "arrive"} onClick={() => { haptic(); apply("arrive", time); }}>Llegar a las…</button>
+      </div>
+      <div className="tchips" role="group" aria-label="Con qué quieres viajar">
+        {TRAVEL_MODES.map((m) => <button key={m.key} className="chip" aria-pressed={modes[m.key]} onClick={() => { haptic(); toggleMode(m.key); }}>{m.label}</button>)}
       </div>
       {when.mode !== "now" && (
         <label className="whent">

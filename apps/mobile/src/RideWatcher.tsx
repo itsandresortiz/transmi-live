@@ -8,6 +8,9 @@ import { nowMs } from "./clock";
 import { cancelAlerts, onAlertTap, schedule } from "./notify";
 import { stopText } from "./stopname";
 import { useRide } from "./ride";
+import { useTrip } from "./trip";
+import { endTripActivity, showTripActivity } from "../modules/tripactivity/src";
+import { SYSTEM_COLOR } from "./ui/theme";
 import { router, usePathname } from "expo-router";
 import { useLaunch } from "./ui/Launch";
 
@@ -19,8 +22,8 @@ export function RideWatcher() {
   const busId = useRide((s) => s.busId), alightId = useRide((s) => s.alightId);
 
   useEffect(() => {
-    if (!busId || !alightId) { void cancelAlerts(); return; }
-    let warned = 99;
+    if (!busId || !alightId) { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); return; }
+    let warned = 99, shown = "";
     void activateKeepAwakeAsync(TAG).catch(() => undefined);
 
     const tick = () => {
@@ -43,7 +46,19 @@ export function RideWatcher() {
       if (left >= 3) void schedule("ride-3", at(ti - 3), "Faltan 3 paradas", `Te bajas en ${name}.`, data);
       if (left >= 2) void schedule("ride-1", at(ti - 1), "Prepárate para bajar", `La siguiente parada es ${name}.`, data);
       if (left >= 1) void schedule("ride-0", at(ti) - 20, "Bájate aquí", `Estás llegando a ${name}.`, data);
-      if (left <= 0) { void cancelAlerts(); useRide.getState().clear(); }
+      // lo mismo en la pantalla de bloqueo y la isla dinámica (si no hay ya un viaje de «Cómo llegar» ocupándola)
+      if (!useTrip.getState().it && left > 0) {
+        const eta = at(ti), key = `${left}|${Math.round(eta / 20)}`, total = Math.max(useRide.getState().total, left, 1), route = transit.routeOf(v);
+        if (key !== shown) {
+          shown = key;
+          void showTripActivity(name, {
+            title: `Vas en el ${route?.shortName ?? "bus"}`, detail: left === 1 ? `La siguiente parada es la tuya: ${name}.` : `Te bajas en ${name}. Faltan ${left} paradas.`,
+            badge: route?.shortName ?? "", color: SYSTEM_COLOR[v.system], until: eta, untilLabel: "Te bajas en",
+            step: total - left, steps: total, arrive: eta, link: `transmilive:///ride/${busId}`,
+          });
+        }
+      }
+      if (left <= 0) { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); useRide.getState().clear(); }
     };
     tick();
     const timer = setInterval(() => { if (AppState.currentState === "active") tick(); }, EVERY_MS);

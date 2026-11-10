@@ -63,7 +63,7 @@ export function TripWatcher() {
           badge: cur?.kind === "ride" ? cur.shortName : "", color: cur?.kind === "ride" ? SYSTEM_COLOR[cur.system] : "#e11d2e",
           until: (cur?.kind === "ride" ? (g.phase === "wait" ? cur.departAt : cur.arriveAt) : times?.end ?? 0) + shift,
           untilLabel: cur?.kind === "ride" ? (g.phase === "wait" ? "Llega en" : "Te bajas en") : g.leg === it.legs.length - 1 ? "Llegas en" : "Caminando",
-          step: g.leg + 1, steps: it.legs.length, arrive: it.arriveAt + shift,
+          step: g.leg + 1, steps: it.legs.length, arrive: it.arriveAt + shift, link: "transmilive:///trip",
         });
       }
     };

@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { type Itinerary, type PlanPlace, type PlanSort, planTrip, sortItineraries } from "@transmi/application";
+import { type Itinerary, type PlanPlace, type PlanSort, planTrip, sortItineraries, ALL_MODES, type TravelMode, type TravelModes, systemsFor, toggleMode } from "@transmi/application";
+import type { SystemType } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { locateMe } from "@/location";
@@ -17,14 +18,14 @@ export function nowMode(): "live" | "schedule" | "none" {
 }
 
 /** Calcula las opciones según cuándo viaja la persona. «Llegar a las…» busca la hora de salida que lo logra. */
-export function planFor(origin: PlanPlace, dest: PlanPlace, when: When): Itinerary[] {
+export function planFor(origin: PlanPlace, dest: PlanPlace, when: When, systems?: SystemType[]): Itinerary[] {
   const now = nowMs();
   const isNow = when.mode === "now" || (when.mode === "depart" && when.at - now < 120_000);
-  if (isNow) { const m = nowMode(); return m === "none" ? [] : planTrip(transit, origin, dest, { nowMs: now, scheduled: m === "schedule" }); }
-  if (when.mode === "depart") return planTrip(transit, origin, dest, { nowMs: when.at, scheduled: true });
+  if (isNow) { const m = nowMode(); return m === "none" ? [] : planTrip(transit, origin, dest, { systems, nowMs: now, scheduled: m === "schedule" }); }
+  if (when.mode === "depart") return planTrip(transit, origin, dest, { systems, nowMs: when.at, scheduled: true });
   let depart = Math.max(now, when.at - 45 * 60_000), res: Itinerary[] = [];
   for (let i = 0; i < 3; i++) {
-    res = planTrip(transit, origin, dest, { nowMs: depart, scheduled: depart - now > 120_000 });
+    res = planTrip(transit, origin, dest, { systems, nowMs: depart, scheduled: depart - now > 120_000 });
     if (!res.length) break;
     const best = Math.min(...res.map((r) => r.arriveAt * 1000));
     const next = Math.max(now, depart + (when.at - best));
@@ -49,6 +50,9 @@ interface PlannerState {
   setDest(p: PlanPlace | null): void;
   setOrigin(p: PlanPlace | null): void;
   setWhen(w: When): void;
+  /** Con qué quiere viajar la persona (TransMilenio, SITP zonal, alimentador). */
+  modes: TravelModes;
+  toggleMode(k: TravelMode): void;
   setSort(s: PlanSort): void;
   select(i: number): void;
   swap(): Promise<void>;
@@ -60,6 +64,8 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   setSaveAs: (saveAs) => set({ saveAs }),
   setDest: (dest) => { set({ dest, results: null, sel: 0 }); void get().plan(); },
   setOrigin: (origin) => { set({ origin, results: null, sel: 0 }); void get().plan(); },
+  modes: ALL_MODES,
+  toggleMode: (k) => { set((c) => ({ modes: toggleMode(c.modes, k), results: null, sel: 0 })); void get().plan(); },
   setWhen: (when) => { set({ when, results: null, sel: 0 }); void get().plan(); },
   setSort: (sortBy) => set({ sortBy, sel: 0 }),
   select: (sel) => set({ sel }),
@@ -78,7 +84,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     if (!origin) { set({ busy: false, results: [] }); return; }
     // un instante después, para que se vea «Buscando…» antes de que el cálculo ocupe el hilo principal
     setTimeout(() => {
-      try { const results = planFor(origin, s.dest!, s.when); set((c) => ({ results, busy: false, sel: Math.min(c.sel, Math.max(0, results.length - 1)) })); }
+      try { const results = planFor(origin, s.dest!, s.when, systemsFor(s.modes)); set((c) => ({ results, busy: false, sel: Math.min(c.sel, Math.max(0, results.length - 1)) })); }
       catch { set({ results: [], busy: false }); }
     }, 30);
   },

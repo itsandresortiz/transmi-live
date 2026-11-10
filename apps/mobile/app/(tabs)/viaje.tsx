@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SymbolView } from "expo-symbols";
 import * as Haptics from "expo-haptics";
-import { type Itinerary, type PlanPlace, type PlanSort, searchPlanPlaces } from "@transmi/application";
+import { TRAVEL_MODES, type Itinerary, type PlanPlace, type PlanSort, searchPlanPlaces } from "@transmi/application";
 import { SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { geocode } from "@/geocode";
@@ -20,7 +20,7 @@ import { TripBanner } from "@/ui/TripBanner";
 import { allowAlerts } from "@/notify";
 import { useTrip } from "@/trip";
 import { RouteBadge } from "@/ui/RouteBadge";
-import { radius, space, type, useColors } from "@/ui/theme";
+import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
 type Field = "origin" | "dest";
 const SORTS: [PlanSort, string][] = [["mejor", "Mejor"], ["rapida", "Más rápida"], ["trasbordos", "Menos trasbordos"], ["caminata", "Menos caminata"]];
@@ -100,6 +100,12 @@ export default function Viaje() {
           <>
             <SavePlace dest={p.dest} />
             <WhenRow when={p.when} onChange={p.setWhen} />
+            <View style={styles.pad}>
+              <Text style={[type.caption, { color: c.muted, marginBottom: space[2] }]}>Viajar en</Text>
+              <View style={styles.chips}>
+                {TRAVEL_MODES.map((m) => <Chip key={m.key} label={m.label} selected={p.modes[m.key]} dot={SYSTEM_COLOR[m.systems[0]!]} onPress={() => p.toggleMode(m.key)} />)}
+              </View>
+            </View>
             <Results />
           </>
         ) : (

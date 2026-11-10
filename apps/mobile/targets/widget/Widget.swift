@@ -14,6 +14,7 @@ struct StopData: Codable, Hashable {
   let id: String
   let name: String
   let arrivals: [Arrival]
+  var sched: [Arrival]? = nil   // próximas pasadas según el horario (respaldo cuando el dato en vivo ya se venció)
 }
 
 struct Snapshot: Codable {
@@ -66,7 +67,7 @@ struct Provider: TimelineProvider {
     let now = Date()
     // una entrada por cada llegada próxima: al pasar un bus, el widget ya muestra los siguientes sin pedir más datos
     var dates: Set<Date> = [now]
-    for a in snap?.stops.first?.arrivals ?? [] {
+    for a in (snap?.stops.first?.arrivals ?? []) + (snap?.stops.first?.sched ?? []) {
       let d = Date(timeIntervalSince1970: a.t)
       if d > now { dates.insert(d) }
     }
@@ -78,19 +79,31 @@ struct Provider: TimelineProvider {
 // MARK: - Vistas
 
 struct RouteBadge: View {
+  @Environment(\.widgetRenderingMode) private var mode
   let a: Arrival
   var body: some View {
-    Text(a.r)
-      .font(.system(size: 13, weight: .heavy, design: .rounded))
-      .foregroundStyle(.white)
-      .padding(.horizontal, 7).padding(.vertical, 3)
-      .background(Color(hex: a.c), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    if mode == .fullColor {
+      Text(a.r)
+        .font(.system(size: 13, weight: .heavy, design: .rounded))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 7).padding(.vertical, 3)
+        .background(Color(hex: a.c), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    } else {
+      // con el tinte o el modo transparente de iOS los colores se aplanan: un recuadro relleno taparía el texto, así que va en contorno
+      Text(a.r)
+        .font(.system(size: 13, weight: .heavy, design: .rounded))
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 7).padding(.vertical, 3)
+        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Color.primary, lineWidth: 1.5))
+        .widgetAccentable()
+    }
   }
 }
 
 struct ArrivalRow: View {
   let a: Arrival
   let compact: Bool
+  var scheduled: Bool = false   // hora del horario (no es un bus en vivo): se muestra como hora, no como cuenta regresiva
   var body: some View {
     HStack(spacing: 8) {
       RouteBadge(a: a)
@@ -98,8 +111,8 @@ struct ArrivalRow: View {
         Text(a.h).font(.system(size: 13, weight: .medium)).lineLimit(1).foregroundStyle(.secondary)
       }
       Spacer(minLength: 4)
-      // cuenta regresiva que corre sola, con segundos
-      Text(Date(timeIntervalSince1970: a.t), style: .timer)
+      // en vivo: cuenta regresiva que corre sola, con segundos; programado: la hora
+      Text(Date(timeIntervalSince1970: a.t), style: scheduled ? .time : .timer)
         .font(.system(size: compact ? 15 : 17, weight: .bold, design: .rounded))
         .monospacedDigit()
         .multilineTextAlignment(.trailing)
@@ -114,6 +127,7 @@ struct StopWidgetView: View {
 
   private var stop: StopData? { entry.snapshot?.stops.first }
   private var upcoming: [Arrival] { (stop?.arrivals ?? []).filter { Date(timeIntervalSince1970: $0.t) > entry.date }.sorted { $0.t < $1.t } }
+  private var planned: [Arrival] { (stop?.sched ?? []).filter { Date(timeIntervalSince1970: $0.t) > entry.date }.sorted { $0.t < $1.t } }
   private var isDemo: Bool { entry.snapshot?.demo == true }
   private var ageMinutes: Int { Int(max(0, Date().timeIntervalSince1970 - (entry.snapshot?.at ?? 0)) / 60) }
 
@@ -139,6 +153,8 @@ struct StopWidgetView: View {
       Text(isDemo ? "Demostración" : (stop?.name ?? "TransMi LIVE")).font(.headline).lineLimit(1)
       if let a = upcoming.first {
         HStack { Text(a.r).bold(); Spacer(); Text(Date(timeIntervalSince1970: a.t), style: .timer).monospacedDigit() }
+      } else if let p = planned.first {
+        HStack { Text(p.r).bold(); Spacer(); Text(Date(timeIntervalSince1970: p.t), style: .time) }
       } else {
         Text("Sin buses acercándose").font(.caption).foregroundStyle(.secondary)
       }
@@ -159,7 +175,14 @@ struct StopWidgetView: View {
           Image(systemName: "mappin.circle.fill").foregroundStyle(Color.accentColor)
           Text(stop!.name).font(.system(size: 15, weight: .bold)).lineLimit(1)
         }
-        if upcoming.isEmpty {
+        if upcoming.isEmpty && !planned.isEmpty {
+          // sin dato en vivo vigente: lo que dice el horario, rotulado como programado
+          VStack(spacing: 7) {
+            ForEach(Array(planned.prefix(family == .systemSmall ? 3 : 4)), id: \.self) { ArrivalRow(a: $0, compact: family == .systemSmall, scheduled: true) }
+          }
+          Spacer(minLength: 0)
+          Text("Programado · abre la app para ver en vivo").font(.caption2).foregroundStyle(.secondary)
+        } else if upcoming.isEmpty {
           Text("Sin buses acercándose ahora").font(.subheadline).foregroundStyle(.secondary)
           Spacer(minLength: 0)
         } else {
@@ -168,7 +191,9 @@ struct StopWidgetView: View {
           }
           Spacer(minLength: 0)
         }
-        if isDemo {
+        if upcoming.isEmpty && !planned.isEmpty {
+          EmptyView()
+        } else if isDemo {
           Text("Demostración · buses de ejemplo").font(.caption2.weight(.semibold)).foregroundStyle(Color(hex: "#8b5cf6"))
         } else if ageMinutes >= 20 {
           Text("Datos de hace \(ageMinutes) min · abre la app").font(.caption2).foregroundStyle(.secondary)
