@@ -7,13 +7,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(git rev-parse --show-toplevel)"
+# Un solo comando: se pone al día con GitHub por su cuenta (y se vuelve a lanzar, porque este mismo archivo pudo cambiar), cierra el servidor de pruebas y limpia la compilación anterior.
 git -C "$ROOT" fetch -q origin main 2>/dev/null || true
 BEHIND="$(git -C "$ROOT" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)"
-if [ "${BEHIND:-0}" -gt 0 ] && [ -z "${SKIP_PULL_CHECK:-}" ]; then
-  echo "Tu copia está $BEHIND cambios atrás de GitHub, así que compilarías una versión vieja."
-  echo "Corre primero:  git pull   y vuelve a lanzar el script."
-  exit 1
+if [ "${BEHIND:-0}" -gt 0 ] && [ -z "${SKIP_PULL_CHECK:-}" ] && [ -z "${TM_PULLED:-}" ]; then
+  echo "Bajando $BEHIND cambios nuevos de GitHub…"
+  git -C "$ROOT" restore apps/mobile/package-lock.json 2>/dev/null || true      # npm install lo toca en cada compilación y frenaría la bajada
+  if ! git -C "$ROOT" pull -q --ff-only origin main; then
+    echo "No se pudo bajar lo nuevo (¿hay cambios tuyos sin guardar?). Corre  git status  y mándale el resultado a Claude."
+    exit 1
+  fi
+  TM_PULLED=1 exec bash "$0" "$@"
 fi
+pkill -f "expo start" 2>/dev/null || true
+rm -rf ios build
 echo "Compilando la versión $(git -C "$ROOT" rev-parse --short HEAD) ($(git -C "$ROOT" log -1 --format=%s | cut -c1-70))"
 [ "$(uname)" = "Darwin" ] || { echo "Esto solo corre en un Mac con Xcode."; exit 1; }
 : "${TEAM_ID:?falta TEAM_ID}"
