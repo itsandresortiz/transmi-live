@@ -14,7 +14,7 @@ export interface Segment<K extends string> { key: K; label: string; dot?: string
  *  Pensado para ir sobre el mapa (vidrio claro, texto oscuro). */
 export function GlassSegments<K extends string>({ items, value, onChange, variant = "map" }: { items: Segment<K>[]; value: K; onChange(k: K): void; /** `map`: barra de vidrio claro que se desliza de lado (sobre el mapa). `plain`: sobre fondo liso, opciones de igual ancho y colores del tema. */ variant?: "map" | "plain" }) {
   const c = useColors();
-  const plain = variant === "plain", ink = plain ? c.text : "#111114";
+  const plain = variant === "plain", ink = c.text;
   const { reduceMotion, reduceTransparency } = useAccessibility();
   const frames = useRef(new Map<string, { x: number; w: number }>());
   const [ready, setReady] = useState(false);
@@ -51,7 +51,7 @@ export function GlassSegments<K extends string>({ items, value, onChange, varian
 
   const bubbleView = (
     <Animated.View pointerEvents="none" style={[styles.bubble, { opacity: ready ? 1 : 0 }, bubble]}>
-      {glass ? <GlassView glassEffectStyle="regular" colorScheme={plain ? "auto" : "light"} isInteractive style={styles.fill} />
+      {glass ? <GlassView glassEffectStyle="regular" colorScheme="auto" isInteractive style={styles.fill} />
         : <View style={[styles.fill, { backgroundColor: plain ? c.card : "rgba(0,0,0,0.12)" }]} />}
     </Animated.View>
   );

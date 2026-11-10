@@ -19,8 +19,9 @@
 - Comentarios y mensajes de commit **en español**, explicando el porqué. El nombre del modelo aparece **solo** en los trailers de atribución (abajo), nunca en código, comentarios, títulos ni cuerpos de commit.
 - No duplicar formatos ni reglas entre web y app: compartir en `packages/*` (hay deuda: `format.ts` y `stopname.ts` están duplicados; ver `09-open-items.md`).
 - App: **no usar `formSheet`** (en iOS 27.2 con listas se ve en negro); todas las ventanas son `modal` con encabezado nativo y la X nativa (`CloseToolbar`). Un `card` empujado sobre un `modal` queda detrás: toda ventana que se abra desde otra debe ser `modal`.
+- App/mapa: no cambiar `mapStyle` en caliente: el mapa se vuelve a montar con `key` al cambiar de apariencia.
 - App/mapa: **no agregar ni quitar capas en caliente** (cierra la app): capas siempre montadas, cambiar `visibility`. No pasar un solo punto a `fitBounds` (cierra la app): usar `flyTo`.
-- App: efectos de cristal solo sobre contenido (mapa); sobre el mapa usar `Glass scheme="light"` con texto oscuro. Botones principales: `PrimaryButton`. Cerrar = **X** (icono), no la palabra «Cerrar».
+- App: efectos de cristal solo sobre contenido (mapa); sobre el mapa usar `Glass scheme="light"` (significa «sobre el mapa»: sigue al mapa claro u oscuro) y los colores de `useOnMap()` para el texto, nunca `#111114` fijo. Botones principales: `PrimaryButton`. Cerrar = **X** (icono), no la palabra «Cerrar».
 - App: interruptores con `Toggle` (de `kit.tsx`), no con `Switch` directo (en iOS 26 queda descentrado).
 - App: las filas que se deslizan de lado deben llegar a los bordes de la pantalla (`marginHorizontal` negativo + `paddingHorizontal` en el contenido); si no, las fichas se recortan en seco en el margen.
 - App: pantallas ocultas no deben repintarse (`useTransitVersion`/`useNow` ya dependen de `useIsFocused`); no calcular cosas pesadas en cada segundo.

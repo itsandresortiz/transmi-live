@@ -5,6 +5,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 
 ## Sin commit (pendiente de decisión del dueño)
 
+- 2026-11-10 · app · **Mapa base oscuro** (estilo `dark` de OpenFreeMap) cuando la app está en apariencia oscura; al cambiar de apariencia el mapa se **vuelve a montar** (`key`), no se cambia el estilo en caliente, y retoma donde estaba (`lastView`). Los controles de vidrio sobre el mapa siguen al mapa (`scheme="light"` ahora significa «sobre el mapa»; `useOnMap()` da los colores de texto). **Capa de tráfico** en la app (`trafficSegments`, capas `trafico-*`, apagada por defecto, interruptor en capas). Sin ver en teléfono (?).
 - 2026-11-10 · app · «Seguir este viaje» sigue **en vivo el bus de cada tramo** (no solo el primero): `busForLeg` (el próximo de esa ruta hacia tu parada; a bordo, el que va pegado a ti) y `liveShift` en `trip-guide.ts`, con pruebas. Aviso único «El X viene con retraso» si llega ≥5 min tarde; en la ventana del viaje: «Ver el bus en el mapa» y «Buscar otra opción desde aquí».
 - 2026-11-10 · app · El **widget muestra los buses de ejemplo** rotulados «Demostración» (`widgetSync.tsx` manda `demo`, `Widget.swift` lo rotula). Swift sin compilar aquí (?).
 - 2026-11-10 · Se quitó de `app.config.js` el identificador de equipo de Apple que estaba escrito como respaldo; ahora sale solo de la variable `TEAM_ID` del Mac.

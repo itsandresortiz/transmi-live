@@ -32,7 +32,7 @@ Las ramas de datos (`live-data`, `schedule-data`, `hop-stats`, `signal-stats`) s
 | `tm.places.v1` | web | casa y trabajo |
 | `tm.recents.v1` | web | destinos recientes |
 | `tm.saved.v1` | app (AsyncStorage, zustand persist) | paradas y rutas favoritas, apodos (`nicknames`), casa y trabajo |
-| `tm.layers.v1` | app | capas del mapa (semáforos, estaciones) |
+| `tm.layers.v1` | app | capas del mapa (semáforos, estaciones, tráfico) |
 | `tm.appearance.v1` | app | apariencia elegida: automático, claro u oscuro |
 | `tm.onboarded.v1` | app | ya vio la bienvenida |
 | `tm.trip.v1` | app | viaje de «Cómo llegar» que se está siguiendo (sin trazados), paso actual y atraso medido; se descarta si ya debió terminar hace 30 min |

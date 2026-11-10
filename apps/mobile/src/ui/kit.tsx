@@ -44,9 +44,10 @@ export function Glass({ children, style, interactive = false, tint, scheme }: { 
   // iOS 26 a veces pierde el efecto de vidrio tras volver del segundo plano: se vuelve a crear la superficie
   const [fresh, setFresh] = useState(0);
   useEffect(() => { const sub = AppState.addEventListener("change", (st) => { if (st === "active") setFresh((n) => n + 1); }); return () => sub.remove(); }, []);
-  if (reduceTransparency) return <View style={[{ backgroundColor: scheme === "light" ? "rgba(255,255,255,0.94)" : c.card }, style]}>{children}</View>;
-  if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView key={fresh} glassEffectStyle={scheme === "light" && !tint ? "clear" : "regular"} colorScheme={scheme ?? "auto"} isInteractive={interactive} tintColor={tint} style={style}>{children}</GlassView>;
-  return <View style={[{ backgroundColor: tint ?? (scheme === "light" ? "rgba(255,255,255,0.86)" : c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)") }, style]}>{children}</View>;
+  const onMap = scheme === "light", mapDark = onMap && c.dark;      // «light» = va sobre el mapa, que en apariencia oscura también es oscuro
+  if (reduceTransparency) return <View style={[{ backgroundColor: onMap ? (mapDark ? "rgba(28,28,30,0.94)" : "rgba(255,255,255,0.94)") : c.card }, style]}>{children}</View>;
+  if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView key={fresh} glassEffectStyle={scheme === "light" && !tint ? "clear" : "regular"} colorScheme={onMap ? (mapDark ? "dark" : "light") : scheme ?? "auto"} isInteractive={interactive} tintColor={tint} style={style}>{children}</GlassView>;
+  return <View style={[{ backgroundColor: tint ?? (onMap ? (mapDark ? "rgba(28,28,30,0.82)" : "rgba(255,255,255,0.86)") : c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)") }, style]}>{children}</View>;
 }
 
 /** Botón redondo de vidrio con un símbolo de iOS (volver, ubicación, avisos…). */
@@ -67,7 +68,7 @@ export function RoundButton({ symbol, label, onPress, size = 46, tint, light = f
   return (
     <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={{ width: size, height: size }}>
       <Glass interactive tint={tint} scheme={light ? "light" : undefined} style={[styles.round, { width: size, height: size, borderRadius: size / 2 }]}>
-        <SymbolView name={symbol} tintColor={light ? "#111114" : c.text} size={size * 0.42} />
+        <SymbolView name={symbol} tintColor={c.text} size={size * 0.42} />
       </Glass>
     </Tap>
   );

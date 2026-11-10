@@ -27,3 +27,9 @@ export function useColors() {
   const p = dark ? (moreContrast ? HIGH_DARK : DARK) : moreContrast ? HIGH_LIGHT : LIGHT;
   return { dark, moreContrast, ...p };
 }
+
+/** Colores de lo que va encima del mapa (controles de vidrio): el mapa es claro u oscuro según la apariencia, y el texto se le opone. */
+export function useOnMap(): { dark: boolean; ink: string; sub: string; accent: string } {
+  const dark = useColorScheme() === "dark";
+  return dark ? { dark, ink: "#f4f4f5", sub: "#b4b4bb", accent: "#ff6b78" } : { dark, ink: "#111114", sub: "#5c5c63", accent: "#d4162a" };
+}

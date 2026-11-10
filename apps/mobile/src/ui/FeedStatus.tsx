@@ -24,7 +24,7 @@ export function FeedStatus({ tint, light = false }: { tint?: string; light?: boo
     <Glass tint={tint} scheme={light ? "light" : undefined} style={styles.glass}>
       <View accessible accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}`} style={styles.pill}>
         <View style={[styles.dot, { backgroundColor: demo ? "#8b5cf6" : live ? "#22c55e" : "#f59e0b" }]} />
-        <Text style={[type.caption, { color: light ? "#111114" : c.text }]}>{title}</Text>
+        <Text style={[type.caption, { color: c.text }]}>{title}</Text>
         {detail ? <Text style={[type.caption, { color: light ? "#111114" : c.text, opacity: 0.7 }]} numberOfLines={1}>{detail}</Text> : null}
       </View>
     </Glass>

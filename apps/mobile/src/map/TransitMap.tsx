@@ -4,9 +4,10 @@ import { Camera, GeoJSONSource, Images, Layer, Map, UserLocation, type CameraRef
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { SystemType } from "@transmi/domain";
 import { transit } from "@/composition-root";
+import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
-import { CORRIDORS, PORTALS, buildStationGeometry, hav, trunkStations } from "@transmi/application";
+import { CORRIDORS, PORTALS, buildStationGeometry, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { BUS_SPRITES } from "./sprites";
@@ -15,7 +16,11 @@ import { useBusFeatures, type Viewport } from "./useBuses";
 import { SYSTEM_COLOR } from "@/ui/theme";
 
 /** Base de OpenStreetMap servida por OpenFreeMap (gratis, sin llave). */
-const MAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
+/** Mapa base claro u oscuro, según la apariencia de la app. */
+const MAP_STYLE = { light: "https://tiles.openfreemap.org/styles/positron", dark: "https://tiles.openfreemap.org/styles/dark" };
+/** Dónde quedó el mapa la última vez: al cambiar de apariencia el mapa se vuelve a montar (no se cambia el estilo en caliente) y retoma desde ahí. */
+const lastView: { center: [number, number]; zoom: number } = { center: BOGOTA_LL(), zoom: 11.6 };
+function BOGOTA_LL(): [number, number] { return [-74.08, 4.65]; }
 const BOGOTA: [number, number] = [-74.075, 4.65];
 const STOP_ZOOM = 15.2;
 
@@ -32,6 +37,8 @@ interface Props {
   /** Capas extra: semáforos y estaciones dibujadas con sus vagones. */
   showSignals?: boolean;
   showStations?: boolean;
+  /** Velocidad de los buses en las calles (capa de tráfico). */
+  showTraffic?: boolean;
   /** Avisa dónde quedó el centro del mapa y su zoom cada vez que termina de moverse. */
   onView?(v: { lat: number; lon: number; zoom: number; bearing: number }): void;
   /** Mapa pequeño dentro de otra pantalla: sin brújula. */
@@ -45,7 +52,7 @@ interface Props {
 }
 
 /** El mapa de buses en vivo: base, trazado de la ruta, paradas (al acercarse), buses y tu ubicación. */
-export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, showSignals = true, showStations = true, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
+export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, showSignals = true, showStations = true, showTraffic = false, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
   const c = useColors();
   const camera = useRef<CameraRef>(null);
   const lastCenter = useRef<[number, number]>(BOGOTA);      // el centro actual, para girar a norte sin moverse
@@ -128,6 +135,12 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   }, [geo]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const signalsJson = useSemaforos(showSignals);
+  /** Tráfico: el último tramo que recorrió cada bus, con su velocidad. Solo se calcula con la capa encendida y cuando llega un lote nuevo. */
+  const version = transit.version;
+  const trafficJson = useMemo(() => JSON.stringify({
+    type: "FeatureCollection",
+    features: showTraffic && active ? trafficSegments(transit, nowMs() / 1000).map((x) => ({ type: "Feature", properties: { b: trafficBand(x.speed) }, geometry: { type: "LineString", coordinates: (x.line ?? [x.a, x.b]).map((g) => [g.lon, g.lat]) } })) : [],
+  }), [showTraffic, active, version]);
   /** Color de cada línea de la troncal (A, B, C…) para los bordes de las estaciones. */
   const lineColor = (fallback: string): unknown => ["match", ["get", "l"], ...Object.entries(TRUNK_LINES).flatMap(([k, v]) => [k, c.dark ? v.dark : v.light]), fallback];
   /** Sobre los colores claros (amarillo de Suba, beige de la 26, rosado del Eje Ambiental) la letra va oscura para que se lea. */
@@ -151,17 +164,22 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     const { bounds, zoom, bearing } = e.nativeEvent;
     setView({ west: bounds[0], south: bounds[1], east: bounds[2], north: bounds[3], zoom });
     lastCenter.current = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+    if (!compact) { lastView.center = lastCenter.current; lastView.zoom = zoom; }
     onView?.({ lat: (bounds[1] + bounds[3]) / 2, lon: (bounds[0] + bounds[2]) / 2, zoom, bearing: bearing ?? 0 });
   }, [onView]);
 
   return (
-    <Map style={StyleSheet.absoluteFill} mapStyle={MAP_STYLE} logo={false} attribution attributionPosition={attributionPosition} compass={false} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
-      <Camera ref={camera} initialViewState={{ center: BOGOTA, zoom: 11.6 }} minZoom={9} maxZoom={19} />
+    <Map key={c.dark ? "oscuro" : "claro"} style={StyleSheet.absoluteFill} mapStyle={c.dark ? MAP_STYLE.dark : MAP_STYLE.light} logo={false} attribution attributionPosition={attributionPosition} compass={false} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
+      <Camera ref={camera} initialViewState={compact ? { center: BOGOTA, zoom: 11.6 } : { center: lastView.center, zoom: lastView.zoom }} minZoom={9} maxZoom={19} />
       <Images images={BUS_SPRITES} />
       <UserLocation />
 
       <GeoJSONSource id="network" data={networkJson}>
         <Layer id="network-line" type="line" {...sp({ lineColor: ["get", "color"], lineOpacity: 0.45, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 3, 17, 6], lineCap: "round", lineJoin: "round" })} />
+      </GeoJSONSource>
+      <GeoJSONSource id="trafico" data={trafficJson}>
+        <Layer id="trafico-casing" type="line" minzoom={11.5} {...sp({ visibility: showTraffic ? "visible" : "none", lineColor: c.dark ? "#0b0b0d" : "#ffffff", lineOpacity: 0.55, lineWidth: ["interpolate", ["linear"], ["zoom"], 11.5, 3, 16, 7.5, 18.5, 12], lineCap: "round", lineJoin: "round" })} />
+        <Layer id="trafico-lines" type="line" minzoom={11.5} {...sp({ visibility: showTraffic ? "visible" : "none", lineColor: ["match", ["get", "b"], 0, "#e5484d", 1, "#f08a24", 2, "#f5c518", "#2fbf71"], lineOpacity: 0.92, lineWidth: ["interpolate", ["linear"], ["zoom"], 11.5, 1.8, 16, 5, 18.5, 8.5], lineCap: "round", lineJoin: "round" })} />
       </GeoJSONSource>
       <GeoJSONSource id="stations" data={stationsJson}>
         {/* cada estación es una ficha del color de su línea con su letra; los portales, más grandes y visibles desde más lejos */}
@@ -182,22 +200,22 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       {stationGeo ? (
         <>
           <GeoJSONSource id="station-bases" data={stationGeo.bases} onPress={(e) => { const ids = (e.nativeEvent.features[0]?.properties?.all as string | undefined)?.split(",")[0]; if (ids) onStop?.(ids); }}>
-            <Layer id="station-base-fill" type="fill" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", fillColor: "#dde2ea", fillOpacity: ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] })} />
+            <Layer id="station-base-fill" type="fill" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#2b2e36" : "#dde2ea", fillOpacity: ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] })} />
             <Layer id="station-base-line" type="line" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#a9b2c1") as never, lineWidth: ["interpolate", ["linear"], ["zoom"], 14.5, 1.4, 18, 2.6] })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-links" data={stationGeo.links}>
-            <Layer id="station-links-fill" type="fill" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", fillColor: "#c4ccd9" })} />
+            <Layer id="station-links-fill" type="fill" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#3a3e48" : "#c4ccd9" })} />
             <Layer id="station-links-line" type="line" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#6f7a8d") as never, lineWidth: 1, lineOpacity: 0.75 })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-capsules" data={stationGeo.capsules} onPress={(e) => { const ids = (e.nativeEvent.features[0]?.properties?.ids as string | undefined)?.split(",")[0]; if (ids) onStop?.(ids); }}>
-            <Layer id="station-capsule-fill" type="fill" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", fillColor: "#ffffff", fillOpacity: 0.98 })} />
+            <Layer id="station-capsule-fill" type="fill" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#4a4f5a" : "#ffffff", fillOpacity: 0.98 })} />
             <Layer id="station-capsule-line" type="line" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#6f7a8d") as never, lineWidth: 1.8 })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-doors" data={stationGeo.doors}>
             <Layer id="station-doors-line" type="line" minzoom={17} {...sp({ visibility: showStations ? "visible" : "none", lineColor: "#6f7a8d", lineWidth: 1, lineOpacity: 0.55 })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-labels" data={stationGeo.labels}>
-            <Layer id="station-wagon-labels" type="symbol" minzoom={16.3} {...sp({ visibility: showStations ? "visible" : "none", textField: ["step", ["zoom"], ["get", "text"], 17.3, ["concat", "Vagón ", ["get", "text"]]], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 16.3, 10, 18.5, 13], textAllowOverlap: true, textIgnorePlacement: true, textColor: "#1c1c1e" })} />
+            <Layer id="station-wagon-labels" type="symbol" minzoom={16.3} {...sp({ visibility: showStations ? "visible" : "none", textField: ["step", ["zoom"], ["get", "text"], 17.3, ["concat", "Vagón ", ["get", "text"]]], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 16.3, 10, 18.5, 13], textAllowOverlap: true, textIgnorePlacement: true, textColor: c.dark ? "#f4f4f5" : "#1c1c1e" })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-chips" data={stationGeo.chips}>
             <Layer id="station-chip-labels" type="symbol" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 14.5, 13, 18, 17], textAnchor: "bottom", textOffset: [0, -0.5], textMaxWidth: 12, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2.4 })} />
@@ -208,7 +226,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <GeoJSONSource id="semaforos" data={signalsJson}>
           <Layer id="semaforos-dots" type="circle" minzoom={13.2} maxzoom={15.4} {...sp({ visibility: showSignals ? "visible" : "none", circleRadius: ["interpolate", ["linear"], ["zoom"], 13.2, 1.6, 15.4, 3.2], circleColor: "#e8503f", circleStrokeColor: "#ffffff", circleStrokeWidth: 1 })} />
           <Layer id="semaforos-icons" type="symbol" minzoom={15.4} {...sp({ visibility: showSignals ? "visible" : "none", iconImage: "semaforo", iconSize: ["interpolate", ["linear"], ["zoom"], 15.4, 0.2, 18, 0.36], iconAllowOverlap: true, iconIgnorePlacement: true })} />
-          <Layer id="semaforos-labels" type="symbol" minzoom={17.2} {...sp({ visibility: showSignals ? "visible" : "none", textField: ["get", "dir"], textFont: ["Noto Sans Regular"], textSize: 10.5, textOffset: [0, 1.35], textAnchor: "top", textOptional: true, textColor: "#6c6c70", textHaloColor: "#eef0f3", textHaloWidth: 1.2 })} />
+          <Layer id="semaforos-labels" type="symbol" minzoom={17.2} {...sp({ visibility: showSignals ? "visible" : "none", textField: ["get", "dir"], textFont: ["Noto Sans Regular"], textSize: 10.5, textOffset: [0, 1.35], textAnchor: "top", textOptional: true, textColor: c.dark ? "#b4b4bb" : "#6c6c70", textHaloColor: c.dark ? "#0b0b0d" : "#eef0f3", textHaloWidth: 1.2 })} />
         </GeoJSONSource>
       )}
       <GeoJSONSource id="focus-stop" data={focusJson}>
