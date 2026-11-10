@@ -14,6 +14,7 @@ import { transit } from "@/composition-root";
 import { motion } from "@/map/engine";
 import { useMapFocus } from "@/map/focus";
 import { useMapLayers } from "@/map/layers";
+import { useRide } from "@/ride";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { etaText } from "@/format";
@@ -65,6 +66,11 @@ export default function Mapa() {
   const followV = focus.followBusId ? transit.fleet.get(focus.followBusId) : undefined;
   const followRoute = followV ? transit.routeOf(followV) : undefined;
   const followNext = followV ? transit.nextStopOf(followV, nowMs()) : undefined;
+  // si además marcaste «Voy en este bus», la tarjeta lo dice y recuerda dónde te bajas
+  const rideBus = useRide((s) => s.busId), rideStop = useRide((s) => s.alightId);
+  const riding = !!focus.followBusId && rideBus === focus.followBusId;
+  const alight = riding && rideStop ? transit.stopById(rideStop) : undefined;
+  const stopFollowing = () => { if (riding) useRide.getState().clear(); focus.clear(); };
   useEffect(() => {
     if (!focused) return;
     let sub: Location.LocationSubscription | undefined, gone = false;
@@ -131,7 +137,7 @@ export default function Mapa() {
         </Animated.View>
       ) : null}
       {rotated ? (
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(160)} style={[styles.compass, { top: insets.top + (focus.followBusId ? 205 : focus.stopId || focus.routeId ? 132 : 82) }]}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(160)} style={[styles.compass, { top: insets.top + (focus.followBusId ? (alight ? 227 : 205) : focus.stopId || focus.routeId ? 132 : 82) }]}>
           <Tap onPress={() => map.current?.resetNorth()} accessibilityRole="button" accessibilityLabel="Orientar el mapa hacia el norte">
             <Glass interactive scheme="light" style={styles.compassGlass}>
               <View style={{ transform: [{ rotate: `${-(center?.bearing ?? 0)}deg` }] }}><SymbolView name="location.north.fill" tintColor="#d4162a" size={20} /></View>
@@ -148,10 +154,10 @@ export default function Mapa() {
                   <View style={styles.followTop}>
                     {followRoute ? <RouteBadge route={followRoute} /> : null}
                     <View style={{ flex: 1 }}>
-                      <Text style={[type.caption, { color: "#5c5c63" }]} numberOfLines={1}>Siguiendo · {followV.plate || followV.label || followV.id}</Text>
+                      <Text style={[type.caption, { color: "#5c5c63" }]} numberOfLines={1}>{riding ? "Vas en este bus" : "Siguiendo"} · {followV.plate || followV.label || followV.id}</Text>
                       <Text style={[type.eyebrow, { color: "#5c5c63", marginTop: 2 }]}>PRÓXIMA PARADA</Text>
                     </View>
-                    <RoundButton symbol="xmark" label="Dejar de seguir este bus" onPress={() => focus.clear()} size={32} light />
+                    <RoundButton symbol="xmark" label={riding ? "Terminar el viaje y dejar de seguir este bus" : "Dejar de seguir este bus"} onPress={stopFollowing} size={32} light />
                   </View>
                   {followNext ? (
                     <View style={styles.followNext}>
@@ -159,12 +165,13 @@ export default function Mapa() {
                       {followNext.arrivalAt ? <Text style={[type.title, { color: "#d4162a" }]}>{etaText(followNext.arrivalAt, nowS)}</Text> : null}
                     </View>
                   ) : <Text style={[type.body, { color: "#5c5c63" }]}>No podemos calcular su próxima parada ahora.</Text>}
+                  {alight ? <Text style={[type.caption, { color: "#5c5c63" }]} numberOfLines={1}>Te bajas en {stopText(alight, rideStop ?? "")}</Text> : null}
                   <Tap onPress={() => router.push({ pathname: "/ride/[id]", params: { id: followV.id } })} accessibilityRole="button" accessibilityLabel="Ver todas las próximas paradas de este bus"><Text style={[type.caption, { color: "#d4162a", fontSize: 14 }]}>Ver todas las paradas ›</Text></Tap>
                 </>
               ) : (
                 <View style={styles.followTop}>
                   <Text style={[type.headline, { color: "#111114", flex: 1 }]}>Este bus dejó de reportar</Text>
-                  <RoundButton symbol="xmark" label="Quitar la selección" onPress={() => focus.clear()} size={32} light />
+                  <RoundButton symbol="xmark" label="Quitar la selección" onPress={stopFollowing} size={32} light />
                 </View>
               )}
             </View>

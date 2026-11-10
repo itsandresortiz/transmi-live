@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,6 +35,8 @@ export default function Ride() {
   const alightId = rideBus === id ? rideStop : null;      // el destino marcado solo cuenta si es para este bus
   const rideTotal = useRide((st) => st.total);
   const setAlightId = (stop: string | null, total = 0) => { if (stop) { void allowAlerts(); useRide.getState().set(id, stop, total); } else useRide.getState().clear(); };
+  // «Voy en este bus» también es seguirlo: al cerrar esta ventana, el mapa lo acompaña y deja arriba su tarjeta
+  useEffect(() => { if (id && useMapFocus.getState().followBusId !== id) useMapFocus.getState().set({ followBusId: id }); }, [id]);
   const v = transit.fleet.get(id);
   const r = v ? transit.routeOf(v) : undefined;
   const seq = v ? transit.sequenceForDisplay(v) : undefined;

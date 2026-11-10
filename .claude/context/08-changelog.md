@@ -5,6 +5,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 
 ## Sin commit (pendiente de decisión del dueño)
 
+- 2026-11-10 · app · «Voy en este bus» ahora también **sigue** al bus: al cerrar la ventana, el mapa lo acompaña y deja arriba la tarjeta fija (dice «Vas en este bus» y «Te bajas en …» si marcaste parada; la X termina el viaje y deja de seguir). `app/ride/[id].tsx`, `app/(tabs)/mapa.tsx`. Sin probar en teléfono.
 - 2026-11-10 · La memoria del proyecto se movió de `docs/context/` + `CLAUDE.md` (raíz) a **`.claude/context/` + `.claude/CLAUDE.md`** y se subió a `main` por decisión del dueño, tras quitar nombres de repos de terceros, de otros proyectos del dueño y detalles de la cuenta de Apple. El repo es público: aquí no va nada privado. El `TEAM_ID` quedó guardado en el Mac del dueño (no en el repo).
 - 2026-11-10 · «Voy en este bus»: los buses de la escena son ahora una **caja 3D real** proyectada con la misma cámara de la vía (`tools/bus-rear-draw.js`: techo con equipos de aire, cara trasera, costado izquierdo, fuelle en articulados, sombra). `tools/bus-sprites.ts` genera las 10 imágenes y `assets/sprites-rear/meta.json` (dónde va cada una); `RideScene` las coloca con ese dato. Visto solo en el prototipo del navegador, no en el teléfono.
 - `.claude/context/**`, `CLAUDE.md`, `.claude/hooks/context-guard.sh` y `.claude/settings.json`: memoria persistente del proyecto y su hook de auto-actualización (creados el 2026-11-10, sesión de documentación).
