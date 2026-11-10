@@ -70,7 +70,7 @@ export function GlassSegments<K extends string>({ items, value, onChange, varian
   });
 
   // sobre fondo liso: una pista del color del tema con la burbuja de vidrio encima; las opciones se reparten el ancho
-  if (plain) return <View style={[styles.bar, styles.row, { flexDirection: "row", backgroundColor: c.cardAlt }]}>{bubbleView}{options}</View>;
+  if (plain) return <View style={[styles.bar, styles.row, { flexDirection: "row", backgroundColor: c.dark ? c.card : "#e3e3e8" }]}>{bubbleView}{options}</View>;
   return (
     <Glass scheme="light" style={styles.bar}>
       <ScrollView ref={scroll} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
@@ -82,10 +82,11 @@ export function GlassSegments<K extends string>({ items, value, onChange, varian
 }
 
 const styles = StyleSheet.create({
+  // pista de 56 de alto con radio 28 y margen 8; burbuja de 40 con radio 20: las dos curvas comparten centro
   bar: { borderRadius: 28, overflow: "hidden" },
   row: { padding: space[2], gap: space[1], alignItems: "center" },
   item: { flexDirection: "row", alignItems: "center", gap: space[2], paddingHorizontal: space[4], minHeight: 40, borderRadius: 20 },
   dot: { width: 9, height: 9, borderRadius: 5 },
   bubble: { position: "absolute", left: 0, top: space[2], height: 40 },
-  fill: { flex: 1, borderRadius: 20, borderCurve: "continuous", overflow: "hidden" },
+  fill: { flex: 1, borderRadius: 20, overflow: "hidden" },
 });

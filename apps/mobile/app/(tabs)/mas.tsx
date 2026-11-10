@@ -32,12 +32,12 @@ function Row({ symbol, tint, title, value, onPress, last = false, link = false }
   );
 }
 
-function Group({ title, children, footer }: { title: string; children: ReactNode; footer?: string }) {
+function Group({ title, children, footer, bare = false }: { title: string; children: ReactNode; footer?: string; /** Sin tarjeta alrededor (el contenido ya trae su propia forma). */ bare?: boolean }) {
   const c = useColors();
   return (
     <View style={styles.group}>
       <Text style={[type.eyebrow, { color: c.muted, marginLeft: space[4] }]}>{title}</Text>
-      <View style={[styles.groupCard, { backgroundColor: c.card }]}>{children}</View>
+      {bare ? children : <View style={[styles.groupCard, { backgroundColor: c.card }]}>{children}</View>}
       {footer ? <Text style={[type.caption, { color: c.muted, marginHorizontal: space[4] }]}>{footer}</Text> : null}
     </View>
   );
@@ -90,8 +90,8 @@ export default function Mas() {
           <Row last symbol="location.fill" tint="#3b82f6" title="Cerca de mí" onPress={() => router.push("/cerca")} />
         </Group>
 
-        <Group title="APARIENCIA" footer="Automático usa la del teléfono.">
-          <View style={{ padding: space[2] }}>
+        <Group bare title="APARIENCIA" footer="Automático usa la del teléfono.">
+          <View>
             <GlassSegments variant="plain" value={appearance.mode} onChange={(m) => appearance.setMode(m)}
               items={[{ key: "auto", label: "Automático" }, { key: "light", label: "Claro" }, { key: "dark", label: "Oscuro" }] as { key: AppearanceMode; label: string }[]} />
           </View>
