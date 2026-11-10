@@ -16,7 +16,7 @@ export interface WidgetArrival { /** ruta */ r: string; /** hacia dónde */ h: s
 
 /** Los próximos buses que llegan a cada parada, a partir de dónde va cada bus y las paradas que le siguen.
  *  Solo buses con reporte reciente y llegadas dentro de la próxima hora. */
-export function arrivalsByStop(state: TransitState, nowMs: number, perStop = 5, ahead = 25, horizonSec = 3600): Map<string, WidgetArrival[]> {
+export function arrivalsByStop(state: TransitState, nowMs: number, perStop = 8, ahead = 25, horizonSec = 3600): Map<string, WidgetArrival[]> {
   const now = nowMs / 1000, out = new Map<string, WidgetArrival[]>();
   for (const v of state.fleet.values()) {
     if (now - v.reportedAt > 180) continue;
@@ -28,7 +28,7 @@ export function arrivalsByStop(state: TransitState, nowMs: number, perStop = 5, 
       if (!(eta > now - 20)) continue;
       if (eta - now > horizonSec) break;
       const id = seq.shape.stopIds[j]!, list = out.get(id) ?? out.set(id, []).get(id)!;
-      list.push({ r: route.shortName, h: seq.shape.headsign, t: Math.round(eta), s: route.system });
+      list.push({ r: route.shortName, h: seq.shape.headsign, t: Math.round(eta), s: v.system });      // el sistema ya resuelto del bus (un alimentador puede venir mal clasificado en la ruta)
     }
   }
   for (const list of out.values()) { list.sort((a, b) => a.t - b.t); list.splice(perStop); }

@@ -89,8 +89,10 @@ struct Provider: TimelineProvider {
       if d > now { dates.insert(d) }
     }
     let entries = dates.sorted().prefix(12).map { StopEntry(date: $0, snapshot: snap) }
-    // iOS decide cada cuánto deja refrescar; se le pide cada 5 min
-    return Timeline(entries: entries, policy: .after(now.addingTimeInterval(5 * 60)))
+    // iOS decide cada cuánto deja refrescar. Se le pide a los 5 min, o antes si los buses en vivo que se conocen se acaban antes (nunca antes de 2 min)
+    let lastLive = (snap?.stops.first?.arrivals ?? []).map { Date(timeIntervalSince1970: $0.t) }.filter { $0 > now }.max()
+    let next = min(now.addingTimeInterval(5 * 60), max(now.addingTimeInterval(2 * 60), lastLive ?? now))
+    return Timeline(entries: entries, policy: .after(next))
   }
 }
 
@@ -160,7 +162,9 @@ struct ArrivalRow: View {
         .font(.system(size: compact ? 15 : 17, weight: .bold, design: .rounded))
         .monospacedDigit()
         .multilineTextAlignment(.trailing)
-        .frame(maxWidth: 64, alignment: .trailing)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .frame(maxWidth: scheduled ? 104 : 64, alignment: .trailing)
     }
   }
 }
@@ -241,6 +245,9 @@ struct StopWidgetView: View {
           Text("Demostración · buses de ejemplo").font(.caption2.weight(.semibold)).foregroundStyle(Color(hex: "#8b5cf6"))
         } else if ageMinutes >= 20 {
           Text("Datos de hace \(ageMinutes) min · abre la app").font(.caption2).foregroundStyle(.secondary)
+        } else if !upcoming.isEmpty, let at = entry.snapshot?.at {
+          // de cuándo es el dato en vivo que se muestra
+          Text("En vivo · actualizado \(Date(timeIntervalSince1970: at), style: .time)").font(.caption2).foregroundStyle(.secondary)
         }
       }
     }

@@ -32,9 +32,9 @@ export function syncWidget(): void {
   const stops = saved.stops.slice(0, 3).flatMap((id) => {
     const stop = transit.stopById(id);
     if (!stop) return [];
-    const arrivals = upcomingAtStop(transit, id, now, 2)
+    const arrivals = upcomingAtStop(transit, id, now, 3)
       .flatMap((u) => u.buses.map((b) => ({ r: u.route.shortName, h: u.headsign, t: Math.round(b.etaAt), c: SYSTEM_COLOR[u.route.system] })))
-      .sort((a, b) => a.t - b.t).slice(0, 5);
+      .sort((a, b) => a.t - b.t).slice(0, 8);      // varios, para que el widget siga con buses en vivo un buen rato después de cerrar la app
     // respaldo para cuando el dato en vivo se venza y la app no esté abierta: las próximas pasadas según el horario (el widget las rotula «Programado»)
     const sched: typeof arrivals = [];
     if (transit.departures.size) {
