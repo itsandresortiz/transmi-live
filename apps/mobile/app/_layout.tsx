@@ -24,9 +24,9 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="route/[id]" options={{ headerShown: true, title: "Ruta", headerBackTitle: "Atrás", headerTintColor: "#e11d2e", presentation: "card" }} />
-        <Stack.Screen name="bus/[id]" options={{ presentation: "formSheet", contentStyle: { backgroundColor: c.bg }, sheetAllowedDetents: [0.62, 0.95], sheetInitialDetentIndex: 0, sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 0, sheetCornerRadius: 28, headerShown: false }} />
-        <Stack.Screen name="ride/[id]" options={{ presentation: "formSheet", contentStyle: { backgroundColor: c.bg }, sheetAllowedDetents: [0.5, 0.92], sheetInitialDetentIndex: 1, sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 0, sheetCornerRadius: 28, headerShown: false }} />
-        <Stack.Screen name="stop/[id]" options={{ presentation: "formSheet", contentStyle: { backgroundColor: c.bg }, sheetAllowedDetents: [0.5, 0.92], sheetInitialDetentIndex: 0, sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 0, sheetCornerRadius: 28, headerShown: false }} />
+        <Stack.Screen name="bus/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", headerRight: close, contentStyle: { backgroundColor: c.bg } }} />
+        <Stack.Screen name="ride/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", headerRight: close, contentStyle: { backgroundColor: c.bg } }} />
+        <Stack.Screen name="stop/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", headerRight: close, contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="avisos" options={{ presentation: "modal", headerShown: true, title: "Avisos del servicio", headerTintColor: "#e11d2e", headerRight: close }} />
         <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="cerca" options={{ presentation: "modal", headerShown: true, title: "Cerca de mí", headerTintColor: "#e11d2e", headerRight: close }} />

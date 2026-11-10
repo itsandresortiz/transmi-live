@@ -15,7 +15,7 @@ import { useSaved } from "@/favorites";
 import { useMapFocus } from "@/map/focus";
 import { usePlanner } from "@/planner/store";
 import { reportProblem } from "@/report";
-import { Card, Chip, RoundButton, SheetClose, Tap } from "@/ui/kit";
+import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
@@ -33,7 +33,7 @@ export default function StopSheet() {
   const nick = useSaved((f) => f.nicknames[id]), setNick = useSaved((f) => f.setNickname);
   const siblings = useMemo(() => (stop ? siblingStops(transit, stop).map((x) => ({ x, names: [...new Set(routesAtStop(transit, x.id).map((r) => r.shortName))].slice(0, 2).join(" ") })) : []), [stop, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!stop) return <View style={[styles.screen, { backgroundColor: c.bg }]}><SheetClose onPress={() => router.back()} /><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>No encontramos esa parada</Text></View>;
+  if (!stop) return <View style={[styles.screen, { backgroundColor: c.bg }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>No encontramos esa parada</Text></View>;
 
   const rows = upcomingAtStop(transit, id, nowSec(), 6);
   const down = liveDown(transit.fleet.size);
@@ -53,8 +53,7 @@ export default function StopSheet() {
   const row = sel ? rows.find((r) => r.route.id === sel.routeId && (!sel.direction || r.direction === sel.direction)) : undefined;
   if (sel) return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <SheetClose onPress={() => router.back()} />
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[2], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <RouteAtStop stopId={id} sel={sel} row={row} now={now} onBack={() => setSel(null)} onMap={(buses, follow) => showOnMap({ routeId: sel.routeId, busIds: buses, followBusId: follow })} />
       </ScrollView>
     </View>
@@ -62,8 +61,7 @@ export default function StopSheet() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <SheetClose onPress={() => router.back()} />
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[2], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
         <Text style={[type.largeTitle, { color: c.text }]}>{nick || label.title}</Text>
         {nick ? <Text style={[type.caption, { color: c.muted }]}>{label.title}</Text> : null}

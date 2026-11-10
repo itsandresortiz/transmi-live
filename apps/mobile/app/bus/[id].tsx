@@ -8,7 +8,7 @@ import { useNow, useTransitVersion } from "@/hooks";
 import { delayClass, delayText, untilText } from "@/format";
 import { stopText } from "@/stopname";
 import { reportProblem } from "@/report";
-import { Card, SheetClose, Tap } from "@/ui/kit";
+import { Card, Tap } from "@/ui/kit";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -20,13 +20,12 @@ export default function BusSheet() {
   useTransitVersion();
   const now = useNow() / 1000;
   const v = transit.fleet.get(id);
-  if (!v) return <View style={[styles.screen, { flex: 1, backgroundColor: c.bg, paddingTop: space[10], paddingBottom: insets.bottom + space[6] }]}><SheetClose onPress={() => router.back()} /><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>Este bus dejó de reportar</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
+  if (!v) return <View style={[styles.screen, { flex: 1, backgroundColor: c.bg, paddingTop: space[2], paddingBottom: insets.bottom + space[6] }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>Este bus dejó de reportar</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
   const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
   const tone = delayClass(d) === "bad" ? "#dc2626" : delayClass(d) === "warn" ? "#d97706" : delayClass(d) === "ok" ? "#16a34a" : c.muted;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <SheetClose onPress={() => router.back()} />
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[2], paddingBottom: insets.bottom + space[10] }]} showsVerticalScrollIndicator={false}>
       <View style={styles.head}>
         {r ? <RouteBadge route={r} /> : null}
         <View style={{ flex: 1 }}>
