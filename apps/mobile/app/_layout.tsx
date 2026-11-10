@@ -39,7 +39,7 @@ export default function RootLayout() {
       <WidgetSync />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="route/[id]" options={{ headerShown: true, title: "Ruta", headerBackTitle: "Atrás", headerTintColor: "#e11d2e", presentation: "card" }} />
+        <Stack.Screen name="route/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="bus/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="ride/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="stop/[id]" options={{ presentation: "modal", headerShown: true, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />

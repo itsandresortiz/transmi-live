@@ -15,6 +15,7 @@ import { useSaved } from "@/favorites";
 import { useMapFocus } from "@/map/focus";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
+import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
@@ -58,7 +59,7 @@ export default function RouteScreen() {
     return out.sort((a, b) => b.k - a.k);
   }, [d, cur, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!d) return <View style={[styles.empty, { backgroundColor: c.bg }]}><Text style={[type.headline, { color: c.text }]}>Ruta no encontrada</Text><Text style={[type.body, { color: c.muted }]}>Ya no aparece en el servicio.</Text></View>;
+  if (!d) return <View style={[styles.empty, { backgroundColor: c.bg }]}><CloseToolbar /><Text style={[type.headline, { color: c.text }]}>Ruta no encontrada</Text><Text style={[type.body, { color: c.muted }]}>Ya no aparece en el servicio.</Text></View>;
   const route = d.route, color = SYSTEM_COLOR[route.system];
   const status = transit.routeStatus(id, nowMs());
   const sched = transit.serviceEnds.scheduleOf(id, nowMs());
@@ -72,6 +73,7 @@ export default function RouteScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Stack.Screen options={{ title: route.shortName }} />
+      <CloseToolbar />
       <View style={{ height: mapH, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, overflow: "hidden" }}>
         <TransitMap ref={map} routeId={id} compact attributionPosition={{ bottom: 6, left: 8 }}
           onBus={(bid) => router.push({ pathname: "/bus/[id]", params: { id: bid } })} onStop={(sid) => router.push({ pathname: "/stop/[id]", params: { id: sid, route: id } })} />

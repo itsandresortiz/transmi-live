@@ -14,6 +14,11 @@ import { transit } from "@/composition-root";
 import { motion } from "@/map/engine";
 import { useMapFocus } from "@/map/focus";
 import { useMapLayers } from "@/map/layers";
+import { nowMs } from "@/clock";
+import { useNow, useTransitVersion } from "@/hooks";
+import { etaText } from "@/format";
+import { stopText } from "@/stopname";
+import { RouteBadge } from "@/ui/RouteBadge";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { locateMe } from "@/location";
 import { FeedStatus } from "@/ui/FeedStatus";
@@ -53,6 +58,12 @@ export default function Mapa() {
   const [denied, setDenied] = useState(false);
   const [panel, setPanel] = useState(false);
   const layers = useMapLayers();
+  // el bus que se sigue: su ruta y su próxima parada con la hora a la que llega
+  useTransitVersion();
+  const nowS = useNow(2000) / 1000;
+  const followV = focus.followBusId ? transit.fleet.get(focus.followBusId) : undefined;
+  const followRoute = followV ? transit.routeOf(followV) : undefined;
+  const followNext = followV ? transit.nextStopOf(followV, nowMs()) : undefined;
   useEffect(() => {
     if (!focused) return;
     let sub: Location.LocationSubscription | undefined, gone = false;
@@ -123,7 +134,7 @@ export default function Mapa() {
         </Animated.View>
       ) : null}
       {rotated ? (
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(160)} style={[styles.compass, { top: insets.top + (focus.stopId || focus.routeId || focus.followBusId ? 132 : 82) }]}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(160)} style={[styles.compass, { top: insets.top + (focus.followBusId ? 205 : focus.stopId || focus.routeId ? 132 : 82) }]}>
           <Tap onPress={() => map.current?.resetNorth()} accessibilityRole="button" accessibilityLabel="Orientar el mapa hacia el norte">
             <Glass interactive scheme="light" style={styles.compassGlass}>
               <View style={{ transform: [{ rotate: `${-(center?.bearing ?? 0)}deg` }] }}><SymbolView name="location.north.fill" tintColor="#d4162a" size={20} /></View>
@@ -131,14 +142,45 @@ export default function Mapa() {
           </Tap>
         </Animated.View>
       ) : null}
-      {focus.stopId || focus.routeId || focus.followBusId ? (
+      {focus.followBusId ? (
+        <View style={[styles.focusChip, { top: insets.top + 72 }]}>
+          <Glass interactive scheme="light" style={styles.focusGlass}>
+            <View style={styles.followBox}>
+              {followV ? (
+                <>
+                  <View style={styles.followTop}>
+                    {followRoute ? <RouteBadge route={followRoute} /> : null}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[type.caption, { color: "#5c5c63" }]} numberOfLines={1}>Siguiendo · {followV.plate || followV.label || followV.id}</Text>
+                      <Text style={[type.eyebrow, { color: "#5c5c63", marginTop: 2 }]}>PRÓXIMA PARADA</Text>
+                    </View>
+                    <RoundButton symbol="xmark" label="Dejar de seguir este bus" onPress={() => focus.clear()} size={32} light />
+                  </View>
+                  {followNext ? (
+                    <View style={styles.followNext}>
+                      <Text style={[type.headline, { color: "#111114", flex: 1 }]} numberOfLines={2}>{stopText(followNext.stop, followNext.stopId)}</Text>
+                      {followNext.arrivalAt ? <Text style={[type.title, { color: "#d4162a" }]}>{etaText(followNext.arrivalAt, nowS)}</Text> : null}
+                    </View>
+                  ) : <Text style={[type.body, { color: "#5c5c63" }]}>No podemos calcular su próxima parada ahora.</Text>}
+                  <Tap onPress={() => router.push({ pathname: "/ride/[id]", params: { id: followV.id } })} accessibilityRole="button" accessibilityLabel="Ver todas las próximas paradas de este bus"><Text style={[type.caption, { color: "#d4162a", fontSize: 14 }]}>Ver todas las paradas ›</Text></Tap>
+                </>
+              ) : (
+                <View style={styles.followTop}>
+                  <Text style={[type.headline, { color: "#111114", flex: 1 }]}>Este bus dejó de reportar</Text>
+                  <RoundButton symbol="xmark" label="Quitar la selección" onPress={() => focus.clear()} size={32} light />
+                </View>
+              )}
+            </View>
+          </Glass>
+        </View>
+      ) : focus.stopId || focus.routeId ? (
         <View style={[styles.focusChip, { top: insets.top + 72 }]}>
           <Glass interactive scheme="light" style={styles.focusGlass}>
             <View style={styles.focusRow}>
-              <Text style={[type.caption, { color: c.text, flex: 1 }]} numberOfLines={1}>
-                {focus.followBusId ? "Siguiendo un bus" : focus.stopId ? `Parada: ${transit.stopById(focus.stopId)?.name ?? ""}` : "Ruta seleccionada"}
+              <Text style={[type.caption, { color: "#111114", flex: 1 }]} numberOfLines={1}>
+                {focus.stopId ? `Parada: ${transit.stopById(focus.stopId)?.name ?? ""}` : "Ruta seleccionada"}
               </Text>
-              <RoundButton symbol="xmark" label="Quitar la selección" onPress={() => focus.clear()} size={32} />
+              <RoundButton symbol="xmark" label="Quitar la selección" onPress={() => focus.clear()} size={32} light />
             </View>
           </Glass>
         </View>
@@ -170,5 +212,8 @@ const styles = StyleSheet.create({
   scrim: { position: "absolute", top: 0, left: 0, right: 0 },
   focusChip: { position: "absolute", left: space[4], right: space[4] },
   focusGlass: { borderRadius: 24, overflow: "hidden" },
+  followBox: { padding: space[3], gap: space[2] },
+  followTop: { flexDirection: "row", alignItems: "center", gap: space[2] },
+  followNext: { flexDirection: "row", alignItems: "center", gap: space[3] },
   focusRow: { flexDirection: "row", alignItems: "center", gap: space[2], paddingLeft: space[4], paddingRight: space[1], paddingVertical: space[1] },
 });
