@@ -83,13 +83,18 @@ export class TransitState {
   /** Dónde va el bus dentro del recorrido de su ruta: su última parada, la lista de paradas y su posición en ella. */
   sequenceOf(v: Vehicle): { shape: RouteShape; index: number } | undefined {
     if (!v.lastStopId) return undefined;
-    const key = `${v.routeId}|${v.lastStopId}`;
+    const key = `${v.routeId}|${v.lastStopId}|${v.tripId?.split(".").pop() ?? ""}`;
     let hit = this.seq.get(key);
     if (hit === undefined) {
       hit = null;
-      for (const shape of this.network.shapes.get(v.routeId) ?? []) {
-        const index = shape.stopIds.indexOf(v.lastStopId);
-        if (index >= 0) { hit = { shape, index }; break; }
+      // la ruta que informa TransMilenio a veces no es la del viaje: si la parada no está en su trazado, se prueba con la ruta que nombra el viaje (último tramo de su código)
+      const tripRoute = v.tripId?.split(".").pop();
+      for (const rid of tripRoute && tripRoute !== v.routeId ? [v.routeId, tripRoute] : [v.routeId]) {
+        for (const shape of this.network.shapes.get(rid) ?? []) {
+          const index = shape.stopIds.indexOf(v.lastStopId);
+          if (index >= 0) { hit = { shape, index }; break; }
+        }
+        if (hit) break;
       }
       this.seq.set(key, hit);
     }
