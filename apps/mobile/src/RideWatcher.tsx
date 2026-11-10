@@ -1,13 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import * as Haptics from "expo-haptics";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { arrivalAtIndex } from "@transmi/application";
 import { transit } from "./composition-root";
 import { nowMs } from "./clock";
-import { cancelAlerts, schedule } from "./notify";
+import { cancelAlerts, onAlertTap, schedule } from "./notify";
 import { stopText } from "./stopname";
 import { useRide } from "./ride";
+import { router, usePathname } from "expo-router";
+import { useLaunch } from "./ui/Launch";
 
 const TAG = "ride";
 const EVERY_MS = 5000;
@@ -37,15 +39,29 @@ export function RideWatcher() {
       else if (left === 3 && warned > 3) { warned = 3; void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
 
       // avisos del teléfono (también si la app queda en segundo plano): se programan con la última hora estimada
-      if (left >= 3) void schedule("ride-3", at(ti - 3), "Faltan 3 paradas", `Te bajas en ${name}.`);
-      if (left >= 2) void schedule("ride-1", at(ti - 1), "Prepárate para bajar", `La siguiente parada es ${name}.`);
-      if (left >= 1) void schedule("ride-0", at(ti) - 20, "Bájate aquí", `Estás llegando a ${name}.`);
+      const data = { busId, alightId, total: useRide.getState().total };
+      if (left >= 3) void schedule("ride-3", at(ti - 3), "Faltan 3 paradas", `Te bajas en ${name}.`, data);
+      if (left >= 2) void schedule("ride-1", at(ti - 1), "Prepárate para bajar", `La siguiente parada es ${name}.`, data);
+      if (left >= 1) void schedule("ride-0", at(ti) - 20, "Bájate aquí", `Estás llegando a ${name}.`, data);
       if (left <= 0) { void cancelAlerts(); useRide.getState().clear(); }
     };
     tick();
     const timer = setInterval(() => { if (AppState.currentState === "active") tick(); }, EVERY_MS);
     return () => { clearInterval(timer); void deactivateKeepAwake(TAG).catch(() => undefined); };
   }, [busId, alightId]);
+
+  // tocar un aviso abre ese viaje (para ver cuánto falta o quitar el aviso); si la app se había cerrado, se recupera dónde te bajas
+  const path = usePathname(), pathRef = useRef(path);
+  pathRef.current = path;
+  const launched = useLaunch((s) => s.done);
+  useEffect(() => {
+    if (!launched) return;
+    return onAlertTap((d) => {
+      const ride = useRide.getState();
+      if (!ride.busId) ride.set(d.busId, d.alightId, d.total);
+      if (pathRef.current !== `/ride/${d.busId}`) setTimeout(() => router.push({ pathname: "/ride/[id]", params: { id: d.busId } }), 150);
+    });
+  }, [launched]);
 
   return null;
 }
