@@ -25,7 +25,8 @@ if (Platform.OS === "ios" && extra.widget && extra.widgetGroup) {
 
 let last = "";
 export function syncWidget(): void {
-  if (!storage || !transit.network.stops.size || isDemo()) return;      // los buses de ejemplo nunca llegan al widget
+  if (!storage || !transit.network.stops.size) return;
+  const demo = isDemo();      // los buses de ejemplo llegan al widget marcados: el widget lo rotula «Demostración», nunca como dato real
   const saved = useSaved.getState();
   const now = nowSec();
   const stops = saved.stops.slice(0, 3).flatMap((id) => {
@@ -36,8 +37,8 @@ export function syncWidget(): void {
       .sort((a, b) => a.t - b.t).slice(0, 5);
     return [{ id, name: saved.nicknames[id] || stopLabelText(transit.labelOf(stop)), arrivals }];
   });
-  const body = JSON.stringify({ at: Math.round(now), stops });
-  const key = JSON.stringify(stops.map((s) => [s.id, s.name, s.arrivals.map((a) => [a.r, Math.round(a.t / 30)])]));   // si casi no cambió, no se recarga el widget
+  const body = JSON.stringify({ at: Math.round(now), stops, demo });
+  const key = (demo ? "demo" : "") + JSON.stringify(stops.map((s) => [s.id, s.name, s.arrivals.map((a) => [a.r, Math.round(a.t / 30)])]));   // si casi no cambió, no se recarga el widget
   if (key === last) return;
   last = key;
   try { storage.set("snapshot", body); reload?.(); } catch { /* sin App Group: el widget no está activo */ }

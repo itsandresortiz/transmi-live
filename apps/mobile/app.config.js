@@ -7,7 +7,7 @@ module.exports = ({ config }) => {
     ...config,
     ios: {
       ...config.ios,
-      ...(widget ? { appleTeamId: process.env.TEAM_ID || "QZHV86F87M" } : {}),
+      ...(widget ? { appleTeamId: process.env.TEAM_ID } : {}),
       entitlements: { ...config.ios?.entitlements, ...(widget ? { "com.apple.security.application-groups": [GROUP] } : {}) },
     },
     plugins: [...(config.plugins ?? []), ...(widget ? ["@bacons/apple-targets"] : [])],

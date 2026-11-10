@@ -1,6 +1,9 @@
 import type { GeoPoint } from "@transmi/domain";
 import { hav } from "./eta";
 import type { Itinerary, RideLeg, StopRef } from "./planner";
+import { upcomingAtStop } from "./queries";
+import { arrivalAtIndex } from "./eta";
+import type { TransitState } from "./transit-state";
 
 /** Guía paso a paso de un viaje de «Cómo llegar»: en qué paso va la persona, qué hacer ahora y qué avisos programar
  *  («ya casi llega tu bus», «prepárate para bajar», «bájate aquí y camina hasta…», «toma el siguiente en el vagón…»).
@@ -105,4 +108,37 @@ export function pendingAlerts(it: Itinerary, s: GuideState, place: PlaceText, sh
   return guideAlerts(it, place)
     .filter((a) => a.leg > s.leg || (a.leg === s.leg && !(s.phase === "ride" && a.kind === "board") && a.kind !== "go"))
     .map((a) => ({ ...a, at: a.at + shift }));
+}
+
+/* ---------- el bus real de cada tramo (para corregir las horas con datos en vivo) ---------- */
+
+/** Qué bus real corresponde a un tramo. Esperando: el próximo de esa ruta que viene hacia la parada donde se sube.
+ *  A bordo: el de esa ruta más cercano a la persona (si hay ubicación y está a menos de 200 m). `keep` es el que ya se venía siguiendo: se conserva mientras siga sirviendo. */
+export function busForLeg(state: TransitState, leg: RideLeg, phase: GuidePhase, here: GeoPoint | null, nowSec: number, keep?: string): string | undefined {
+  const serves = (id: string | undefined, stopId: string): boolean => {
+    const v = id ? state.fleet.get(id) : undefined, seq = v ? state.sequenceForDisplay(v) : undefined;
+    return !!v && !!seq && v.routeId === leg.routeId && seq.shape.stopIds.indexOf(stopId, Math.max(0, seq.index)) >= 0;
+  };
+  if (phase === "ride") {
+    if (serves(keep, leg.alight.id)) return keep;
+    if (!here) return undefined;
+    let best: string | undefined, bestM = 200;
+    for (const v of state.fleet.values()) { if (v.routeId !== leg.routeId) continue; const m = hav(here, v.position); if (m < bestM && serves(v.id, leg.alight.id)) { best = v.id; bestM = m; } }
+    return best;
+  }
+  if (phase !== "wait") return undefined;
+  if (serves(keep, leg.board.id)) return keep;
+  if (serves(leg.busId, leg.board.id)) return leg.busId;
+  const coming = upcomingAtStop(state, leg.board.id, nowSec, 3).filter((u) => u.route.id === leg.routeId).flatMap((u) => u.buses).sort((a, b) => a.etaAt - b.etaAt);
+  return coming.find((b) => b.etaAt >= nowSec - 30)?.vehicle.id;
+}
+
+/** Cuánto se corre el plan según ese bus: su hora real a la parada donde se sube (esperando) o donde se baja (a bordo), menos la prevista. `null` si no se puede calcular. */
+export function liveShift(state: TransitState, leg: RideLeg, phase: GuidePhase, busId: string | undefined, nowMs: number): number | null {
+  const v = busId ? state.fleet.get(busId) : undefined, seq = v ? state.sequenceForDisplay(v) : undefined;
+  if (!v || !seq || (phase !== "wait" && phase !== "ride")) return null;
+  const ti = seq.shape.stopIds.indexOf(phase === "ride" ? leg.alight.id : leg.board.id, Math.max(0, seq.index));
+  if (ti < 0) return null;
+  const eta = arrivalAtIndex(state, v, seq.shape, seq.index, ti, nowMs);
+  return eta > 0 ? Math.round(eta - (phase === "ride" ? leg.arriveAt : leg.departAt)) : null;
 }

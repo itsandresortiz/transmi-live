@@ -19,6 +19,7 @@ struct StopData: Codable, Hashable {
 struct Snapshot: Codable {
   let at: Double     // cuándo la app calculó esto
   let stops: [StopData]
+  var demo: Bool? = nil   // buses de ejemplo (modo demostración de la app): se rotula, nunca se muestra como dato real
 }
 
 private let appGroup = "group.com.transmilive.app"
@@ -113,6 +114,7 @@ struct StopWidgetView: View {
 
   private var stop: StopData? { entry.snapshot?.stops.first }
   private var upcoming: [Arrival] { (stop?.arrivals ?? []).filter { Date(timeIntervalSince1970: $0.t) > entry.date }.sorted { $0.t < $1.t } }
+  private var isDemo: Bool { entry.snapshot?.demo == true }
   private var ageMinutes: Int { Int(max(0, Date().timeIntervalSince1970 - (entry.snapshot?.at ?? 0)) / 60) }
 
   var body: some View {
@@ -134,7 +136,7 @@ struct StopWidgetView: View {
 
   private var lockScreen: some View {
     VStack(alignment: .leading, spacing: 2) {
-      Text(stop?.name ?? "TransMi LIVE").font(.headline).lineLimit(1)
+      Text(isDemo ? "Demostración" : (stop?.name ?? "TransMi LIVE")).font(.headline).lineLimit(1)
       if let a = upcoming.first {
         HStack { Text(a.r).bold(); Spacer(); Text(Date(timeIntervalSince1970: a.t), style: .timer).monospacedDigit() }
       } else {
@@ -166,7 +168,9 @@ struct StopWidgetView: View {
           }
           Spacer(minLength: 0)
         }
-        if ageMinutes >= 20 {
+        if isDemo {
+          Text("Demostración · buses de ejemplo").font(.caption2.weight(.semibold)).foregroundStyle(Color(hex: "#8b5cf6"))
+        } else if ageMinutes >= 20 {
           Text("Datos de hace \(ageMinutes) min · abre la app").font(.caption2).foregroundStyle(.secondary)
         }
       }

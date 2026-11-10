@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { AppState } from "react-native";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { advanceGuide, arrivalAtIndex, pendingAlerts } from "@transmi/application";
+import { advanceGuide, busForLeg, liveShift, pendingAlerts } from "@transmi/application";
 import { transit } from "./composition-root";
 import { nowMs } from "./clock";
 import { cancelTrip, scheduleTrip } from "./notify";
@@ -17,7 +17,7 @@ export function TripWatcher() {
 
   useEffect(() => {
     if (!it) { void cancelTrip(); return; }
-    let here: { lat: number; lon: number } | null = null, hereAt = 0, gone = false, lastKey = "";
+    let here: { lat: number; lon: number } | null = null, hereAt = 0, gone = false, lastKey = "", lateFor = -1;
     let sub: Location.LocationSubscription | undefined;
     void (async () => {
       try {
@@ -32,21 +32,24 @@ export function TripWatcher() {
       const st = useTrip.getState();
       if (!st.it) return;
       const now = nowMs() / 1000, leg = it.legs[st.guide.leg];
-      // si se conoce el bus de este tramo, su hora real corre todos los avisos que faltan
-      let shift = st.shift;
-      if (leg?.kind === "ride" && leg.busId) {
-        const v = transit.fleet.get(leg.busId), seq = v ? transit.sequenceForDisplay(v) : undefined;
-        if (v && seq) {
-          const riding = st.guide.phase === "ride";
-          const ti = seq.shape.stopIds.indexOf(riding ? leg.alight.id : leg.board.id, Math.max(0, seq.index));
-          if (ti >= 0) { const eta = arrivalAtIndex(transit, v, seq.shape, seq.index, ti, nowMs()); if (eta > 0) shift = Math.round(eta - (riding ? leg.arriveAt : leg.departAt)); }
+      const fresh = here && Date.now() - hereAt < 60_000 ? here : null;
+      // el bus real de este tramo (el que viene hacia tu parada o en el que vas): su hora corre todos los avisos que faltan
+      let shift = st.shift, busId: string | null = null;
+      if (leg?.kind === "ride") {
+        busId = busForLeg(transit, leg, st.guide.phase, fresh, now, st.busId ?? undefined) ?? null;
+        const live = liveShift(transit, leg, st.guide.phase, busId ?? undefined, nowMs());
+        if (live != null) shift = live;
+        // el bus que esperas viene bastante más tarde de lo previsto: se avisa una vez por tramo
+        if (st.guide.phase === "wait" && live != null && live >= 300 && lateFor !== st.guide.leg) {
+          lateFor = st.guide.leg;
+          void scheduleTrip([...pendingAlerts(it, st.guide, placeText, shift), { id: `late-${st.guide.leg}`, at: Date.now() / 1000 + 3, title: `El ${leg.shortName} viene con retraso`, body: `Llega unos ${Math.round(live / 60)} min más tarde de lo previsto. Abre el viaje para ver otra opción.` }]);
         }
       }
-      const fresh = here && Date.now() - hereAt < 60_000 ? here : null;
       const g = advanceGuide(it, st.guide, fresh, now, shift);
       if (g.phase === "done") { void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); st.stop(); return; }
       if (g.leg !== st.guide.leg || g.phase !== st.guide.phase) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      if (g.leg !== st.guide.leg || g.phase !== st.guide.phase || shift !== st.shift) st.update(g, shift);
+      const moved = g.leg !== st.guide.leg || g.phase !== st.guide.phase;
+      if (moved || shift !== st.shift || busId !== st.busId) st.update(g, moved ? shift : shift, moved ? null : busId);
       const key = `${g.leg}${g.phase}${Math.round(shift / 20)}`;
       if (key !== lastKey) { lastKey = key; void scheduleTrip(pendingAlerts(it, g, placeText, shift)); }
     };

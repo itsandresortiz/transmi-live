@@ -77,3 +77,38 @@ describe("guía paso a paso de un viaje", () => {
     expect(left[1]!.at).toBe(T0 + 1020 - 15 + 60);
   });
 });
+
+import { TransitState, busForLeg, liveShift } from "@transmi/application";
+import { TransitNetwork, type VehicleReport } from "@transmi/domain";
+
+describe("el bus real de un tramo del viaje", () => {
+  const M = 111_320 * Math.cos((4.65 * Math.PI) / 180), lonAt = (m: number) => -74.1 + m / M, ids = ["S0", "S1", "S2", "S3", "S4"];
+  const NOW = 1_000_000;
+  function world(meters: number): TransitState {
+    const st = new TransitState(), net = new TransitNetwork();
+    net.routes.set("R", { id: "R", shortName: "R1", longName: "Ruta", system: "troncal" });
+    ids.forEach((id, i) => net.stops.set(id, { id, code: id, name: id, position: { lat: 4.65, lon: lonAt(i * 1000) } }));
+    net.shapes.set("R", [{ routeId: "R", direction: "0", headsign: "x", points: Array.from({ length: 41 }, (_, i) => ({ lat: 4.65, lon: lonAt(i * 100) })), stopIds: ids }]);
+    st.setNetwork(net);
+    const rep: VehicleReport = { id: "b", routeId: "R", tripId: "T", lastStopId: "S0", reportedAt: NOW, position: { lat: 4.65, lon: lonAt(meters) } };
+    st.applyPositions([rep], NOW * 1000);
+    return st;
+  }
+  const leg = { ...ride("R1", "x", 0, 0, NOW + 600, NOW + 1200), routeId: "R", board: { id: "S2", name: "S2", position: { lat: 4.65, lon: lonAt(2000) } }, alight: { id: "S4", name: "S4", position: { lat: 4.65, lon: lonAt(4000) } } } as RideLeg;
+
+  it("esperando: toma el próximo bus de esa ruta que viene hacia la parada y mide cuánto se corre el plan", () => {
+    const st = world(300);
+    expect(busForLeg(st, leg, "wait", null, NOW)).toBe("b");
+    const shift = liveShift(st, leg, "wait", "b", NOW * 1000);
+    expect(shift).not.toBeNull();
+    expect(Math.abs(shift!)).toBeLessThan(600);        // llega a S2 en unos minutos: el plan (10 min) se corrige con ese dato
+  });
+  it("a bordo: toma el bus de esa ruta que va pegado a la persona, y ninguno si no hay uno cerca", () => {
+    const st = world(2300);
+    expect(busForLeg(st, leg, "ride", { lat: 4.65, lon: lonAt(2350) }, NOW)).toBe("b");
+    expect(busForLeg(st, leg, "ride", { lat: 4.66, lon: lonAt(2350) }, NOW)).toBeUndefined();
+  });
+  it("un bus que ya pasó la parada no sirve para esperar ahí", () => {
+    expect(busForLeg(world(3300), leg, "wait", null, NOW)).toBeUndefined();
+  });
+});

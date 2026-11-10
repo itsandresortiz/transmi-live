@@ -252,7 +252,7 @@ function TripCard({ it, open, onPress, now }: { it: Itinerary; open: boolean; on
               </Tap>
             ))}
             <View style={styles.step}><SymbolView name="mappin.circle.fill" tintColor={c.accent} size={18} /><Text style={[type.headline, { color: c.text }]}>Llegas a las {hm(it.arriveAt)}</Text></View>
-            {first ? <PrimaryButton label="Seguir este viaje" symbol="bell.fill" a11y="Seguir este viaje: te avisamos cuándo subir, cuándo bajar y qué sigue" onPress={() => { void allowAlerts(); useTrip.getState().start(it, usePlanner.getState().dest?.name ?? ""); router.push("/trip"); }} /> : null}
+            {first ? <PrimaryButton label="Seguir este viaje" symbol="bell.fill" a11y="Seguir este viaje: te avisamos cuándo subir, cuándo bajar y qué sigue" onPress={() => { void allowAlerts(); useTrip.getState().start(it, usePlanner.getState().dest); router.push("/trip"); }} /> : null}
           </View>
         ) : null}
       </Card>

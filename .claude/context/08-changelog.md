@@ -5,6 +5,9 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 
 ## Sin commit (pendiente de decisión del dueño)
 
+- 2026-11-10 · app · «Seguir este viaje» sigue **en vivo el bus de cada tramo** (no solo el primero): `busForLeg` (el próximo de esa ruta hacia tu parada; a bordo, el que va pegado a ti) y `liveShift` en `trip-guide.ts`, con pruebas. Aviso único «El X viene con retraso» si llega ≥5 min tarde; en la ventana del viaje: «Ver el bus en el mapa» y «Buscar otra opción desde aquí».
+- 2026-11-10 · app · El **widget muestra los buses de ejemplo** rotulados «Demostración» (`widgetSync.tsx` manda `demo`, `Widget.swift` lo rotula). Swift sin compilar aquí (?).
+- 2026-11-10 · Se quitó de `app.config.js` el identificador de equipo de Apple que estaba escrito como respaldo; ahora sale solo de la variable `TEAM_ID` del Mac.
 - 2026-11-10 · app · **Nombres de estaciones y portales en el mapa con el color de su línea**: cada estación es una ficha del color de su troncal (amarillo Suba, verde Norte, azul Caracas…) con su letra y el nombre en negrita; los portales, más grandes y visibles desde lejos (zoom 10,5). La línea de cada estación sale del eje de las avenidas (`CORRIDORS`) y los portales de `PORTALS`, ambos en el nuevo `packages/application/src/trunk-data.ts`. `TransitMap.tsx`: capas `portal-dot`, `station-dot`, `station-letter`, `portal-label`, `station-label`. Visto en un prototipo de navegador; usa la fuente «Noto Sans Bold» del mapa base (**(?)** sin confirmar en el teléfono).
 - 2026-11-10 · app · «Reportar un problema o dar una idea» abre un **correo** a la dirección pública de contacto (`src/report.ts`, `CONTACT`); antes abría GitHub. Si no hay app de correo, muestra la dirección.
 - 2026-11-10 · app · «Buses de ejemplo» queda **escondido**: el grupo «Pruebas» de Más aparece al tocar 8 veces la fila «Buses en la calle» (o si la demostración está encendida). Se recuerda mientras la app siga abierta.

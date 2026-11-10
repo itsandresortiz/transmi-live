@@ -8,6 +8,8 @@ import { useNow, useTransitVersion } from "@/hooks";
 import { etaText } from "@/format";
 import { hm } from "@/planner/format";
 import { placeText, useTrip } from "@/trip";
+import { useMapFocus } from "@/map/focus";
+import { usePlanner } from "@/planner/store";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
@@ -19,7 +21,7 @@ export default function Trip() {
   const insets = useSafeAreaInsets();
   useTransitVersion();
   const now = useNow() / 1000;
-  const it = useTrip((s) => s.it), dest = useTrip((s) => s.dest), guide = useTrip((s) => s.guide), shift = useTrip((s) => s.shift);
+  const it = useTrip((s) => s.it), dest = useTrip((s) => s.dest), guide = useTrip((s) => s.guide), shift = useTrip((s) => s.shift), busId = useTrip((s) => s.busId), place = useTrip((s) => s.place);
 
   if (!it) return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -57,7 +59,8 @@ export default function Trip() {
           <Text style={[type.eyebrow, { color: c.onInk, opacity: 0.7 }]}>AHORA</Text>
           <Text style={[type.title, { color: c.onInk }]}>{nowDo.title}</Text>
           <Text style={[type.body, { color: c.onInk, opacity: 0.85 }]}>{nowDo.body}</Text>
-          {key && key > now ? <Text style={[type.headline, { color: c.onInk, fontVariant: ["tabular-nums"] }]}>{guide.phase === "wait" ? "El bus llega en " : "Te bajas en "}{etaText(key, now)}{leg?.kind === "ride" && leg.waitKind !== "live" && guide.phase === "wait" ? " (aprox.)" : ""}</Text> : null}
+          {key && key > now ? <Text style={[type.headline, { color: c.onInk, fontVariant: ["tabular-nums"] }]}>{guide.phase === "wait" ? "El bus llega en " : "Te bajas en "}{etaText(key, now)}{busId ? " (en vivo)" : " (aprox.)"}</Text> : null}
+          {busId ? <Tap onPress={() => { useMapFocus.getState().set({ followBusId: busId }); router.back(); router.navigate("/mapa"); }} accessibilityRole="button" accessibilityLabel="Ver este bus en el mapa"><Text style={[type.caption, { color: c.onInk, fontSize: 14, textDecorationLine: "underline" }]}>Ver el bus en el mapa ›</Text></Tap> : null}
         </Card>
 
         <Card style={{ gap: space[4] }}>
@@ -89,6 +92,7 @@ export default function Trip() {
         </Card>
 
         <Text style={[type.caption, { color: c.muted }]}>Te avisamos cuando tu bus esté por llegar, cuando te toque bajar y qué sigue. Con la app abierta usamos tu ubicación y el bus en vivo; con la app cerrada los avisos salen a la hora estimada y pueden variar.</Text>
+        {place ? <PrimaryButton label="Buscar otra opción desde aquí" symbol="arrow.triangle.2.circlepath" onPress={() => { usePlanner.getState().setOrigin(null); usePlanner.getState().setDest(place); router.back(); router.navigate("/viaje"); }} a11y="Buscar otra forma de llegar desde donde estás" /> : null}
         <PrimaryButton label="Terminar viaje" tone="ink" onPress={end} a11y="Terminar el viaje y quitar los avisos" />
       </ScrollView>
     </View>
