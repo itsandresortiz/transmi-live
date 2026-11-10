@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SymbolView } from "expo-symbols";
+import * as Haptics from "expo-haptics";
 import { type Itinerary, type PlanPlace, type PlanSort, searchPlanPlaces } from "@transmi/application";
 import { SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "@/composition-root";
@@ -44,8 +45,16 @@ export default function Viaje() {
     return () => { clearTimeout(t); ctl.abort(); };
   }, [text]);
 
+  const saveAs = usePlanner((st) => st.saveAs);
+  const saved = useSaved();
+  // desde «Guardar casa / trabajo» de Inicio: se abre el buscador del destino y lo que se elija se guarda
+  useEffect(() => { if (saveAs) { setEditing("dest"); setText(""); } }, [saveAs]);
   const choose = (place: PlanPlace) => {
-    if (editing === "origin") p.setOrigin(place); else p.setDest(place);
+    if (editing === "origin") p.setOrigin(place);
+    else {
+      p.setDest(place);
+      if (saveAs) { saved.setPlace(saveAs, place); usePlanner.getState().setSaveAs(null); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }
+    }
     setEditing(null); setText("");
   };
   const useMe = () => { p.setOrigin(null); setEditing(null); setText(""); };
@@ -54,6 +63,15 @@ export default function Viaje() {
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[PAGE, { paddingBottom: space[10] * 3 }]}>
         <Text style={[type.largeTitle, styles.title, { color: c.text }]} accessibilityRole="header">¿Cómo llegar?</Text>
+        {saveAs ? (
+          <View style={styles.pad}>
+            <Card style={{ gap: space[1], borderWidth: 1.5, borderColor: c.accent }} >
+              <Text style={[type.headline, { color: c.text }]}>{saveAs === "home" ? "¿Dónde queda tu casa?" : "¿Dónde queda tu trabajo?"}</Text>
+              <Text style={[type.body, { color: c.muted }]}>Busca la dirección, una estación o una parada y la guardamos para llegar con un toque.</Text>
+              <Tap onPress={() => { usePlanner.getState().setSaveAs(null); setEditing(null); }} accessibilityRole="button" accessibilityLabel="Cancelar"><Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>Cancelar</Text></Tap>
+            </Card>
+          </View>
+        ) : null}
 
         <View style={styles.pad}>
           <Card style={styles.fields}>

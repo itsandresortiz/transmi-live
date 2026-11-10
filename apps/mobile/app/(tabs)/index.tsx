@@ -28,12 +28,13 @@ export default function Inicio() {
   const live = st.connection === "live" || st.connection === "waiting";
 
   const saved = useSaved();
+  const askPlace = (slot: "home" | "work") => { usePlanner.getState().setSaveAs(slot); router.navigate("/viaje"); };
   const goTo = (p: typeof saved.home) => { if (p) usePlanner.getState().setDest(p); router.navigate("/viaje"); };
   const quick: { symbol: Parameters<typeof IconDot>[0]["symbol"]; label: string; go: () => void }[] = [
-    { symbol: "location.fill", label: "Cerca de mí", go: () => router.navigate("/mapa") },
-    { symbol: "house.fill", label: saved.home ? "Casa" : "Guardar casa", go: () => goTo(saved.home) },
-    { symbol: "briefcase.fill", label: saved.work ? "Trabajo" : "Guardar trabajo", go: () => goTo(saved.work) },
-    { symbol: "star.fill", label: "Favoritos", go: () => router.navigate("/rutas") },
+    { symbol: "location.fill", label: "Cerca de mí", go: () => router.push("/cerca") },
+    { symbol: "house.fill", label: saved.home ? "Casa" : "Guardar casa", go: () => (saved.home ? goTo(saved.home) : askPlace("home")) },
+    { symbol: "briefcase.fill", label: saved.work ? "Trabajo" : "Guardar trabajo", go: () => (saved.work ? goTo(saved.work) : askPlace("work")) },
+    { symbol: "star.fill", label: "Favoritos", go: () => router.push("/favoritos") },
   ];
 
   return (

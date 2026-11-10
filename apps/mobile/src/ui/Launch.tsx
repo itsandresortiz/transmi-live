@@ -1,7 +1,9 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Image, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SymbolView } from "expo-symbols";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
+import Animated, { Easing, FadeInDown, FadeOutUp, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { create } from "zustand";
 import { useAccessibility } from "@/accessibility";
 import { transit } from "@/composition-root";
@@ -21,7 +23,7 @@ const BUSES = [
   { sprite: "zonal-s-R", lane: 2, dur: 4800, offset: 0.45 },
   { sprite: "troncal-s-R", lane: 2, dur: 7000, offset: 0.9 },
 ] as const;
-const LANE_H = 52, LANES = 4, BUS_W = 104;
+const LANE_H = 50, LANES = 4, BUS_W = 104, EDGE = 9;
 
 /** Un bus que cruza la pantalla una y otra vez. El desfase inicial reparte los buses para que no salgan todos juntos. */
 function RoadBus({ sprite, lane, dur, offset, width, still }: { sprite: string; lane: number; dur: number; offset: number; width: number; still: boolean }) {
@@ -51,10 +53,36 @@ function Dashes({ width, y, still }: { width: number; y: number; still: boolean 
 const R0 = 44, BORDER = 520, DIAMETER = 2 * (R0 + BORDER), TOTAL_MS = 1700, OPEN_AT = 0.45;
 const clamp01 = (x: number) => { "worklet"; return x < 0 ? 0 : x > 1 ? 1 : x; };
 
-/** Pantalla de arranque: una avenida con buses en movimiento mientras cargan las rutas y los buses en vivo. Al estar listo, la avenida deja solo una insignia roja con el bus,
- *  que se abre como una ventana por donde aparece la app y crece hasta llenar la pantalla (sin desvanecer ni barra de carga). */
+/** El número sube hasta su valor en vez de aparecer de golpe. */
+function useCount(target: number, ms = 700): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!target) { setN(0); return; }
+    const t0 = Date.now();
+    const id = setInterval(() => { const u = Math.min(1, (Date.now() - t0) / ms); setN(Math.round(target * (1 - (1 - u) ** 3))); if (u >= 1) clearInterval(id); }, 33);
+    return () => clearInterval(id);
+  }, [target, ms]);
+  return n;
+}
+
+/** «LIVE»: una cápsula roja con un punto que late, como el indicador de una transmisión en directo. */
+function LivePill({ still }: { still: boolean }) {
+  const c = useColors();
+  const beat = useSharedValue(1);
+  useEffect(() => { if (!still) beat.value = withRepeat(withSequence(withTiming(0.25, { duration: 700 }), withTiming(1, { duration: 700 })), -1, false); }, [still, beat]);
+  const dot = useAnimatedStyle(() => ({ opacity: beat.value }));
+  return (
+    <View style={[styles.live, { backgroundColor: c.accent }]}>
+      <Animated.View style={[styles.liveDot, dot]} />
+      <Text maxFontSizeMultiplier={1.1} style={styles.liveText}>LIVE</Text>
+    </View>
+  );
+}
+
+/** Pantalla de arranque: la marca, una avenida con buses y una sola línea que dice qué pasa. Cuando todo está listo, una insignia roja se abre como una ventana y revela la app. */
 export function Launch() {
   const c = useColors();
+  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { reduceMotion } = useAccessibility();
   useSyncExternalStore((l) => transit.subscribe(l), () => transit.version);
@@ -65,14 +93,16 @@ export function Launch() {
   useEffect(() => { const t0 = Date.now(), id = setInterval(() => setElapsed(Date.now() - t0), 200); return () => clearInterval(id); }, []);
 
   const routes = transit.network.routes.size > 0, buses = transit.fleet.size;
+  const count = useCount(routes ? buses : 0);
   const ready = routes && (buses > 0 || elapsed > MAX_MS - 2000) && elapsed >= MIN_MS || elapsed >= MAX_MS;
   useEffect(() => {
     if (!ready || phase !== "on") return;
     setPhase("leaving");
     const ms = reduceMotion ? 350 : TOTAL_MS;
     t.value = withTiming(1, { duration: ms, easing: Easing.linear });
+    const buzz = reduceMotion ? undefined : setTimeout(() => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), ms * OPEN_AT);   // un toque justo cuando la ventana se abre
     const id = setTimeout(() => { setPhase("gone"); useLaunch.setState({ done: true }); }, ms + 40);
-    return () => clearTimeout(id);
+    return () => { clearTimeout(id); if (buzz) clearTimeout(buzz); };
   }, [ready, phase, reduceMotion, t]);
 
   // 1) la avenida y los textos se van; 2) queda la insignia; 3) la insignia se abre y el hueco crece mostrando la app
@@ -86,9 +116,10 @@ export function Launch() {
   const rim = useAnimatedStyle(() => { const u = clamp01((t.value - OPEN_AT) / (1 - OPEN_AT)); return { opacity: t.value < OPEN_AT ? 0 : 1 - u, transform: [{ scale: 1 + 13 * u * u * u }] }; });
   if (phase === "gone") return null;
 
-  const line = !routes ? "Cargando rutas y paradas…" : buses > 0 ? `${buses.toLocaleString("es-CO")} buses en la calle ahora` : elapsed < MAX_MS ? "Buscando buses en vivo…" : "Sin datos en vivo por ahora";
-  const roadW = width - space[5] * 2;
+  const stage = !routes ? "rutas" : buses > 0 ? "buses" : elapsed < MAX_MS ? "buscando" : "sin";
+  const line = stage === "rutas" ? "Preparando rutas y paradas" : stage === "buscando" ? "Buscando buses en vivo" : stage === "sin" ? "Sin datos en vivo; usamos los horarios" : `${count.toLocaleString("es-CO")} buses en la calle ahora`;
   const mid = { left: width / 2 - R0, top: height / 2 - R0, width: R0 * 2, height: R0 * 2, borderRadius: R0 } as const;
+  const strips = Array.from({ length: EDGE }, (_, i) => 1 - i / EDGE);      // 1 → casi 0: el borde se funde con el fondo
   return (
     <View style={styles.overlay} pointerEvents={phase === "on" ? "auto" : "none"} accessibilityViewIsModal accessibilityLabel={`Abriendo TransMi LIVE. ${line}`}>
       {/* el hueco por donde se ve la app: un anillo enorme del color del fondo con un círculo vacío al centro */}
@@ -97,13 +128,28 @@ export function Launch() {
       {/* mientras carga, el fondo es sólido; cuando la insignia se abre, deja ver la app por el hueco */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: c.bg }, solid]} />
       <Animated.View style={[styles.center, scene]}>
-        <Text style={[type.eyebrow, { color: c.accent }]}>BOGOTÁ EN VIVO</Text>
-        <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">TransMi LIVE</Text>
-        <View style={[styles.road, { backgroundColor: c.card, width: roadW, height: LANE_H * LANES + 8 }]}>
-          <Dashes width={width} y={LANE_H * 2 + 2} still={reduceMotion} />
-          {BUSES.map((b) => <RoadBus key={b.sprite + b.lane} {...b} width={roadW} still={reduceMotion} />)}
+        <View style={styles.brand}>
+          <Text maxFontSizeMultiplier={1.15} style={[styles.wordmark, { color: c.text }]} accessibilityRole="header">TransMi</Text>
+          <LivePill still={reduceMotion} />
         </View>
-        <Text style={[type.body, { color: c.muted, textAlign: "center" }]} accessibilityLiveRegion="polite">{line}</Text>
+        <Text maxFontSizeMultiplier={1.2} style={[type.body, { color: c.muted, marginTop: space[1] }]}>Bogotá, en tiempo real</Text>
+
+        {/* la avenida: sin caja, de lado a lado, con los bordes fundidos en el fondo */}
+        <View style={[styles.road, { width, height: LANE_H * LANES }]}>
+          {[1, 3].map((i) => <View key={i} style={[styles.laneLine, { top: i * LANE_H, backgroundColor: c.line }]} />)}
+          <Dashes width={width} y={LANE_H * 2 - 1} still={reduceMotion} />
+          {BUSES.map((b) => <RoadBus key={b.sprite + b.lane} {...b} width={width} still={reduceMotion} />)}
+          {strips.map((o, i) => <View key={"l" + i} pointerEvents="none" style={[styles.strip, { left: i * 7, opacity: o, backgroundColor: c.bg }]} />)}
+          {strips.map((o, i) => <View key={"r" + i} pointerEvents="none" style={[styles.strip, { right: i * 7, opacity: o, backgroundColor: c.bg }]} />)}
+        </View>
+
+        <View style={styles.statusBox}>
+          <Animated.Text key={stage} entering={reduceMotion ? undefined : FadeInDown.duration(380)} exiting={reduceMotion ? undefined : FadeOutUp.duration(240)} maxFontSizeMultiplier={1.2}
+            style={[type.headline, { color: c.text, textAlign: "center", fontVariant: ["tabular-nums"] }]} accessibilityLiveRegion="polite">{line}</Animated.Text>
+        </View>
+      </Animated.View>
+      <Animated.View pointerEvents="none" style={[styles.footer, { bottom: insets.bottom + space[5] }, scene]}>
+        <Text maxFontSizeMultiplier={1.2} style={[type.caption, { color: c.muted, opacity: 0.8 }]}>Con datos abiertos de TransMilenio</Text>
       </Animated.View>
       <Animated.View pointerEvents="none" style={[{ position: "absolute", ...mid, backgroundColor: c.accent, alignItems: "center", justifyContent: "center" }, badge]}>
         <SymbolView name="bus.fill" tintColor="#ffffff" size={40} />
@@ -114,8 +160,17 @@ export function Launch() {
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFill, zIndex: 100, elevation: 100 },
-  center: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", gap: space[4], paddingHorizontal: space[5] },
-  road: { borderRadius: radius.xl, borderCurve: "continuous", overflow: "hidden", marginVertical: space[4] },
+  center: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
+  brand: { flexDirection: "row", alignItems: "center", gap: space[2] },
+  wordmark: { fontSize: 46, fontWeight: "800", letterSpacing: -1.6 },
+  live: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 26, borderRadius: 13, borderCurve: "continuous", marginTop: 6 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#ffffff" },
+  liveText: { color: "#ffffff", fontSize: 13, fontWeight: "800", letterSpacing: 1.2 },
+  road: { marginTop: space[8], marginBottom: space[8], overflow: "hidden" },
+  laneLine: { position: "absolute", left: 0, right: 0, height: StyleSheet.hairlineWidth },
+  strip: { position: "absolute", top: 0, bottom: 0, width: 7 },
+  statusBox: { height: 30, justifyContent: "center", alignItems: "center", paddingHorizontal: space[5] },
+  footer: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   bus: { position: "absolute", left: 0 },
   dashes: { position: "absolute", left: 0, flexDirection: "row", gap: 28, height: 3 },
   dash: { width: 28, height: 3, borderRadius: 2 },

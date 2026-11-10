@@ -39,6 +39,8 @@ export default function Mapa() {
   const [system, setSystem] = useState<SystemType | null>(null);
 
   const locate = async () => { const me = await locateMe(); if (me) map.current?.flyTo(me.lat, me.lon, 15.8); };
+  // «Cerca de mí» pide que el mapa te ubique al llegar
+  useEffect(() => { if (focused && focus.locate) { useMapFocus.setState({ locate: false }); setTimeout(() => void locate(), 300); } }, [focused, focus.locate]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <View style={styles.screen}>

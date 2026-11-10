@@ -29,6 +29,8 @@ export default function RootLayout() {
         <Stack.Screen name="stop/[id]" options={{ presentation: "formSheet", contentStyle: { backgroundColor: c.bg }, sheetAllowedDetents: [0.5, 0.92], sheetInitialDetentIndex: 0, sheetGrabberVisible: true, sheetLargestUndimmedDetentIndex: 0, sheetCornerRadius: 28, headerShown: false }} />
         <Stack.Screen name="avisos" options={{ presentation: "modal", headerShown: true, title: "Avisos del servicio", headerTintColor: "#e11d2e", headerRight: close }} />
         <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="cerca" options={{ presentation: "modal", headerShown: true, title: "Cerca de mí", headerTintColor: "#e11d2e", headerRight: close }} />
+        <Stack.Screen name="favoritos" options={{ presentation: "modal", headerShown: true, title: "Favoritos", headerTintColor: "#e11d2e", headerRight: close }} />
         <Stack.Screen name="card" options={{ presentation: "modal", headerShown: true, title: "Mi tarjeta", headerTintColor: "#e11d2e", headerRight: close }} />
       </Stack>
       <Launch />

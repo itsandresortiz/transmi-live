@@ -7,8 +7,10 @@ export interface MapFocus {
   busIds: string[];
   /** Si se da, el mapa acompaña a ese bus. */
   followBusId: string | null;
+  /** Si es verdadero, al llegar el mapa te ubica y se centra en ti (lo pide «Cerca de mí»). */
+  locate: boolean;
 }
-const EMPTY: MapFocus = { stopId: null, routeId: null, busIds: [], followBusId: null };
+const EMPTY: MapFocus = { stopId: null, routeId: null, busIds: [], followBusId: null, locate: false };
 
 export const useMapFocus = create<MapFocus & { set(f: Partial<MapFocus>): void; clear(): void }>((set) => ({
   ...EMPTY,

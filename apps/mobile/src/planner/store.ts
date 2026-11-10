@@ -43,6 +43,9 @@ interface PlannerState {
   results: Itinerary[] | null;
   sel: number;
   busy: boolean;
+  /** Si es «home» o «work», el próximo lugar que se elija como destino se guarda como casa o trabajo. */
+  saveAs: "home" | "work" | null;
+  setSaveAs(s: "home" | "work" | null): void;
   setDest(p: PlanPlace | null): void;
   setOrigin(p: PlanPlace | null): void;
   setWhen(w: When): void;
@@ -53,7 +56,8 @@ interface PlannerState {
 }
 
 export const usePlanner = create<PlannerState>((set, get) => ({
-  origin: null, dest: null, when: { mode: "now" }, sortBy: "mejor", results: null, sel: 0, busy: false,
+  origin: null, dest: null, when: { mode: "now" }, sortBy: "mejor", results: null, sel: 0, busy: false, saveAs: null,
+  setSaveAs: (saveAs) => set({ saveAs }),
   setDest: (dest) => { set({ dest, results: null, sel: 0 }); void get().plan(); },
   setOrigin: (origin) => { set({ origin, results: null, sel: 0 }); void get().plan(); },
   setWhen: (when) => { set({ when, results: null, sel: 0 }); void get().plan(); },
