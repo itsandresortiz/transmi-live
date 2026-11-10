@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { SYSTEM_LABEL, routeTitle } from "@transmi/domain";
@@ -20,12 +20,13 @@ export default function BusSheet() {
   useTransitVersion();
   const now = useNow() / 1000;
   const v = transit.fleet.get(id);
-  if (!v) return <View style={[styles.screen, { backgroundColor: c.bg, paddingBottom: insets.bottom + space[6] }]}><SheetClose onPress={() => router.back()} /><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>Este bus dejó de reportar</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
+  if (!v) return <View style={[styles.screen, { flex: 1, backgroundColor: c.bg, paddingTop: space[10], paddingBottom: insets.bottom + space[6] }]}><SheetClose onPress={() => router.back()} /><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>Este bus dejó de reportar</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
   const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
   const tone = delayClass(d) === "bad" ? "#dc2626" : delayClass(d) === "warn" ? "#d97706" : delayClass(d) === "ok" ? "#16a34a" : c.muted;
   return (
-    <View style={[styles.screen, { backgroundColor: c.bg, paddingBottom: insets.bottom + space[6] }]}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <SheetClose onPress={() => router.back()} />
+      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[10], paddingBottom: insets.bottom + space[10] }]} showsVerticalScrollIndicator={false}>
       <View style={styles.head}>
         {r ? <RouteBadge route={r} /> : null}
         <View style={{ flex: 1 }}>
@@ -54,6 +55,7 @@ export default function BusSheet() {
       <Tap onPress={() => reportProblem({ what: `bus ${v.plate || v.label || v.id} (ruta ${r?.shortName ?? v.routeId})` })} accessibilityRole="button" accessibilityLabel="Reportar un problema con este bus" style={{ alignSelf: "center", marginTop: space[2] }}>
         <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>Reportar un problema con este bus</Text>
       </Tap>
+      </ScrollView>
     </View>
   );
 }

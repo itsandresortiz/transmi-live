@@ -65,13 +65,18 @@ export function SheetClose({ onPress }: { onPress: () => void }) {
 /** En pantallas anchas (iPad) el contenido no se estira de lado a lado: se centra en una columna. */
 export const PAGE: StyleProp<ViewStyle> = { width: "100%", maxWidth: 680, alignSelf: "center" };
 
-/** Etiqueta redonda para elegir (ordenar, filtrar). */
-export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress: () => void }) {
+/** Etiqueta redonda para elegir (ordenar, filtrar). Con `glass` va sobre una superficie de vidrio (como en el mapa): sin fondo propio, y la elegida se marca con un relleno suave. `dot` pone un punto de color antes del texto. */
+export function Chip({ label, selected, onPress, glass = false, dot }: { label: string; selected?: boolean; onPress: () => void; glass?: boolean; dot?: string }) {
   const c = useColors();
+  const bg = glass ? (selected ? (c.dark ? "rgba(255,255,255,0.26)" : "rgba(0,0,0,0.13)") : "transparent") : selected ? c.ink : c.card;
+  const fg = glass ? c.text : selected ? c.onInk : c.text;
   return (
     <Tap onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!selected }} accessibilityLabel={label}
-      style={[styles.chip, { backgroundColor: selected ? c.ink : c.card, borderColor: c.line }]}>
-      <Text style={[type.caption, { color: selected ? c.onInk : c.text, fontSize: 14 }]}>{label}</Text>
+      style={[styles.chip, glass ? { minHeight: 40, borderWidth: 0 } : { borderColor: c.line }, { backgroundColor: bg }]}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space[2] }}>
+        {dot ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: dot }} /> : null}
+        <Text style={[type.caption, { color: fg, fontSize: 14, fontWeight: selected || !glass ? "700" : "500" }]}>{label}</Text>
+      </View>
     </Tap>
   );
 }

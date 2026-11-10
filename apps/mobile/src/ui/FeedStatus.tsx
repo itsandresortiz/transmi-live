@@ -20,7 +20,7 @@ export function FeedStatus({ tint }: { tint?: string }) {
       <View accessible accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}`} style={styles.pill}>
         <View style={[styles.dot, { backgroundColor: live ? "#22c55e" : "#f59e0b" }]} />
         <Text style={[type.caption, { color: c.text }]}>{title}</Text>
-        {detail ? <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{detail}</Text> : null}
+        {detail ? <Text style={[type.caption, { color: c.text, opacity: 0.75 }]} numberOfLines={1}>{detail}</Text> : null}
       </View>
     </Glass>
   );

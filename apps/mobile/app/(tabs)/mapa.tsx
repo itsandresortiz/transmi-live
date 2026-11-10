@@ -13,7 +13,7 @@ import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { locateMe } from "@/location";
 import { FeedStatus } from "@/ui/FeedStatus";
 import { Chip, Glass, RoundButton } from "@/ui/kit";
-import { space, type, useColors } from "@/ui/theme";
+import { SYSTEM_COLOR, space, type, useColors } from "@/ui/theme";
 
 export default function Mapa() {
   const insets = useSafeAreaInsets();
@@ -21,7 +21,7 @@ export default function Mapa() {
   const focused = useIsFocused();
   const c = useColors();
   const focus = useMapFocus();
-  const overlay = c.dark ? "rgba(24,24,28,0.82)" : "rgba(255,255,255,0.88)";
+  const overlay = c.dark ? "rgba(20,20,24,0.42)" : "rgba(255,255,255,0.4)";      // vidrio con un velo suave: se ve el mapa detrás pero el texto se lee
   const calm = usePathname() !== "/mapa";   // hay una hoja abierta encima del mapa
 
   // al llegar con una parada elegida: se encuadra la parada y los buses que se acercan; si se sigue un bus, el mapa lo acompaña
@@ -45,7 +45,7 @@ export default function Mapa() {
       {focused ? <StatusBar style="dark" /> : null}
       {/* el mapa no se lee con VoiceOver: las pestañas Rutas y Cómo llegar dicen lo mismo con texto */}
       <View style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <TransitMap ref={map} system={system} active={focused} calm={calm} attributionPosition={{ bottom: insets.bottom + 88, right: 10 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
+      <TransitMap ref={map} system={system} active={focused} calm={calm} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
         onBus={(id) => { void Haptics.selectionAsync(); router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
         onStop={(id) => router.navigate({ pathname: "/stop/[id]", params: { id } })} />
       </View>
@@ -54,16 +54,16 @@ export default function Mapa() {
         {[0.3, 0.2, 0.12, 0.06].map((o, i) => <View key={i} style={{ flex: 1, backgroundColor: c.dark ? `rgba(0,0,0,${o})` : `rgba(255,255,255,${o + 0.2})` }} />)}
       </View>
       <View pointerEvents="box-none" style={[styles.top, { top: insets.top + space[2] }]}>
-        <Glass style={styles.chipsGlass}>
+        <Glass tint={overlay} style={styles.chipsGlass}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            <Chip label="Todos" selected={!system} onPress={() => setSystem(null)} />
-            {SYSTEMS.map((s) => <Chip key={s} label={SYSTEM_LABEL[s]} selected={system === s} onPress={() => setSystem(system === s ? null : s)} />)}
+            <Chip glass label="Todos" selected={!system} onPress={() => setSystem(null)} />
+            {SYSTEMS.map((s) => <Chip glass key={s} dot={SYSTEM_COLOR[s]} label={SYSTEM_LABEL[s]} selected={system === s} onPress={() => setSystem(system === s ? null : s)} />)}
           </ScrollView>
         </Glass>
       </View>
       {focus.stopId || focus.routeId || focus.followBusId ? (
         <View style={[styles.focusChip, { top: insets.top + 72 }]}>
-          <Glass interactive style={styles.focusGlass}>
+          <Glass interactive tint={overlay} style={styles.focusGlass}>
             <View style={styles.focusRow}>
               <Text style={[type.caption, { color: c.text, flex: 1 }]} numberOfLines={1}>
                 {focus.followBusId ? "Siguiendo un bus" : focus.stopId ? `Parada: ${transit.stopById(focus.stopId)?.name ?? ""}` : "Ruta seleccionada"}
@@ -73,8 +73,8 @@ export default function Mapa() {
           </Glass>
         </View>
       ) : null}
-      {/* el estado del servicio y el botón de ubicación van en la misma fila, sobre la barra inferior, con fondo propio para leerse sobre cualquier mapa */}
-      <View pointerEvents="box-none" style={[styles.bottomRow, { bottom: insets.bottom + 128 }]}>
+      {/* el estado del servicio y el botón de ubicación van en una fila de vidrio justo encima de la barra inferior (en estas pantallas el margen de abajo ya cuenta la barra) */}
+      <View pointerEvents="box-none" style={[styles.bottomRow, { bottom: insets.bottom + 12 }]}>
         <View pointerEvents="none"><FeedStatus tint={overlay} /></View>
         <RoundButton symbol="location.fill" label="Mi ubicación" onPress={() => void locate()} size={52} tint={overlay} />
       </View>
