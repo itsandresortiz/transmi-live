@@ -16,21 +16,32 @@ export function GlassSegments<K extends string>({ items, value, onChange }: { it
   const { reduceMotion, reduceTransparency } = useAccessibility();
   const frames = useRef(new Map<string, { x: number; w: number }>());
   const [ready, setReady] = useState(false);
+  // lo elegido se pinta aquí al instante; el aviso hacia afuera (que recalcula el mapa) espera a que la burbuja termine de moverse
+  const [sel, setSel] = useState<K>(value);
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const x = useSharedValue(0), w = useSharedValue(0), press = useSharedValue(1);
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   const moveTo = (k: string, animate: boolean) => {
     const f = frames.current.get(k);
     if (!f) return;
-    if (animate && !reduceMotion) { x.value = withSpring(f.x, { damping: 17, stiffness: 210, mass: 0.9 }); w.value = withSpring(f.w, { damping: 19, stiffness: 230 }); }
+    if (animate && !reduceMotion) { x.value = withSpring(f.x, { damping: 20, stiffness: 180, mass: 1 }); w.value = withSpring(f.w, { damping: 22, stiffness: 180, mass: 1 }); }
     else { x.value = f.x; w.value = f.w; }
     scroll.current?.scrollTo({ x: Math.max(0, f.x - 60), animated: animate });
   };
-  useEffect(() => { moveTo(value, ready); }, [value]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (value !== sel && !pending.current) { setSel(value); moveTo(value, ready); } }, [value]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { if (pending.current) clearTimeout(pending.current); }, []);
+  const choose = (k: K) => {
+    void Haptics.selectionAsync();
+    moveTo(k, true);                      // la animación arranca ya, en el hilo de la interfaz
+    setSel(k);
+    if (pending.current) clearTimeout(pending.current);
+    pending.current = setTimeout(() => { pending.current = null; onChange(k); }, reduceMotion ? 0 : 260);
+  };
   const onItemLayout = (k: string) => (e: LayoutChangeEvent) => {
     const { x: fx, width } = e.nativeEvent.layout;
     frames.current.set(k, { x: fx, w: width });
-    if (k === value) { moveTo(k, false); if (!ready) setReady(true); }
+    if (k === sel && !ready) { moveTo(k, false); setReady(true); }
   };
 
   const bubble = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { scale: press.value }], width: w.value }));
@@ -44,15 +55,15 @@ export function GlassSegments<K extends string>({ items, value, onChange }: { it
           {glass ? <GlassView glassEffectStyle="regular" colorScheme="light" isInteractive style={styles.fill} /> : <View style={[styles.fill, { backgroundColor: "rgba(0,0,0,0.12)" }]} />}
         </Animated.View>
         {items.map((it) => {
-          const on = it.key === value;
+          const on = it.key === sel;
           return (
             <Pressable key={it.key} onLayout={onItemLayout(it.key)} hitSlop={6}
               onPressIn={() => { if (on && !reduceMotion) press.value = withSpring(1.06, { damping: 12, stiffness: 300 }); }}
               onPressOut={() => { press.value = withTiming(1, { duration: 180 }); }}
-              onPress={() => { if (!on) { void Haptics.selectionAsync(); onChange(it.key); } }}
+              onPress={() => { if (!on) choose(it.key); }}
               accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={it.label} style={styles.item}>
               {it.dot ? <View style={[styles.dot, { backgroundColor: it.dot }]} /> : null}
-              <Text style={[type.caption, { color: "#111114", fontSize: 14, fontWeight: on ? "700" : "500" }]}>{it.label}</Text>
+              <Text style={[type.caption, { color: "#111114", fontSize: 14, fontWeight: "600", opacity: on ? 1 : 0.72 }]}>{it.label}</Text>
             </Pressable>
           );
         })}
