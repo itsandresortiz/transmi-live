@@ -11,14 +11,17 @@ import { useAccessibility } from "@/accessibility";
 import { CORRIDORS, PORTALS, buildStationGeometry, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
+import lightStyle from "./style-light.json";
+import darkStyle from "./style-dark.json";
 import { BUS_SPRITES } from "./sprites";
 import { sp } from "./styleProps";
 import { useBusFeatures, type Viewport } from "./useBuses";
 import { SYSTEM_COLOR } from "@/ui/theme";
 
 /** Base de OpenStreetMap servida por OpenFreeMap (gratis, sin llave). */
-/** Mapa base claro u oscuro, según la apariencia de la app. */
-const MAP_STYLE = { light: "https://tiles.openfreemap.org/styles/positron", dark: "https://tiles.openfreemap.org/styles/dark" };
+/** Mapa base claro u oscuro, según la apariencia de la app. Son los estilos de OpenFreeMap con colores propios (más contraste entre calles, parques y agua);
+ *  los genera `tools/map-styles.py`: no editar los .json a mano. */
+const MAP_STYLE = { light: lightStyle as never, dark: darkStyle as never };
 /** Dónde quedó el mapa la última vez: al cambiar de apariencia el mapa se vuelve a montar (no se cambia el estilo en caliente) y retoma desde ahí. */
 const lastView: { center: [number, number]; zoom: number } = { center: BOGOTA_LL(), zoom: 11.6 };
 function BOGOTA_LL(): [number, number] { return [-74.08, 4.65]; }

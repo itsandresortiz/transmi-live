@@ -37,6 +37,7 @@ Ubica el bus en el trazado, calcula cuánto del tramo hacia la siguiente parada 
 ## Dibujo
 - **Web**: `apps/web/src/map/MapController.ts` (capas de MapLibre), `BusCanvas.ts` (buses en canvas 2D a ~60 fps), `busTop.ts` (**dibujo del bus visto desde arriba, compartido**), `stations.ts` (reexporta `station-geometry`), `theme.ts` (colores por tema).
 - **App**: `apps/mobile/src/map/TransitMap.tsx` (MapLibre React Native: buses, red, estaciones, semáforos, ruta, parada enfocada; todas las capas están **siempre montadas**, solo cambia `visibility`), `useBuses.ts` (GeoJSON de buses), `styleProps.ts` (`sp()` reparte el estilo en `paint`/`layout` con nombres en kebab-case), `sprites.ts` (imágenes de buses y semáforo).
+- **Mapa base de la app**: estilos propios `src/map/style-light.json` / `style-dark.json` (teselas y fuentes de OpenFreeMap). Se regeneran con `python3 tools/map-styles.py` (la paleta está en ese archivo). **No editar a mano.**
 - **Imágenes de buses de la app**: se generan con `npx tsx tools/bus-sprites.ts` (Playwright renderiza el mismo `busTop.ts`) en `apps/mobile/assets/sprites-top/top-<sistema>-<s|l>.png` (`l` = articulado). **No editar a mano.** El mismo comando genera `assets/sprites-rear/rear-<sistema>-<s|l>.png` (bus en 3D desde atrás para la escena del viaje: caja proyectada con la cámara de `RideScene`, dibujo en `tools/bus-rear-draw.js`; `meta.json` dice dónde colocar cada imagen. Si cambia la cámara de la escena hay que cambiar `CAM` allí y regenerar).
 
 ## App móvil: pantallas y navegación
