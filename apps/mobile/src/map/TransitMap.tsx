@@ -6,7 +6,7 @@ import type { SystemType } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
-import { buildStationGeometry, trunkStations } from "@transmi/application";
+import { CORRIDORS, PORTALS, buildStationGeometry, hav, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { BUS_SPRITES } from "./sprites";
@@ -100,27 +100,40 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     return { type: "FeatureCollection", features };
   }, [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Estaciones de la troncal: un punto en el centro de sus vagones y su nombre. */
+  /** Las estaciones de la troncal dibujadas como en la web: base, pasillo, vagones con puertas y su número. */
+  const geo = useMemo(() => (transit.network.stops.size && transit.network.shapes.size ? buildStationGeometry(transit, trunkStations(transit), CORRIDORS) : null), [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const stationGeo = useMemo(() => {
+    const j = (x: unknown) => JSON.stringify(x ?? { type: "FeatureCollection", features: [] });
+    return geo ? { bases: j(geo.bases), links: j(geo.links), capsules: j(geo.capsules), doors: j(geo.doors), labels: j(geo.labels), chips: j(geo.chips) } : null;
+  }, [geo]);
+
+  /** Estaciones y portales de la troncal: un punto en el centro de sus vagones, su nombre y la letra de su línea (A, B, C…), que le da el color. */
   const stations = useMemo<FeatureCollection<Point>>(() => {
     const features: Feature<Point>[] = [];
+    const lineOfStop: Record<string, string> = {};
+    for (const f of geo?.chips.features ?? []) for (const id of String(f.properties?.all ?? "").split(",")) lineOfStop[id] = String(f.properties?.l ?? "X");
     if (transit.network.stops.size) for (const st of trunkStations(transit)) {
       if (!st.stops.length) continue;
       const lat = st.stops.reduce((a, s) => a + s.position.lat, 0) / st.stops.length, lon = st.stops.reduce((a, s) => a + s.position.lon, 0) / st.stops.length;
-      const portal = st.stops.some((s) => !!transit.labelOf(s).platform);
-      features.push({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: { title: st.title, portal } });
+      const portal = st.stops.some((s) => !!transit.labelOf(s).platform) || /^(portal|terminal)\b/i.test(st.title);
+      const l = st.stops.map((s) => lineOfStop[s.id]).find((x) => !!x) ?? "X";
+      features.push({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: { title: st.title, portal, l, letter: l === "X" ? "" : l } });
+    }
+    // los portales no tienen vagones (tienen plataformas): se agregan con su nombre y su línea, sin repetir los que ya estén
+    for (const p of PORTALS) {
+      if (features.some((f) => f.properties?.portal && hav({ lat: f.geometry.coordinates[1]!, lon: f.geometry.coordinates[0]! }, p) < 400)) continue;
+      features.push({ type: "Feature", geometry: { type: "Point", coordinates: [p.lon, p.lat] }, properties: { title: p.name.replace(/\s+[–-]\s+.*$/, ""), portal: true, l: p.l, letter: p.l === "X" ? "" : p.l } });
     }
     return { type: "FeatureCollection", features };
-  }, [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [geo]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Las estaciones de la troncal dibujadas como en la web: base, pasillo, vagones con puertas y su número. */
-  const stationGeo = useMemo(() => {
-    const g = transit.network.stops.size && transit.network.shapes.size ? buildStationGeometry(transit, trunkStations(transit)) : null;
-    const j = (x: unknown) => JSON.stringify(x ?? { type: "FeatureCollection", features: [] });
-    return g ? { bases: j(g.bases), links: j(g.links), capsules: j(g.capsules), doors: j(g.doors), labels: j(g.labels), chips: j(g.chips) } : null;
-  }, [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   const signalsJson = useSemaforos(showSignals);
   /** Color de cada línea de la troncal (A, B, C…) para los bordes de las estaciones. */
-  const lineColor = (fallback: string): unknown => ["match", ["get", "l"], ...Object.entries(TRUNK_LINES).flatMap(([k, v]) => [k, v.light]), fallback];
+  const lineColor = (fallback: string): unknown => ["match", ["get", "l"], ...Object.entries(TRUNK_LINES).flatMap(([k, v]) => [k, c.dark ? v.dark : v.light]), fallback];
+  /** Sobre los colores claros (amarillo de Suba, beige de la 26, rosado del Eje Ambiental) la letra va oscura para que se lea. */
+  const letterColor: unknown = ["match", ["get", "l"], ["C", "K", "J"], "#1c1c1e", c.dark ? "#0b0b0d" : "#ffffff"];
+  const nameColor = c.dark ? "#f4f4f5" : "#1c1c1e", nameHalo = c.dark ? "#0b0b0d" : "#ffffff";
+  const isPortal: unknown = ["==", ["get", "portal"], true];
 
   // el mapa recibe texto ya serializado: las capas fijas no se vuelven a convertir en cada actualización de los buses
   const networkJson = useMemo(() => JSON.stringify(network), [network]);
@@ -151,8 +164,12 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <Layer id="network-line" type="line" {...sp({ lineColor: ["get", "color"], lineOpacity: 0.45, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 3, 17, 6], lineCap: "round", lineJoin: "round" })} />
       </GeoJSONSource>
       <GeoJSONSource id="stations" data={stationsJson}>
-        <Layer id="station-dot" type="circle" minzoom={11.5} maxzoom={14.5} {...sp({ circleRadius: ["case", ["get", "portal"], 7, 4.5], circleColor: "#ffffff", circleStrokeColor: "#e11d2e", circleStrokeWidth: 2.2 })} />
-        <Layer id="station-label" type="symbol" minzoom={12.8} maxzoom={14.5} {...sp({ textField: ["get", "title"], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 12.8, 10, 16, 13], textOffset: [0, 1.1], textAnchor: "top", textColor: c.dark ? "#f4f4f5" : "#1f2430", textHaloColor: c.dark ? "#18181b" : "#ffffff", textHaloWidth: 1.8, textMaxWidth: 7 })} />
+        {/* cada estación es una ficha del color de su línea con su letra; los portales, más grandes y visibles desde más lejos */}
+        <Layer id="portal-dot" type="circle" minzoom={10.5} maxzoom={14.5} filter={isPortal as never} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 10.5, 6, 14.5, 11], circleColor: lineColor("#e11d2e") as never, circleStrokeColor: nameHalo, circleStrokeWidth: 2 })} />
+        <Layer id="station-dot" type="circle" minzoom={11.8} maxzoom={14.5} filter={["!", isPortal] as never} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 11.8, 4, 14.5, 8], circleColor: lineColor("#e11d2e") as never, circleStrokeColor: nameHalo, circleStrokeWidth: 1.8 })} />
+        <Layer id="station-letter" type="symbol" minzoom={12.6} maxzoom={14.5} {...sp({ textField: ["get", "letter"], textFont: ["Noto Sans Bold"], textSize: ["case", ["get", "portal"], 12, 10], textAllowOverlap: true, textIgnorePlacement: true, textColor: letterColor as never })} />
+        <Layer id="portal-label" type="symbol" minzoom={10.5} maxzoom={14.5} filter={isPortal as never} {...sp({ textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 10.5, 11.5, 14.5, 15], textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.15, textJustify: "auto", textMaxWidth: 8, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2.2 })} />
+        <Layer id="station-label" type="symbol" minzoom={12.6} maxzoom={14.5} filter={["!", isPortal] as never} {...sp({ textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 12.6, 11, 14.5, 13.5], textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.05, textJustify: "auto", textMaxWidth: 8, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2 })} />
       </GeoJSONSource>
       {(
         <GeoJSONSource id="route-line" data={lineJson}>
@@ -183,7 +200,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
             <Layer id="station-wagon-labels" type="symbol" minzoom={16.3} {...sp({ visibility: showStations ? "visible" : "none", textField: ["step", ["zoom"], ["get", "text"], 17.3, ["concat", "Vagón ", ["get", "text"]]], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 16.3, 10, 18.5, 13], textAllowOverlap: true, textIgnorePlacement: true, textColor: "#1c1c1e" })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-chips" data={stationGeo.chips}>
-            <Layer id="station-chip-labels" type="symbol" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", textField: ["get", "title"], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 14.5, 11, 18, 14], textAnchor: "bottom", textOffset: [0, -0.45], textMaxWidth: 12, textColor: "#1c1c1e", textHaloColor: "#ffffff", textHaloWidth: 1.8 })} />
+            <Layer id="station-chip-labels" type="symbol" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 14.5, 13, 18, 17], textAnchor: "bottom", textOffset: [0, -0.5], textMaxWidth: 12, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2.4 })} />
           </GeoJSONSource>
         </>
       ) : null}
