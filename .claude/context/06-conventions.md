@@ -25,6 +25,7 @@
 - Swift: no escribir en una misma condición `a < b, c > d` (se interpreta como genérico y no compila): calcular cada comparación en una variable.
 - App: interruptores con `Toggle` (de `kit.tsx`), no con `Switch` directo (en iOS 26 queda descentrado).
 - App: las filas que se deslizan de lado deben llegar a los bordes de la pantalla (`marginHorizontal` negativo + `paddingHorizontal` en el contenido); si no, las fichas se recortan en seco en el margen.
+- App: nada pesado en el primer instante tras abrir (la carga de datos arranca con un pequeño retraso en `_layout.tsx`): si se ocupa el hilo antes del primer cuadro, la pantalla de arranque no se pinta y se ve negro.
 - App: pantallas ocultas no deben repintarse (`useTransitVersion`/`useNow` ya dependen de `useIsFocused`); no calcular cosas pesadas en cada segundo.
 - No tocar el motor de movimiento para «inventar» paradas cuando el bus no trae ninguna.
 - Pruebas deben pasar **sin** `apps/mobile/node_modules` (así corre CI).

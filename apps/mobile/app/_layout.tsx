@@ -16,7 +16,14 @@ export const unstable_settings = { anchor: "(tabs)", initialRouteName: "(tabs)" 
 
 export default function RootLayout() {
   const c = useColors();
-  useEffect(() => startData(), []);
+  // La carga de rutas ocupa el hilo de la app por un momento. Desde que las rutas se guardan en el teléfono, esa carga arrancaba de inmediato y tapaba
+  // el primer cuadro: la pantalla de arranque no alcanzaba a pintarse y se veía negro. Se le da primero un instante a la animación para que aparezca
+  // (una vez andando sigue sola, aunque la app esté ocupada).
+  useEffect(() => {
+    let stop: (() => void) | undefined;
+    const id = setTimeout(() => { stop = startData(); }, 650);
+    return () => { clearTimeout(id); stop?.(); };
+  }, []);
   // la primera vez se explica qué es la app y qué hace con los datos
   const launched = useLaunch((s) => s.done);
   useEffect(() => { if (launched) void AsyncStorage.getItem("tm.onboarded.v1").then((v) => { if (!v) setTimeout(() => router.push("/onboarding"), 200); }).catch(() => undefined); }, [launched]);
