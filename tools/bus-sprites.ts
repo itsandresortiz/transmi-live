@@ -38,17 +38,17 @@ async function main() {
   const REAR = "apps/mobile/assets/sprites-rear";
   mkdirSync(REAR, { recursive: true });
   await page.addScriptTag({ content: readFileSync("tools/bus-rear-draw.js", "utf8") });
+  // la caja 3D se proyecta con la cámara de la escena; además de la imagen sale dónde ponerla (meta.json, lo lee RideScene)
+  const meta: Record<string, unknown> = {};
   for (const [system, color] of Object.entries(COLORS)) for (const long of [false, true]) {
-    const url = await page.evaluate(({ color, long }) => {
-      const cv = document.getElementById("c") as HTMLCanvasElement, R = 4;
-      cv.width = 120 * R; cv.height = (long ? 250 : 190) * R;
-      const c = cv.getContext("2d")!; c.clearRect(0, 0, cv.width, cv.height); c.scale(R, R);
-      // @ts-expect-error drawRearBus lo define el script
-      drawRearBus(c, color, long);
-      return cv.toDataURL("image/png");
+    const out = await page.evaluate(({ color, long }) => {
+      // @ts-expect-error renderBus lo define el script
+      return renderBus(document.getElementById("c"), color, long, 3) as { png: string; meta: unknown };
     }, { color, long });
-    writeFileSync(`${REAR}/rear-${system}-${long ? "l" : "s"}.png`, Buffer.from(url.split(",")[1]!, "base64"));
+    writeFileSync(`${REAR}/rear-${system}-${long ? "l" : "s"}.png`, Buffer.from(out.png.split(",")[1]!, "base64"));
+    meta[long ? "l" : "s"] = out.meta;
   }
+  writeFileSync(`${REAR}/meta.json`, JSON.stringify(meta) + "\n");
   await browser.close();
   console.log("Imágenes listas en", OUT);
 }

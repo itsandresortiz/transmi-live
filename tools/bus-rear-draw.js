@@ -1,40 +1,81 @@
-// Bus visto desde atrás y arriba (3/4), para la escena de «Voy en este bus» de la app: cara trasera con ventana y luces, y el techo alejándose en perspectiva.
-// Lienzo 120 × (long ? 250 : 190). JavaScript simple porque se ejecuta dentro de un navegador (tools/bus-sprites.ts).
-function shade(hex, k) { const n = parseInt(hex.slice(1), 16), f = (v) => Math.max(0, Math.min(255, Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; }
-function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
-function quad(c, x0, x1, y0, x2, x3, y1, r) { // trapecio: arriba (x0..x1 en y0), abajo (x2..x3 en y1)
-  c.beginPath(); c.moveTo(x0 + r, y0); c.lineTo(x1 - r, y0); c.quadraticCurveTo(x1, y0, x1 + (x3 - x1) * 0.06, y0 + r); c.lineTo(x3, y1); c.lineTo(x2, y1); c.lineTo(x0 - (x0 - x2) * 0.06, y0 + r); c.quadraticCurveTo(x0, y0, x0 + r, y0); c.closePath(); }
-function drawRearBus(c, color, long) {
-  const H = long ? 250 : 190, faceH = 62, faceY = H - faceH - 12, x0 = 12, x1 = 108;   // cara trasera
-  // techo: t=0 atrás, t=1 al frente (más angosto y arriba). El bus va por el carril derecho y la vía se cierra hacia el centro de la pantalla:
-  // el frente se corre a la izquierda (LEAN) para fugar hacia el mismo punto que la vía
-  const LEAN = 22;
-  const at = (t) => ({ l: x0 + 18 * t - LEAN * t, r: x1 - 18 * t - LEAN * t, y: faceY - (faceY - 14) * t });
-  // sombra en el piso
-  c.save(); c.fillStyle = "rgba(0,0,0,.28)"; c.filter = "blur(5px)"; c.beginPath(); c.ellipse(60, H - 10, 54, 9, 0, 0, 6.3); c.fill(); c.restore();
-  const roof = (ta, tb) => { const a = at(ta), b = at(tb);
-    const g = c.createLinearGradient(0, b.y, 0, a.y); g.addColorStop(0, shade(color, 0.34)); g.addColorStop(1, shade(color, 0.12));
-    c.fillStyle = g; quad(c, b.l, b.r, b.y, a.l, a.r, a.y, 7); c.fill();
-    // costados del techo: un filo más oscuro que da volumen
-    c.strokeStyle = shade(color, -0.25); c.lineWidth = 1.6; c.beginPath(); c.moveTo(a.l, a.y); c.lineTo(b.l, b.y + 6); c.moveTo(a.r, a.y); c.lineTo(b.r, b.y + 6); c.stroke();
-    // equipos del techo (aire y claraboyas)
-    for (const t of [0.22, 0.5, 0.78]) { const m = at(ta + (tb - ta) * t), w = (m.r - m.l) * 0.42, h = 9 * (1 - 0.35 * (ta + (tb - ta) * t)); c.fillStyle = "rgba(255,255,255,.22)"; const cx = (m.l + m.r) / 2; rr(c, cx - w / 2, m.y - h / 2, w, h, 2.5); c.fill(); c.fillStyle = "rgba(0,0,0,.14)"; rr(c, cx - w / 2 + 2, m.y - h / 2 + 2, w - 4, h - 4, 1.5); c.fill(); }
-  };
-  // costado derecho (el que queda a la vista al fugar a la izquierda): una cara más oscura con ventanas
-  { const a = at(0), b = at(1); c.fillStyle = shade(color, -0.38); c.beginPath(); c.moveTo(a.r, a.y); c.lineTo(b.r, b.y + 4); c.lineTo(b.r + 5, b.y + 16); c.lineTo(x1, faceY + faceH - 12); c.closePath(); c.fill();
-    c.fillStyle = "rgba(20,25,34,.85)"; c.beginPath(); c.moveTo(a.r - 0.5, a.y + 6); c.lineTo(b.r + 0.5, b.y + 9); c.lineTo(b.r + 3.5, b.y + 15); c.lineTo(x1 - 1, a.y + 26); c.closePath(); c.fill(); }
-  if (long) { roof(0.52, 1); const a = at(0.46), b = at(0.52); c.fillStyle = "#1b1f27"; quad(c, b.l + 2, b.r - 2, b.y, a.l + 2, a.r - 2, a.y, 1); c.fill(); c.strokeStyle = "rgba(255,255,255,.3)"; c.lineWidth = 0.8; for (const t of [0.475, 0.49, 0.505]) { const m = at(t); c.beginPath(); c.moveTo(m.l + 4, m.y); c.lineTo(m.r - 4, m.y); c.stroke(); } roof(0, 0.46); }
-  else roof(0, 1);
-  // cara trasera
-  const g = c.createLinearGradient(0, faceY, 0, faceY + faceH); g.addColorStop(0, shade(color, -0.04)); g.addColorStop(1, shade(color, -0.3));
-  c.fillStyle = g; rr(c, x0, faceY, x1 - x0, faceH, 9); c.fill();
-  c.fillStyle = shade(color, 0.3); rr(c, x0 + 3, faceY, x1 - x0 - 6, 3, 1.5); c.fill();                       // filo de luz arriba
-  c.fillStyle = "#141922"; rr(c, x0 + 9, faceY + 8, x1 - x0 - 18, 24, 5); c.fill();                           // ventana trasera
-  c.fillStyle = "rgba(255,255,255,.16)"; c.beginPath(); c.moveTo(x0 + 16, faceY + 10); c.lineTo(x0 + 40, faceY + 10); c.lineTo(x0 + 26, faceY + 30); c.lineTo(x0 + 12, faceY + 30); c.closePath(); c.fill();   // reflejo
-  c.fillStyle = "#ff5a4d"; rr(c, x0 + 6, faceY + 38, 16, 7, 2.5); c.fill(); rr(c, x1 - 22, faceY + 38, 16, 7, 2.5); c.fill();   // luces
-  c.fillStyle = "#ffd27a"; rr(c, x0 + 24, faceY + 39, 7, 5, 2); c.fill(); rr(c, x1 - 31, faceY + 39, 7, 5, 2); c.fill();
-  c.fillStyle = "rgba(255,255,255,.9)"; rr(c, 49, faceY + 38, 22, 8, 2); c.fill();                           // placa
-  c.fillStyle = "#12161d"; rr(c, x0 + 2, faceY + faceH - 11, x1 - x0 - 4, 11, 4); c.fill();                  // parachoques
-  c.fillStyle = "#0b0d11"; rr(c, x0 + 6, faceY + faceH - 3, 20, 9, 3); c.fill(); rr(c, x1 - 26, faceY + faceH - 3, 20, 9, 3); c.fill();   // llantas
+// Bus en 3D para la escena de «Voy en este bus» de la app. No se dibuja «a ojo»: es una caja real (ancho, largo y alto) proyectada con LA MISMA cámara
+// que usa la vía en apps/mobile/src/ui/RideScene.tsx (perspectiva 600, suelo inclinado 56° sobre su borde inferior), así el techo, la cara trasera
+// y el costado visible (el izquierdo: el bus va por el carril derecho) cuadran exactamente con la calle.
+// JavaScript simple porque se ejecuta dentro de un navegador (tools/bus-sprites.ts). Devuelve además dónde poner la imagen en la escena.
+const CAM = { d: 600, tilt: (56 * Math.PI) / 180 };
+/** Punto del mundo → pantalla. xg: metros de pantalla a lo ancho desde el centro de la vía; s: distancia sobre el suelo desde el borde inferior; h: altura sobre el suelo.
+ *  Devuelve x desde el centro de la escena e y hacia ARRIBA desde el borde inferior de la escena. */
+function project(xg, s, h) {
+  const y = s * Math.cos(CAM.tilt) + h * Math.sin(CAM.tilt), z = -s * Math.sin(CAM.tilt) + h * Math.cos(CAM.tilt), k = CAM.d / (CAM.d - z);
+  return { x: xg * k, y: y * k };
 }
-if (typeof module !== "undefined") module.exports = { drawRearBus };
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16), f = (v) => Math.max(0, Math.min(255, Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; }
+
+const BUS = { cx: 50, w: 66, h: 78, s0: 46 };          // centro del carril derecho, ancho, alto y dónde queda la cola (unidades del suelo de la escena)
+const BOXES = { s: [{ a: 0, b: 250 }], l: [{ a: 0, b: 176 }, { a: 190, b: 420 }] };      // corto: un cuerpo; articulado: dos con el fuelle entre ellos
+
+/** Dibuja el bus en un lienzo ya escalado (R px por unidad de pantalla) y trasladado; `P` convierte un punto del mundo en coordenadas del lienzo. */
+function paintBus(c, color, long, P) {
+  const x0 = BUS.cx - BUS.w / 2, x1 = BUS.cx + BUS.w / 2, H = BUS.h;
+  const poly = (pts, fill) => { c.beginPath(); pts.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y))); c.closePath(); c.fillStyle = fill; c.fill(); c.lineJoin = "round"; c.lineWidth = 1.2; c.strokeStyle = fill; c.stroke(); };
+  const grad = (a, b, ca, cb) => { const g = c.createLinearGradient(a.x, a.y, b.x, b.y); g.addColorStop(0, ca); g.addColorStop(1, cb); return g; };
+  const boxes = BOXES[long ? "l" : "s"].map((b) => ({ a: BUS.s0 + b.a, b: BUS.s0 + b.b }));
+  const tail = boxes[0].a, nose = boxes[boxes.length - 1].b;
+
+  // sombra en el piso (un poco más grande que el bus)
+  c.save(); c.filter = "blur(4px)"; poly([P(x0 - 6, tail - 10, 0), P(x1 + 8, tail - 10, 0), P(x1 + 8, nose + 6, 0), P(x0 - 6, nose + 6, 0)], "rgba(0,0,0,.42)"); c.restore();
+
+  for (let i = boxes.length - 1; i >= 0; i--) {                        // de lejos a cerca
+    const { a, b } = boxes[i];
+    if (i < boxes.length - 1) {                                        // fuelle hacia el cuerpo de adelante
+      const g0 = b, g1 = boxes[i + 1].a;
+      poly([P(x0 + 3, g0, 4), P(x0 + 3, g1, 4), P(x0 + 3, g1, H - 3), P(x0 + 3, g0, H - 3)], "#14171d");
+      poly([P(x0 + 3, g0, H - 3), P(x1 - 3, g0, H - 3), P(x1 - 3, g1, H - 3), P(x0 + 3, g1, H - 3)], "#20242c");
+    }
+    // costado izquierdo (el que se ve): más oscuro, con la franja de ventanas, puertas y llantas
+    poly([P(x0, a, 0), P(x0, b, 0), P(x0, b, H), P(x0, a, H)], grad(P(x0, a, H), P(x0, a, 0), shade(color, -0.34), shade(color, -0.52)));
+    poly([P(x0, a + 6, H * 0.5), P(x0, b - 6, H * 0.5), P(x0, b - 6, H * 0.84), P(x0, a + 6, H * 0.84)], "rgba(14,18,26,.92)");
+    const n = Math.max(2, Math.round((b - a) / 44));
+    for (let k = 1; k < n; k++) { const s = a + ((b - a) * k) / n; poly([P(x0, s - 1.2, H * 0.5), P(x0, s + 1.2, H * 0.5), P(x0, s + 1.2, H * 0.84), P(x0, s - 1.2, H * 0.84)], shade(color, -0.45)); }
+    for (const t of [0.2, 0.8]) { const s = a + (b - a) * t; poly([P(x0, s - 13, 0), P(x0, s + 13, 0), P(x0, s + 13, 15), P(x0, s + 8, 22), P(x0, s - 8, 22), P(x0, s - 13, 15)], "#0c0e12"); }
+    // techo: lo más claro, con un bisel y los equipos de aire
+    poly([P(x0, a, H), P(x1, a, H), P(x1, b, H), P(x0, b, H)], grad(P(BUS.cx, b, H), P(BUS.cx, a, H), shade(color, 0.3), shade(color, 0.1)));
+    poly([P(x0 + 5, a + 5, H + 0.5), P(x1 - 5, a + 5, H + 0.5), P(x1 - 5, b - 5, H + 0.5), P(x0 + 5, b - 5, H + 0.5)], "rgba(255,255,255,.1)");
+    const units = Math.max(1, Math.round((b - a) / 90));
+    for (let k = 0; k < units; k++) {
+      const s = a + ((b - a) * (k + 0.5)) / units, u0 = BUS.cx - 17, u1 = BUS.cx + 17, l = 26, hh = 7;
+      poly([P(u0, s - l, H), P(u0, s + l, H), P(u0, s + l, H + hh), P(u0, s - l, H + hh)], shade(color, -0.12));               // costado del equipo
+      poly([P(u0, s - l, H), P(u1, s - l, H), P(u1, s - l, H + hh), P(u0, s - l, H + hh)], shade(color, 0.02));                // cara trasera del equipo
+      poly([P(u0, s - l, H + hh), P(u1, s - l, H + hh), P(u1, s + l, H + hh), P(u0, s + l, H + hh)], shade(color, 0.42));      // tapa
+      poly([P(u0 + 5, s - l + 6, H + hh + 0.3), P(u1 - 5, s - l + 6, H + hh + 0.3), P(u1 - 5, s + l - 6, H + hh + 0.3), P(u0 + 5, s + l - 6, H + hh + 0.3)], "rgba(0,0,0,.16)");
+    }
+  }
+  // cara trasera (la más cercana): ventana, luces, placa y parachoques
+  const a = tail, R = (x, h) => P(x, a, h);
+  poly([R(x0, 0), R(x1, 0), R(x1, H), R(x0, H)], grad(R(BUS.cx, H), R(BUS.cx, 0), shade(color, -0.06), shade(color, -0.3)));
+  poly([R(x0 + 2, H - 3), R(x1 - 2, H - 3), R(x1 - 2, H), R(x0 + 2, H)], shade(color, 0.28));                                   // filo de luz bajo el techo
+  poly([R(x0 + 7, H * 0.48), R(x1 - 7, H * 0.48), R(x1 - 7, H * 0.86), R(x0 + 7, H * 0.86)], "#121720");                        // ventana trasera
+  poly([R(x0 + 12, H * 0.5), R(x0 + 26, H * 0.5), R(x0 + 38, H * 0.84), R(x0 + 24, H * 0.84)], "rgba(255,255,255,.14)");        // reflejo
+  for (const sx of [x0 + 4, x1 - 15]) poly([R(sx, H * 0.28), R(sx + 11, H * 0.28), R(sx + 11, H * 0.38), R(sx, H * 0.38)], "#ff5a4d");
+  for (const sx of [x0 + 17, x1 - 22]) poly([R(sx, H * 0.29), R(sx + 5, H * 0.29), R(sx + 5, H * 0.37), R(sx, H * 0.37)], "#ffd27a");
+  poly([R(BUS.cx - 9, H * 0.27), R(BUS.cx + 9, H * 0.27), R(BUS.cx + 9, H * 0.39), R(BUS.cx - 9, H * 0.39)], "rgba(255,255,255,.92)");   // placa
+  poly([R(x0 + 1, 3), R(x1 - 1, 3), R(x1 - 1, H * 0.2), R(x0 + 1, H * 0.2)], "#12161d");                                        // parachoques
+  for (const sx of [x0 + 3, x1 - 17]) poly([R(sx, 0), R(sx + 14, 0), R(sx + 14, 10), R(sx, 10)], "#090b0e");                    // llantas traseras
+}
+
+/** Caja que encierra al bus en pantalla (con margen para la sombra): x desde el centro de la escena, y hacia arriba desde su borde inferior. */
+function busBounds(long) {
+  const x0 = BUS.cx - BUS.w / 2 - 12, x1 = BUS.cx + BUS.w / 2 + 14, boxes = BOXES[long ? "l" : "s"], tail = BUS.s0 - 16, nose = BUS.s0 + boxes[boxes.length - 1].b + 10;
+  const pts = []; for (const x of [x0, x1]) for (const s of [tail, nose]) for (const h of [0, BUS.h + 10]) pts.push(project(x, s, h));
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  return { left: Math.floor(Math.min(...xs)), right: Math.ceil(Math.max(...xs)), bottom: Math.floor(Math.min(...ys)), top: Math.ceil(Math.max(...ys)), nose: BUS.s0 + boxes[boxes.length - 1].b };
+}
+/** Pinta el bus en un lienzo del tamaño justo y devuelve la imagen (PNG en base64) y dónde ponerla. */
+function renderBus(canvas, color, long, R) {
+  const b = busBounds(long), w = b.right - b.left, h = b.top - b.bottom;
+  canvas.width = Math.round(w * R); canvas.height = Math.round(h * R);
+  const c = canvas.getContext("2d"); c.clearRect(0, 0, canvas.width, canvas.height); c.scale(R, R);
+  paintBus(c, color, long, (xg, s, hh) => { const p = project(xg, s, hh); return { x: p.x - b.left, y: b.top - p.y }; });
+  return { png: canvas.toDataURL("image/png"), meta: { left: b.left, bottom: b.bottom, width: w, height: h, nose: b.nose } };
+}
+if (typeof module !== "undefined") module.exports = { renderBus, busBounds, project };
