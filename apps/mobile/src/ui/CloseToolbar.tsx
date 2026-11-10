@@ -5,7 +5,7 @@ let closing = false;
 export function CloseToolbar() {
   return (
     <Stack.Toolbar placement="right">
-      <Stack.Toolbar.Button icon="xmark" accessibilityLabel="Cerrar" onPress={() => { if (closing) return; closing = true; router.back(); setTimeout(() => { closing = false; }, 700); }} />
+      <Stack.Toolbar.Button icon="xmark" accessibilityLabel="Cerrar" onPress={() => { if (closing) return; closing = true; if (router.canGoBack()) router.back(); else router.replace("/"); setTimeout(() => { closing = false; }, 700); }} />
     </Stack.Toolbar>
   );
 }

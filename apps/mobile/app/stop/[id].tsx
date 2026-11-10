@@ -56,7 +56,7 @@ export default function StopSheet() {
   if (sel) return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <RouteAtStop stopId={id} sel={sel} row={row} now={now} onBack={() => setSel(null)} onMap={(buses, follow) => showOnMap({ routeId: sel.routeId, busIds: buses, followBusId: follow })} />
       </ScrollView>
     </View>
@@ -65,7 +65,7 @@ export default function StopSheet() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
         <Text style={[type.largeTitle, { color: c.text }]}>{nick || label.title}</Text>
         {nick ? <Text style={[type.caption, { color: c.muted }]}>{label.title}</Text> : null}

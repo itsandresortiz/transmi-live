@@ -30,7 +30,7 @@ export default function Personalizar() {
     saved.setNickname(id, clean);
     if (clean && !saved.stops.includes(id)) saved.toggleStop(id);      // con nombre, la parada también queda en favoritos
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    if (router.canGoBack()) router.back(); else router.replace("/");
   };
 
   return (

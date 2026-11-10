@@ -55,7 +55,7 @@ export default function Ride() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
-      <ScrollView contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.head}>
           {r ? <RouteBadge route={r} /> : null}
           <View style={{ flex: 1 }}>
