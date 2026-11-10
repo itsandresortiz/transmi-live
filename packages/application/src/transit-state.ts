@@ -80,6 +80,28 @@ export class TransitState {
     return l;
   }
 
+  /** La «última parada» que informa TransMilenio suele estar mal (hoy, ~9 de cada 10 buses van a más de 1 km de ella, a veces a más de 10 km: es la de otro tramo del día).
+   *  Si no concuerda con dónde está el bus sobre el recorrido, se reemplaza por la última parada que de verdad pasó, calculada con su posición; así todo lo que se apoya en ella
+   *  (próxima parada, llegadas, tiempos aprendidos) parte de un dato verdadero. */
+  private fixedStops = new Map<string, { reportedAt: number; stopId?: string }>();
+  private reconcileLastStops(): void {
+    if (!this.network.shapes.size) return;
+    for (const v of this.fleet.values()) {
+      if (!v.lastStopId) continue;      // sin parada informada no se inventa una: solo se corrige la que viene mal
+      const memo = this.fixedStops.get(v.id);
+      if (memo && memo.reportedAt === v.reportedAt) { if (memo.stopId) v.lastStopId = memo.stopId; continue; }      // mismo reporte: ya se revisó
+      let fix: string | undefined;
+      const reported = this.sequenceByStop(v);
+      const info = reported ? shapeStops(this, reported.shape) : null;
+      const hit = info ? info.path.project(v.world, 0, 0, 80) : null;
+      const agrees = reported && info && hit ? hit.s >= info.s[reported.index]! - 150 && hit.s <= (info.s[reported.index + 1] ?? Infinity) + 150 : !!reported;     // sin poder comprobarlo, se deja la informada
+      if (!agrees) { const pos = this.sequenceByPosition(v); if (pos) fix = pos.shape.stopIds[pos.index]; }
+      if (fix) v.lastStopId = fix;
+      this.fixedStops.set(v.id, { reportedAt: v.reportedAt, stopId: fix });
+    }
+    if (this.fixedStops.size > this.fleet.size * 2) for (const id of this.fixedStops.keys()) if (!this.fleet.get(id)) this.fixedStops.delete(id);
+  }
+
   /** Dónde va el bus dentro del recorrido de su ruta: su última parada, la lista de paradas y su posición en ella. */
   sequenceOf(v: Vehicle): { shape: RouteShape; index: number } | undefined {
     return this.sequenceByStop(v);
@@ -137,6 +159,7 @@ export class TransitState {
 
   applyPositions(reports: readonly VehicleReport[], nowMs: number): void {
     this.fleet.ingest(reports.filter((r) => r.reportedAt >= nowMs / 1000 - MAX_REPORT_AGE_S), nowMs);
+    this.reconcileLastStops();
     let latest = this.lastBatchAt ?? 0;
     for (const r of reports) if (r.reportedAt > latest) latest = r.reportedAt;
     if (latest) this.lastBatchAt = latest;
@@ -164,8 +187,9 @@ export class TransitState {
 
   setNetwork(network: TransitNetwork): void {
     this.network = network;
-    this.seq.clear(); this.trunk = null; this.served = null; this.labels.clear();
+    this.seq.clear(); this.trunk = null; this.served = null; this.labels.clear(); this.fixedStops.clear();
     this.resolveSystems();
+    this.reconcileLastStops();
     this.touch();
   }
 
