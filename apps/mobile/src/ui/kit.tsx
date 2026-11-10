@@ -36,6 +36,7 @@ export function Card({ children, style, dark = false }: { children: ReactNode; s
   );
 }
 
+/** Sobre el mapa (`scheme="light"`) se usa el vidrio «claro» de iOS: deja ver el mapa a través y lo refracta, en vez del esmerilado casi blanco. */
 /** Superficie de vidrio líquido en iOS 26; en lo demás, un fondo translúcido. Con «Reducir transparencia» del teléfono, un fondo sólido. */
 export function Glass({ children, style, interactive = false, tint, scheme }: { children?: ReactNode; style?: StyleProp<ViewStyle>; interactive?: boolean; tint?: string; /** Fuerza vidrio claro u oscuro (sobre el mapa, que es claro, conviene claro con texto oscuro). */ scheme?: "light" | "dark" }) {
   const c = useColors();
@@ -44,7 +45,7 @@ export function Glass({ children, style, interactive = false, tint, scheme }: { 
   const [fresh, setFresh] = useState(0);
   useEffect(() => { const sub = AppState.addEventListener("change", (st) => { if (st === "active") setFresh((n) => n + 1); }); return () => sub.remove(); }, []);
   if (reduceTransparency) return <View style={[{ backgroundColor: scheme === "light" ? "rgba(255,255,255,0.94)" : c.card }, style]}>{children}</View>;
-  if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView key={fresh} glassEffectStyle="regular" colorScheme={scheme ?? "auto"} isInteractive={interactive} tintColor={tint} style={style}>{children}</GlassView>;
+  if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView key={fresh} glassEffectStyle={scheme === "light" && !tint ? "clear" : "regular"} colorScheme={scheme ?? "auto"} isInteractive={interactive} tintColor={tint} style={style}>{children}</GlassView>;
   return <View style={[{ backgroundColor: tint ?? (scheme === "light" ? "rgba(255,255,255,0.86)" : c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)") }, style]}>{children}</View>;
 }
 
