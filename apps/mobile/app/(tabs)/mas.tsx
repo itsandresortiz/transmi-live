@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Linking, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Constants from "expo-constants";
@@ -12,6 +12,7 @@ import { reportProblem } from "@/report";
 import { useAppearance, type AppearanceMode } from "@/appearance";
 import { useSaved } from "@/favorites";
 import { useDemo } from "@/demo";
+import { usePlanner } from "@/planner/store";
 import { Tap, PAGE } from "@/ui/kit";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { radius, space, type, useColors } from "@/ui/theme";
@@ -25,7 +26,7 @@ function Row({ symbol, tint, title, value, onPress, last = false, link = false }
         <View style={[styles.tile, { backgroundColor: tint }]}><SymbolView name={symbol} tintColor="#ffffff" size={17} /></View>
         <View style={[styles.rowBody, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.line }]}>
           <Text style={[type.body, { color: c.text, flex: 1 }]} numberOfLines={1}>{title}</Text>
-          {value ? <Text style={[type.body, { color: c.muted }]} numberOfLines={1}>{value}</Text> : null}
+          {value ? <Text style={[type.body, { color: c.muted, flexShrink: 1, maxWidth: "55%", textAlign: "right" }]} numberOfLines={1}>{value}</Text> : null}
           <SymbolView name={link ? "arrow.up.right" : "chevron.right"} tintColor={c.muted} size={12} />
         </View>
       </View>
@@ -50,6 +51,17 @@ export default function Mas() {
   const appearance = useAppearance();
   const saved = useSaved();
   const demo = useDemo();
+  // casa y trabajo: si no hay, se busca el lugar; si ya hay, se puede cambiar o quitar
+  const editPlace = (slot: "home" | "work") => {
+    const label = slot === "home" ? "casa" : "trabajo", cur = saved[slot];
+    const pick = () => { usePlanner.getState().setSaveAs(slot); router.navigate("/viaje"); };
+    if (!cur) { pick(); return; }
+    Alert.alert(slot === "home" ? "Casa" : "Trabajo", cur.name, [
+      { text: `Cambiar ${label}`, onPress: pick },
+      { text: `Quitar ${label}`, style: "destructive", onPress: () => saved.setPlace(slot, null) },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
   const hasBuses = transit.fleet.size >= 50, late = (st.ageSeconds ?? 0) > 300, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
@@ -89,7 +101,9 @@ export default function Mas() {
 
         <Group title="TUS COSAS">
           <Row symbol="star.fill" tint="#f59e0b" title="Favoritos" value={favs ? String(favs) : undefined} onPress={() => router.push("/favoritos")} />
-          <Row last symbol="location.fill" tint="#3b82f6" title="Cerca de mí" onPress={() => router.push("/cerca")} />
+          <Row symbol="location.fill" tint="#3b82f6" title="Cerca de mí" onPress={() => router.push("/cerca")} />
+          <Row symbol="house.fill" tint="#10b981" title="Casa" value={saved.home?.name ?? "Agregar"} onPress={() => editPlace("home")} />
+          <Row last symbol="briefcase.fill" tint="#6366f1" title="Trabajo" value={saved.work?.name ?? "Agregar"} onPress={() => editPlace("work")} />
         </Group>
 
         <Group bare title="APARIENCIA" footer="Automático usa la del teléfono.">
