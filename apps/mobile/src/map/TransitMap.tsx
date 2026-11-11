@@ -181,7 +181,8 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     <Map key={c.dark ? "oscuro" : "claro"} style={StyleSheet.absoluteFill} mapStyle={c.dark ? MAP_STYLE.dark : MAP_STYLE.light} logo={false} attribution attributionPosition={attributionPosition} compass={false} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
       <Camera ref={camera} initialViewState={compact ? { center: BOGOTA, zoom: 11.6 } : { center: lastView.center, zoom: lastView.zoom }} minZoom={9} maxZoom={19} />
       <Images images={BUS_SPRITES} />
-      <UserLocation />
+      {/* tu ubicación con la flecha que indica hacia dónde apunta el teléfono (como en la web) */}
+      <UserLocation heading />
 
       <GeoJSONSource id="network" data={networkJson}>
         <Layer id="network-line" type="line" {...sp({ lineColor: lineColor(c.dark ? "#ff5a5e" : "#e30613") as never, lineOpacity: showTraffic ? 0.25 : 0.7, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 3, 17, 6], lineCap: "round", lineJoin: "round" })} />
