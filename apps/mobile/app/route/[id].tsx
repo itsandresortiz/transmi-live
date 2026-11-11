@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { liveDown } from "@/lastService";
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { arrivalAtIndex, routeDetail } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEM_LABEL, alertTitle, describeAlert, routeOfficialName, routeTitle, type Vehicle } from "@transmi/domain";

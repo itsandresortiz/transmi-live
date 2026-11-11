@@ -3,7 +3,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { stopLabelText } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { useSaved } from "@/favorites";

@@ -1,9 +1,16 @@
+import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 
 /** Avisos del viaje («prepárate», «bájate aquí»). Son notificaciones locales del teléfono: no pasan por ningún servidor ni se envía nada. */
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
 });
+
+/** En Android los avisos van por un «canal» (el usuario puede ajustarlo en los ajustes del teléfono). Este es de importancia alta: suena y aparece encima de lo que se esté haciendo. */
+const CHANNEL = "viaje";
+if (Platform.OS === "android") {
+  void Notifications.setNotificationChannelAsync(CHANNEL, { name: "Avisos del viaje", description: "Cuándo subir, cuándo prepararte para bajar y dónde bajarte.", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 250, 150, 250], lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC }).catch(() => undefined);
+}
 
 const IDS = ["ride-3", "ride-1", "ride-0"] as const;
 export type RideAlert = (typeof IDS)[number];
@@ -49,7 +56,7 @@ export async function schedule(id: RideAlert, at: number, title: string, body: s
     await Notifications.scheduleNotificationAsync({
       identifier: id,
       content: { title, body, data: { ...data }, sound: true, interruptionLevel: "timeSensitive" },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(when) },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(when), channelId: CHANNEL },
     });
   } catch { /* sin permiso o sin soporte: la vibración y la pantalla siguen avisando */ }
 }
@@ -70,7 +77,7 @@ export async function scheduleTrip(alerts: readonly { id: string; at: number; ti
       await Notifications.scheduleNotificationAsync({
         identifier: TRIP + a.id,
         content: { title: a.title, body: a.body, data: { trip: true }, sound: true, interruptionLevel: "timeSensitive" },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(a.at * 1000) },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(a.at * 1000), channelId: CHANNEL },
       });
     }
     const all = await Notifications.getAllScheduledNotificationsAsync();

@@ -3,7 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import * as Haptics from "expo-haptics";
 import { TRAVEL_MODES, type Itinerary, type PlanPlace, type PlanSort, searchPlanPlaces } from "@transmi/application";
 import { SYSTEM_LABEL } from "@transmi/domain";

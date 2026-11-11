@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { router } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { guideNow } from "@transmi/application";
 import { placeText, useTrip } from "@/trip";
 import { Card, Tap } from "./kit";

@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { SymbolView, type SFSymbol } from "expo-symbols";
+import { SymbolView, type SFSymbol } from "@/ui/Symbol";
 import { type CardMovement, type CardReading, type TuLlaveCard, NotTuLlaveError, groupCardNumber, movementsByMonth, parseTuLlave } from "@transmi/domain";
 import { Tullave } from "../modules/tullave/src";
 import { useAccessibility } from "@/accessibility";

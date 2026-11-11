@@ -3,7 +3,7 @@ import { AppState, Platform, Pressable, StyleSheet, Switch, Text, View, type Pre
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
-import { SymbolView, type SFSymbol } from "expo-symbols";
+import { SymbolView, type SFSymbol } from "@/ui/Symbol";
 import { useAccessibility } from "@/accessibility";
 import { radius, space, type, useColors } from "./theme";
 

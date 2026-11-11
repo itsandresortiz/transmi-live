@@ -5,7 +5,7 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { router, useIsFocused, usePathname } from "expo-router";
 import { hav } from "@transmi/application";
 import { SYSTEMS, SYSTEM_LABEL, type SystemType } from "@transmi/domain";

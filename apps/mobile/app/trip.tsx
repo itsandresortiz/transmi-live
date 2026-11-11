@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { guideNow, guideSteps, tripGeometry } from "@transmi/application";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { transit } from "@/composition-root";

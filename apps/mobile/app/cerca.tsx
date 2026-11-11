@@ -3,7 +3,7 @@ import { liveDown } from "@/lastService";
 import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { nearestStops, siblingStops, upcomingAtStop, type UpcomingRoute } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";

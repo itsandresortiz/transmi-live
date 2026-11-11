@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SymbolView, type SFSymbol } from "expo-symbols";
+import { SymbolView, type SFSymbol } from "@/ui/Symbol";
 import { router } from "expo-router";
 import { describeStopGroup, searchRoutes, searchStopGroups } from "@transmi/application";
 import { SYSTEM_LABEL, routeCodes, routeTitle, routeVariant, stopLabelText, type Route } from "@transmi/domain";

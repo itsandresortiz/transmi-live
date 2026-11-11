@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { router } from "expo-router";
 import { transit } from "@/composition-root";
 import { useNow, useTransitVersion } from "@/hooks";

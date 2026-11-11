@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { alertsFor, frequencyText, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEM_LABEL, alertTitle, routeTitle, stopLabelText, type Route } from "@transmi/domain";
 import { transit } from "@/composition-root";

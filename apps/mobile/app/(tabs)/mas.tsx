@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { liveDown } from "@/lastService";
 import Constants from "expo-constants";
-import { SymbolView, type SFSymbol } from "expo-symbols";
+import { SymbolView, type SFSymbol } from "@/ui/Symbol";
 import { connectionStatus } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";

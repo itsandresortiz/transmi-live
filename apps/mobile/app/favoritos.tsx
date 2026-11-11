@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Animated, { LinearTransition } from "react-native-reanimated";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { upcomingAtStop } from "@transmi/application";
 import { routeTitle, stopLabelText } from "@transmi/domain";
 import { transit } from "@/composition-root";

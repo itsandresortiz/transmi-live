@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { allowAlerts } from "@/notify";
 import { useRide } from "@/ride";
-import { SymbolView } from "expo-symbols";
+import { SymbolView } from "@/ui/Symbol";
 import { arrivalAtIndex } from "@transmi/application";
 import { SYSTEM_LABEL, routeTitle } from "@transmi/domain";
 import { transit } from "@/composition-root";
