@@ -36,7 +36,8 @@ npm install
 npx expo prebuild --platform android --clean --no-install
 # si quedaron Gradle de intentos anteriores (ocupando memoria y a veces pegados), se apagan todos
 ( [ -x android/gradlew ] && cd android && ./gradlew --stop >/dev/null 2>&1 ) || true
-pkill -f GradleDaemon 2>/dev/null || true
+pkill -9 -f gradle 2>/dev/null || true      # a la fuerza: un Gradle pegado no se apaga con la orden suave y deja bloqueada la memoria compartida (~/.gradle)
+sleep 2
 echo "Armando la app de Android. La primera vez tarda entre 10 y 20 minutos; no cierres esta ventana."
 # versión «release»: lleva todo el código dentro, no necesita que el computador esté sirviendo nada
 npx expo run:android --variant release
