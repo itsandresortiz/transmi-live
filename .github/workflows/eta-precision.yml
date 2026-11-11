@@ -1,0 +1,14 @@
+name: Medir precisión de los tiempos de llegada
+# Prueba puntual (se lanza a mano): compara la hora de llegada que muestra la app con la hora en que cada bus cruzó de verdad la parada.
+on: { workflow_dispatch: {} }
+permissions: { contents: read }
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx --yes tsx tools/etaprecision.ts 540 8
