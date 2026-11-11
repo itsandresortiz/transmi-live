@@ -6,6 +6,11 @@ export const RETENTION_MS = 90_000;
 /** Un bus sin reportar en tanto tiempo ya no está circulando (típico de madrugada, con la fuente congelada). */
 export const MAX_REPORT_AGE_S = 600;
 
+/** Desde cuándo el último reporte de un bus se considera viejo para mostrarlo como los demás. Hoy un reporte normal llega con 40–80 s de edad
+ *  y cada bus cambia cada 30–100 s, así que hasta ~3 min es normal; más que eso, el bus dejó de reportar y se dibuja atenuado. */
+export const STALE_REPORT_S = 240;
+export const isStaleReport = (v: { reportedAt: number }, nowSec: number): boolean => nowSec - v.reportedAt > STALE_REPORT_S;
+
 /** Agregado: la flota de buses en circulación. */
 export class Fleet {
   private readonly byId = new Map<VehicleId, Vehicle>();

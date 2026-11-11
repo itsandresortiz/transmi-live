@@ -275,11 +275,11 @@ export class MapController {
     // vista de toda la ciudad: la columna vertebral (troncal y dual) siempre; zonales y alimentadores solo al acercarse, para que el mapa respire
     m.addLayer({
       id: "bus-dots-minor", type: "circle", source: "buses", minzoom: 11.8, maxzoom: 13, filter: ["==", ["get", "m"], 0],
-      paint: { "circle-radius": zoomWidth([11.8, 1.7], [13, 3.4]), "circle-color": ["get", "color"], "circle-opacity": 0.85, "circle-stroke-color": "#ffffff", "circle-stroke-width": 0.8 },
+      paint: { "circle-radius": zoomWidth([11.8, 1.7], [13, 3.4]), "circle-color": ["get", "color"], "circle-opacity": ["*", 0.85, ["coalesce", ["get", "o"], 1]], "circle-stroke-color": "#ffffff", "circle-stroke-width": 0.8, "circle-stroke-opacity": ["coalesce", ["get", "o"], 1] },
     });
     m.addLayer({
       id: "bus-dots", type: "circle", source: "buses", maxzoom: 13, filter: ["==", ["get", "m"], 1],
-      paint: { "circle-radius": zoomWidth([9, 2.6], [13, 4.4]), "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1 },
+      paint: { "circle-radius": zoomWidth([9, 2.6], [13, 4.4]), "circle-color": ["get", "color"], "circle-opacity": ["coalesce", ["get", "o"], 1], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1, "circle-stroke-opacity": ["coalesce", ["get", "o"], 1] },
     });
   }
 

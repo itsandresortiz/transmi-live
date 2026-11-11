@@ -70,7 +70,7 @@ export default function Favoritos() {
                   </View>
                 ) : <SymbolView name="chevron.right" tintColor={c.muted} size={12} />}
               </View>
-              {sorting ? null : next.length ? <View style={styles.next}>{next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Eta at={u.buses[0]!.etaAt} style={[type.headline, { color: c.text }]} /></View>)}</View>
+              {sorting ? null : next.length ? <View style={styles.next}>{next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Text style={[type.caption, { color: c.muted, flex: 1 }]} numberOfLines={1}>{u.headsign ? `Hacia ${u.headsign}` : ""}</Text><Eta at={u.buses[0]!.etaAt} style={[type.headline, { color: c.text }]} /></View>)}</View>
                 : <Text style={[type.caption, { color: c.muted }]}>{live ? "Ningún bus viene ahora" : "Sin datos en vivo por ahora"}</Text>}
             </Card>
           </Tap>
@@ -98,6 +98,6 @@ const styles = StyleSheet.create({
   arrows: { flexDirection: "row", gap: space[2] },
   arrow: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   top: { flexDirection: "row", alignItems: "center", gap: space[3] },
-  next: { flexDirection: "row", flexWrap: "wrap", gap: space[3] },
+  next: { gap: space[2] },      // una fila por ruta: recuadro, hacia dónde va y el tiempo
   chip: { flexDirection: "row", alignItems: "center", gap: space[2] },
 });

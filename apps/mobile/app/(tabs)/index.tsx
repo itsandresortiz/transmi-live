@@ -13,6 +13,7 @@ import { stopLabelText } from "@transmi/domain";
 import { nowSec } from "@/clock";
 import { etaText } from "@/format";
 import { Eta } from "@/ui/Eta";
+import { useActiveMessages } from "@/messages";
 import { useSaved } from "@/favorites";
 import { liveDown } from "@/lastService";
 import { useDemo } from "@/demo";
@@ -37,7 +38,7 @@ export default function Inicio() {
 
   const saved = useSaved();
   const demo = useDemo((d) => d.on);
-  const alerts = transit.alerts.length;
+  const alerts = transit.alerts.length + useActiveMessages().length;      // los avisos de TransMilenio y los mensajes propios
   // tus paradas con los próximos buses de cada una (los 3 más cercanos, de cualquier ruta); sin buses, la próxima hora del horario
   const favStops = useMemo(() => saved.stops.slice(0, 6).flatMap((id) => {
     const stop = transit.stopById(id);

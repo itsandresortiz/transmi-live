@@ -1,7 +1,7 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { nowMs as clockNow } from "../clock";
 import { MotionEngine, type TransitState } from "@transmi/application";
-import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo, toWorld } from "@transmi/domain";
+import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo, toWorld, isStaleReport } from "@transmi/domain";
 import { type BusDraw, BusCanvas } from "./BusCanvas";
 import type { MapController } from "./MapController";
 import type { MapTheme } from "./theme";
@@ -104,7 +104,7 @@ export class BusRenderer {
         if (o.routeId && v.routeId !== o.routeId) continue;
         const w = this.step(v.id, v.world, nowMs, tau);   // vista lejana: sin adelantar (en línea recta se saldrían de la calle)
         const g = toGeo(w);
-        features.push({ type: "Feature", properties: { id: v.id, m: v.system === "troncal" || v.system === "dual" ? 1 : 0, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th) }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
+        features.push({ type: "Feature", properties: { id: v.id, o: isStaleReport(v, nowMs / 1000) ? 0.38 : 1, m: v.system === "troncal" || v.system === "dual" ? 1 : 0, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th) }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
       }
       this.mapc.setBuses({ type: "FeatureCollection", features });
       this.applyFollow(nowMs);
@@ -126,7 +126,7 @@ export class BusRenderer {
       if (o.motion === "predict") this.shown.set(v.id, { x: w.x, y: w.y, t: nowMs });
       const g = toGeo(w);
       items.push({ id: v.id, lon: g.lon, lat: g.lat, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th),
-        left: v.bearing != null && v.bearing > 180, angle: o.motion === "predict" ? this.motion.heading(v.id) ?? v.bearing : v.bearing, long: v.system === "troncal", label: this.state.routeOf(v)?.shortName ?? v.routeId, last: this.state.serviceOf(v)?.isLast });
+        left: v.bearing != null && v.bearing > 180, angle: o.motion === "predict" ? this.motion.heading(v.id) ?? v.bearing : v.bearing, long: v.system === "troncal", label: this.state.routeOf(v)?.shortName ?? v.routeId, stale: isStaleReport(v, nowSec), last: this.state.serviceOf(v)?.isLast });
     }
     this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
     this.items = items;

@@ -76,7 +76,7 @@ export default function Cerca() {
                     </View>
                     {next.length ? (
                       <View style={styles.next}>
-                        {next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Eta at={u.buses[0]!.etaAt} style={[type.headline, { color: c.text }]} /></View>)}
+                        {next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Text style={[type.caption, { color: c.muted, flex: 1 }]} numberOfLines={1}>{u.headsign ? `Hacia ${u.headsign}` : ""}</Text><Eta at={u.buses[0]!.etaAt} style={[type.headline, { color: c.text }]} /></View>)}
                       </View>
                     ) : <Text style={[type.caption, { color: c.muted }]}>{liveDown() ? "Sin datos en vivo por ahora" : "Ningún bus viene ahora"}</Text>}
                   </Card>
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   screen: { padding: space[5], gap: space[3] },
   top: { flexDirection: "row", alignItems: "center", gap: space[3] },
   icon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
-  next: { flexDirection: "row", flexWrap: "wrap", gap: space[3] },
+  next: { gap: space[2] },      // una fila por ruta: recuadro, hacia dónde va y el tiempo
   chip: { flexDirection: "row", alignItems: "center", gap: space[2] },
   btn: { minHeight: 54, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: space[2], marginTop: space[2] },
 });

@@ -1,7 +1,7 @@
 import type { Map as MLMap } from "maplibre-gl";
 import { TOP_H, TOP_LONG_H, TOP_W, busTopSprite } from "./busTop";
 
-export interface BusDraw { id: string; lon: number; lat: number; color: string; left: boolean; /** rumbo (grados desde el norte) o null si no se sabe */ angle?: number | null; /** vehículo articulado (troncal) */ long?: boolean; label: string; /** último servicio de su ruta */ last?: boolean }
+export interface BusDraw { id: string; /** dejó de reportar hace rato: se dibuja atenuado */ stale?: boolean; lon: number; lat: number; color: string; left: boolean; /** rumbo (grados desde el norte) o null si no se sabe */ angle?: number | null; /** vehículo articulado (troncal) */ long?: boolean; label: string; /** último servicio de su ruta */ last?: boolean }
 
 const W = TOP_W;
 /** Tamaño del ícono según el zoom (igual que el que tenía la capa del mapa). */
@@ -71,6 +71,7 @@ export class BusCanvas {
       const deg = b.angle != null ? b.angle - this.map.getBearing() : b.left ? -90 : 90, rad = (deg * Math.PI) / 180;
       if (b.last) { ctx.beginPath(); ctx.arc(p.x, p.y, h * 0.62, 0, Math.PI * 2); ctx.fillStyle = "rgba(245,158,11,.35)"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#f59e0b"; ctx.stroke(); ctx.fillStyle = this.textColor; ctx.lineWidth = 3.5; ctx.strokeStyle = this.haloColor; }
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rad);
+      if (b.stale) ctx.globalAlpha = 0.38;
       ctx.drawImage(this.sprite(b.color, !!b.long), -w / 2, -h / 2, w, h);
       ctx.restore();
       if (labels) {

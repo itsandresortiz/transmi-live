@@ -35,7 +35,6 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 ## Bugs conocidos / limitaciones
 - ✅ (2026-11-11) Avisos con nombre de ruta y sin prefijo «TM_».
 - Tiempos de llegada a una parada (`upcomingAtStop`): con el dato un minuto atrasado, un bus a una parada de distancia queda en «llegando» más de la cuenta. Falta volver a medir el error del ETA (ya no hay hora real de llegada en el feed: medir con el cambio de «última parada» de las posiciones) antes de tocar esa regla.
-- La campana de Inicio no cuenta los mensajes del dueño.
 - Mensajes del dueño: tardan ~5 min (caché de GitHub); si hace falta inmediato, servirlos por la función de Supabase.
 - **Apps publicadas (iOS 1.0.0 y el paquete Android 26111114)** no traen las correcciones del 2026-11-11: muestran 0 avisos y, si el intermediario falla, pueden tomar una copia de respaldo vieja y atrasar la hora. Mitigado del lado de los datos (respaldo fresco y vigilado); se corrige del todo con una versión nueva (1.0.1).
 - ✅ (2026-11-11) `hop-stats` reactivado con posiciones y relanzamiento propio. Pendiente: tras unos días de datos, comparar el perfil por ruta/franja contra el valor fijo de segundos por parada y decidir si se usa en el ETA y en el adelanto del bus.
