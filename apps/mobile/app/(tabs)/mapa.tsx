@@ -8,7 +8,7 @@ import { StatusBar } from "expo-status-bar";
 import { SymbolView } from "@/ui/Symbol";
 import { router, useIsFocused, usePathname } from "expo-router";
 import { hav } from "@transmi/application";
-import { SYSTEMS, SYSTEM_LABEL, type SystemType } from "@transmi/domain";
+import { SYSTEMS, SYSTEM_LABEL, routeTitle, type SystemType } from "@transmi/domain";
 import { toGeo } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { motion } from "@/map/engine";
@@ -182,9 +182,26 @@ export default function Mapa() {
         <View style={[styles.focusChip, { top: insets.top + 72 }]}>
           <Glass interactive scheme="light" style={styles.focusGlass}>
             <View style={styles.focusRow}>
-              <Text style={[type.caption, { color: om.ink, flex: 1 }]} numberOfLines={1}>
-                {focus.stopId ? `Parada: ${transit.stopById(focus.stopId)?.name ?? ""}` : "Ruta seleccionada"}
-              </Text>
+              {focus.stopId ? (
+                <Tap style={{ flex: 1 }} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: focus.stopId! } })} accessibilityRole="button" accessibilityLabel={`Parada ${stopText(transit.stopById(focus.stopId), "")}. Ver sus llegadas`}>
+                  <Text style={[type.caption, { color: om.sub }]}>Parada · toca para ver llegadas</Text>
+                  <Text style={[type.headline, { color: om.ink, fontSize: 15 }]} numberOfLines={1}>{stopText(transit.stopById(focus.stopId), "")}</Text>
+                </Tap>
+              ) : (() => {
+                // qué ruta es, hacia dónde va y cuántos buses suyos hay en la calle; al tocar se abre su ficha
+                const r = transit.routeById(focus.routeId!);
+                let n = 0; for (const v of transit.fleet.values()) if (v.routeId === focus.routeId) n++;
+                return (
+                  <Tap style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: space[2] }} onPress={() => router.push({ pathname: "/route/[id]", params: { id: focus.routeId! } })} accessibilityRole="button"
+                    accessibilityLabel={`Ruta ${r?.shortName ?? ""} ${r?.longName ?? ""}, ${n} ${n === 1 ? "bus" : "buses"} en la calle. Ver la ruta`}>
+                    {r ? <RouteBadge route={r} /> : null}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[type.headline, { color: om.ink, fontSize: 15 }]} numberOfLines={1}>{r ? routeTitle(r) : "Ruta seleccionada"}</Text>
+                      <Text style={[type.caption, { color: om.sub }]} numberOfLines={1}>{n ? `${n} ${n === 1 ? "bus" : "buses"} en la calle` : "Sin buses en la calle ahora"} · toca para ver paradas</Text>
+                    </View>
+                  </Tap>
+                );
+              })()}
               <RoundButton symbol="xmark" label="Quitar la selección" onPress={() => focus.clear()} size={32} light />
             </View>
           </Glass>
@@ -214,7 +231,7 @@ const styles = StyleSheet.create({
   compassGlass: { width: 46, height: 46, borderRadius: 23, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   scrim: { position: "absolute", top: 0, left: 0, right: 0 },
   focusChip: { position: "absolute", left: space[4], right: space[4] },
-  focusGlass: { borderRadius: 20, overflow: "hidden" },       // fila de 40 de alto: píldora, concéntrica con su botón (radio 16 + margen 4)
+  focusGlass: { borderRadius: 24, overflow: "hidden" },       // fila de 40 de alto: píldora, concéntrica con su botón (radio 16 + margen 4)
   followGlass: { borderRadius: 28, overflow: "hidden" },      // margen 12 + botón de radio 16 en la esquina
   followBox: { padding: space[3], gap: space[2] },
   followTop: { flexDirection: "row", alignItems: "center", gap: space[2] },

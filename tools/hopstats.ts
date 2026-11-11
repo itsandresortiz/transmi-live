@@ -1,10 +1,11 @@
 /**
  * Grabadora de tiempos reales entre paradas.
  *
- * Cada bus informa la última parada a la que llegó, junto con la hora de su GPS. Cuando esa parada cambia dos veces seguidas se sabe
- * cuánto tardó en el tramo (con la espera en la parada incluida), con un margen de unos segundos (se consulta cada 10 s).
- * Hasta el 2026-11-05 se tomaba de la hora real de llegada que traía el archivo de viajes de TransMilenio; desde entonces ese archivo
- * ya no trae paradas ni horas, y la grabación se quedó sin datos. Lo acumulado antes se conserva y se le suma lo nuevo.
+ * Hasta el 2026-11-05 se tomaba de la hora real de llegada a cada parada que traía el archivo de viajes de TransMilenio. Desde entonces
+ * ese archivo no trae paradas ni horas, y la «última parada» y el número de secuencia que trae cada bus quedaron fijos (no cambian en
+ * todo el viaje; comprobado con 4.796 buses en 41 min). Lo único que avanza es la posición: se mide cuánto recorre cada bus sobre su
+ * trazado entre dos reportes y ese tiempo se reparte entre los tramos que cruzó. `n` es cuánto de cada tramo se recorrió en total
+ * (puede tener decimales) y `sum` los segundos gastados: `sum / n` = segundos para recorrer el tramo. Lo acumulado antes se conserva.
  * Esta herramienta las acumula por ruta, tramo, tipo de día y franja horaria (suma, cuenta y suma de cuadrados), sin guardar datos crudos,
  * y las publica en la rama `hop-stats`. Con unos días de datos permite medir si un perfil histórico supera a la fórmula actual.
  *
@@ -15,6 +16,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { TransitState, shapeStops } from "@transmi/application";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 
 const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 10_000;
@@ -40,14 +42,13 @@ async function main() {
   const liteDir = clone("live-data");
   if (!liteDir || !existsSync(join(liteDir, "gtfs-lite.zip"))) throw new Error("no hay gtfs-lite.zip en live-data");
   const net = buildNetwork(await parseGtfsLite(new Uint8Array(readFileSync(join(liteDir, "gtfs-lite.zip")))));
-  const stopIndex = new Map<string, Map<string, number>>();      // ruta|sentido -> parada -> posición
-  for (const [rid, shapes] of net.shapes) for (const sh of shapes) stopIndex.set(`${rid}|${sh.direction}`, new Map(sh.stopIds.map((s, i) => [s, i])));
-  const shapesOf = (rid: string) => net.shapes.get(rid) ?? [];
-
   const run: Stats = {};
-  // bus -> última parada informada, la hora (del GPS del bus) en que se le vio por primera vez en ella, y si se le vio llegar
-  // (si ya estaba ahí en la primera consulta no se sabe cuándo llegó: ese tramo no se cuenta)
-  const last = new Map<string, { stop: string; at: number; route: string; seenArrive: boolean }>();
+  // Dónde iba cada bus sobre su recorrido en su reporte anterior (metros desde el inicio) y a qué hora (la de su GPS).
+  // Entre dos reportes seguidos se sabe cuántos metros avanzó y en cuánto tiempo: ese tiempo se reparte entre los tramos (parada a parada)
+  // que cruzó, en proporción a lo recorrido en cada uno. Sumando tiempo y avance por tramo sale cuánto se tarda en recorrerlo entero
+  // (incluida la espera en paradas y semáforos: el tiempo de un bus detenido también se suma al tramo donde está).
+  const state = new TransitState(); state.setNetwork(net);
+  const last = new Map<string, { key: string; s: number; at: number }>();
   let events = 0, seen = 0, polls = 0;
   const end = Date.now() + SECONDS * 1000;
   while (Date.now() < end) {
@@ -55,33 +56,31 @@ async function main() {
     try {
       const res = await fetch("https://gtfs.transmilenio.gov.co/positions.pb", { headers: { "User-Agent": "Mozilla/5.0 (transmi-live)" } });
       if (res.ok) {
-        const reports = decodePositions(new Uint8Array(await res.arrayBuffer()));
+        state.applyPositions(decodePositions(new Uint8Array(await res.arrayBuffer())), Date.now());
         polls++;
-        for (const r of reports) {
-          if (!r.lastStopId || !r.routeId || !r.reportedAt) continue;
+        for (const v of state.fleet.values()) {
+          const seq = state.sequenceForDisplay(v); if (!seq) continue;
+          const info = shapeStops(state, seq.shape); if (!info) continue;
+          const hit = info.path.project(v.world, 0, 0, 120);
+          const a = info.s[seq.index], b = info.s[seq.index + 1];
+          if (!hit || a == null || b == null || hit.s < a - 150 || hit.s > b + 150) continue;      // el bus tiene que ir por el tramo donde se le ubicó
           seen++;
-          const prev = last.get(r.id);
-          if (!prev || prev.route !== r.routeId) { last.set(r.id, { stop: r.lastStopId, at: r.reportedAt, route: r.routeId, seenArrive: false }); continue; }
-          if (prev.stop === r.lastStopId || r.reportedAt <= prev.at) continue;
-          last.set(r.id, { stop: r.lastStopId, at: r.reportedAt, route: r.routeId, seenArrive: true });
-          if (!prev.seenArrive) continue;
-          const dur = r.reportedAt - prev.at;
-          for (const sh of shapesOf(r.routeId)) {
-            const idx = stopIndex.get(`${r.routeId}|${sh.direction}`)!;
-            const a = idx.get(prev.stop), b = idx.get(r.lastStopId);
-            if (a == null || b == null || b <= a || b - a > 4) continue;
-            const hops = b - a, per = dur / hops;
-            if (per < 5 || per > 900) break;
-            const d = new Date((r.reportedAt - 5 * 3600) * 1000);      // hora de Bogotá (UTC-5)
-            const tag = `${dayType(d)}|${bucketOf(d.getUTCHours())}`;
-            for (let i = a; i < b; i++) {
-              const k = `${r.routeId}|${sh.direction}|${i}|${tag}`;
-              const acc = (run[k] ??= { n: 0, sum: 0, sq: 0 });
-              acc.n++; acc.sum += per; acc.sq += per * per;
-            }
-            events++;
-            break;
+          const key = `${seq.shape.routeId}|${seq.shape.direction}`, prev = last.get(v.id);
+          if (prev && prev.at === v.reportedAt) continue;                                            // mismo reporte que la vez pasada
+          last.set(v.id, { key, s: hit.s, at: v.reportedAt });
+          if (!prev || prev.key !== key) continue;
+          const dt = v.reportedAt - prev.at, ds = hit.s - prev.s;
+          if (dt < 5 || dt > 300 || ds < -30 || ds > 3500) continue;                                 // saltos o datos raros
+          const d = new Date((v.reportedAt - 5 * 3600) * 1000);                                      // hora de Bogotá (UTC-5)
+          const tag = `${dayType(d)}|${bucketOf(d.getUTCHours())}`;
+          const add = (i: number, frac: number, secs: number) => { const acc = (run[`${key}|${i}|${tag}`] ??= { n: 0, sum: 0, sq: 0 }); acc.n += frac; acc.sum += secs; };
+          if (ds <= 5) { add(seq.index, 0, dt); events++; continue; }                               // detenido: el tiempo cuenta, el avance no
+          for (let i = 0; i < info.s.length - 1; i++) {
+            const lo = Math.max(prev.s, info.s[i]!), hi = Math.min(hit.s, info.s[i + 1]!), len = info.s[i + 1]! - info.s[i]!;
+            if (hi <= lo || len < 15) continue;
+            add(i, (hi - lo) / len, dt * (hi - lo) / ds);
           }
+          events++;
         }
       }
     } catch (e) { console.log("consulta fallida:", (e as Error).message); }
@@ -98,9 +97,9 @@ async function main() {
   for (const [k, a] of Object.entries(run)) { const t = (total[k] ??= { n: 0, sum: 0, sq: 0 }); t.n += a.n; t.sum += a.sum; t.sq += a.sq; }
   const out = mkdtempSync(join(tmpdir(), "hs-out-"));
   mkdirSync(out, { recursive: true });
-  const meta = { v: 2, fuente: "posiciones (cambio de última parada)", buckets: BUCKETS, updated: new Date().toISOString(), keys: Object.keys(total).length, tramos: Object.values(total).reduce((s, a) => s + a.n, 0) };
+  const meta = { v: 3, fuente: "posiciones (avance sobre el trazado)", buckets: BUCKETS, updated: new Date().toISOString(), keys: Object.keys(total).length, tramos: Object.values(total).reduce((s, a) => s + a.n, 0) };
   const round = (x: number) => Math.round(x * 10) / 10;
-  const compact = Object.fromEntries(Object.entries(total).map(([k, a]) => [k, { n: a.n, sum: round(a.sum), sq: Math.round(a.sq) }]));
+  const compact = Object.fromEntries(Object.entries(total).map(([k, a]) => [k, { n: Math.round(a.n * 100) / 100, sum: round(a.sum), sq: Math.round(a.sq) }]));
   writeFileSync(join(out, "stats.json.gz"), gzipSync(JSON.stringify({ ...meta, stats: compact }), { level: 9 }));
   execFileSync("bash", ["scripts/publish.sh", out], { stdio: "inherit", env: { ...process.env, BRANCH: "hop-stats", GITHUB_REPOSITORY: REPO, GITHUB_TOKEN: TOKEN } });
   console.log("acumulado:", JSON.stringify(meta));
