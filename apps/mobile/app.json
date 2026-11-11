@@ -62,7 +62,8 @@
           ]
         }
       ],
-      "./plugins/sin-push"
+      "./plugins/sin-push",
+      "./plugins/android-memoria"
     ],
     "experiments": {
       "typedRoutes": true

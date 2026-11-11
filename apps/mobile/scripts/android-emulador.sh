@@ -32,5 +32,9 @@ if ! adb devices | awk 'NR>1 && $2=="device"' | grep -q .; then
 fi
 
 npm install
+# se vuelve a generar la carpeta de Android desde cero: así siempre lleva la configuración al día (incluida la memoria extra para compilar)
+npx expo prebuild --platform android --clean --no-install
+# si quedó un Gradle de un intento anterior (con poca memoria), se apaga
+( [ -x android/gradlew ] && cd android && ./gradlew --stop >/dev/null 2>&1 ) || true
 # versión «release»: lleva todo el código dentro, no necesita que el computador esté sirviendo nada
 npx expo run:android --variant release
