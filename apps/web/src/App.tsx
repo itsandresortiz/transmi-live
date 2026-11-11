@@ -15,6 +15,7 @@ import { FollowBar } from "./ui/FollowBar";
 import { RideBar } from "./ui/ride";
 import { TripBar } from "./ui/trip";
 import { Settings } from "./ui/Settings";
+import { AppPromo } from "./ui/AppPromo";
 import { Sheet } from "./ui/Sheet";
 import { Bell, Compass, Locate, Mark, Sliders } from "./ui/icons";
 import { PlannerView, tripGeo } from "./ui/planner";
@@ -405,6 +406,7 @@ export function App() {
       <TripBar th={th} />
       <FollowBar th={th} onResume={() => { useUi.getState().setFollowPaused(false); }} />
       <Settings th={th} />
+      <AppPromo />
       <div className={`toast glass${toastOn ? " on" : ""}`} role="status" aria-live="polite">{ui.toast?.text}</div>
     </>
   );

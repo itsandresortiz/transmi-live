@@ -403,3 +403,32 @@ button.stat:active{transform:scale(.97)}
 .endedrow>div .rb{margin:0}.endedrow>div .more{align-self:center;font-size:12.5px;color:var(--muted)}
 .sched-now{margin:0 0 6px;font-size:14px;font-weight:600}.sched-stop{margin-bottom:6px}
 .scc.idle{opacity:.7}.scc.idle em{font-style:normal;color:var(--muted)}
+
+/* Anuncio de la app de iPhone: tarjeta que sube desde abajo en el celular y queda centrada en pantallas anchas */
+.promo-scrim{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.46);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);opacity:0;transition:opacity .3s}
+.promo-scrim.on{opacity:1}
+.promo{position:fixed;z-index:91;left:50%;bottom:0;width:min(100vw,440px);max-height:94dvh;overflow-y:auto;padding:20px 22px calc(10px + env(safe-area-inset-bottom,0px));border-radius:30px 30px 0 0;background:var(--surface);color:var(--fg);box-shadow:0 -12px 60px rgba(0,0,0,.32);text-align:center;transform:translate(-50%,104%);transition:transform .42s cubic-bezier(.2,.9,.25,1)}
+.promo.on{transform:translate(-50%,0)}
+@media (min-width:720px){.promo{bottom:auto;top:50%;border-radius:30px;padding-bottom:20px;transform:translate(-50%,-46%) scale(.96);opacity:0;transition:transform .36s cubic-bezier(.2,.9,.25,1),opacity .25s}.promo.on{transform:translate(-50%,-50%) scale(1);opacity:1}}
+.promo-x{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--surface2);color:var(--muted)}
+.promo-hero{position:relative;height:98px;display:grid;place-items:center;margin:0 0 10px}
+.promo-hero img{position:relative;border-radius:21px;box-shadow:0 14px 34px rgba(225,29,46,.42),0 2px 8px rgba(0,0,0,.18)}
+.promo-ring{position:absolute;left:50%;top:50%;border-radius:50%;border:1.5px solid var(--accent);transform:translate(-50%,-50%);opacity:0;animation:promo-ring 2.8s ease-out infinite}
+.promo-ring.r1{width:88px;height:88px}.promo-ring.r2{width:88px;height:88px;animation-delay:1.4s}
+@keyframes promo-ring{0%{opacity:.5;transform:translate(-50%,-50%) scale(.9)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.6)}}
+.promo-new{display:inline-block;padding:4px 11px;border-radius:99px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase}
+.promo h2{margin:10px 0 0;font-family:"TM Wide",system-ui,sans-serif;font-weight:800;font-size:24px;line-height:1.12;letter-spacing:-.5px;text-wrap:balance}
+.promo-sub{margin:9px auto 0;max-width:330px;color:var(--muted);font-size:15px;line-height:1.4}
+.promo-list{list-style:none;margin:14px 0 0;padding:4px 16px;border-radius:18px;background:var(--surface2);text-align:left}
+.promo-list li{padding:9px 0 9px 20px;position:relative}
+.promo-list li+li{border-top:.5px solid var(--line)}
+.promo-list li::before{content:"";position:absolute;left:2px;top:16px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.promo-list b{display:block;font-size:14.5px;font-weight:650}
+.promo-list span{display:block;margin-top:1px;font-size:13px;color:var(--muted);line-height:1.35}
+.promo-cta{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;margin:14px 0 0;min-height:56px;border-radius:17px;background:var(--fg);color:var(--bg);text-decoration:none;transition:transform .15s}
+.promo-cta:active{transform:scale(.98)}
+.promo-cta small{font-size:11.5px;font-weight:500;opacity:.82;line-height:1.2}
+.promo-cta b{font-size:20px;font-weight:650;letter-spacing:-.3px;line-height:1.15}
+.promo-later{display:block;width:100%;margin-top:6px;min-height:44px;color:var(--muted);font-size:15px;font-weight:600}
+@media (prefers-reduced-motion:reduce){.promo,.promo-scrim{transition:none}.promo-ring{animation:none}}
+@media (max-height:720px){.promo-list span{display:none}.promo-hero{height:88px;margin-bottom:6px}.promo-sub{font-size:14px}}

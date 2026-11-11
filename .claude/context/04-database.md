@@ -45,3 +45,5 @@ Las ramas de datos (`live-data`, `widget-data`, `schedule-data`, `hop-stats`, `s
 
 ## Si algún día hubiera base de datos
 Se registraría aquí: tablas, relaciones, RLS, migraciones y funciones. Hoy no aplica.
+
+- Web, almacenamiento local: `tm.iosapp.v1` = ya se mostró (o se cerró) el anuncio de la app de iPhone.

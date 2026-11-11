@@ -1,3 +1,4 @@
+import { APP_STORE_URL, showsIosApp } from "./AppPromo";
 import { CardSection } from "./card";
 import { useEffect, useState } from "react";
 import { SYSTEMS, SYSTEM_LABEL } from "@transmi/domain";
@@ -70,6 +71,12 @@ export function Settings({ th }: { th: MapTheme }) {
           <div className="grp"><h3>Instalar</h3>
             {ev ? <button className="btn primary" onClick={() => void ev.prompt()}>Instalar TransMi LIVE en tu celular</button>
               : <p className="hint">En iPhone: toca el botón Compartir y luego «Añadir a pantalla de inicio».</p>}
+          </div>
+        )}
+        {showsIosApp() && (
+          <div className="grp"><h3>App para iPhone</h3>
+            <a className="btn primary" href={APP_STORE_URL} target="_blank" rel="noopener">Descargar en el App Store</a>
+            <p className="hint">Con saldo de tu TuLlave, avisos de tu viaje y tu parada en la pantalla de inicio. Gratis.</p>
           </div>
         )}
         <div className="grp"><h3>Ayuda</h3>
