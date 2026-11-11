@@ -48,12 +48,17 @@ async function main() {
     const pathsOf = (rid: string) => paths.get(rid) ?? (paths.set(rid, (net.shapes.get(rid) ?? []).filter((x) => x.points.length > 1).map((x) => new RoadPath(x.points))), paths.get(rid)!);
     const err = { model: [] as number[], held: [] as number[], along: [] as number[], lat: [] as number[], signed: [] as number[] };
     const lag: number[] = [];
-    let hist = new Map<string, { t: number; x: number; y: number }[]>();
+    // dónde se dibujó cada bus en los últimos ~4 min. Hace falta guardar varios intervalos: TransMilenio entrega hoy cada posición con
+    // 30–90 s de atraso, así que el reporte que dice dónde estaba el bus en el instante T llega uno o varios lotes después de T.
+    const HIST_S = 240;
+    const hist = new Map<string, { t: number; x: number; y: number }[]>();
+    const gap: number[] = [], lagAll: number[] = [];
     for (let k = 0; k < batches.length; k++) {
       const b = batches[k]!;
       if (k > 0) {
         for (const r of b.reports) {
           const h = hist.get(r.id), prev = state.fleet.get(r.id);
+          if (prev && r.reportedAt !== prev.reportedAt) { gap.push(r.reportedAt - prev.reportedAt); lagAll.push(b.at - r.reportedAt); }
           if (!h || !prev || r.reportedAt === prev.reportedAt) continue;
           const rw = toWorld(r.position);
           if (distanceMeters(prev.world, rw) < 15) continue;       // parado: no mide el movimiento
@@ -67,19 +72,27 @@ async function main() {
       }
       state.applyPositions(b.reports, b.at * 1000);
       const next = batches[k + 1]; if (!next) break;
-      hist = new Map();
-      for (let t = b.at; t < next.at; t += 0.25) for (const v of state.fleet.values()) { const w = eng.step(v, t); (hist.get(v.id) ?? hist.set(v.id, []).get(v.id)!).push({ t, x: w.x, y: w.y }); }
+      let tick = 0;
+      for (let t = b.at; t < next.at; t += 0.25, tick++) for (const v of state.fleet.values()) {
+        const w = eng.step(v, t);
+        if (tick % 4) continue;                    // el motor avanza 4 veces por segundo, como en la app; se guarda una muestra por segundo
+        const l = hist.get(v.id) ?? hist.set(v.id, []).get(v.id)!;
+        l.push({ t, x: w.x, y: w.y });
+        while (l.length && l[0]!.t < t - HIST_S) l.shift();
+      }
     }
-    return { err, lag };
+    return { err, lag, gap, lagAll };
   };
   const base = evaluate(0.5);
   console.log("\n=== PRECISIÓN (buses que se movieron más de 15 m entre reportes; " + base.err.model.length + " muestras) ===");
   console.log("Sin predicción (quieto en el último reporte):", f(base.err.held));
   console.log("Distancia a la ruta (a lo ancho):", f(base.err.lat));
   console.log(`Retraso entre el reporte y su llegada: mediana ${pct(base.lag, 0.5).toFixed(1)} s, p90 ${pct(base.lag, 0.9).toFixed(1)} s`);
+  console.log(`Cada cuánto cambia el reporte de un mismo bus (s): mediana ${pct(base.gap, 0.5).toFixed(0)}, p10 ${pct(base.gap, 0.1).toFixed(0)}, p90 ${pct(base.gap, 0.9).toFixed(0)} (n=${base.gap.length})`);
+  console.log(`Edad del GPS al llegar el lote, todos los reportes nuevos (s): mediana ${pct(base.lagAll, 0.5).toFixed(0)}, p10 ${pct(base.lagAll, 0.1).toFixed(0)}, p90 ${pct(base.lagAll, 0.9).toFixed(0)}`);
   console.log("--- políticas (ganancia = fracción de la velocidad medida que realmente avanza) ---");
   const row = (label: string, r: ReturnType<typeof evaluate>) => console.log(`${label.padEnd(34)} error ${f(r.err.model)} | a lo largo: sesgo mediano ${pct(r.err.signed.map((x) => x), 0.5).toFixed(1)} m (neg = se queda corto)`);
-  for (const g of [0.3, 0.5, 0.7, 0.9, 1.1]) row(`ganancia ${g}`, g === 0.5 ? base : evaluate(g));
+  for (const g of [0, 0.15, 0.3, 0.5, 0.7, 0.9]) row(`ganancia ${g}`, g === 0.5 ? base : evaluate(g));
   for (const [c, name] of [[0.1, "corrección suave"], [0.3, "corrección fuerte"]] as const) row(`ganancia 0.7 + ${name}`, evaluate(0.7, { catchUp: c }));
 }
 

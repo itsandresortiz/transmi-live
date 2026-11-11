@@ -11,4 +11,4 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npx --yes tsx tools/precision.ts 270 8
+      - run: npx --yes tsx tools/precision.ts 420 8
