@@ -51,6 +51,7 @@ if keytool -printcert -jarfile "$AAB" 2>/dev/null | grep -q "CN=TransMi LIVE"; t
 OUT="$HOME/Desktop/TransMiLIVE-$TM_VERSION_CODE.aab"
 cp "$AAB" "$OUT"
 echo
-echo "Listo: $OUT  (versión 1.0.0, compilación $TM_VERSION_CODE)"
+VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' app.json | head -1)"
+echo "Listo: $OUT  (versión ${VERSION:-?}, compilación $TM_VERSION_CODE)"
 echo "Ese archivo es el que se arrastra en Google Play Console."
 open -R "$OUT" 2>/dev/null || true
