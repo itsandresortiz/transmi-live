@@ -14,7 +14,11 @@ export interface PredictionPolicy {
   readonly maxSeconds: number;
   readonly minSpeedMps: number;
 }
-export const DEFAULT_PREDICTION: PredictionPolicy = { gain: 0.5, gainDecayPerSecond: 0, maxSeconds: 90, minSpeedMps: 0.3 };
+/** Recalibrado el 2026-11-11 (36.036 comparaciones en hora pico). TransMilenio pasó a entregar cada posición con ~55–60 s de edad
+ *  (antes ~4 s) y la de un mismo bus cambia cada ~60 s: con el tope de 90 s el bus se quedaba quieto buena parte del tiempo.
+ *  Con 0,4 y tope de 150 s el error mediano baja de 172 m a 166 m (p90 de 436 a 423 m) y el bus sigue andando entre reportes.
+ *  Antes: 0,5 y 90 s (calibrado con 16 lotes cuando el dato llegaba casi al instante). */
+export const DEFAULT_PREDICTION: PredictionPolicy = { gain: 0.4, gainDecayPerSecond: 0, maxSeconds: 150, minSpeedMps: 0.3 };
 
 /** Segundos «efectivos» de movimiento que se le atribuyen a un dato con esta antigüedad. */
 export function motionSeconds(ageSeconds: number, p: PredictionPolicy = DEFAULT_PREDICTION): number {

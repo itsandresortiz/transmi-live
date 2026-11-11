@@ -45,3 +45,9 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Decisión**: si el periodo dura menos de 5 min se trata como «reportado a esa hora» y se muestra durante 6 h con el texto «Reportado hoy a las …». Los avisos con periodo largo siguen la regla estricta.
 - **Descartado**: mostrar todo lo que venga en el feed (431 novedades, algunas de la madrugada, parecerían de ahora) o no mostrar nada.
 - **Por revisar**: si 6 h es mucho o poco (decisión de producto del dueño) y si el feed vuelve al formato anterior.
+
+## 2026-11-11 · Adelanto de los buses con el dato un minuto atrasado
+- **Contexto**: TransMilenio pasó de entregar la posición con ~4 s de edad a ~55–60 s, y cada bus cambia cada ~60 s. Con el tope de 90 s el bus quedaba quieto buena parte del tiempo y el error mediano subió de 87 m a ~172 m.
+- **Decisión**: ganancia 0,4 y tope 150 s (166 m de mediana, mejor p90, y el bus no se congela).
+- **Descartado**: mantener 0,5 con tope largo (178 m), subir la ganancia (peor en todo), 0,3 (algo menos de error mediano pero el bus queda 100 m atrás).
+- **Por revisar**: solo se midió en hora pico; en valle los buses van más rápido y podría convenir más ganancia. Usar el perfil de `hop-stats` por ruta y franja cuando haya datos.

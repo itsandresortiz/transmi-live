@@ -121,20 +121,21 @@ describe("predicción", () => {
   it("avanza desde el primer segundo, sin esperar", () => {
     const v = moving();
     const p = predictPosition(v, 1030 + 10);                  // 10 s de antigüedad
-    expect(distanceMeters(v.world, p)).toBeGreaterThan(20);   // ≈ 5 m/s × 10 s × 0,5
-    expect(distanceMeters(v.world, p)).toBeLessThan(30);
+    expect(distanceMeters(v.world, p)).toBeGreaterThan(15);   // ≈ 5 m/s × 10 s × 0,4
+    expect(distanceMeters(v.world, p)).toBeLessThan(25);
     expect(motionSeconds(0)).toBe(0);
   });
   it("avanza menos de lo que dice la velocidad medida (los buses frenan y esperan)", () => {
     const v = moving();
     const p = predictPosition(v, 1030 + 40);
     expect(distanceMeters(v.world, p)).toBeLessThan(5 * 40);
-    expect(distanceMeters(v.world, p)).toBeGreaterThan(5 * 40 * 0.4);
+    expect(distanceMeters(v.world, p)).toBeGreaterThan(5 * 40 * 0.3);
   });
-  it("se detiene en el tope de 90 s", () => {
+  it("se detiene en el tope (150 s)", () => {
     const v = moving();
     const p = predictPosition(v, 1030 + 1000);
-    expect(distanceMeters(v.world, p)).toBeLessThan(5 * 90 + 5);
+    expect(distanceMeters(v.world, p)).toBeLessThan(5 * 150 * 0.4 + 5);
+    expect(distanceMeters(v.world, p)).toBeGreaterThan(5 * 150 * 0.4 - 5);
   });
 });
 
