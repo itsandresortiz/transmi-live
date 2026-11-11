@@ -34,7 +34,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 
 ## Bugs conocidos / limitaciones
 - **Apps publicadas (iOS 1.0.0 y el paquete Android 26111114)** no traen las correcciones del 2026-11-11: muestran 0 avisos y, si el intermediario falla, pueden tomar una copia de respaldo vieja y atrasar la hora. Mitigado del lado de los datos (respaldo fresco y vigilado); se corrige del todo con una versión nueva (1.0.1).
-- `hop-stats` lleva ~6 días sin actualizarse (solo corre con el horario de GitHub): darle relanzamiento propio o sumarlo a la vigilancia cruzada.
+- ✅ (2026-11-11) `hop-stats` reactivado con posiciones y relanzamiento propio. Pendiente: tras unos días de datos, comparar el perfil por ruta/franja contra el valor fijo de segundos por parada y decidir si se usa en el ETA y en el adelanto del bus.
 - La actividad en vivo del viaje no cambia de paso con la app cerrada (no hay push): muestra el último paso y su cuenta regresiva.
 - «Seguir este viaje»: solo se conoce el bus real del primer tramo (los demás van por hora estimada); con la app cerrada no se corrige el atraso.
 - ✅ (2026-11-10) Buses sin próxima parada: era un error de ubicación en rutas de ida y vuelta, no falta de rutas. Hoy ~3 % sin próxima parada (fuera de recorrido, final de ruta). Queda ~1,7 % con tramos absurdos entre paradas (>3 km) en rutas largas circulares (`projectAfter` no encuentra la primera pasada a ≤40 m). Solo ~5 % de los buses trae puntualidad.

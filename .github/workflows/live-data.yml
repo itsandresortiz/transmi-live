@@ -28,6 +28,8 @@ jobs:
         run: |
           N=$( (gh run list --repo "$GITHUB_REPOSITORY" --workflow widget-data.yml --status in_progress --json databaseId --jq length; gh run list --repo "$GITHUB_REPOSITORY" --workflow widget-data.yml --status queued --json databaseId --jq length) 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo 1)
           if [ "${N:-1}" = "0" ]; then echo "widget-data.yml estaba detenido: se relanza"; gh workflow run widget-data.yml --repo "$GITHUB_REPOSITORY" --ref main || true; fi
+          H=$( (gh run list --repo "$GITHUB_REPOSITORY" --workflow hop-stats.yml --status in_progress --json databaseId --jq length; gh run list --repo "$GITHUB_REPOSITORY" --workflow hop-stats.yml --status queued --json databaseId --jq length) 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo 1)
+          if [ "${H:-1}" = "0" ]; then echo "hop-stats.yml estaba detenido: se relanza"; gh workflow run hop-stats.yml --repo "$GITHUB_REPOSITORY" --ref main || true; fi
       - name: Relanzar para seguir sin pausa
         if: always()
         env:

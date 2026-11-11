@@ -1,8 +1,10 @@
 /**
  * Grabadora de tiempos reales entre paradas.
  *
- * TransMilenio informa, por viaje, la última parada a la que llegó el bus con su hora REAL de llegada. Dos llegadas
- * consecutivas de un mismo viaje dan cuánto tardó en ese tramo (con la espera en la parada incluida), con precisión de segundos.
+ * Cada bus informa la última parada a la que llegó, junto con la hora de su GPS. Cuando esa parada cambia dos veces seguidas se sabe
+ * cuánto tardó en el tramo (con la espera en la parada incluida), con un margen de unos segundos (se consulta cada 10 s).
+ * Hasta el 2026-11-05 se tomaba de la hora real de llegada que traía el archivo de viajes de TransMilenio; desde entonces ese archivo
+ * ya no trae paradas ni horas, y la grabación se quedó sin datos. Lo acumulado antes se conserva y se le suma lo nuevo.
  * Esta herramienta las acumula por ruta, tramo, tipo de día y franja horaria (suma, cuenta y suma de cuadrados), sin guardar datos crudos,
  * y las publica en la rama `hop-stats`. Con unos días de datos permite medir si un perfil histórico supera a la fórmula actual.
  *
@@ -13,9 +15,9 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildNetwork, decodeTripUpdates, parseGtfsLite } from "@transmi/infrastructure";
+import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 
-const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 20_000;
+const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 10_000;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live", TOKEN = process.env.GITHUB_TOKEN ?? "";
 const url = (b: string) => `https://${TOKEN ? `x-access-token:${TOKEN}@` : ""}github.com/${REPO}.git`;
 
@@ -43,33 +45,37 @@ async function main() {
   const shapesOf = (rid: string) => net.shapes.get(rid) ?? [];
 
   const run: Stats = {};
-  const last = new Map<string, { stop: string; at: number }>();   // viaje -> última llegada vista
+  // bus -> última parada informada, la hora (del GPS del bus) en que se le vio por primera vez en ella, y si se le vio llegar
+  // (si ya estaba ahí en la primera consulta no se sabe cuándo llegó: ese tramo no se cuenta)
+  const last = new Map<string, { stop: string; at: number; route: string; seenArrive: boolean }>();
   let events = 0, seen = 0, polls = 0;
   const end = Date.now() + SECONDS * 1000;
   while (Date.now() < end) {
     const t0 = Date.now();
     try {
-      const res = await fetch("https://gtfs.transmilenio.gov.co/tripupdates.pb", { headers: { "User-Agent": "Mozilla/5.0 (transmi-live)" } });
+      const res = await fetch("https://gtfs.transmilenio.gov.co/positions.pb", { headers: { "User-Agent": "Mozilla/5.0 (transmi-live)" } });
       if (res.ok) {
-        const updates = decodeTripUpdates(new Uint8Array(await res.arrayBuffer()));
+        const reports = decodePositions(new Uint8Array(await res.arrayBuffer()));
         polls++;
-        for (const u of updates) {
-          const cur = u.nextStop; if (!cur?.arrivalAt || !u.routeId) continue;
+        for (const r of reports) {
+          if (!r.lastStopId || !r.routeId || !r.reportedAt) continue;
           seen++;
-          const prev = last.get(u.tripId);
-          last.set(u.tripId, { stop: cur.stopId, at: cur.arrivalAt });
-          if (!prev || prev.stop === cur.stopId || cur.arrivalAt <= prev.at) continue;
-          const dur = cur.arrivalAt - prev.at;
-          for (const sh of shapesOf(u.routeId)) {
-            const idx = stopIndex.get(`${u.routeId}|${sh.direction}`)!;
-            const a = idx.get(prev.stop), b = idx.get(cur.stopId);
+          const prev = last.get(r.id);
+          if (!prev || prev.route !== r.routeId) { last.set(r.id, { stop: r.lastStopId, at: r.reportedAt, route: r.routeId, seenArrive: false }); continue; }
+          if (prev.stop === r.lastStopId || r.reportedAt <= prev.at) continue;
+          last.set(r.id, { stop: r.lastStopId, at: r.reportedAt, route: r.routeId, seenArrive: true });
+          if (!prev.seenArrive) continue;
+          const dur = r.reportedAt - prev.at;
+          for (const sh of shapesOf(r.routeId)) {
+            const idx = stopIndex.get(`${r.routeId}|${sh.direction}`)!;
+            const a = idx.get(prev.stop), b = idx.get(r.lastStopId);
             if (a == null || b == null || b <= a || b - a > 4) continue;
             const hops = b - a, per = dur / hops;
             if (per < 5 || per > 900) break;
-            const d = new Date((cur.arrivalAt - 5 * 3600) * 1000);      // hora de Bogotá (UTC-5)
+            const d = new Date((r.reportedAt - 5 * 3600) * 1000);      // hora de Bogotá (UTC-5)
             const tag = `${dayType(d)}|${bucketOf(d.getUTCHours())}`;
             for (let i = a; i < b; i++) {
-              const k = `${u.routeId}|${sh.direction}|${i}|${tag}`;
+              const k = `${r.routeId}|${sh.direction}|${i}|${tag}`;
               const acc = (run[k] ??= { n: 0, sum: 0, sq: 0 });
               acc.n++; acc.sum += per; acc.sq += per * per;
             }
@@ -92,7 +98,7 @@ async function main() {
   for (const [k, a] of Object.entries(run)) { const t = (total[k] ??= { n: 0, sum: 0, sq: 0 }); t.n += a.n; t.sum += a.sum; t.sq += a.sq; }
   const out = mkdtempSync(join(tmpdir(), "hs-out-"));
   mkdirSync(out, { recursive: true });
-  const meta = { v: 1, buckets: BUCKETS, updated: new Date().toISOString(), keys: Object.keys(total).length, tramos: Object.values(total).reduce((s, a) => s + a.n, 0) };
+  const meta = { v: 2, fuente: "posiciones (cambio de última parada)", buckets: BUCKETS, updated: new Date().toISOString(), keys: Object.keys(total).length, tramos: Object.values(total).reduce((s, a) => s + a.n, 0) };
   const round = (x: number) => Math.round(x * 10) / 10;
   const compact = Object.fromEntries(Object.entries(total).map(([k, a]) => [k, { n: a.n, sum: round(a.sum), sq: Math.round(a.sq) }]));
   writeFileSync(join(out, "stats.json.gz"), gzipSync(JSON.stringify({ ...meta, stats: compact }), { level: 9 }));

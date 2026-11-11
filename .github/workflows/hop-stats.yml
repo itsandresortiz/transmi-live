@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: hop-stats
   cancel-in-progress: false
@@ -18,7 +19,13 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - name: Grabar ~4,5 minutos
+      - name: Grabar ~6,5 minutos
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx --yes tsx tools/hopstats.ts 270
+        run: npx --yes tsx tools/hopstats.ts 390
+      - name: Relanzar para seguir sin pausa
+        # el horario de GitHub casi no corre en este repositorio: la grabación se encadena sola, como los datos en vivo
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run hop-stats.yml --repo "$GITHUB_REPOSITORY" --ref main || true
