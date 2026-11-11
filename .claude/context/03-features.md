@@ -60,3 +60,5 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 - **Android (2026-11-11)**: las ventanas usan el encabezado propio `AppHeader` (título + X); «Mi tarjeta» muestra «Pronto en Android»; «Cerca de mí» avisa si la persona está lejos de Bogotá.
 
 - **Web · anuncio de la app de iPhone**: tarjeta de una sola vez (`AppPromo.tsx`, enlace `APP_STORE_URL`) y grupo «App para iPhone» en Ajustes; oculto en Android hasta que la app esté en Google Play (entonces agregar su enlace ahí mismo).
+
+- **Mensajes del dueño** (web y app desde 1.0.1): `mensajes.json` en la raíz del repo → línea de «En vivo» (deslizante) y primera tarjeta de Avisos, rotulado «Aviso de TransMi LIVE». Cómo escribirlos: clave `como_usarlo` y `ejemplo` dentro del mismo archivo.

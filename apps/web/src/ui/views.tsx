@@ -6,7 +6,8 @@ import { useRide } from "./ride";
 import { nowMode } from "./plannerStore";
 import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, liveDown } from "./liveStatus";
 import { haptic } from "./haptics";
-import { routeCodes, routeOfficialName, routeTitle, routeVariant, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
+import { routeCodes, routeOfficialName, routeTitle, routeVariant, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert, ownerMessageUntil } from "@transmi/domain";
+import { useActiveMessages } from "./messages";
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
 import { Back, Bus, Chevron } from "./icons";
@@ -253,6 +254,7 @@ export function AlertsView({ th, act }: Props) {
   }, [me, transit.alerts, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   const hasMine = favStops.length + favRoutes.length > 0;
   const setTab = useUi((u) => u.setTab);
+  const own = useActiveMessages();
   const base = scope === "mine" ? mine : scope === "near" ? near : all;
   const q = normalize(query.trim());
   const list = q ? base.filter((x) => all.some((y) => y.index === x.index)) : base;
@@ -268,7 +270,16 @@ export function AlertsView({ th, act }: Props) {
         {me && <button className="chip" aria-pressed={scope === "near"} onClick={() => setScope("near")}>Cerca de mí ({near.length})</button>}
       </div>
       {!hasMine && !me && <p className="hint" style={{ margin: "0 2px 10px" }}>Guarda paradas o rutas con ⭐, o activa tu ubicación, para ver solo los avisos que te afectan.</p>}
-      {!list.length ? <Empty title="Sin avisos" text={scope === "all" ? "No hay novedades del servicio en este momento." : "Nada que te afecte por ahora."} /> : list.map(({ alert, index }) => (
+      {/* lo que escribe el dueño de la app va primero y se distingue de los avisos de TransMilenio */}
+      {own.map((m) => (
+        <div key={m.id} className="card" role="group">
+          <span className={`pill ${m.important ? "bad" : "warn"}`}>Aviso de TransMi LIVE</span>
+          <div className="ct">{m.text}</div>
+          {ownerMessageUntil(m, Date.now() / 1000) && <div className="cs faint" style={{ fontSize: 12, marginTop: 4 }}>{ownerMessageUntil(m, Date.now() / 1000)}</div>}
+        </div>
+      ))}
+      {!list.length ? (own.length ? null : <Empty title="Sin avisos" text={scope === "all" ? "No hay novedades del servicio en este momento." : "Nada que te afecte por ahora."} />) : null}
+      {!list.length ? null : list.map(({ alert, index }) => (
         <div key={index} className="card" role="group">
           <span className={`pill ${alert.effect === "noService" ? "bad" : alert.effect === "additional" ? "ok" : "warn"}`}>{ALERT_EFFECT_LABEL[alert.effect]}</span>
           <div className="ct">{alertTitle(alert)}</div>

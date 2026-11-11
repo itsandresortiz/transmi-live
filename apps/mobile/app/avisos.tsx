@@ -1,7 +1,9 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ALERT_EFFECT_LABEL, alertTitle, alertValidity, describeAlert } from "@transmi/domain";
+import { ALERT_EFFECT_LABEL, alertTitle, alertValidity, describeAlert, ownerMessageUntil } from "@transmi/domain";
+import { useActiveMessages } from "@/messages";
+import { nowMs } from "@/clock";
 import { transit } from "@/composition-root";
 import { useTransitVersion } from "@/hooks";
 import { Card } from "@/ui/kit";
@@ -15,11 +17,23 @@ export default function Avisos() {
   const insets = useSafeAreaInsets();
   useTransitVersion();
   const list = transit.alerts;
+  const own = useActiveMessages();
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
-      {!list.length ? <Card><Text style={[type.headline, { color: c.text }]}>Sin avisos</Text><Text style={[type.body, { color: c.muted }]}>No hay novedades del servicio en este momento.</Text></Card> : null}
+      {/* lo que escribe el dueño de la app va primero y se distingue de los avisos de TransMilenio */}
+      {own.map((m) => {
+        const tone = m.important ? "#dc2626" : "#d97706", until = ownerMessageUntil(m, nowMs() / 1000);
+        return (
+          <Card key={m.id} style={{ gap: space[2] }}>
+            <View style={[styles.pill, { backgroundColor: tone + "22" }]}><Text style={[type.caption, { color: tone }]}>Aviso de TransMi LIVE</Text></View>
+            <Text style={[type.headline, { color: c.text }]}>{m.text}</Text>
+            {until ? <Text style={[type.caption, { color: c.muted }]}>{until}</Text> : null}
+          </Card>
+        );
+      })}
+      {!list.length && !own.length ? <Card><Text style={[type.headline, { color: c.text }]}>Sin avisos</Text><Text style={[type.body, { color: c.muted }]}>No hay novedades del servicio en este momento.</Text></Card> : null}
       {list.map((a, i) => {
         const tone = a.effect === "noService" ? "#dc2626" : a.effect === "additional" ? "#16a34a" : "#d97706";
         return (

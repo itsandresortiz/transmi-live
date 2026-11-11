@@ -237,3 +237,29 @@ describe("avisos legibles y vigentes", () => {
     expect(alertValidity({ ...base, startsAt: Date.UTC(2025, 11, 22, 12) / 1000, endsAt: Date.UTC(2026, 10, 25, 12) / 1000 }, now)).toMatch(/Desde el 22 de dic.* 2025 · hasta el 25 de nov/);
   });
 });
+
+import { activeOwnerMessages, parseBogotaTime, parseOwnerMessages } from "../src";
+describe("mensajes del dueño", () => {
+  it("lee la hora de Bogotá", () => {
+    expect(parseBogotaTime("2026-11-12 06:30")).toBe(Date.UTC(2026, 10, 12, 11, 30) / 1000);
+    expect(parseBogotaTime("2026-11-12")).toBe(Date.UTC(2026, 10, 12, 5, 0) / 1000);
+    expect(parseBogotaTime("mañana")).toBeUndefined();
+  });
+  it("tolera un archivo escrito a mano y descarta lo que no entiende", () => {
+    const list = parseOwnerMessages({ mensajes: [
+      { texto: "  Manifestación en la   Caracas con 26 ", desde: "2026-11-12 06:00", hasta: "2026-11-12 12:00", tipo: "Importante" },
+      { texto: "Sin fechas" }, { texto: "" }, "basura", { texto: "Fecha mal", hasta: "12 de nov" },
+    ], ejemplo: { texto: "no cuenta" } });
+    expect(list.map((m) => m.text)).toEqual(["Manifestación en la Caracas con 26", "Sin fechas"]);
+    expect(list[0]!.important).toBe(true);
+    expect(parseOwnerMessages(null)).toEqual([]);
+    expect(parseOwnerMessages("x")).toEqual([]);
+  });
+  it("solo muestra los que están en su horario, los importantes primero", () => {
+    const list = parseOwnerMessages({ mensajes: [{ texto: "A" }, { texto: "B", desde: "2026-11-12 06:00", hasta: "2026-11-12 12:00", tipo: "importante" }] });
+    const at = (h: number) => Date.UTC(2026, 10, 12, h + 5) / 1000;
+    expect(activeOwnerMessages(list, at(5)).map((m) => m.text)).toEqual(["A"]);
+    expect(activeOwnerMessages(list, at(8)).map((m) => m.text)).toEqual(["B", "A"]);
+    expect(activeOwnerMessages(list, at(12)).map((m) => m.text)).toEqual(["A"]);
+  });
+});

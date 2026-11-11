@@ -47,3 +47,5 @@ Las ramas de datos (`live-data`, `widget-data`, `schedule-data`, `hop-stats`, `s
 Se registraría aquí: tablas, relaciones, RLS, migraciones y funciones. Hoy no aplica.
 
 - Web, almacenamiento local: `tm.iosapp.v1` = ya se mostró (o se cerró) el anuncio de la app de iPhone.
+
+- `mensajes.json` (raíz, rama `main`): mensajes temporales del dueño. Lo edita el dueño a mano en GitHub; lo leen web y app por `raw.githubusercontent.com` (unos 5 min de caché).

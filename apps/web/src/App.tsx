@@ -16,6 +16,8 @@ import { RideBar } from "./ui/ride";
 import { TripBar } from "./ui/trip";
 import { Settings } from "./ui/Settings";
 import { AppPromo } from "./ui/AppPromo";
+import { Marquee } from "./ui/Marquee";
+import { useActiveMessages, useMessagesPolling } from "./ui/messages";
 import { Sheet } from "./ui/Sheet";
 import { Bell, Compass, Locate, Mark, Sliders } from "./ui/icons";
 import { PlannerView, tripGeo } from "./ui/planner";
@@ -426,6 +428,9 @@ function Status() {
   useTransitVersion();
   const now = useNow();
   const online = useOnline();
+  useMessagesPolling();
+  // un mensaje del dueño (accidente, manifestación…) ocupa por un rato el lugar de «En vivo · hace N s», en una sola línea que se desliza si es larga
+  const msg = useActiveMessages()[0];
   const st: ConnectionStatus = connectionStatus(transit, now);
   const cls = st.connection === "live" ? "live" : st.connection === "waiting" || st.connection === "idle" ? "warn" : st.connection === "stale" ? "bad" : "";
   const text =
@@ -435,6 +440,7 @@ function Status() {
     : st.connection === "live" ? `En vivo · hace ${ago(st.ageSeconds!)}`
     : st.connection === "waiting" ? `Actualizando · ${agoShort(st.ageSeconds!)}`
     : `Sin señal · ${agoShort(st.ageSeconds!)}`;
+  if (msg && online) return <div className="st msg" role="status" title={msg.text}><span className={`dot ${msg.important ? "bad" : "warn"}`} /><Marquee>{msg.text}</Marquee></div>;
   return <div className="st" title={st.ageSeconds != null ? `Último dato hace ${ago(st.ageSeconds)}` : undefined}><span className={`dot ${cls}`} /><span>{text}</span></div>;
 }
 void CONFIG; void SYSTEM_LABEL;

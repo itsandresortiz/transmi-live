@@ -3,6 +3,7 @@ import { gunzipSync } from "fflate";
 import { CONFIG, liveData, networkSource, transit } from "./composition-root";
 import { isDemo } from "./demo";
 import { cachedBytes } from "./offline";
+import { refreshMessages } from "./messages";
 
 /** Hermes (el motor de JavaScript del teléfono) no trae DecompressionStream: los archivos .gz se abren con fflate. */
 async function gz<T>(url: string, name: string): Promise<T | null> {
@@ -29,6 +30,8 @@ export function startData(): () => void {
   const poll = () => { if (AppState.currentState === "active" && !isDemo()) void liveData.refresh().catch(() => undefined); };      // en demostración no se piden datos reales (se mezclarían)
   poll();
   const timer = setInterval(poll, POLL_MS);
-  const sub = AppState.addEventListener("change", (s) => { if (s === "active" && !isDemo()) void liveData.refresh(true).catch(() => undefined); });
-  return () => { clearInterval(timer); sub.remove(); started = false; };
+  void refreshMessages();
+  const msgTimer = setInterval(() => { if (AppState.currentState === "active") void refreshMessages(); }, 120_000);
+  const sub = AppState.addEventListener("change", (s) => { if (s !== "active") return; void refreshMessages(); if (!isDemo()) void liveData.refresh(true).catch(() => undefined); });
+  return () => { clearInterval(timer); clearInterval(msgTimer); sub.remove(); started = false; };
 }

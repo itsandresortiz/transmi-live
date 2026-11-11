@@ -12,3 +12,4 @@ export * from "./transit/prediction";
 export * from "./transit/network";
 export * from "./transit/path";
 export * from "./transit/trunk-lines";
+export * from "./transit/owner-message";
