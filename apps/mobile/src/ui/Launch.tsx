@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Image, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SymbolView } from "expo-symbols";
 import Animated, { Easing, FadeInDown, FadeOutUp, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
@@ -14,7 +14,8 @@ import { radius, space, type, useColors } from "./theme";
 export const useLaunch = create<{ done: boolean }>(() => ({ done: false }));
 
 const MIN_MS = 1500;       // no parpadea si todo carga muy rápido
-const MAX_MS = 7000;       // si no hay datos en vivo, igual se entra a la app
+const MAX_MS = 8000;       // si ni siquiera cargan las rutas, igual se entra a la app
+const WAIT_LIVE_MS = 4500; // con las rutas ya cargadas, cuánto se espera a los primeros buses antes de entrar (se cuenta desde que cargan las rutas)
 const BUSES = [
   { sprite: "top-troncal-l", dir: "R", lane: 3, dur: 5200, offset: 0.1 },
   { sprite: "top-dual-l", dir: "R", lane: 3, dur: 6400, offset: 0.62 },
@@ -99,7 +100,12 @@ export function Launch() {
 
   const routes = transit.network.routes.size > 0, buses = transit.fleet.size;
   const count = useCount(routes ? buses : 0);
-  const ready = routes && (buses > 0 || elapsed > MAX_MS - 2000) && elapsed >= MIN_MS || elapsed >= MAX_MS;
+  // El tiempo de espera de los buses se cuenta desde que cargan las rutas, no desde que abrió la app: al procesar las rutas el teléfono se ocupa unos segundos
+  // y el reloj de la pantalla saltaba de golpe pasando el límite, antes de que alcanzaran a llegar los buses (y decía «sin datos en vivo» habiéndolos).
+  const routesAt = useRef<number | null>(null);
+  if (routes && routesAt.current == null) routesAt.current = Date.now();
+  const sinceRoutes = routesAt.current == null ? 0 : Date.now() - routesAt.current;
+  const ready = (routes && (buses > 0 || sinceRoutes >= WAIT_LIVE_MS) && elapsed >= MIN_MS) || (!routes && elapsed >= MAX_MS);
   useEffect(() => {
     if (!ready || phase !== "on") return;
     setPhase("leaving");
@@ -121,7 +127,9 @@ export function Launch() {
   const rim = useAnimatedStyle(() => { const u = clamp01((t.value - OPEN_AT) / (1 - OPEN_AT)); return { opacity: t.value < OPEN_AT ? 0 : 1 - u, transform: [{ scale: 1 + 13 * u * u * u }] }; });
   if (phase === "gone") return null;
 
-  const stage = !routes ? "rutas" : buses > 0 ? "buses" : elapsed < MAX_MS ? "buscando" : "sin";
+  // «Sin datos en vivo» solo si el servidor ya contestó y de verdad no trajo buses; mientras no se sepa, sigue «Buscando buses en vivo»
+  const answeredEmpty = transit.lastPollOkAt != null && sinceRoutes >= 3000;
+  const stage = !routes ? "rutas" : buses > 0 ? "buses" : answeredEmpty ? "sin" : "buscando";
   const line = stage === "rutas" ? "Preparando rutas y paradas" : stage === "buscando" ? "Buscando buses en vivo" : stage === "sin" ? "Sin datos en vivo; usamos los horarios" : `${count.toLocaleString("es-CO")} buses en la calle ahora`;
   const mid = { left: width / 2 - R0, top: height / 2 - R0, width: R0 * 2, height: R0 * 2, borderRadius: R0 } as const;
   const strips = Array.from({ length: EDGE }, (_, i) => 1 - i / EDGE);      // 1 → casi 0: el borde se funde con el fondo

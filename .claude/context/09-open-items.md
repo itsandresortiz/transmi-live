@@ -40,6 +40,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - `README.md` raíz y `docs/TESTFLIGHT.md` describen el camino antiguo con Capacitor; actualizar.
 
 ## Deuda técnica
+- Abrir la app procesa `network.json.gz` (leer ~18 MB de JSON + armar la red) en el hilo principal: en teléfonos lentos puede congelar la app unos segundos. Si se nota, mover a un hilo aparte o guardar un formato más compacto/binario.
 - La web sigue leyendo `gtfs-lite.zip` (17 MB, en un Web Worker); podría usar `network.json.gz` como la app.
 - Rendimiento: lo que queda más caro por lote es `applyPositions` (~38 ms en Node; en un teléfono lento puede notarse como un tirón cada ~20 s) y «Cómo llegar» (190–350 ms en Node). No se ha medido en un teléfono lento real.
 - `packages/application/src/trunk-data.ts` copia `apps/web/src/data/troncales.json` y los portales de `estaciones.json`: hacer que la web lea del mismo sitio.
