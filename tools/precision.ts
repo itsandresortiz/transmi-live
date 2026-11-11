@@ -40,8 +40,9 @@ async function main() {
 
   // 2) reproducción con el motor de la app, para varias políticas de predicción (misma captura)
   const net = st.network;
-  const evaluate = (gain: number, extra: Partial<MotionParams> = {}) => {
+  const evaluate = (gain: number, extra: Partial<MotionParams> = {}, maxSeconds = 90) => {
     (DEFAULT_PREDICTION as { gain: number }).gain = gain;
+    (DEFAULT_PREDICTION as { maxSeconds: number }).maxSeconds = maxSeconds;
     const state = new TransitState(); state.setNetwork(net);
     const eng = new MotionEngine(state, { ...DEFAULT_MOTION, ...extra });
     const paths = new Map<string, RoadPath[]>();
@@ -92,7 +93,9 @@ async function main() {
   console.log(`Edad del GPS al llegar el lote, todos los reportes nuevos (s): mediana ${pct(base.lagAll, 0.5).toFixed(0)}, p10 ${pct(base.lagAll, 0.1).toFixed(0)}, p90 ${pct(base.lagAll, 0.9).toFixed(0)}`);
   console.log("--- políticas (ganancia = fracción de la velocidad medida que realmente avanza) ---");
   const row = (label: string, r: ReturnType<typeof evaluate>) => console.log(`${label.padEnd(34)} error ${f(r.err.model)} | a lo largo: sesgo mediano ${pct(r.err.signed.map((x) => x), 0.5).toFixed(1)} m (neg = se queda corto)`);
-  for (const g of [0, 0.15, 0.3, 0.5, 0.7, 0.9]) row(`ganancia ${g}`, g === 0.5 ? base : evaluate(g));
+  for (const g of [0.3, 0.5, 0.6, 0.7]) row(`ganancia ${g}`, g === 0.5 ? base : evaluate(g));
+  // el dato llega hoy con ~60 s de edad y cada bus cambia cada ~60 s: con el tope de 90 s el bus se queda quieto buena parte del tiempo
+  for (const [g, mx] of [[0.5, 120], [0.5, 150], [0.5, 200], [0.6, 150], [0.6, 200], [0.4, 150]] as const) row(`ganancia ${g}, tope ${mx} s`, evaluate(g, {}, mx));
   for (const [c, name] of [[0.1, "corrección suave"], [0.3, "corrección fuerte"]] as const) row(`ganancia 0.7 + ${name}`, evaluate(0.7, { catchUp: c }));
 }
 
