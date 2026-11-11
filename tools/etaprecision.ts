@@ -36,7 +36,7 @@ async function main() {
 
   const state = new TransitState(); state.setNetwork(net);
   // por bus: por dónde ha ido (metros sobre su trazado, hora del GPS) y qué se le pronosticó
-  type Pred = { stopS: number; away: number; madeAt: number; shown: number; raw: number };
+  type Pred = { stopS: number; away: number; madeAt: number; shown: number; raw: number; remaining: number };
   const tracks = new Map<string, { key: string; pts: { t: number; s: number }[]; preds: Pred[] }>();
   for (const b of batches) {
     state.applyPositions(b.reports, b.at * 1000);
@@ -51,8 +51,9 @@ async function main() {
       if (!tr || tr.key !== key) { tr = { key, pts: [], preds: [] }; tracks.set(v.id, tr); }
       const lastPt = tr.pts[tr.pts.length - 1];
       if (!lastPt || v.reportedAt > lastPt.t) tr.pts.push({ t: v.reportedAt, s: hit.s });
-      for (let j = seq.index + 1; j <= Math.min(seq.index + 5, info.s.length - 1); j++) {
-        tr.preds.push({ stopS: info.s[j]!, away: j - seq.index, madeAt: b.at, shown: arrivalAtIndex(state, v, seq.shape, seq.index, j, b.at * 1000), raw: rawArrival(state, v, seq.shape, seq.index, j, b.at * 1000).eta });
+      for (let j = seq.index + 1; j <= Math.min(seq.index + 6, info.s.length - 1); j++) {
+        const rw = rawArrival(state, v, seq.shape, seq.index, j, b.at * 1000);
+        tr.preds.push({ stopS: info.s[j]!, away: j - seq.index, madeAt: b.at, shown: arrivalAtIndex(state, v, seq.shape, seq.index, j, b.at * 1000), raw: rw.eta, remaining: rw.remaining });
       }
     }
   }
@@ -61,21 +62,38 @@ async function main() {
     for (let i = 1; i < pts.length; i++) { const p = pts[i - 1]!, q = pts[i]!; if (p.s < S && q.s >= S && q.t - p.t <= 200 && q.s - p.s < 3500) return p.t + (q.t - p.t) * (S - p.s) / (q.s - p.s); }
     return null;
   };
-  const by = new Map<number, { shown: number[]; raw: number[]; gone: number; n: number; lleg: number; llegGone: number }>();
-  for (const tr of tracks.values()) for (const p of tr.preds) {
-    const truth = cross(tr.pts, p.stopS); if (truth == null) continue;
-    const g2 = by.get(p.away) ?? by.set(p.away, { shown: [], raw: [], gone: 0, n: 0, lleg: 0, llegGone: 0 }).get(p.away)!;
-    g2.n++;
-    const says = p.shown - p.madeAt <= 15;                  // la pantalla dice «llegando»
-    if (says) g2.lleg++;
-    if (truth < p.madeAt) { g2.gone++; if (says) g2.llegGone++; continue; }     // cuando se mostró, el bus ya había pasado por esa parada
-    g2.shown.push(p.shown - truth); g2.raw.push(p.raw - truth);
+  const endAt = batches[batches.length - 1]!.at;
+  const FACTORS = [1, 1.2, 1.4, 1.6, 1.8], BUCKETS = ["no vencida", "vencida 0–30 s", "30–60 s", "60–120 s", "más de 120 s"];
+  const bucket = (d: number) => (d < 0 ? 0 : d < 30 ? 1 : d < 60 ? 2 : d < 120 ? 3 : 4);
+  interface G { n: number; gone: number; lleg: number; llegGone: number; exp: { n: number; gone: number }[]; err: number[][]; shown: number[] }
+  const by = new Map<number, G>();
+  for (const tr of tracks.values()) {
+    const lastPt = tr.pts[tr.pts.length - 1]!;
+    for (const p of tr.preds) {
+      let truth = cross(tr.pts, p.stopS);
+      // si el bus siguió reportando hasta el final y aún no llegaba a la parada, se sabe que llegó DESPUÉS de su último reporte:
+      // se cuenta como «muy tarde» (no se descarta: descartarlo haría ver los tiempos mejores de lo que son)
+      const late = truth == null && lastPt.s < p.stopS && endAt - lastPt.t < 150 && lastPt.t > p.madeAt;
+      if (truth == null && !late) continue;
+      if (late) truth = Infinity;
+      const g2 = by.get(p.away) ?? by.set(p.away, { n: 0, gone: 0, lleg: 0, llegGone: 0, exp: BUCKETS.map(() => ({ n: 0, gone: 0 })), err: FACTORS.map(() => []), shown: [] }).get(p.away)!;
+      g2.n++;
+      const says = p.shown - p.madeAt <= 15, passed = truth! < p.madeAt;
+      const e = g2.exp[bucket(p.madeAt - p.raw)]!; e.n++; if (passed) e.gone++;
+      if (says) { g2.lleg++; if (passed) g2.llegGone++; }
+      if (passed) { g2.gone++; continue; }
+      g2.shown.push(p.shown - truth!);
+      FACTORS.forEach((f, k) => g2.err[k]!.push(p.raw + p.remaining * (f - 1) - truth!));
+    }
   }
-  console.log("\n=== HORA DE LLEGADA A LAS PRÓXIMAS PARADAS (positivo = la app dice más tarde de lo que fue) ===");
+  const med = (a: number[]) => pct(a, 0.5), fin = (x: number) => (Number.isFinite(x) ? x.toFixed(0) : "más de lo medible");
+  console.log("\n=== HORA DE LLEGADA A LAS PRÓXIMAS PARADAS (negativo = la app dice que llega antes de lo que fue) ===");
   for (const away of [...by.keys()].sort((x, y) => x - y)) {
-    const g2 = by.get(away)!, abs = g2.shown.map(Math.abs), absR = g2.raw.map(Math.abs);
-    console.log(`a ${away} parada(s): n=${g2.n} · ya había pasado al mostrarse: ${(100 * g2.gone / g2.n).toFixed(0)} % · decía «llegando»: ${(100 * g2.lleg / g2.n).toFixed(0)} % (de esos, ya había pasado: ${g2.lleg ? (100 * g2.llegGone / g2.lleg).toFixed(0) : "-"} %)`);
-    if (g2.shown.length) console.log(`     lo mostrado: sesgo ${pct(g2.shown, 0.5).toFixed(0)} s, error mediano ${pct(abs, 0.5).toFixed(0)} s, p90 ${pct(abs, 0.9).toFixed(0)} s · cálculo sin retoque: sesgo ${pct(g2.raw, 0.5).toFixed(0)} s, error mediano ${pct(absR, 0.5).toFixed(0)} s, p90 ${pct(absR, 0.9).toFixed(0)} s (n=${g2.shown.length})`);
+    const g2 = by.get(away)!;
+    console.log(`\na ${away} parada(s): n=${g2.n} · ya había pasado al mostrarse: ${(100 * g2.gone / g2.n).toFixed(0)} % · decía «llegando»: ${(100 * g2.lleg / g2.n).toFixed(0)} % (de esos, ya había pasado: ${g2.lleg ? (100 * g2.llegGone / g2.lleg).toFixed(0) : "-"} %)`);
+    console.log("   según cuánto hace que venció la cuenta → ya había pasado: " + g2.exp.map((e, k) => `${BUCKETS[k]}: ${e.n ? (100 * e.gone / e.n).toFixed(0) : "-"} % (n=${e.n})`).join(" · "));
+    console.log(`   lo mostrado: sesgo ${fin(med(g2.shown))} s, error mediano ${fin(med(g2.shown.map(Math.abs)))} s`);
+    FACTORS.forEach((f, k) => console.log(`   tiempo por tramo × ${f}: sesgo ${fin(med(g2.err[k]!))} s, error mediano ${fin(med(g2.err[k]!.map(Math.abs)))} s, p75 ${fin(pct(g2.err[k]!.map(Math.abs), 0.75))} s (n=${g2.err[k]!.length})`));
   }
 }
 main().catch((e) => { console.error(e); process.exit(1); });
