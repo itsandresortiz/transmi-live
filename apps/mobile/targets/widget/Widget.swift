@@ -124,53 +124,91 @@ private func fetchRemote(stopId: String, done: @escaping (RemoteShard?) -> Void)
 
 // MARK: - Vistas
 
+/// La ruta en su recuadro de color. Con el tinte o el modo transparente de iOS los colores se aplanan y un recuadro relleno taparía el texto: ahí va en contorno.
 struct RouteBadge: View {
   @Environment(\.widgetRenderingMode) private var mode
   let a: Arrival
+  var big: Bool = false
   var body: some View {
+    let size: CGFloat = big ? 15 : 12
+    let radius: CGFloat = big ? 8 : 6
     if mode == .fullColor {
       Text(a.r)
-        .font(.system(size: 13, weight: .heavy, design: .rounded))
+        .font(.system(size: size, weight: .heavy, design: .rounded))
         .foregroundStyle(.white)
-        .padding(.horizontal, 7).padding(.vertical, 3)
-        .background(Color(hex: a.c), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .lineLimit(1)
+        .padding(.horizontal, big ? 9 : 6).padding(.vertical, big ? 4 : 2.5)
+        .background(Color(hex: a.c), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
     } else {
-      // con el tinte o el modo transparente de iOS los colores se aplanan: un recuadro relleno taparía el texto, así que va en contorno
       Text(a.r)
-        .font(.system(size: 13, weight: .heavy, design: .rounded))
+        .font(.system(size: size, weight: .heavy, design: .rounded))
         .foregroundStyle(.primary)
-        .padding(.horizontal, 7).padding(.vertical, 3)
-        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Color.primary, lineWidth: 1.5))
+        .lineLimit(1)
+        .padding(.horizontal, big ? 9 : 6).padding(.vertical, big ? 4 : 2.5)
+        .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Color.primary, lineWidth: 1.5))
         .widgetAccentable()
     }
   }
 }
 
+/// Una llegada en una fila: ruta, hacia dónde (si cabe) y la cuenta regresiva (en vivo) o la hora (programado).
 struct ArrivalRow: View {
   let a: Arrival
   let compact: Bool
-  var scheduled: Bool = false   // hora del horario (no es un bus en vivo): se muestra como hora, no como cuenta regresiva
+  var scheduled: Bool = false
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: 7) {
       RouteBadge(a: a)
-      if !compact {
-        Text(a.h).font(.system(size: 13, weight: .medium)).lineLimit(1).foregroundStyle(.secondary)
+      if !compact && !a.h.isEmpty {
+        Text(a.h).font(.system(size: 12, weight: .medium)).lineLimit(1).foregroundStyle(.secondary)
       }
       Spacer(minLength: 4)
-      // en vivo: cuenta regresiva que corre sola, con segundos; programado: la hora
       Text(Date(timeIntervalSince1970: a.t), style: scheduled ? .time : .timer)
-        .font(.system(size: compact ? 15 : 17, weight: .bold, design: .rounded))
+        .font(.system(size: compact ? 13 : 15, weight: .semibold, design: .rounded))
         .monospacedDigit()
         .multilineTextAlignment(.trailing)
         .lineLimit(1)
         .minimumScaleFactor(0.7)
-        .frame(maxWidth: scheduled ? 104 : 64, alignment: .trailing)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: scheduled ? 96 : 58, alignment: .trailing)
+    }
+  }
+}
+
+/// El próximo bus, en grande: una barra del color de su ruta, la ruta y la cuenta regresiva.
+struct NextBusHero: View {
+  @Environment(\.widgetRenderingMode) private var mode
+  let a: Arrival
+  let scheduled: Bool
+  let timeSize: CGFloat
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      HStack(spacing: 6) {
+        RouteBadge(a: a, big: true)
+        if !a.h.isEmpty {
+          Text(a.h).font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary).lineLimit(1)
+        }
+      }
+      Text(Date(timeIntervalSince1970: a.t), style: scheduled ? .time : .timer)
+        .font(.system(size: timeSize, weight: .heavy, design: .rounded))
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.55)
+    }
+    .padding(.leading, 12)
+    // la barra va como capa sobre el bloque: así toma exactamente su alto
+    .overlay(alignment: .leading) {
+      Capsule()
+        .fill(mode == .fullColor ? Color(hex: a.c) : Color.primary)
+        .frame(width: 4)
+        .widgetAccentable()
     }
   }
 }
 
 struct StopWidgetView: View {
   @Environment(\.widgetFamily) private var family
+  @Environment(\.colorScheme) private var scheme
   let entry: StopEntry
 
   private var stop: StopData? { entry.snapshot?.stops.first }
@@ -178,79 +216,167 @@ struct StopWidgetView: View {
   private var planned: [Arrival] { (stop?.sched ?? []).filter { Date(timeIntervalSince1970: $0.t) > entry.date }.sorted { $0.t < $1.t } }
   private var isDemo: Bool { entry.snapshot?.demo == true }
   private var ageMinutes: Int { Int(max(0, Date().timeIntervalSince1970 - (entry.snapshot?.at ?? 0)) / 60) }
+  /// Lo que se muestra: los buses en vivo y, si no hay ninguno vigente, lo que dice el horario (rotulado como programado).
+  private var isScheduled: Bool { upcoming.isEmpty && !planned.isEmpty }
+  private var list: [Arrival] { upcoming.isEmpty ? planned : upcoming }
 
   var body: some View {
     Group {
       switch family {
       case .accessoryRectangular: lockScreen
       case .accessoryInline: Text(inline)
-      default: home
+      case .systemSmall: small
+      default: medium
       }
     }
     .widgetURL(stop.flatMap { URL(string: "transmilive:///stop/\($0.id)") })
-    .containerBackground(.background, for: .widget)
+    .containerBackground(for: .widget) {
+      // fondo con un degradado suave en vez de un color plano
+      LinearGradient(
+        colors: scheme == .dark ? [Color(hex: "#23232b"), Color(hex: "#0e0e12")] : [Color(hex: "#ffffff"), Color(hex: "#eef0f4")],
+        startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
   }
 
+  // MARK: piezas
+
+  /// Estado en una palabra, con su punto de color: en vivo (verde), programado (gris), demostración (morado) o dato viejo (ámbar).
+  private var statusText: String {
+    if isDemo { return "Demostración" }
+    if isScheduled { return "Programado" }
+    if ageMinutes >= 20 { return "Hace \(ageMinutes) min" }
+    return "En vivo"
+  }
+  private var statusColor: Color {
+    if isDemo { return Color(hex: "#8b5cf6") }
+    if isScheduled { return Color.secondary }
+    if ageMinutes >= 20 { return Color(hex: "#f59e0b") }
+    return Color(hex: "#22c55e")
+  }
+  private var status: some View {
+    HStack(spacing: 4) {
+      Circle().fill(statusColor).frame(width: 6, height: 6)
+      Text(statusText.uppercased()).font(.system(size: 9, weight: .bold)).kerning(0.5).foregroundStyle(.secondary).lineLimit(1)
+    }
+  }
+  /// El nombre de la parada, en letra ancha.
+  private func title(_ size: CGFloat) -> some View {
+    Text(stop?.name ?? "TransMi LIVE")
+      .font(.system(size: size, weight: .heavy).width(.expanded))
+      .lineLimit(1)
+      .minimumScaleFactor(0.75)
+  }
+  private var noStop: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Image(systemName: "star.fill").font(.system(size: 18)).foregroundStyle(Color(hex: "#e11d2e")).widgetAccentable()
+      Text("Guarda una parada").font(.system(size: 15, weight: .heavy).width(.expanded)).lineLimit(2).minimumScaleFactor(0.8)
+      Text("Márcala con la estrella en TransMi LIVE y aparecerá aquí.").font(.caption).foregroundStyle(.secondary)
+      Spacer(minLength: 0)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+  private var noBuses: some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Image(systemName: "moon.zzz.fill").font(.system(size: 18)).foregroundStyle(.secondary)
+      Text("Sin buses acercándose").font(.system(size: 14, weight: .semibold))
+      Text("Abre la app para ver más.").font(.caption2).foregroundStyle(.secondary)
+    }
+  }
+
+  // MARK: tamaños
+
   private var inline: String {
-    guard let a = upcoming.first else { return "TransMi LIVE" }
-    return "\(a.r) llega pronto"
+    guard let a = list.first else { return "TransMi LIVE" }
+    return isScheduled ? "\(a.r) programado" : "\(a.r) llega pronto"
   }
 
   private var lockScreen: some View {
     VStack(alignment: .leading, spacing: 2) {
-      Text(isDemo ? "Demostración" : (stop?.name ?? "TransMi LIVE")).font(.headline).lineLimit(1)
-      if let a = upcoming.first {
-        HStack { Text(a.r).bold(); Spacer(); Text(Date(timeIntervalSince1970: a.t), style: .timer).monospacedDigit() }
-      } else if let p = planned.first {
-        HStack { Text(p.r).bold(); Spacer(); Text(Date(timeIntervalSince1970: p.t), style: .time) }
+      Text(isDemo ? "Demostración" : (stop?.name ?? "TransMi LIVE")).font(.system(size: 14, weight: .heavy).width(.expanded)).lineLimit(1).minimumScaleFactor(0.8)
+      if let a = list.first {
+        HStack(spacing: 6) {
+          Text(a.r).font(.system(size: 15, weight: .heavy, design: .rounded))
+          Spacer(minLength: 4)
+          Text(Date(timeIntervalSince1970: a.t), style: isScheduled ? .time : .timer).font(.system(size: 15, weight: .bold, design: .rounded)).monospacedDigit().multilineTextAlignment(.trailing)
+        }
+        if list.count > 1 {
+          HStack(spacing: 6) {
+            Text(list[1].r).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            Text(Date(timeIntervalSince1970: list[1].t), style: isScheduled ? .time : .timer).font(.system(size: 12, weight: .medium, design: .rounded)).monospacedDigit().multilineTextAlignment(.trailing).foregroundStyle(.secondary)
+          }
+        }
       } else {
         Text("Sin buses acercándose").font(.caption).foregroundStyle(.secondary)
       }
     }
   }
 
-  private var home: some View {
-    VStack(alignment: .leading, spacing: 8) {
+  /// Pequeño: el nombre, el próximo bus en grande y los dos siguientes.
+  private var small: some View {
+    VStack(alignment: .leading, spacing: 0) {
       if stop == nil {
-        VStack(alignment: .leading, spacing: 6) {
-          Image(systemName: "star.fill").foregroundStyle(Color.accentColor)
-          Text("Guarda una parada").font(.headline)
-          Text("Márcala con la estrella en TransMi LIVE y aparecerá aquí.").font(.caption).foregroundStyle(.secondary)
-        }
-        Spacer(minLength: 0)
+        noStop
       } else {
-        HStack(spacing: 6) {
-          Image(systemName: "mappin.circle.fill").foregroundStyle(Color.accentColor)
-          Text(stop!.name).font(.system(size: 15, weight: .bold)).lineLimit(1)
-        }
-        if upcoming.isEmpty && !planned.isEmpty {
-          // sin dato en vivo vigente: lo que dice el horario, rotulado como programado
-          VStack(spacing: 7) {
-            ForEach(Array(planned.prefix(family == .systemSmall ? 3 : 4)), id: \.self) { ArrivalRow(a: $0, compact: family == .systemSmall, scheduled: true) }
+        title(13)
+        status.padding(.top, 3)
+        Spacer(minLength: 4)
+        if let first = list.first {
+          NextBusHero(a: first, scheduled: isScheduled, timeSize: 28)
+          Spacer(minLength: 4)
+          // los dos siguientes si caben; en los teléfonos más pequeños, solo uno
+          ViewThatFits(in: .vertical) {
+            VStack(spacing: 4) {
+              ForEach(Array(list.dropFirst().prefix(2)), id: \.self) { ArrivalRow(a: $0, compact: true, scheduled: isScheduled) }
+            }
+            VStack(spacing: 4) {
+              ForEach(Array(list.dropFirst().prefix(1)), id: \.self) { ArrivalRow(a: $0, compact: true, scheduled: isScheduled) }
+            }
           }
-          Spacer(minLength: 0)
-          Text("Programado · abre la app para ver en vivo").font(.caption2).foregroundStyle(.secondary)
-        } else if upcoming.isEmpty {
-          Text("Sin buses acercándose ahora").font(.subheadline).foregroundStyle(.secondary)
-          Spacer(minLength: 0)
         } else {
-          VStack(spacing: 7) {
-            ForEach(Array(upcoming.prefix(family == .systemSmall ? 3 : 4)), id: \.self) { ArrivalRow(a: $0, compact: family == .systemSmall) }
-          }
+          noBuses
           Spacer(minLength: 0)
-        }
-        if upcoming.isEmpty && !planned.isEmpty {
-          EmptyView()
-        } else if isDemo {
-          Text("Demostración · buses de ejemplo").font(.caption2.weight(.semibold)).foregroundStyle(Color(hex: "#8b5cf6"))
-        } else if ageMinutes >= 20 {
-          Text("Datos de hace \(ageMinutes) min · abre la app").font(.caption2).foregroundStyle(.secondary)
-        } else if !upcoming.isEmpty, let at = entry.snapshot?.at {
-          // de cuándo es el dato en vivo que se muestra
-          Text("En vivo · actualizado \(Date(timeIntervalSince1970: at), style: .time)").font(.caption2).foregroundStyle(.secondary)
         }
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  /// Mediano: a la izquierda el próximo bus en grande; a la derecha, los que siguen.
+  private var medium: some View {
+    Group {
+      if stop == nil {
+        noStop
+      } else {
+        HStack(alignment: .top, spacing: 14) {
+          VStack(alignment: .leading, spacing: 0) {
+            title(15)
+            status.padding(.top, 4)
+            Spacer(minLength: 6)
+            if let first = list.first {
+              NextBusHero(a: first, scheduled: isScheduled, timeSize: 36)
+            } else {
+              noBuses
+            }
+            Spacer(minLength: 0)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+
+          if list.count > 1 {
+            VStack(alignment: .leading, spacing: 0) {
+              Text("LUEGO").font(.system(size: 9, weight: .bold)).kerning(0.5).foregroundStyle(.secondary)
+              Spacer(minLength: 6)
+              VStack(spacing: 8) {
+                ForEach(Array(list.dropFirst().prefix(4)), id: \.self) { ArrivalRow(a: $0, compact: true, scheduled: isScheduled) }
+              }
+              Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+          }
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 
