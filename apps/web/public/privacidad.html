@@ -13,6 +13,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.55 -apple-system,
 main{max-width:720px;margin:0 auto;padding:32px 20px 64px}
 h1{font-size:34px;letter-spacing:-.6px;margin:0 0 4px}h2{font-size:21px;margin:32px 0 8px}
 p,li{color:var(--muted)}b{color:var(--fg)}a{color:var(--accent)}ul{padding-left:20px}
+table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:15px}th,td{text-align:left;vertical-align:top;padding:9px 8px;border-bottom:1px solid var(--line);color:var(--muted)}th{color:var(--fg);font-size:13px;text-transform:uppercase;letter-spacing:.04em}td:first-child{color:var(--fg);font-weight:600}.wrap{overflow-x:auto}
 .top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:24px}
 </style>
 </head>
@@ -29,6 +30,19 @@ p,li{color:var(--muted)}b{color:var(--fg)}a{color:var(--accent)}ul{padding-left:
 <li><b>El saldo de tu tarjeta TuLlave se lee en tu teléfono y no sale de él.</b> Ni el saldo, ni el número, ni los movimientos se envían o se guardan.</li>
 <li><b>No es una app oficial</b> de TransMilenio S.A., de la Alcaldía de Bogotá ni de la Secretaría de Movilidad. Usa sus datos abiertos.</li>
 </ul>
+
+<h2>Qué sale de tu teléfono, a quién y para qué</h2>
+<div class="wrap"><table>
+<thead><tr><th>Dato</th><th>A quién llega</th><th>Para qué</th><th>¿Se guarda?</th></tr></thead>
+<tbody>
+<tr><td>Tu ubicación exacta</td><td>A nadie. Se queda en tu teléfono.</td><td>Mostrar lo cercano, tu punto en el mapa y guiarte en un viaje.</td><td>No</td></tr>
+<tr><td>Tu ubicación aproximada (a ~100 m)</td><td>Photon (OpenStreetMap), solo cuando buscas una dirección.</td><td>Ordenar los resultados de la búsqueda por cercanía.</td><td>No por nosotros; ese servicio puede guardar registros técnicos con sus propias reglas.</td></tr>
+<tr><td>Lo que escribes al buscar una dirección o el punto que tocas en el mapa</td><td>Photon (OpenStreetMap).</td><td>Encontrar y nombrar el lugar.</td><td>Igual que la fila anterior.</td></tr>
+<tr><td>Qué zona del mapa miras</td><td>OpenFreeMap.</td><td>Dibujar el mapa.</td><td>Registros técnicos del servicio.</td></tr>
+<tr><td>Qué parada tienes de favorita (solo el widget)</td><td>El archivo público de llegadas en GitHub.</td><td>Actualizar el widget con la app cerrada.</td><td>No viaja nada que te identifique.</td></tr>
+<tr><td>Saldo y movimientos de tu TuLlave</td><td>A nadie. Se leen y se muestran en tu teléfono.</td><td>Mostrarte tu saldo.</td><td>No</td></tr>
+</tbody></table></div>
+<p>Cuando la app baja las posiciones de los buses, las rutas o los horarios, esos servicios ven, como en cualquier conexión a internet, tu dirección IP. No la usamos para nada ni la relacionamos contigo.</p>
 
 <h2>Lo que se guarda en tu dispositivo</h2>
 <p>Tus paradas y rutas favoritas, casa y trabajo, los apodos que les pones, tus ajustes y una copia de los datos del servicio para que la app abra rápido. Todo vive solo en tu teléfono o navegador y se borra al desinstalar la app o limpiar los datos del sitio.</p>
@@ -58,11 +72,19 @@ p,li{color:var(--muted)}b{color:var(--fg)}a{color:var(--accent)}ul{padding-left:
 <li><b>NFC:</b> solo cuando pulsas «Leer mi tarjeta», para leer tu TuLlave en el momento.</li>
 </ul>
 
+<h2>Tus derechos</h2>
+<p>Como no tenemos cuentas ni guardamos datos personales tuyos, no hay nada que consultar, corregir o borrar de nuestro lado. Lo que la app guarda vive en tu teléfono y lo borras desinstalándola. Si crees que tenemos algún dato tuyo, o quieres que revisemos algo, escríbenos y lo atendemos.</p>
+
 <h2>Menores de edad</h2>
 <p>La app no recoge datos personales de nadie, tampoco de menores.</p>
 
+<h2>Quién está detrás</h2>
+<p>TransMi LIVE es una app independiente del equipo de TransMi LIVE. No está afiliada a TransMilenio S.A., a la Alcaldía de Bogotá ni a la Secretaría Distrital de Movilidad; usa sus datos abiertos.</p>
+
 <h2>Cambios y contacto</h2>
 <p>Si esta política cambia, se actualiza aquí con su fecha. Para preguntas o para pedir que se aclare algo, escríbenos a <a href="mailto:info@transmilive.com">info@transmilive.com</a>.</p>
+<h2>Summary in English</h2>
+<p>TransMi LIVE shows Bogotá public transport in real time. It has no accounts, no ads and no tracking in the iPhone app. Your precise location never leaves your phone. When you search for an address, the text you type and your location rounded to about 100 m are sent to Photon (OpenStreetMap) to return results; the map area you view goes to OpenFreeMap; bus, route and schedule data come from TransMilenio S.A. open data through our own function and public copies on GitHub. The TuLlave card balance is read on your device and is never stored or sent. We do not sell or share data. Contact: <a href="mailto:info@transmilive.com">info@transmilive.com</a>.</p>
 </main>
 </body>
 </html>
