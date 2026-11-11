@@ -112,3 +112,16 @@ describe("el bus real de un tramo del viaje", () => {
     expect(busForLeg(world(3300), leg, "wait", null, NOW)).toBeUndefined();
   });
 });
+
+import { tripGeometry } from "@transmi/application";
+
+describe("el viaje dibujado en el mapa", () => {
+  it("trae cada tramo en orden, con los puntos donde se sube, se baja y el destino", () => {
+    const geo = tripGeometry(new TransitState(), trip, place);
+    expect(geo.legs.map((l) => l.kind)).toEqual(["walk", "ride", "walk", "ride", "walk"]);
+    expect(geo.legs[1]).toMatchObject({ kind: "ride", shortName: "X1", system: "troncal" });
+    expect(geo.legs.every((l) => l.line.length >= 2)).toBe(true);                      // sin trazado guardado, al menos la línea entre las dos paradas
+    expect(geo.points.map((p) => p.kind)).toEqual(["origin", "board", "alight", "board", "alight", "dest"]);
+    expect(geo.points[1]!.name).toBe("Sube al X1: Estación 1, vagón 2");
+  });
+});

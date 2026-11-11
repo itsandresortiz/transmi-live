@@ -214,7 +214,7 @@ function TripCard({ it, open, onPress, now }: { it: Itinerary; open: boolean; on
   const c = useColors();
   const first = it.legs.find(isRide);
   return (
-    <Tap onPress={onPress} accessibilityRole="button" accessibilityState={{ expanded: open }}
+    <Tap still onPress={onPress} accessibilityRole="button" accessibilityState={{ expanded: open }}
       accessibilityLabel={`${durText(it.seconds)}, llegas ${hm(it.arriveAt)}, ${transfersText(it.transfers)}`}>
       <Card style={open ? { borderWidth: 1.5, borderColor: c.accent } : undefined}>
         <View style={styles.tripTop}>

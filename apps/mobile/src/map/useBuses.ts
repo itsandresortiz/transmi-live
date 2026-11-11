@@ -15,11 +15,13 @@ const hash = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h 
 const EMPTY: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
 
 /** Buses de la pantalla como puntos para el mapa, recalculados con el motor de movimiento a la cadencia de `cadenceMs`. Solo los que se ven. */
-export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; enabled?: boolean; everyMs?: number } = {}): FeatureCollection<Point> {
+export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; /** Solo los buses de estas rutas (las de un viaje, por ejemplo). */ routeIds?: readonly string[] | null; enabled?: boolean; everyMs?: number } = {}): FeatureCollection<Point> {
   const [data, setData] = useState<FeatureCollection<Point>>(EMPTY);
-  const { system = null, routeId = null, enabled = true, everyMs = 0 } = opts;
+  const { system = null, routeId = null, routeIds = null, enabled = true, everyMs = 0 } = opts;
+  const only = routeIds?.join(",") ?? "";
   useEffect(() => {
     if (!enabled || !view) { setData(EMPTY); return; }
+    const onlySet = only ? new Set(only.split(",")) : null;
     const build = () => {
       const t = nowSec();
       const padX = (view.east - view.west) * 0.05, padY = (view.north - view.south) * 0.05;
@@ -29,6 +31,7 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       const labels = view.zoom >= 15;
       for (const v of transit.fleet.values()) {
         if (routeId && v.routeId !== routeId) continue;
+        if (onlySet && !onlySet.has(v.routeId)) continue;
         if (system && v.system !== system) continue;
         // primero se descartan por su último reporte los que están lejos de la pantalla (un bus no avanza más de unos 3 km entre reportes): así el motor de movimiento calcula cientos de buses por tanda y no miles
         if (v.position.lon < view.west - far || v.position.lon > view.east + far || v.position.lat < view.south - far || v.position.lat > view.north + far) continue;
@@ -53,6 +56,6 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
     };
     loop();
     return () => { stopped = true; clearTimeout(timer); };
-  }, [view, system, routeId, enabled, everyMs]);
+  }, [view, system, routeId, only, enabled, everyMs]);
   return data;
 }

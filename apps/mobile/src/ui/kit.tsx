@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AppState, Platform, Pressable, StyleSheet, Switch, Text, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { SymbolView, type SFSymbol } from "expo-symbols";
@@ -10,16 +10,16 @@ import { radius, space, type, useColors } from "./theme";
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /** Cualquier cosa tocable se hunde un poco al presionarla y vuelve con un resorte, como en iOS. */
-export function Tap({ children, style, haptic = true, onPress, ...rest }: PressableProps & { children: ReactNode; style?: StyleProp<ViewStyle>; haptic?: boolean }) {
+export function Tap({ children, style, haptic = true, still = false, onPress, ...rest }: PressableProps & { children: ReactNode; style?: StyleProp<ViewStyle>; haptic?: boolean; /** Para tarjetas grandes con mucho texto: al tocarlas se atenúan un instante en vez de encogerse (encoger un bloque grande deja las letras borrosas un momento). */ still?: boolean }) {
   const { reduceMotion } = useAccessibility();
   const scale = useSharedValue(1);
-  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const anim = useAnimatedStyle(() => (still ? { opacity: 0.55 + 0.45 * ((scale.value - 0.96) / 0.04) } : { transform: [{ scale: scale.value }] }));
   return (
     <AnimatedPressable
       hitSlop={12}
       {...rest}
-      onPressIn={() => { if (!reduceMotion) scale.value = withSpring(0.96, { damping: 18, stiffness: 420 }); }}
-      onPressOut={() => { if (!reduceMotion) scale.value = withSpring(1, { damping: 14, stiffness: 300 }); }}
+      onPressIn={() => { if (!reduceMotion) scale.value = still ? withTiming(0.96, { duration: 80 }) : withSpring(0.96, { damping: 18, stiffness: 420 }); }}
+      onPressOut={() => { if (!reduceMotion) scale.value = still ? withTiming(1, { duration: 180 }) : withSpring(1, { damping: 14, stiffness: 300 }); }}
       onPress={(e) => { if (haptic && Platform.OS === "ios") void Haptics.selectionAsync(); onPress?.(e); }}
       style={[style, anim]}
     >

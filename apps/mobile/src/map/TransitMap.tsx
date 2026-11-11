@@ -8,7 +8,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { CORRIDORS, PORTALS, buildStationGeometry, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { CORRIDORS, PORTALS, type TripGeo, buildStationGeometry, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import lightStyle from "./style-light.json";
@@ -36,6 +36,10 @@ interface Props {
   /** Parada destacada y buses que se acercan a ella (con un aro). */
   focusStopId?: string | null;
   highlightIds?: string[];
+  /** Un viaje de «Cómo llegar» dibujado completo: caminatas punteadas, cada bus con su recorrido y los puntos donde se sube y se baja. */
+  trip?: TripGeo | null;
+  /** Solo se ven los buses de estas rutas (las del viaje). */
+  onlyRoutes?: readonly string[] | null;
   /** Si es falso (otra pestaña al frente), los buses dejan de recalcularse para no gastar batería. */
   active?: boolean;
   /** Capas extra: semáforos y estaciones dibujadas con sus vagones. */
@@ -56,7 +60,7 @@ interface Props {
 }
 
 /** El mapa de buses en vivo: base, trazado de la ruta, paradas (al acercarse), buses y tu ubicación. */
-export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], active = true, showSignals = true, showStations = true, showTraffic = false, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
+export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], trip = null, onlyRoutes = null, active = true, showSignals = true, showStations = true, showTraffic = false, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
   const c = useColors();
   const camera = useRef<CameraRef>(null);
   const lastCenter = useRef<[number, number]>(BOGOTA);      // el centro actual, para girar a norte sin moverse
@@ -132,6 +136,15 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   }, [geo]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const signalsJson = useSemaforos(showSignals);
+  /** El viaje que se está siguiendo, como líneas y puntos. Las capas están siempre montadas: sin viaje, los datos van vacíos. */
+  const tripLines = useMemo(() => JSON.stringify({
+    type: "FeatureCollection",
+    features: (trip?.legs ?? []).map((l) => ({ type: "Feature", properties: { kind: l.kind, color: l.kind === "ride" && l.system ? SYSTEM_COLOR[l.system] : "#8a8f98" }, geometry: { type: "LineString", coordinates: l.line.map((g) => [g.lon, g.lat]) } })),
+  }), [trip]);
+  const tripPoints = useMemo(() => JSON.stringify({
+    type: "FeatureCollection",
+    features: (trip?.points ?? []).map((pt) => ({ type: "Feature", properties: { kind: pt.kind, name: pt.name }, geometry: { type: "Point", coordinates: [pt.position.lon, pt.position.lat] } })),
+  }), [trip]);
   /** Tráfico: el último tramo que recorrió cada bus, con su velocidad. Solo se calcula con la capa encendida y cuando llega un lote nuevo. */
   const version = transit.version;
   const trafficJson = useMemo(() => JSON.stringify({
@@ -231,7 +244,16 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <Layer id="stops-dot" type="circle" {...sp({ circleRadius: 5.5, circleColor: "#ffffff", circleStrokeColor: c.dark ? "#d4d4d8" : "#3f3f46", circleStrokeWidth: 2 })} />
       </GeoJSONSource>
 
-      <BusLayer view={view} system={system} routeId={routeId} active={active} calm={calm} highlightIds={highlightIds} dark={c.dark} onBus={onBus} />
+      <GeoJSONSource id="trip-lines" data={tripLines}>
+        <Layer id="trip-casing" type="line" filter={["==", ["get", "kind"], "ride"] as never} {...sp({ lineColor: c.dark ? "#0b0b0d" : "#ffffff", lineWidth: 9, lineCap: "round", lineJoin: "round" })} />
+        <Layer id="trip-ride" type="line" filter={["==", ["get", "kind"], "ride"] as never} {...sp({ lineColor: ["get", "color"], lineWidth: 5.5, lineCap: "round", lineJoin: "round" })} />
+        <Layer id="trip-walk" type="line" filter={["==", ["get", "kind"], "walk"] as never} {...sp({ lineColor: c.dark ? "#c3c8d2" : "#4a4e57", lineWidth: 3.5, lineDasharray: [0.2, 1.8], lineCap: "round", lineJoin: "round" })} />
+      </GeoJSONSource>
+      <GeoJSONSource id="trip-points" data={tripPoints}>
+        <Layer id="trip-dot" type="circle" {...sp({ circleRadius: ["match", ["get", "kind"], "dest", 8, "origin", 6, 6.5], circleColor: ["match", ["get", "kind"], "dest", "#e11d2e", "origin", "#3b82f6", "#ffffff"], circleStrokeColor: ["match", ["get", "kind"], "dest", "#ffffff", "origin", "#ffffff", "#1c1c1e"], circleStrokeWidth: 2.5 })} />
+        <Layer id="trip-label" type="symbol" minzoom={12.5} {...sp({ textField: ["get", "name"], textFont: ["Noto Sans Bold"], textSize: 12, textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.1, textJustify: "auto", textMaxWidth: 10, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2 })} />
+      </GeoJSONSource>
+      <BusLayer view={view} system={system} routeId={routeId} routeIds={onlyRoutes} active={active} calm={calm} highlightIds={highlightIds} dark={c.dark} onBus={onBus} />
       {children}
     </Map>
   );
@@ -239,9 +261,9 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
 
 /** Los buses, aparte del resto del mapa: se recalculan muchas veces por segundo y así solo se repinta esta capa (no las estaciones, la red ni los semáforos).
  *  Los estilos de las capas se crean una sola vez: en cada tanda lo único que cambia son los datos. */
-const BusLayer = memo(function BusLayer({ view, system, routeId, active, calm, highlightIds, dark, onBus }: { view: Viewport | null; system: SystemType | null; routeId: string | null; active: boolean; calm: boolean; highlightIds: string[]; dark: boolean; onBus?: (id: string) => void }) {
+const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null, active, calm, highlightIds, dark, onBus }: { view: Viewport | null; system: SystemType | null; routeId: string | null; routeIds?: readonly string[] | null; active: boolean; calm: boolean; highlightIds: string[]; dark: boolean; onBus?: (id: string) => void }) {
   const { reduceMotion } = useAccessibility();
-  const buses = useBusFeatures(view, { system, routeId, enabled: active, everyMs: calm ? 2000 : reduceMotion ? 250 : 0 });
+  const buses = useBusFeatures(view, { system, routeId, routeIds, enabled: active, everyMs: calm ? 2000 : reduceMotion ? 250 : 0 });
   const json = useMemo(() => JSON.stringify(buses), [buses]);
   const ringKey = highlightIds.join(",");
   const st = useMemo(() => ({

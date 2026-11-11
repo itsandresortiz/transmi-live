@@ -1,4 +1,4 @@
-import type { GeoPoint } from "@transmi/domain";
+import { type GeoPoint, RoadPath, type SystemType, toWorld } from "@transmi/domain";
 import { hav } from "./eta";
 import type { Itinerary, RideLeg, StopRef } from "./planner";
 import { upcomingAtStop } from "./queries";
@@ -141,4 +141,41 @@ export function liveShift(state: TransitState, leg: RideLeg, phase: GuidePhase, 
   if (ti < 0) return null;
   const eta = arrivalAtIndex(state, v, seq.shape, seq.index, ti, nowMs);
   return eta > 0 ? Math.round(eta - (phase === "ride" ? leg.arriveAt : leg.departAt)) : null;
+}
+
+/* ---------- el viaje dibujado en el mapa ---------- */
+
+export interface TripGeoLeg { kind: "walk" | "ride"; leg: number; system?: SystemType; routeId?: string; shortName?: string; line: GeoPoint[] }
+export interface TripGeoPoint { kind: "origin" | "board" | "alight" | "dest"; leg: number; position: GeoPoint; name: string }
+export interface TripGeo { legs: TripGeoLeg[]; points: TripGeoPoint[] }
+
+const tripPaths = new WeakMap<object, RoadPath>();
+/** El recorrido por la calle de un tramo en bus, entre donde se sube y donde se baja. Si el plan ya lo trae se usa; si no (un viaje recuperado tras cerrar la app
+ *  no guarda los trazados), se recorta del trazado de la ruta. Como último recurso, la línea recta entre las dos paradas. */
+function rideLine(state: TransitState, leg: RideLeg): GeoPoint[] {
+  if (leg.line.length > 1) return leg.line;
+  for (const shape of state.network.shapes.get(leg.routeId) ?? []) {
+    const bi = shape.stopIds.indexOf(leg.board.id), ai = bi >= 0 ? shape.stopIds.indexOf(leg.alight.id, bi + 1) : -1;
+    if (ai < 0 || shape.points.length < 2) continue;
+    let path = tripPaths.get(shape);
+    if (!path) { path = new RoadPath(shape.points); tripPaths.set(shape, path); }
+    const h0 = path.project(toWorld(leg.board.position), 0, 0, 150), h1 = h0 ? path.projectAfter(toWorld(leg.alight.position), h0.s, 150) : null;
+    if (h0 && h1 && h1.s > h0.s) return path.slice(h0.s, h1.s);
+  }
+  return [leg.board.position, leg.alight.position];
+}
+
+/** Todo el viaje como líneas y puntos para dibujarlo en el mapa: caminatas, cada bus con el recorrido que hace, dónde se sube y se baja, y el destino. */
+export function tripGeometry(state: TransitState, it: Itinerary, place: PlaceText): TripGeo {
+  const legs: TripGeoLeg[] = [], points: TripGeoPoint[] = [];
+  it.legs.forEach((l, i) => {
+    if (l.kind === "walk") { legs.push({ kind: "walk", leg: i, line: [l.from, l.to] }); if (i === 0) points.push({ kind: "origin", leg: i, position: l.from, name: "" }); return; }
+    legs.push({ kind: "ride", leg: i, system: l.system, routeId: l.routeId, shortName: l.shortName, line: rideLine(state, l) });
+    if (i === 0) points.push({ kind: "origin", leg: i, position: l.board.position, name: "" });
+    points.push({ kind: "board", leg: i, position: l.board.position, name: `Sube al ${l.shortName}: ${place(l.board)}` });
+    points.push({ kind: "alight", leg: i, position: l.alight.position, name: `Baja: ${place(l.alight)}` });
+  });
+  const last = it.legs[it.legs.length - 1];
+  if (last) points.push({ kind: "dest", leg: it.legs.length - 1, position: last.kind === "walk" ? last.to : last.alight.position, name: "Destino" });
+  return { legs, points };
 }
