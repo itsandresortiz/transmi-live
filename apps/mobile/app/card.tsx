@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
@@ -117,7 +117,13 @@ export default function CardScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
-        {!Tullave || !available ? (
+        {Platform.OS !== "ios" ? (
+          <Card style={{ gap: space[2] }}>
+            <Text style={[type.headline, { color: c.text }]}>Pronto en Android</Text>
+            <Text style={[type.body, { color: c.muted }]}>Consultar el saldo de tu TuLlave acercando la tarjeta al teléfono todavía no está disponible en Android. Estamos trabajando en ello.</Text>
+            <Text style={[type.body, { color: c.muted }]}>Mientras tanto puedes consultar tu saldo en los puntos de recarga y en las taquillas de las estaciones.</Text>
+          </Card>
+        ) : !Tullave || !available ? (
           <Card><Text style={[type.headline, { color: c.text }]}>{!Tullave ? "Esta versión no trae el lector de tarjetas" : "No pudimos activar el NFC"}</Text>
             <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{!Tullave
               ? `El lector de tarjetas no quedó registrado en la app. Módulos nativos que sí hay: ${Object.keys((globalThis as { expo?: { modules?: object } }).expo?.modules ?? {}).filter((k) => !k.startsWith("Expo")).join(", ") || "ninguno"}.`

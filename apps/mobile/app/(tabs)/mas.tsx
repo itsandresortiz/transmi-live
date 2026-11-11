@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -90,9 +90,9 @@ export default function Mas() {
             </View>
             <View style={{ gap: 2 }}>
               <Text style={styles.heroTitle}>Consulta tu saldo</Text>
-              <Text style={styles.heroSub}>Acerca la tarjeta al teléfono. Se lee aquí y no se guarda.</Text>
+              <Text style={styles.heroSub}>{Platform.OS === "ios" ? "Acerca la tarjeta al teléfono. Se lee aquí y no se guarda." : "Pronto podrás leerla acercándola al teléfono."}</Text>
             </View>
-            <View style={styles.heroBtn}><Text style={styles.heroBtnText}>Leer mi tarjeta</Text><SymbolView name="arrow.right" tintColor="#111114" size={13} /></View>
+            <View style={styles.heroBtn}><Text style={styles.heroBtnText}>{Platform.OS === "ios" ? "Leer mi tarjeta" : "Pronto en Android"}</Text><SymbolView name="arrow.right" tintColor="#111114" size={13} /></View>
           </View>
         </Tap>
 

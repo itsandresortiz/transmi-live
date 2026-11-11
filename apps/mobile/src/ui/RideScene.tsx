@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { Image, Platform, StyleSheet, View, type ViewStyle } from "react-native";
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import type { SystemType } from "@transmi/domain";
 import { useAccessibility } from "@/accessibility";
@@ -20,6 +20,25 @@ const REAR: Record<string, number> = {
   "zonal-s": require("../../assets/sprites-rear/rear-zonal-s.png"), "zonal-l": require("../../assets/sprites-rear/rear-zonal-l.png"),
   "otro-s": require("../../assets/sprites-rear/rear-otro-s.png"), "otro-l": require("../../assets/sprites-rear/rear-otro-l.png"),
 };
+
+/** El suelo inclinado. En iPhone gira sobre su borde de abajo (`transformOrigin`), con la cámara encima de ese borde.
+ *  Android no respeta ese punto de giro cuando hay perspectiva (gira sobre el centro y la vía queda chiquita y lejos del bus). Allá se arma la misma
+ *  vista con lo que Android sí hace bien: girar sobre el centro con la cámara más lejos, y luego encoger a lo ancho y a lo alto. Da exactamente la misma
+ *  imagen (comprobado con números: los puntos caen en el mismo sitio). */
+const TILT = 56, CAM = 600;
+const SIN = Math.sin((TILT * Math.PI) / 180), COS = Math.cos((TILT * Math.PI) / 180);
+const CAM_CENTER = CAM + (GROUND_H / 2) * SIN, SHRINK = CAM / CAM_CENTER, HINGE = COS * (GROUND_H / 2) * SHRINK;
+function groundStyles(width: number): { outer: ViewStyle; inner: ViewStyle } {
+  const left = (width - GROUND_W) / 2;
+  if (Platform.OS === "android") return {
+    outer: { position: "absolute", left, top: H - HINGE - GROUND_H / 2, width: GROUND_W, height: GROUND_H, transform: [{ scaleX: SHRINK }, { scaleY: SHRINK * SHRINK }] },
+    inner: { width: GROUND_W, height: GROUND_H, transform: [{ perspective: CAM_CENTER }, { rotateX: `${TILT}deg` }] },
+  };
+  return {
+    outer: { position: "absolute", left, top: H - GROUND_H, width: GROUND_W, height: GROUND_H },
+    inner: { width: GROUND_W, height: GROUND_H, transformOrigin: "bottom", transform: [{ perspective: CAM }, { rotateX: `${TILT}deg` }] },
+  };
+}
 
 /** Manzanas y árboles a los lados: dos filas que se repiten cada PERIOD para que el bucle no tenga saltos. */
 function useSides() {
@@ -51,12 +70,13 @@ export function RideScene({ system, color, moving = true, width }: { system: Sys
   const long = system === "troncal", sprite = REAR[`${system}-${long ? "l" : "s"}`];
   // el bus es una imagen ya proyectada con esta misma cámara: se pone donde dice META y calza con la vía
   const m = META[long ? "l" : "s"], busTop = GROUND_H - m.nose;
+  const ground = useMemo(() => groundStyles(width), [width]);
   const fade = Array.from({ length: STRIPS }, (_, i) => 1 - i / STRIPS);
 
   return (
     <View style={{ width, height: H, overflow: "hidden" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {/* el suelo, inclinado: lo de arriba queda lejos */}
-      <View style={{ position: "absolute", left: (width - GROUND_W) / 2, top: H - GROUND_H, width: GROUND_W, height: GROUND_H, transformOrigin: "bottom", transform: [{ perspective: 600 }, { rotateX: "56deg" }] }}>
+      <View style={ground.outer}><View style={ground.inner}>
         <View style={{ position: "absolute", left: roadX, width: ROAD_W, top: 0, bottom: 0, backgroundColor: road }} />
         <View style={{ position: "absolute", left: roadX - 4, width: 5, top: 0, bottom: 0, backgroundColor: curb }} />
         <View style={{ position: "absolute", left: roadX + ROAD_W - 1, width: 5, top: 0, bottom: 0, backgroundColor: curb }} />
@@ -71,7 +91,7 @@ export function RideScene({ system, color, moving = true, width }: { system: Sys
             </View>
           )))}
         </Animated.View>
-      </View>
+      </View></View>
       <Animated.View style={[{ position: "absolute", left: width / 2 + m.left, top: H - m.bottom - m.height, width: m.width, height: m.height }, busStyle]}>
         <Image source={sprite} style={{ width: m.width, height: m.height }} resizeMode="contain" />
       </Animated.View>

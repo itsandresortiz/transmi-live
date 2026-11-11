@@ -27,6 +27,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - **Actividad en vivo del viaje** (pantalla de bloqueo / isla dinámica): código nativo nuevo sin compilar. Si la compilación falla, mandar el bloque de errores; el módulo `modules/tripactivity` se compila siempre (también sin `WIDGET=1`).
 
 - **Android (primer paso)**: probar en el emulador con `bash apps/mobile/scripts/android-emulador.sh`: ¿abre?, ¿se ven los iconos y la barra inferior?, ¿el mapa, el buscador y Cómo llegar?, ¿se cierran las ventanas con la flecha de atrás?, ¿llegan los avisos del viaje? Revisar sombras de las tarjetas (en Android hace falta `elevation`), el efecto de cristal (sin él) y el teclado.
+- **Android, segunda prueba** (sin ver en emulador): vía de «Voy en este bus» bajo el bus, encabezado nuevo con X en todas las ventanas (¿queda bien con la barra de estado, en claro y oscuro?), «Cerca de mí» con la ubicación del emulador puesta en Bogotá, «Mi tarjeta» con «Pronto en Android».
 - **Android, pendientes**: lector TuLlave (módulo Kotlin con IsoDep), widget (Glance), notificación fija para el viaje en lugar de la isla dinámica, cuenta de Google Play (pago único; las cuentas personales nuevas deben hacer una prueba cerrada ~12 personas × 14 días **(?)** confirmar), ficha, formulario de seguridad de datos (misma declaración que en Apple), firma del paquete (AAB) y política (ya hay).
 
 ## Bugs conocidos / limitaciones

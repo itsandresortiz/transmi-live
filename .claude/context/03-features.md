@@ -56,3 +56,5 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 - Función de Supabase `rapid-responder` (código en `supabase/functions/tm`): `/meta`, `/positions`, `/tripupdates`, `/alerts`, `/live?pos=&tu=&al=&wait=`.
 - `raw.githubusercontent.com/itsandresortiz/transmi-live/live-data/` (`positions.pb`, `tripupdates.pb`, `alerts.pb`, `meta.json`, `gtfs-lite.zip`) y `…/schedule-data/` (horarios).
 - OpenFreeMap (estilo `positron` y teselas), Photon/OSM (buscador de direcciones, `src/geocode.ts`), `transmilive.com/semaforos.json`.
+
+- **Android (2026-11-11)**: las ventanas usan el encabezado propio `AppHeader` (título + X); «Mi tarjeta» muestra «Pronto en Android»; «Cerca de mí» avisa si la persona está lejos de Bogotá.

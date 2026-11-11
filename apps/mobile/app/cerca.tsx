@@ -37,19 +37,25 @@ export default function Cerca() {
     });
   }, [me, Math.floor(now / 10), transit.version]);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  // si la parada más cercana está a muchos kilómetros, la persona no está en Bogotá (o el teléfono da una ubicación que no es): se dice claro
+  const far = useMemo(() => { if (!me || rows.length) return false; const n = nearestStops(transit, me, 1, 1e8)[0]; return !!n && n.meters > 30000; }, [me, rows.length, transit.version]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const loading = transit.network.stops.size === 0;
+
   const showOnMap = () => { useMapFocus.getState().set({ locate: true }); router.dismissAll(); router.navigate("/mapa"); };
 
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
       <CloseToolbar />
-      {me === undefined ? <Card><Text style={[type.headline, { color: c.text }]}>Buscando dónde estás</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>Si es la primera vez, iOS te pide permiso para usar tu ubicación mientras tienes la app abierta.</Text></Card>
+      {me === undefined ? <Card><Text style={[type.headline, { color: c.text }]}>Buscando dónde estás</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>Si es la primera vez, el teléfono te pide permiso para usar tu ubicación mientras tienes la app abierta.</Text></Card>
         : me === null ? (
           <Card style={{ gap: space[2] }}>
             <Text style={[type.headline, { color: c.text }]}>No pudimos ubicarte</Text>
             <Text style={[type.body, { color: c.muted }]}>Para mostrarte lo que tienes cerca, la app necesita usar tu ubicación mientras está abierta. No se guarda ni se envía a ningún lado.</Text>
             <Tap onPress={() => void Linking.openSettings()} accessibilityRole="button" accessibilityLabel="Abrir los ajustes del teléfono"><Text style={[type.headline, { color: c.accent }]}>Abrir Ajustes</Text></Tap>
           </Card>
-        ) : rows.length === 0 ? <Card><Text style={[type.headline, { color: c.text }]}>No hay paradas a menos de 1 km</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>Prueba el mapa para ver los buses que pasan por la zona.</Text></Card>
+        ) : loading ? <Card><Text style={[type.headline, { color: c.text }]}>Cargando las paradas</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>Un momento: estamos trayendo las paradas y estaciones.</Text></Card>
+        : far ? <Card><Text style={[type.headline, { color: c.text }]}>Parece que no estás en Bogotá</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>Tu ubicación queda lejos de las paradas de TransMilenio y del SITP. Cuando estés en Bogotá aquí verás las paradas que tienes cerca.</Text></Card>
+        : rows.length === 0 ? <Card><Text style={[type.headline, { color: c.text }]}>No hay paradas a menos de 1 km</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>Prueba el mapa para ver los buses que pasan por la zona.</Text></Card>
         : (
           <>
             <Text style={[type.caption, { color: c.muted }]}>Paradas y estaciones a menos de 1 km, de la más cercana a la más lejana.</Text>
