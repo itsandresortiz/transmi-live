@@ -25,7 +25,7 @@ if [ -z "${JAVA_HOME:-}" ] && [ -d "/Applications/Android Studio.app/Contents/jb
 if ! adb devices | awk 'NR>1 && $2=="device"' | grep -q .; then
   AVD="$(emulator -list-avds 2>/dev/null | head -1 || true)"
   [ -n "$AVD" ] || { echo "No hay ningún emulador. En Android Studio: More Actions › Virtual Device Manager › Create Device (un Pixel con la imagen más nueva)."; exit 1; }
-  echo "Prendiendo el emulador «$AVD»…"
+  echo "Prendiendo el emulador «${AVD}»…"
   (emulator -avd "$AVD" -no-snapshot-save >/dev/null 2>&1 &)
   adb wait-for-device
   until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 2; done
