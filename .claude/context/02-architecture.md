@@ -62,3 +62,5 @@ Ubica el bus en el trazado, calcula cuánto del tramo hacia la siguiente parada 
 - La ubicación se usa solo con la app abierta y no se guarda (ver `apps/web/public/privacidad.html`, pendiente de revisión del dueño).
 - La lectura de la TuLlave ocurre en el teléfono; el número se oculta por defecto y no se guarda ni se envía.
 - La función de Supabase es **pública y de solo lectura** (JWT desactivado a propósito): solo sirve tres archivos fijos. Ninguna llave privada está en el repo (`.env` ignorado, `*.p8` ignorado).
+
+- **Lector TuLlave**: módulo propio `modules/tullave` con dos implementaciones que devuelven lo mismo (respuestas de la tarjeta en hexadecimal): iOS (`ios/TullaveModule.swift`, Core NFC) y Android (`android/…/TullaveModule.kt`, IsoDep en modo lector). La interpretación es compartida (`packages/domain/src/card/tullave.ts`).

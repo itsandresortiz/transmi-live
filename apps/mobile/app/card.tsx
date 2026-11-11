@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
@@ -87,6 +87,9 @@ export default function CardScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const available = (() => { try { return Tullave?.isAvailable() ?? false; } catch { return false; } })();
+  const nfc = (() => { try { return Tullave?.nfcState?.() ?? (available ? "on" : "none"); } catch { return "none" as const; } })();
+  // en iPhone la antena está arriba; en Android casi siempre en el centro de la parte de atrás
+  const where = Platform.OS === "android" ? "la parte de atrás del teléfono" : "la parte de arriba del teléfono";
 
   const read = async () => {
     if (!Tullave) return;
@@ -100,7 +103,7 @@ export default function CardScreen() {
       const code = (e as { code?: string }).code;
       setError(e instanceof NotTuLlaveError || code === "not_tullave" ? "Esa tarjeta no parece una TuLlave."
         : code === "cancelled" ? null
-        : code === "timeout" ? "No alcanzamos a leer la tarjeta. Acércala a la parte de arriba del teléfono e intenta de nuevo."
+        : code === "timeout" ? `No alcanzamos a leer la tarjeta. Acércala a ${where} e intenta de nuevo.`
         : "No pudimos leer la tarjeta. Intenta de nuevo.");
     } finally { setBusy(false); }
   };
@@ -117,11 +120,14 @@ export default function CardScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
-        {Platform.OS !== "ios" ? (
+        {Platform.OS === "android" && (!Tullave || !available) ? (
+          // Android: sin lector en esta compilación, sin NFC en el teléfono, o con el NFC apagado
           <Card style={{ gap: space[2] }}>
-            <Text style={[type.headline, { color: c.text }]}>Pronto en Android</Text>
-            <Text style={[type.body, { color: c.muted }]}>Consultar el saldo de tu TuLlave acercando la tarjeta al teléfono todavía no está disponible en Android. Estamos trabajando en ello.</Text>
-            <Text style={[type.body, { color: c.muted }]}>Mientras tanto puedes consultar tu saldo en los puntos de recarga y en las taquillas de las estaciones.</Text>
+            <Text style={[type.headline, { color: c.text }]}>{!Tullave ? "Pronto en Android" : nfc === "off" ? "Enciende el NFC" : "Este teléfono no tiene NFC"}</Text>
+            <Text style={[type.body, { color: c.muted }]}>{!Tullave ? "Consultar el saldo de tu TuLlave acercando la tarjeta al teléfono todavía no está disponible en esta versión."
+              : nfc === "off" ? "Para leer tu tarjeta TuLlave, enciende el NFC en los ajustes del teléfono (Conexiones o Dispositivos conectados) y vuelve aquí."
+              : "Para leer la tarjeta hace falta un teléfono con NFC. Puedes consultar tu saldo en los puntos de recarga y en las taquillas de las estaciones."}</Text>
+            {Tullave && nfc === "off" ? <Tap onPress={() => void Linking.sendIntent("android.settings.NFC_SETTINGS").catch(() => Linking.openSettings())} accessibilityRole="button" accessibilityLabel="Abrir los ajustes de NFC"><Text style={[type.headline, { color: c.accent }]}>Abrir ajustes de NFC</Text></Tap> : null}
           </Card>
         ) : !Tullave || !available ? (
           <Card><Text style={[type.headline, { color: c.text }]}>{!Tullave ? "Esta versión no trae el lector de tarjetas" : "No pudimos activar el NFC"}</Text>
@@ -133,11 +139,12 @@ export default function CardScreen() {
             <TuLlaveFace balance={card ? card.data.balance : null} number={card?.data.number} readAt={card?.at} busy={busy} still={reduceMotion} />
 
             <Text style={[type.body, { color: c.muted, textAlign: "center" }]} accessibilityLiveRegion="polite">
-              {busy ? "Acerca la tarjeta a la parte de arriba del teléfono" : card ? (card.data.balance < 0 ? `Debes ${pesos(-card.data.balance)}: se descuenta en tu próxima recarga.` : "Saldo leído de tu tarjeta") : "Toca el botón y apoya tu TuLlave en la parte de arriba del teléfono"}
+              {busy ? `Acerca la tarjeta a ${where}` : card ? (card.data.balance < 0 ? `Debes ${pesos(-card.data.balance)}: se descuenta en tu próxima recarga.` : "Saldo leído de tu tarjeta") : `Toca el botón y apoya tu TuLlave en ${where}`}
             </Text>
             {error ? <Text style={[type.body, { color: "#dc2626", textAlign: "center" }]} accessibilityRole="alert">{error}</Text> : null}
 
             <PrimaryButton symbol="wave.3.right" disabled={busy} label={busy ? "Esperando la tarjeta…" : card ? "Leer de nuevo" : "Leer mi tarjeta"} onPress={() => void read()} />
+            {busy && Tullave?.cancel ? <Tap onPress={() => Tullave?.cancel?.()} accessibilityRole="button" accessibilityLabel="Dejar de esperar la tarjeta" style={{ alignSelf: "center", minHeight: 40, justifyContent: "center" }}><Text style={[type.headline, { color: c.muted }]}>Cancelar</Text></Tap> : null}
 
             {card ? (
               <>
