@@ -116,6 +116,7 @@ export default function RouteScreen() {
         ))}
 
         <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>BUSES EN VIVO</Text>
+        {buses.length ? <Text style={[type.caption, { color: c.muted, marginTop: -space[1] }]}>Cada bus con su próxima parada y en cuánto llega a ella.</Text> : null}
         {buses.length ? (
           <Card style={{ gap: 0, paddingVertical: space[1] }}>
             {buses.slice(0, MAX_BUSES).map((b, i) => {
@@ -125,10 +126,11 @@ export default function RouteScreen() {
                   style={[styles.busRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.line }]}>
                   <SymbolView name="bus.fill" tintColor={color} size={20} />
                   <View style={{ flex: 1 }}>
+                    {/* se dice a dónde es ese tiempo: sin el rótulo, «37 s» junto a un nombre no se sabe si es la parada donde está, a la que va o el destino */}
+                    <Text style={[type.caption, { color: c.muted }]}>Bus {b.v.plate || b.v.label || b.v.id} · próxima parada{dl.kind !== "unknown" ? <Text style={{ color: tone }}> · {delayText(dl)}</Text> : null}</Text>
                     <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{stopText(transit.stopById(b.nextId), b.nextId)}</Text>
-                    <Text style={[type.caption, { color: c.muted }]}>{b.v.plate || b.v.label || b.v.id}{dl.kind !== "unknown" ? <Text style={{ color: tone }}> · {delayText(dl)}</Text> : null}</Text>
                   </View>
-                  <Text style={[type.headline, { color: i === 0 ? c.accent : c.text }]}>{etaText(b.at, now)}</Text>
+                  <Text style={[type.headline, { color: i === 0 ? c.accent : c.text, fontVariant: ["tabular-nums"] }]}>{etaText(b.at, now) === "llegando" ? "llegando" : `en ${etaText(b.at, now)}`}</Text>
                   <SymbolView name="chevron.right" tintColor={c.muted} size={12} />
                 </Tap>
               );
