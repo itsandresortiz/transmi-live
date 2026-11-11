@@ -10,9 +10,14 @@ export const SYSTEM_COLOR: Record<SystemType, string> = {
 /** Espacios, esquinas y letras: todo sale de aquí, nada de números sueltos en las pantallas. */
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40 } as const;
 export const radius = { sm: 12, md: 16, lg: 22, xl: 30, pill: 999 } as const;
+/** Letra ancha de los títulos grandes («¿A dónde vamos hoy?», el nombre de una parada): le da carácter propio a la app. Es Archivo Expanded ExtraBold
+ *  (licencia abierta OFL, en `assets/fonts/`), incluida en la app con el plugin `expo-font` de `app.json`; se nombra por su nombre interno. La web usa la misma. */
+export const WIDE = "TMWide-ExtraBold";
 export const type = {
-  hero: { fontSize: 38, fontWeight: "800", letterSpacing: -1 },
-  largeTitle: { fontSize: 32, fontWeight: "800", letterSpacing: -0.6 },
+  hero: { fontFamily: WIDE, fontSize: 34, lineHeight: 38, letterSpacing: -0.6 },
+  largeTitle: { fontFamily: WIDE, fontSize: 27, lineHeight: 32, letterSpacing: -0.4 },
+  /** Números grandes (cuenta regresiva): letra del sistema, que tiene cifras de ancho fijo. */
+  number: { fontSize: 38, fontWeight: "800", letterSpacing: -1 },
   title: { fontSize: 22, fontWeight: "700", letterSpacing: -0.3 },
   headline: { fontSize: 17, fontWeight: "600" },
   body: { fontSize: 16, fontWeight: "400" },

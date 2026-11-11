@@ -1,3 +1,5 @@
+/* Letra ancha de los títulos (nombre de la parada, de la ruta, de las hojas): la misma de la app. Archivo Expanded ExtraBold, licencia abierta OFL. */
+@font-face{font-family:"TM Wide";src:url("/fonts/TMWide-ExtraBold.woff2") format("woff2");font-weight:800;font-display:swap}
 /* TransMi LIVE - sistema de diseno
    Primero celular: hoja inferior deslizable sobre un mapa a pantalla completa.
    En pantallas anchas la hoja pasa a ser un panel flotante a la izquierda. */
@@ -115,7 +117,7 @@ button.stat:active{transform:scale(.97)}
 /* ---------- detalle ---------- */
 .back{display:inline-flex;align-items:center;gap:2px;height:36px;margin:2px 0 4px -6px;padding:0 8px;border-radius:10px;color:var(--accent);font-weight:600;font-size:15px}
 .dcard{display:flex;gap:14px;align-items:center;margin:2px 0 14px}
-.dcard h2{margin:0;font-size:20px;line-height:1.2;letter-spacing:-.02em;font-weight:720;text-wrap:balance}
+.dcard h2{margin:0;font-family:"TM Wide",system-ui,sans-serif;font-size:19px;line-height:1.18;letter-spacing:-.015em;font-weight:800;text-wrap:balance}
 .dcard p{margin:3px 0 0;color:var(--muted);font-size:14px}
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:3px;border-radius:12px;background:var(--hover);margin:0 0 12px}
 .seg button{min-height:34px;padding:0 10px;border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -150,7 +152,7 @@ button.stat:active{transform:scale(.97)}
 .settings{zoom:var(--ts,1);position:fixed;z-index:60;left:0;right:0;bottom:0;max-height:88dvh;overflow-y:auto;padding:8px 18px calc(22px + env(safe-area-inset-bottom,0px));border-radius:26px 26px 0 0;transform:translateY(105%);visibility:hidden;transition:transform .34s cubic-bezier(.2,.9,.25,1),visibility 0s .34s}
 .settings.on{transform:none;visibility:visible;transition-delay:0s}
 .settings h2{margin:6px 0 2px;font-size:22px;letter-spacing:-.02em;font-weight:760}
-.sh{display:flex;align-items:center;justify-content:space-between}
+.sh{display:flex;align-items:center;justify-content:space-between}.sh h2{font-family:"TM Wide",system-ui,sans-serif;font-weight:800;letter-spacing:-.015em}
 .grp{margin-top:18px}
 .grp>h3{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
 .grp .box{border-radius:16px;background:var(--surface2);overflow:hidden}

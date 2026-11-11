@@ -36,6 +36,14 @@
           "locationWhenInUsePermission": "TransMi LIVE usa tu ubicación para mostrarte las paradas cercanas y cómo llegar. No se guarda ni se comparte."
         }
       ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/TMWide-ExtraBold.ttf"
+          ]
+        }
+      ],
       "./plugins/sin-push"
     ],
     "experiments": {

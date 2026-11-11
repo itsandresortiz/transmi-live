@@ -31,6 +31,7 @@
 - Pruebas deben pasar **sin** `apps/mobile/node_modules` (así corre CI).
 
 ## Diseño / UI
+- Títulos grandes (`type.hero`, `type.largeTitle`; en la web `.dcard h2`, `.sh h2`) en la **letra ancha** `TMWide-ExtraBold` (Archivo Expanded ExtraBold, OFL). Todo lo demás, letra del sistema; los números grandes usan `type.number`. No ponerle `fontWeight` a un texto con la letra ancha.
 - Apariencia tipo app de Apple: tipografía del sistema, Liquid Glass, esquinas continuas, hápticos suaves, animaciones con muelles, cuidado con el margen superior bajo el encabezado nativo (`contentInsetAdjustmentBehavior="automatic"`).
 - **Curvas concéntricas**: cuando una forma redondeada contiene otra pegada a su borde, radio exterior = radio interior + margen (p. ej. pista 28 con margen 8 y burbuja 20). No meter una píldora dentro de una tarjeta de esquinas distintas con poco margen.
 - Sin emojis en la interfaz: usar símbolos del sistema (`SymbolView`) con el color que corresponda.

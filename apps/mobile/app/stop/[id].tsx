@@ -197,7 +197,7 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
 
           <View style={[styles.hero, { backgroundColor: color }]}>
             <Text style={[type.eyebrow, { color: "#ffffff", opacity: 0.8 }]}>PRÓXIMO BUS</Text>
-            <Text style={[type.hero, { color: "#ffffff" }]}>{etaText(hero.etaAt, now)}{!hero.official ? <Text style={type.title}> aprox.</Text> : null}</Text>
+            <Text style={[type.number, { color: "#ffffff" }]}>{etaText(hero.etaAt, now)}{!hero.official ? <Text style={type.title}> aprox.</Text> : null}</Text>
             {now - hero.vehicle.reportedAt > 90 ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.85 }]}>Dato de hace {Math.round((now - hero.vehicle.reportedAt) / 60)} min</Text> : null}
             <Text style={[type.body, { color: "#ffffff" }]}>{hero.stopsAway <= 1 ? "Ya va hacia esta parada." : `Ahora va hacia ${stopText(heroNext, "su próxima parada")}, ${stopsAwayText(hero.stopsAway)} de aquí.`}</Text>
             {frequencyText(row.buses.map((b) => b.etaAt), now) ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.9 }]}>{frequencyText(row.buses.map((b) => b.etaAt), now)}</Text> : null}
