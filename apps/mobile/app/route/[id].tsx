@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-n
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "@/ui/Symbol";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { arrivalAtIndex, routeDetail } from "@transmi/application";
+import { arrivalAtIndex, displayNextIndex, routeDetail } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEM_LABEL, alertTitle, describeAlert, routeOfficialName, routeTitle, type Vehicle } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
@@ -53,9 +53,9 @@ export default function RouteScreen() {
     for (const v of d.vehicles) {
       const seq = transit.sequenceForDisplay(v);
       if (!seq || seq.shape !== cur) continue;
-      const nextId = cur.stopIds[seq.index + 1];
+      const j = displayNextIndex(transit, v, cur, seq.index, nowMs()), nextId = cur.stopIds[j];
       if (!nextId) continue;
-      out.push({ v, k: seq.index, nextId, at: arrivalAtIndex(transit, v, cur, seq.index, seq.index + 1, nowMs()) });
+      out.push({ v, k: j - 1, nextId, at: arrivalAtIndex(transit, v, cur, seq.index, j, nowMs()) });
     }
     return out.sort((a, b) => b.k - a.k);
   }, [d, cur, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -110,7 +110,7 @@ export default function RouteScreen() {
             <Card style={{ gap: space[1] }}>
               <Text style={[type.caption, { color: alert.effect === "noService" ? "#dc2626" : "#d97706" }]}>{ALERT_EFFECT_LABEL[alert.effect]}</Text>
               <Text style={[type.headline, { color: c.text }]} numberOfLines={2}>{alertTitle(alert)}</Text>
-              <Text style={[type.body, { color: c.muted }]} numberOfLines={3}>{describeAlert(alert)}</Text>
+              <Text style={[type.body, { color: c.muted }]} numberOfLines={3}>{describeAlert(alert, (id) => transit.routeById(id)?.shortName)}</Text>
             </Card>
           </Tap>
         ))}

@@ -23,6 +23,7 @@ export default function BusSheet() {
   const v = transit.fleet.get(id);
   if (!v) return <View style={[styles.screen, { flex: 1, backgroundColor: c.bg, paddingTop: space[4], paddingBottom: insets.bottom + space[6] }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>{transit.lastBatchAt == null ? "Cargando el bus…" : "Este bus dejó de reportar"}</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
   const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
+  const headsign = transit.sequenceForDisplay(v)?.shape.headsign;
   const tone = delayClass(d) === "bad" ? "#dc2626" : delayClass(d) === "warn" ? "#d97706" : delayClass(d) === "ok" ? "#16a34a" : c.muted;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -33,6 +34,7 @@ export default function BusSheet() {
         <View style={{ flex: 1 }}>
           <Text style={[type.title, { color: c.text, paddingRight: space[10] }]} numberOfLines={2}>{r ? routeTitle(r) : SYSTEM_LABEL[v.system]}</Text>
           <Text style={[type.caption, { color: c.muted }]}>{SYSTEM_LABEL[v.system]} · {v.plate || v.label || v.id}</Text>
+          {headsign ? <Text style={[type.body, { color: c.text, marginTop: 2 }]} numberOfLines={1}>Hacia {headsign}</Text> : null}
         </View>
       </View>
       <Card>

@@ -58,7 +58,14 @@ export function shapeStops(state: TransitState, shape: RouteShape): ShapeStops |
  *  Medido con lotes reales, usar la posición baja el error mediano de 44–57 s a 34–37 s frente a contar solo desde la hora de llegada
  *  a la última parada (que queda como respaldo cuando el bus no se puede ubicar sobre su trazado). */
 export function arrivalAtIndex(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, to: number, nowMs = Date.now()): number {
-  const stopIds = shape.stopIds, now = nowMs / 1000;
+  const { eta, remaining } = rawArrival(state, v, shape, lastIndex, to, nowMs), now = nowMs / 1000;
+  // si el bus va más lento que lo esperado el cálculo ya quedó en el pasado: no se sabe cuándo llega, pero no es «ya»; se supone que le falta una parte del tramo
+  return eta > now + 3 ? eta : now + Math.max(10, 0.3 * remaining);
+}
+
+/** La cuenta sin retoques: puede dar una hora que ya pasó (el bus ya debió llegar a esa parada según el cálculo). */
+export function rawArrival(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, to: number, nowMs = Date.now()): { eta: number; remaining: number } {
+  const stopIds = shape.stopIds;
   const hop = (i: number) => estimateTravelSeconds(state, v, stopIds, i, i + 1, nowMs);
   let eta: number;
   let remaining = 0;
@@ -77,6 +84,16 @@ export function arrivalAtIndex(state: TransitState, v: Vehicle, shape: RouteShap
     const reached = tu?.nextStop && tu.nextStop.stopId === v.lastStopId ? tu.nextStop.arrivalAt : undefined;
     eta = (reached ?? v.reportedAt) + remaining;
   }
-  // si el bus va más lento que lo esperado el cálculo ya quedó en el pasado: no se sabe cuándo llega, pero no es «ya»; se supone que le falta una parte del tramo
-  return eta > now + 3 ? eta : now + Math.max(10, 0.3 * remaining);
+  return { eta, remaining };
+}
+
+/** La parada a la que va el bus **ahora**, para mostrar. La posición llega con cerca de un minuto de atraso (así la publica TransMilenio desde
+ *  nov. 2026) y entre dos paradas un bus tarda más o menos eso: la «siguiente» según el reporte muchas veces ya quedó atrás y la pantalla
+ *  decía «llegando» en casi todos los buses. Si la cuenta a una parada ya venció, se pasa a la que sigue (máximo `MAX_SKIP` paradas). */
+const MAX_SKIP = 3;
+export function displayNextIndex(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, nowMs = Date.now()): number {
+  const now = nowMs / 1000, last = shape.stopIds.length - 1;
+  let j = lastIndex + 1;
+  for (let n = 0; n < MAX_SKIP && j < last && rawArrival(state, v, shape, lastIndex, j, nowMs).eta < now - 5; n++) j++;
+  return j;
 }

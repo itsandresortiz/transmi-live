@@ -40,7 +40,7 @@ export default function Avisos() {
           <Card key={i} style={{ gap: space[2] }}>
             <View style={[styles.pill, { backgroundColor: tone + "22" }]}><Text style={[type.caption, { color: tone }]}>{ALERT_EFFECT_LABEL[a.effect]}</Text></View>
             <Text style={[type.headline, { color: c.text }]}>{alertTitle(a)}</Text>
-            <Text style={[type.body, { color: c.muted }]}>{describeAlert(a)}</Text>
+            <Text style={[type.body, { color: c.muted }]}>{describeAlert(a, (id) => transit.routeById(id)?.shortName)}</Text>
             {alertValidity(a) ? <Text style={[type.caption, { color: c.muted }]}>{alertValidity(a)}</Text> : null}
             <View style={styles.routes}>{a.routeIds.slice(0, 10).map((id) => { const r = transit.routeById(id); return r ? <RouteBadge key={id} route={r} /> : null; })}</View>
           </Card>

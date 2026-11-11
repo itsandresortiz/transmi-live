@@ -2,7 +2,7 @@ import {
   Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle, type RouteShape,
   type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, isAlertActive, parseStopName, MAX_REPORT_AGE_S,
 } from "@transmi/domain";
-import { arrivalAtIndex, shapeStops } from "./eta";
+import { arrivalAtIndex, displayNextIndex, shapeStops } from "./eta";
 import { type RouteDayStatus, ServiceEnds, type ServiceMark } from "./service-ends";
 import { Departures } from "./departures";
 import { TravelTimes } from "./travel-times";
@@ -152,9 +152,12 @@ export class TransitState {
   /** La parada que sigue (la última que informa TransMilenio ya la pasó) y la hora estimada de llegada, en segundos desde 1970. */
   nextStopOf(v: Vehicle, nowMs = Date.now(), byPosition = true): { stopId: string; stop?: Stop; arrivalAt?: number } | undefined {
     const seq = byPosition ? this.sequenceForDisplay(v) : this.sequenceOf(v);   // por posición solo para mostrar; el movimiento de los buses pide solo la parada informada
-    const stopId = seq?.shape.stopIds[seq.index + 1];
-    if (!seq || !stopId) return undefined;
-    return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape, seq.index, seq.index + 1, nowMs) };
+    if (!seq) return undefined;
+    // para mostrar se salta la parada que el bus ya debió pasar; el motor de movimiento pide la que sigue a la informada, sin saltos
+    const j = byPosition ? displayNextIndex(this, v, seq.shape, seq.index, nowMs) : seq.index + 1;
+    const stopId = seq.shape.stopIds[j];
+    if (!stopId) return undefined;
+    return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape, seq.index, j, nowMs) };
   }
 
   /** Saca de la flota los buses que llevan mucho sin reportar. Hay que llamarlo aunque no lleguen datos nuevos. */

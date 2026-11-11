@@ -23,13 +23,14 @@ export interface ServiceAlert {
 }
 
 /** «Novedad en la operacion en linea HF615\416A11_Br. X\064A09_Br. Y» → «La ruta HF615 se desvía entre Br. X y Br. Y». */
-export function describeAlert(a: ServiceAlert): string {
+/** `routeName` traduce el número interno de la ruta (así la nombra TransMilenio desde nov. 2026: «10772») al nombre que conoce la gente («T21»). */
+export function describeAlert(a: ServiceAlert, routeName?: (id: string) => string | undefined): string {
   const d = a.description;
   if (!d) return a.headline;
   const parts = d.split("\\");
   if (parts.length < 2) return d.replace(/^Novedad en la operacion en linea\s*/i, "");
-  const line = parts[0]!.replace(/^.*\s/, "");
-  const places = parts.slice(1).map((x) => x.replace(/^\w+?_/, "").trim()).filter(Boolean);
+  const code = parts[0]!.replace(/^.*\s/, ""), line = routeName?.(code) ?? code;
+  const places = parts.slice(1).map((x) => x.replace(/^\w+?_/, "").replace(/^TM_/, "").trim()).filter(Boolean);
   const verb = a.effect === "noService" ? "no presta servicio" : a.effect === "detour" ? "se desvía" : a.effect === "delays" ? "va con demoras" : a.effect === "reduced" ? "tiene servicio reducido" : a.effect === "additional" ? "tiene servicio adicional" : "tiene cambios";
   if (places.length === 2) return `La ruta ${line} ${verb} entre ${places[0]} y ${places[1]}.`;
   if (places.length === 1) return `La ruta ${line} ${verb} cerca de ${places[0]}.`;

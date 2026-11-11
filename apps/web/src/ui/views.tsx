@@ -283,7 +283,7 @@ export function AlertsView({ th, act }: Props) {
         <div key={index} className="card" role="group">
           <span className={`pill ${alert.effect === "noService" ? "bad" : alert.effect === "additional" ? "ok" : "warn"}`}>{ALERT_EFFECT_LABEL[alert.effect]}</span>
           <div className="ct">{alertTitle(alert)}</div>
-          <div className="cs">{describeAlert(alert)}</div>
+          <div className="cs">{describeAlert(alert, (id) => transit.routeById(id)?.shortName)}</div>
           <div className="cs faint" style={{ fontSize: 12, marginTop: 4 }}>{[alertValidity(alert), alert.headline ? `Ref. ${alertReference(alert)}` : ""].filter(Boolean).join(" · ")}</div>
           {alert.routeIds.length > 0 && (
             <div className="rbs">
@@ -345,7 +345,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
       )}
       <RouteStatusNote routeId={id} nowMs={nowSec * 1000} />
       {!bus && <RouteSchedule routeId={id} nowMs={nowSec * 1000} />}
-      {d.alerts.map(({ alert, index }) => <div key={index} className="card"><span className="pill warn">{ALERT_EFFECT_LABEL[alert.effect]}</span><div className="ct" style={{ marginTop: 8 }}>{alertTitle(alert)}</div><div className="cs">{describeAlert(alert)}</div>{alertValidity(alert) && <div className="cs" style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{alertValidity(alert)}</div>}</div>)}
+      {d.alerts.map(({ alert, index }) => <div key={index} className="card"><span className="pill warn">{ALERT_EFFECT_LABEL[alert.effect]}</span><div className="ct" style={{ marginTop: 8 }}>{alertTitle(alert)}</div><div className="cs">{describeAlert(alert, (id) => transit.routeById(id)?.shortName)}</div>{alertValidity(alert) && <div className="cs" style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{alertValidity(alert)}</div>}</div>)}
       {cur && cur.stopIds.length > 0 && (
         <>
           <div className="sec">{bus ? "Por dónde va este bus" : "Paradas"}</div>
