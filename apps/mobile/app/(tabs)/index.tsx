@@ -12,6 +12,7 @@ import { stopKind, stopTag } from "@/stopname";
 import { stopLabelText } from "@transmi/domain";
 import { nowSec } from "@/clock";
 import { etaText } from "@/format";
+import { Eta } from "@/ui/Eta";
 import { useSaved } from "@/favorites";
 import { liveDown } from "@/lastService";
 import { useDemo } from "@/demo";
@@ -110,7 +111,7 @@ export default function Inicio() {
                       <View key={a.key} style={styles.arrival}>
                         <RouteBadge route={a.route} />
                         <Text style={[type.caption, { color: c.muted, flex: 1, fontSize: 14 }]} numberOfLines={1}>{a.headsign ? `Hacia ${a.headsign}` : ""}</Text>
-                        <Text style={[type.headline, { color: i === 0 ? c.accent : c.text, fontVariant: ["tabular-nums"] }]}>{etaText(a.at, now)}</Text>
+                        <Eta at={a.at} style={[type.headline, { color: i === 0 ? c.accent : c.text }]} />
                       </View>
                     )) : f.scheduled ? (
                       <View style={styles.arrival}>

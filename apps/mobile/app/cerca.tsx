@@ -9,6 +9,7 @@ import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { etaText } from "@/format";
+import { Eta } from "@/ui/Eta";
 import { locateMe } from "@/location";
 import { stopKind, stopTag } from "@/stopname";
 import { useMapFocus } from "@/map/focus";
@@ -75,7 +76,7 @@ export default function Cerca() {
                     </View>
                     {next.length ? (
                       <View style={styles.next}>
-                        {next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Text style={[type.headline, { color: c.text }]}>{etaText(u.buses[0]!.etaAt, now)}</Text></View>)}
+                        {next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Eta at={u.buses[0]!.etaAt} style={[type.headline, { color: c.text }]} /></View>)}
                       </View>
                     ) : <Text style={[type.caption, { color: c.muted }]}>{liveDown() ? "Sin datos en vivo por ahora" : "Ningún bus viene ahora"}</Text>}
                   </Card>

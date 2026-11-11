@@ -12,6 +12,7 @@ import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { etaText } from "@/format";
+import { Eta } from "@/ui/Eta";
 import { useSaved } from "@/favorites";
 import { Card, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
@@ -69,7 +70,7 @@ export default function Favoritos() {
                   </View>
                 ) : <SymbolView name="chevron.right" tintColor={c.muted} size={12} />}
               </View>
-              {sorting ? null : next.length ? <View style={styles.next}>{next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Text style={[type.headline, { color: c.text }]}>{etaText(u.buses[0]!.etaAt, now)}</Text></View>)}</View>
+              {sorting ? null : next.length ? <View style={styles.next}>{next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Eta at={u.buses[0]!.etaAt} style={[type.headline, { color: c.text }]} /></View>)}</View>
                 : <Text style={[type.caption, { color: c.muted }]}>{live ? "Ningún bus viene ahora" : "Sin datos en vivo por ahora"}</Text>}
             </Card>
           </Tap>
