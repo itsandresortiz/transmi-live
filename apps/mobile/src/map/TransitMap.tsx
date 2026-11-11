@@ -84,6 +84,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       for (const s of transit.network.stops.values()) {
         const { lat, lon } = s.position;
         if (lon < view.west || lon > view.east || lat < view.south || lat > view.north) continue;
+        if (!transit.isServed(s.id)) continue;      // registros «de la estación» sin rutas (uno en medio de cada estación o portal): no son paradas reales
         features.push({ type: "Feature", id: s.id, geometry: { type: "Point", coordinates: [lon, lat] }, properties: { id: s.id } });
         if (features.length >= 700) break;
       }

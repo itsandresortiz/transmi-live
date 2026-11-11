@@ -255,6 +255,8 @@ export function nearestStops(state: TransitState, p: { lat: number; lon: number 
   for (const stop of state.network.stops.values()) {
     const dLat = Math.abs(stop.position.lat - p.lat);
     if (dLat > maxMeters / 111_000) continue;
+    // el GTFS trae un registro «de la estación» en medio de cada estación o portal, sin código ni rutas: no es una parada donde pare un bus
+    if (state.network.shapes.size && !state.isServed(stop.id)) continue;
     const m = hav(stop.position, p);
     if (m <= maxMeters) out.push({ stop, meters: m });
   }

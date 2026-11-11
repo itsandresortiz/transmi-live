@@ -515,7 +515,11 @@ export class MapController {
     this.computeSectors(net);
     this.netRef = net; this.rebuildPortalLines();
     const stops: Feature<Point>[] = [];
+    // el GTFS trae un registro «de la estación» en medio de cada estación o portal, sin rutas: no es una parada real y no se dibuja
+    const served = new Set<string>();
+    for (const shapes of net.shapes.values()) for (const sh of shapes) for (const id of sh.stopIds) served.add(id);
     for (const s of net.stops.values()) {
+      if (!served.has(s.id)) continue;
       const k = this.stopSector.get(s.id);
       stops.push({ type: "Feature", properties: k == null ? { id: s.id } : { id: s.id, k }, geometry: { type: "Point", coordinates: [s.position.lon, s.position.lat] } });
     }

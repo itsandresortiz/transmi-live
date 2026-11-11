@@ -23,6 +23,7 @@ Las ramas de datos (`live-data`, `widget-data`, `schedule-data`, `hop-stats`, `s
 ## Particularidades del GTFS que hay que recordar
 - Un solo recorrido por ruta y sentido en el GTFS publicado; `direction_id` suele venir vacío.
 - La **letra** del nombre de una parada de troncal es el vagón (A=1, B=2…); los números (`- 2 ó 5`, `- 4 ó 6`…) distinguen sentidos.
+- **168 registros de `stops.txt` no tienen ninguna ruta**; 156 son el registro «de la estación» (sin código, en medio de cada estación o portal). No son paradas: no se dibujan ni se ofrecen como cercanas (`state.isServed`).
 - Hay paradas sin ruta (p. ej. la estación nueva «Calle 53 - Universidad Manuela Beltrán», id sin código): `station-geometry`/`queries.ts` las usan como **nombre alterno** de la estación pegada (<80 m) cuyo nombre empiece igual.
 - El `tripId` del feed termina en un código de ruta que a menudo **no existe** en el GTFS (el GTFS va por detrás del feed). Ver `02-architecture.md`.
 - `feed_version` = 1, válido todo 2026 (¿no se actualiza durante el año? **(?)**).
