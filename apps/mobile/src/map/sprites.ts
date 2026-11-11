@@ -1,5 +1,7 @@
 /** Buses vistos desde arriba, mirando hacia el norte (se giran con su rumbo). Salen del mismo dibujo que la web: tools/bus-sprites.ts. `s` = bus corto, `l` = articulado. */
 export const BUS_SPRITES: Record<string, number> = {
+  // el haz que muestra hacia dónde apunta el teléfono (mirando al norte; se gira con la brújula)
+  "me-cone": require("../../assets/sprites-top/me-cone.png"),
   "top-troncal-s": require("../../assets/sprites-top/top-troncal-s.png"),
   "top-troncal-l": require("../../assets/sprites-top/top-troncal-l.png"),
   "top-dual-s": require("../../assets/sprites-top/top-dual-s.png"),

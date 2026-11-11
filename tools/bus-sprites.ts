@@ -49,6 +49,9 @@ async function main() {
     meta[long ? "l" : "s"] = out.meta;
   }
   writeFileSync(`${REAR}/meta.json`, JSON.stringify(meta) + "\n");
+  // el haz («linterna») que muestra hacia dónde apunta el teléfono, igual al de la web (.me .cone en app.css): un abanico azul de 68° que se desvanece hacia afuera, mirando al norte
+  await page.setContent(`<body style="margin:0;background:transparent"><div id="k" style="width:168px;height:168px;border-radius:50%;background:conic-gradient(from -34deg,rgba(37,99,235,.72) 0deg 68deg,transparent 68deg);-webkit-mask:radial-gradient(circle,#000 8%,transparent 70%);mask:radial-gradient(circle,#000 8%,transparent 70%)"></div></body>`);
+  await (await page.$("#k"))!.screenshot({ path: `${OUT}/me-cone.png`, omitBackground: true });
   await browser.close();
   console.log("Imágenes listas en", OUT);
 }

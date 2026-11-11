@@ -1,5 +1,6 @@
 import { type ComponentProps, forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { StyleSheet } from "react-native";
+import * as Location from "expo-location";
 import { Camera, GeoJSONSource, Images, Layer, Map, UserLocation, type CameraRef } from "@maplibre/maplibre-react-native";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { SystemType } from "@transmi/domain";
@@ -181,8 +182,9 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     <Map key={c.dark ? "oscuro" : "claro"} style={StyleSheet.absoluteFill} mapStyle={c.dark ? MAP_STYLE.dark : MAP_STYLE.light} logo={false} attribution attributionPosition={attributionPosition} compass={false} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
       <Camera ref={camera} initialViewState={compact ? { center: BOGOTA, zoom: 11.6 } : { center: lastView.center, zoom: lastView.zoom }} minZoom={9} maxZoom={19} />
       <Images images={BUS_SPRITES} />
-      {/* tu ubicación con la flecha que indica hacia dónde apunta el teléfono (como en la web) */}
-      <UserLocation heading />
+      {/* debajo de tu punto, el haz que muestra hacia dónde apunta el teléfono (como en la web) */}
+      <HeadingCone active={active} />
+      <UserLocation />
 
       <GeoJSONSource id="network" data={networkJson}>
         <Layer id="network-line" type="line" {...sp({ lineColor: lineColor(c.dark ? "#ff5a5e" : "#e30613") as never, lineOpacity: showTraffic ? 0.25 : 0.7, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 3, 17, 6], lineCap: "round", lineJoin: "round" })} />
@@ -318,6 +320,42 @@ const TrafficLayer = memo(function TrafficLayer({ json, show, moving, dark }: { 
         <Layer key={b} id={`trafico-flow-${b}`} type="line" minzoom={12.5} filter={base.filters[b]}
           {...sp({ visibility: vis, lineColor: "#ffffff", lineOpacity: b === 0 ? 0.65 : 0.88, lineWidth: ["interpolate", ["linear"], ["zoom"], 12.5, 0.9, 16, 2.6, 18.5, 4.6], lineDasharray: flowDashAt(b, t), lineCap: "butt", lineJoin: "round" })} />
       ))}
+    </GeoJSONSource>
+  );
+});
+
+/** El haz («linterna») que sale de tu punto hacia donde apunta el teléfono. Usa la brújula y tu ubicación solo si ya diste el permiso (no lo pide por su cuenta)
+ *  y solo con el mapa al frente. La capa está siempre montada: sin dato, va vacía. */
+const HeadingCone = memo(function HeadingCone({ active }: { active: boolean }) {
+  const [at, setAt] = useState<{ lon: number; lat: number; rot: number } | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    let gone = false, pos: { lon: number; lat: number } | null = null, rot: number | null = null, shown = { lon: 0, lat: 0, rot: -999 };
+    const subs: { remove(): void }[] = [];
+    const push = () => {
+      if (gone || !pos || rot == null) return;
+      // solo se repinta si giraste al menos 3° o te moviste: la brújula avisa muchas veces por segundo
+      const turn = Math.abs(((rot - shown.rot + 540) % 360) - 180);
+      if (turn < 3 && Math.abs(pos.lon - shown.lon) < 0.00002 && Math.abs(pos.lat - shown.lat) < 0.00002) return;
+      shown = { ...pos, rot };
+      setAt(shown);
+    };
+    void (async () => {
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        if (!perm.granted || gone) return;
+        subs.push(await Location.watchPositionAsync({ accuracy: Location.Accuracy.Balanced, distanceInterval: 3 }, (p) => { pos = { lon: p.coords.longitude, lat: p.coords.latitude }; push(); }));
+        subs.push(await Location.watchHeadingAsync((h) => { const v = h.trueHeading >= 0 ? h.trueHeading : h.magHeading; if (v >= 0) { rot = v; push(); } }));
+        if (gone) subs.forEach((x) => x.remove());
+      } catch { /* sin brújula (simulador) o sin permiso: no se dibuja el haz */ }
+    })();
+    return () => { gone = true; subs.forEach((x) => x.remove()); };
+  }, [active]);
+  const json = useMemo(() => JSON.stringify({ type: "FeatureCollection", features: at ? [{ type: "Feature", properties: { rot: at.rot }, geometry: { type: "Point", coordinates: [at.lon, at.lat] } }] : [] }), [at]);
+  const style = useMemo(() => sp({ iconImage: "me-cone", iconSize: 0.5, iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconPitchAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true }), []);
+  return (
+    <GeoJSONSource id="me-heading" data={json}>
+      <Layer id="me-cone" type="symbol" {...style} />
     </GeoJSONSource>
   );
 });
