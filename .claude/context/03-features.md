@@ -24,7 +24,7 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 | --- | --- | --- |
 | **Inicio** | `index.tsx` | Saludo, píldora «N en vivo» (abre el mapa) y campana de avisos, buscador, **Tus paradas** (carrusel: cada favorita con sus 3 próximos buses o la próxima hora programada; «Ver todas»), acceso rápido (Cerca de mí, Casa, Trabajo, Favoritos), «Cómo llegar» y «Rutas», y tus rutas favoritas |
 | **Mapa** | `mapa.tsx` | Mapa en vivo: abre centrado en ti la primera vez (si estás en Bogotá), filtros de sistema en vidrio, «En vivo», botón de ubicación (solo al alejarte), botón de capas (semáforos, estaciones), brújula propia (solo si el mapa está girado), tarjeta de «siguiendo un bus» con próxima parada |
-| **Rutas** | `rutas.tsx` | Buscador y lista de rutas |
+| **Buscar** (archivo `rutas.tsx`, ruta `/rutas`) | `rutas.tsx` | Un campo y un selector Rutas / Paradas: lista y busca rutas; busca paradas, estaciones y portales por nombre o código (dice qué es cada una); sin texto: «Paradas cerca de mí» y favoritas |
 | **Cómo llegar** | `viaje.tsx` | Origen/destino, salir ahora / salir a las / llegar a las, orden, itinerarios; tocar un tramo de bus abre la parada con esa ruta; modo «guardar casa/trabajo» (`planner/store.ts` `saveAs`) |
 | **Más** | `mas.tsx` | Tarjeta TuLlave destacada arriba (abre `/card`) y listas agrupadas tipo Ajustes: Servicio (buses en la calle, avisos con conteo), Tus cosas (Favoritos, Cerca de mí), Apariencia (Automático/Claro/Oscuro, `src/appearance.ts`), Pruebas (escondido: 8 toques en «Buses en la calle»), Ayuda (reportar problema → correo de contacto, privacidad), versión y compilación |
 

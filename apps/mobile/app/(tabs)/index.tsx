@@ -80,10 +80,10 @@ export default function Inicio() {
         </View>
         <Text style={[type.hero, styles.hero, { color: c.text }]} accessibilityRole="header">¿A dónde{"\n"}vamos hoy?</Text>
 
-        <Tap onPress={() => router.navigate("/viaje")} accessibilityRole="search" accessibilityLabel="Buscar un destino" style={styles.searchWrap}>
+        <Tap onPress={() => router.navigate("/rutas")} accessibilityRole="search" accessibilityLabel="Buscar una ruta, parada o estación" style={styles.searchWrap}>
           <View style={[styles.search, { backgroundColor: c.card, shadowColor: c.shadow }]}>
             <SymbolView name="magnifyingglass" tintColor={c.muted} size={18} />
-            <Text style={[type.body, { color: c.muted, flex: 1 }]}>Buscar ruta, parada o destino</Text>
+            <Text style={[type.body, { color: c.muted, flex: 1 }]}>Buscar ruta, parada o estación</Text>
             <View style={[styles.filter, { backgroundColor: c.ink }]}><SymbolView name="slider.horizontal.3" tintColor={c.onInk} size={16} /></View>
           </View>
         </Tap>

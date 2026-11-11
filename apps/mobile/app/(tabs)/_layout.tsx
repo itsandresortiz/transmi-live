@@ -13,8 +13,8 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Mapa</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="rutas">
-        <NativeTabs.Trigger.Icon sf="bus" />
-        <NativeTabs.Trigger.Label>Rutas</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="magnifyingglass" />
+        <NativeTabs.Trigger.Label>Buscar</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="viaje">
         <NativeTabs.Trigger.Icon sf="arrow.triangle.turn.up.right.diamond" />

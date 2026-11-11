@@ -1,7 +1,7 @@
 import { type GeoPoint, type Route, type RouteShape, RoadPath, type SystemType, toWorld } from "@transmi/domain";
 import { hav } from "./eta";
 import type { TransitState } from "./transit-state";
-import { searchStopGroups, upcomingAtStop, routesAtStop } from "./queries";
+import { type StopGroup, searchStopGroups, upcomingAtStop, routesAtStop } from "./queries";
 
 /* ====================================================================================================
  *  Planificador de viajes.
@@ -533,8 +533,8 @@ function tidyName(name: string): string {
   const small = new Set(["de", "del", "la", "las", "el", "los", "y", "con"]);
   return name.toLowerCase().split(" ").map((w, i) => (i > 0 && small.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
 }
-function searchStopGroupsLite(state: TransitState, q: string, limit: number): PlanPlace[] {
-  return searchStopGroups(state, q, limit).map((g) => {
+/** Qué es un grupo de paradas (portal, estación o paradero) y una línea que lo describe; con el nombre ya arreglado. Lo usan «Cómo llegar» y el buscador de paradas. */
+export function describeStopGroup(state: TransitState, g: StopGroup): PlanPlace & { kind: "Estación" | "Portal" | "Paradero"; detail: string } {
     const portal = g.stops.some((s) => state.labelOf(s).platform), station = !portal && g.stops.some((s) => state.labelOf(s).wagon);
     const title = tidyName(g.title);
     if (portal) return { name: /^(portal|terminal)\b/i.test(title) ? title : `Portal ${title}`, position: g.position, kind: "Portal" as const, detail: "Portal de TransMilenio" };
@@ -546,7 +546,9 @@ function searchStopGroupsLite(state: TransitState, q: string, limit: number): Pl
     const names = [...new Set(g.stops.flatMap((s) => routesAtStop(state, s.id).map((r) => r.shortName)))];
     // un paradero de la calle frente a una estación suele llamarse igual que ella: se rotula para no confundirlos
     return { name: /^(estaci[oó]n|portal)\b/i.test(title) ? `Paradero ${title}` : title, position: g.position, kind: "Paradero" as const, detail: names.length ? `Paradero · pasan ${names.slice(0, 4).join(", ")}${names.length > 4 ? "…" : ""}` : "Paradero" };
-  });
+}
+function searchStopGroupsLite(state: TransitState, q: string, limit: number): PlanPlace[] {
+  return searchStopGroups(state, q, limit).map((g) => describeStopGroup(state, g));
 }
 
 /* ---------- con qué viajar ---------- */
