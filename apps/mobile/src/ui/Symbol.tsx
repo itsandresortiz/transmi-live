@@ -22,7 +22,7 @@ const ANDROID: Record<string, IonName> = {
   "lock.fill": "lock-closed", magnifyingglass: "search", map: "map-outline", "map.fill": "map", mappin: "location-outline", "mappin.circle.fill": "location",
   pencil: "pencil", "person.crop.circle.badge.xmark": "person-remove", "play.fill": "play", "signpost.right.fill": "trail-sign",
   "slider.horizontal.3": "options", "square.3.layers.3d": "layers", "square.and.arrow.up": "share-outline", star: "star-outline", "star.fill": "star",
-  "tram.fill": "train", "wave.3.right": "wifi", xmark: "close", "xmark.circle.fill": "close-circle",
+  "tram.fill": "train", viewfinder: "scan-outline", "wave.3.right": "wifi", xmark: "close", "xmark.circle.fill": "close-circle",
 };
 export const ANDROID_ICONS = ANDROID;
 

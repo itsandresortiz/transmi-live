@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,7 +15,7 @@ import { usePlanner } from "@/planner/store";
 import { Card, PrimaryButton, RoundButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
-import { radius, space, type, useColors } from "@/ui/theme";
+import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
 /** El viaje que estás siguiendo, paso a paso: qué hacer ahora, qué sigue y a qué hora llegas. Los avisos salen aunque cierres esta ventana. */
 export default function Trip() {
@@ -26,6 +26,7 @@ export default function Trip() {
   const it = useTrip((s) => s.it), dest = useTrip((s) => s.dest), guide = useTrip((s) => s.guide), shift = useTrip((s) => s.shift), busId = useTrip((s) => s.busId), place = useTrip((s) => s.place);
 
   const map = useRef<TransitMapHandle>(null);
+  const [open, setOpen] = useState<Set<number>>(() => new Set());      // tramos en bus con la lista de paradas desplegada
   const { height } = useWindowDimensions();
   // el dibujo del viaje solo cambia si cambia el viaje (o cuando terminan de cargar las rutas, para seguir las calles)
   const version = transit.network.shapes.size;
@@ -64,7 +65,7 @@ export default function Trip() {
       <View style={{ height: mapH, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, overflow: "hidden" }}>
         <TransitMap ref={map} compact trip={geo} onlyRoutes={routeIds} highlightIds={busId ? [busId] : []} showSignals={false} attributionPosition={{ bottom: 6, left: 8 }}
           onBus={(bid) => router.push({ pathname: "/bus/[id]", params: { id: bid } })} onStop={(sid) => router.push({ pathname: "/stop/[id]", params: { id: sid } })} />
-        <View style={styles.mapBtn}><RoundButton symbol="arrow.up.left.and.arrow.down.right" label="Ver todo el viaje en el mapa" onPress={fitAll} size={40} light /></View>
+        <View style={styles.mapBtn}><RoundButton symbol="viewfinder" label="Encuadrar todo el viaje en el mapa" onPress={fitAll} size={40} light /></View>
       </View>
       <ScrollView contentContainerStyle={[styles.screen, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         <View>
@@ -99,9 +100,37 @@ export default function Trip() {
                 </View>
               </View>
             );
-            return l.kind === "ride"
-              ? <Tap key={s.leg} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: l.board.id, route: l.routeId } })} accessibilityRole="button" accessibilityLabel={`${s.title}. ${s.detail}. Ver el bus en vivo`}>{row}</Tap>
-              : <View key={s.leg} accessible accessibilityLabel={`${s.title}. ${s.detail}`}>{row}</View>;
+            if (l.kind !== "ride") return <View key={s.leg} accessible accessibilityLabel={`${s.title}. ${s.detail}`}>{row}</View>;
+            // todas las paradas que hace ese bus entre donde te subes y donde te bajas: para ir contando y saber cuánto falta
+            const all = [l.board, ...(l.between ?? []), l.alight], shown = open.has(s.leg);
+            return (
+              <View key={s.leg} style={{ gap: space[2] }}>
+                <Tap onPress={() => router.push({ pathname: "/stop/[id]", params: { id: l.board.id, route: l.routeId } })} accessibilityRole="button" accessibilityLabel={`${s.title}. ${s.detail}. Ver el bus en vivo`}>{row}</Tap>
+                <Tap haptic={false} onPress={() => setOpen((o) => { const n = new Set(o); if (n.has(s.leg)) n.delete(s.leg); else n.add(s.leg); return n; })} accessibilityRole="button" accessibilityState={{ expanded: shown }}
+                  accessibilityLabel={shown ? "Ocultar las paradas de este bus" : `Ver las ${all.length} paradas de este bus`} style={styles.toggle}>
+                  <Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>{shown ? "Ocultar paradas" : `Ver las ${all.length} paradas`}</Text>
+                  <SymbolView name={shown ? "chevron.up" : "chevron.down"} tintColor={c.accent} size={11} />
+                </Tap>
+                {shown ? (
+                  <View style={styles.stops}>
+                    {all.map((st, k) => {
+                      const edge = k === 0 || k === all.length - 1, color = route ? SYSTEM_COLOR[route.system] : c.muted;
+                      return (
+                        <View key={`${st.id}-${k}`} style={styles.stopRow}>
+                          <View style={styles.rail}>
+                            {k > 0 ? <View style={[styles.railLine, { top: 0, bottom: "50%", backgroundColor: color }]} /> : null}
+                            {k < all.length - 1 ? <View style={[styles.railLine, { top: "50%", bottom: 0, backgroundColor: color }]} /> : null}
+                            <View style={[edge ? styles.dotBig : styles.dot, { borderColor: color, backgroundColor: edge ? color : c.card }]} />
+                          </View>
+                          <Text style={[edge ? type.headline : type.body, { color: edge ? c.text : c.muted, flex: 1, fontSize: edge ? 15 : 14 }]} numberOfLines={1}>{placeText(st)}</Text>
+                          {edge ? <Text style={[type.caption, { color: c.muted }]}>{k === 0 ? "Subes" : "Bajas"}</Text> : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            );
           })}
           <View style={styles.step}>
             <View style={styles.icon}><SymbolView name="mappin.circle.fill" tintColor={c.accent} size={20} /></View>
@@ -122,4 +151,11 @@ const styles = StyleSheet.create({
   step: { flexDirection: "row", alignItems: "flex-start", gap: space[3] },
   icon: { minWidth: 34, alignItems: "center", paddingTop: 2 },
   mapBtn: { position: "absolute", right: 12, bottom: 12 },
+  toggle: { flexDirection: "row", alignItems: "center", gap: space[1], marginLeft: 34 + space[3], alignSelf: "flex-start", minHeight: 32 },
+  stops: { marginLeft: 34 + space[3] },
+  stopRow: { flexDirection: "row", alignItems: "center", gap: space[3], minHeight: 30 },
+  rail: { width: 14, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
+  railLine: { position: "absolute", width: 3, borderRadius: 2 },
+  dot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2 },
+  dotBig: { width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
 });
