@@ -11,7 +11,7 @@ const reply = (body: unknown, status = 200) =>
 
 describe("fuente en vivo con respaldo", () => {
   const files: Record<string, Uint8Array> = { positions: fx("positions.a"), tripupdates: fx("tripupdates"), alerts: fx("alerts") };
-  const make = (primaryUp: boolean, log: string[] = []) => {
+  const make = (primaryUp: boolean, log: string[] = [], fallbackAt?: number, onClock?: (ms: number) => void) => {
     const fetchFn = (async (input: RequestInfo | URL) => {
       const u = String(input);
       log.push(u);
@@ -21,11 +21,11 @@ describe("fuente en vivo con respaldo", () => {
         const k = Object.keys(files).find((x) => u.includes(`/${x}?`))!;
         return reply(files[k]!);
       }
-      if (u.includes("meta.json")) return reply({ pos: "P1", tu: "T1", al: "A1" });
+      if (u.includes("meta.json")) return reply({ pos: "P1", tu: "T1", al: "A1", ...(fallbackAt ? { at: fallbackAt } : {}) });
       const k = Object.keys(files).find((x) => u.includes(`/${x}.pb`))!;
       return reply(files[k]!);
     }) as typeof fetch;
-    return new ProxyLiveFeed({ primaryBase: "https://proxy.test/fn", fallbackBase: "https://raw.test/live/", fetchFn });
+    return new ProxyLiveFeed({ primaryBase: "https://proxy.test/fn", fallbackBase: "https://raw.test/live/", fetchFn, onClock });
   };
 
   it("descarga posiciones, retrasos y avisos cuando hay datos nuevos", async () => {
@@ -46,6 +46,17 @@ describe("fuente en vivo con respaldo", () => {
     const poll = await make(false).poll({});
     expect(poll!.source).toBe("delayed");
     expect(poll!.batch.positions!.length).toBeGreaterThan(5000);
+  });
+  it("no usa una copia de respaldo vieja (el proceso que la publica se detuvo): prefiere quedarse sin datos", async () => {
+    const twoHoursAgo = Math.floor(Date.now() / 1000) - 7200;
+    await expect(make(false, [], twoHoursAgo).poll({})).rejects.toThrow(/Sin conexión/);
+    const fresh = await make(false, [], Math.floor(Date.now() / 1000) - 40).poll({});
+    expect(fresh!.source).toBe("delayed");
+  });
+  it("la hora de la copia de respaldo no se usa como reloj (es la hora en que se publicó, no la de ahora)", async () => {
+    const clocks: number[] = [];
+    await make(false, [], Math.floor(Date.now() / 1000) - 300, (ms) => clocks.push(ms)).poll({});
+    expect(clocks).toEqual([]);
   });
   it("falla con un mensaje claro si no hay ninguna fuente", async () => {
     const feed = new ProxyLiveFeed({ primaryBase: "https://x.test", fetchFn: (async () => { throw new TypeError("net"); }) as typeof fetch });

@@ -58,3 +58,10 @@ Datos reales para validar: `git fetch origin +live-data:refs/remotes/origin/live
 ## Google Play (Android)
 - Paquete: `bash apps/mobile/scripts/playstore-local.sh` → `~/Desktop/TransMiLIVE-<compilación>.aab`, firmado con la llave de subida del Mac del dueño (`~/.transmilive/transmilive-subida.jks`; clave en el Llavero de macOS, elemento `transmilive-llave-subida`). Variables (solo nombres): `TM_UPLOAD_STORE`, `TM_UPLOAD_ALIAS`, `TM_UPLOAD_PASS`, `TM_VERSION_CODE`.
 - La subida es manual en Google Play Console (el dueño). Nombre del paquete: `com.transmilive.app`. Conviene usar «Firma de apps de Google Play» (si se pierde la llave de subida, Google deja cambiarla).
+
+## Cadenas de datos: cómo se mantienen vivas (2026-11-11)
+- «Datos en vivo» (`live-data.yml`) y «Llegadas para el widget» (`widget-data.yml`) se relanzan solas al terminar. El horario `*/5` de GitHub es solo un respaldo y en este repo casi no corre (se ha visto cada ~8 h). Por eso cada una revisa a la otra al final y la relanza si no hay ejecución en curso ni en espera.
+- Si las dos se caen a la vez, hay que lanzar una a mano (Actions › «Datos en vivo» › Run workflow); la vigilancia (`health.yml`) abre un issue «salud-datos», pero tarde.
+- La rama `live-data` la escriben dos procesos: el bucle en vivo (los `.pb` y `meta.json`) y el diario (`gtfs-lite.zip`, `network.json.gz`). El bucle toma siempre del remoto los archivos del diario antes de empujar; `publish.sh` comprueba 20 s después que lo suyo siga ahí y repite hasta 4 veces.
+- La app y la web usan primero el intermediario (Supabase) y, si falla, `live-data` solo si tiene menos de 10 minutos. La hora de `meta.json` del respaldo es la de publicación: nunca se usa como reloj.
+- `hop-stats` depende solo del horario de GitHub: lleva días sin actualizarse (pendiente).

@@ -39,3 +39,9 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Quitar del mapa buses con >10 min sin reportar** · evita mostrar buses congelados cuando el feed se atasca.
 - **Vagón = letra del nombre de la parada** · verificado con rutas conocidas (La Campiña: H15 vagón 3, la 7 vagón 1).
 - **Copiar de otro repo de referencia solo ideas, sin escribir en él** · accesibilidad, contraste, estado del feed, bienvenida, apodos, reportes, política de privacidad.
+
+## 2026-11-11 · Avisos de TransMilenio con periodo de segundos
+- **Contexto**: el feed pasó a publicar los avisos con inicio y fin separados por segundos (la hora del reporte), todos ya «vencidos»; la app mostraba 0 de 431.
+- **Decisión**: si el periodo dura menos de 5 min se trata como «reportado a esa hora» y se muestra durante 6 h con el texto «Reportado hoy a las …». Los avisos con periodo largo siguen la regla estricta.
+- **Descartado**: mostrar todo lo que venga en el feed (431 novedades, algunas de la madrugada, parecerían de ahora) o no mostrar nada.
+- **Por revisar**: si 6 h es mucho o poco (decisión de producto del dueño) y si el feed vuelve al formato anterior.

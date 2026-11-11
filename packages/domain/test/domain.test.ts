@@ -226,6 +226,10 @@ describe("avisos legibles y vigentes", () => {
     expect(isAlertActive({ ...base, endsAt: now - 1 }, now)).toBe(false);
     expect(isAlertActive({ ...base, startsAt: now + 7200 }, now)).toBe(false);
     expect(isAlertActive(base, now)).toBe(true);
+    // TransMilenio publica ahora las novedades con un periodo de segundos (la hora del reporte): se muestran unas horas, no «vencen» al instante
+    expect(isAlertActive({ ...base, startsAt: now - 3600, endsAt: now - 3598 }, now)).toBe(true);
+    expect(isAlertActive({ ...base, startsAt: now - 8 * 3600, endsAt: now - 8 * 3600 + 5 }, now)).toBe(false);
+    expect(alertValidity({ ...base, startsAt: now - 3600, endsAt: now - 3598 }, now)).toMatch(/^Reportado hoy a las /);
   });
   it("muestra el periodo en hora de Bogotá", () => {
     const now = Date.UTC(2026, 10, 6, 12) / 1000;

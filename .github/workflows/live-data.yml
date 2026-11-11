@@ -19,6 +19,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/live_loop.sh
+      - name: Revisar que el otro proceso de datos siga andando
+        # cada proceso se relanza solo al terminar; si un arranque falla, la cadena se rompe y el horario de respaldo de GitHub puede tardar horas.
+        # Por eso cada uno revisa al otro y lo vuelve a lanzar si no hay ninguna ejecución en curso ni en espera.
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          N=$( (gh run list --repo "$GITHUB_REPOSITORY" --workflow widget-data.yml --status in_progress --json databaseId --jq length; gh run list --repo "$GITHUB_REPOSITORY" --workflow widget-data.yml --status queued --json databaseId --jq length) 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo 1)
+          if [ "${N:-1}" = "0" ]; then echo "widget-data.yml estaba detenido: se relanza"; gh workflow run widget-data.yml --repo "$GITHUB_REPOSITORY" --ref main || true; fi
       - name: Relanzar para seguir sin pausa
         if: always()
         env:

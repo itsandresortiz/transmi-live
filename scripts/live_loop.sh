@@ -22,6 +22,11 @@ for i in $(seq 1 "$N"); do
   done
   if [ "$changed" = 1 ]; then
     printf '{"pos":"%s","tu":"%s","al":"%s","at":%s}\n' "$(sha1sum positions.pb | cut -c1-12)" "$(sha1sum tripupdates.pb | cut -c1-12)" "$(sha1sum alerts.pb | cut -c1-12)" "$(date +%s)" > meta.json
+    # los archivos que publica el proceso diario (rutas y red) no son de este bucle: se toman siempre de lo que hay publicado,
+    # para no pisarlos con la copia vieja que se bajó al empezar
+    if git fetch -q --depth 1 "$URL" live-data 2>/dev/null; then
+      for keep in gtfs-lite.zip network.json.gz; do git cat-file -e "FETCH_HEAD:$keep" 2>/dev/null && git show "FETCH_HEAD:$keep" > "$W/$keep"; done
+    fi
     git checkout -q --orphan "s$i"
     git add -A
     git commit -q -m "datos $(date -u +%Y-%m-%dT%H:%M:%SZ)"

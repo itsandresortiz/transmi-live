@@ -32,6 +32,9 @@ export function parseLiveFrames(buf: Uint8Array): { at: number; parts: { k: "pos
   } catch { return null; }
 }
 
+/** Edad máxima (segundos) de la copia de respaldo para usarla. Normalmente tiene menos de un minuto; si el proceso que la publica se detiene, puede tener horas. */
+export const MAX_FALLBACK_AGE_S = 600;
+
 interface Meta { pos?: string; tu?: string; al?: string; /** hora del servidor (segundos desde 1970) */ at?: number }
 
 /** Lee los tres archivos de TransMilenio preguntando primero por una huella mínima (`meta`):
@@ -42,7 +45,9 @@ export class ProxyLiveFeed implements LiveFeedPort {
     this.f = cfg.fetchFn ?? ((...a) => fetch(...a));
   }
 
-  private async json(url: string): Promise<Meta | null> {
+  /** `clock` = la hora que trae la respuesta es la del servidor en este instante (el intermediario). La copia de respaldo trae la hora en que
+   *  se publicó, que puede ser de hace minutos u horas: usarla como reloj atrasaba la hora de la app y dañaba todos los tiempos de llegada. */
+  private async json(url: string, clock = true): Promise<Meta | null> {
     try {
       const t0 = Date.now();
       const r = await this.f(url, { cache: "no-store" });
@@ -50,7 +55,7 @@ export class ProxyLiveFeed implements LiveFeedPort {
       const m = (await r.json()) as Meta;
       const t1 = Date.now();
       // el reloj de cada aparato puede estar adelantado o atrasado: se mide contra la hora del servidor (±1 s) para que todos muestren lo mismo
-      if (typeof m.at === "number" && m.at > 1e9) this.cfg.onClock?.(m.at * 1000 + 500 - (t0 + t1) / 2);
+      if (clock && typeof m.at === "number" && m.at > 1e9) this.cfg.onClock?.(m.at * 1000 + 500 - (t0 + t1) / 2);
       return m && m.pos ? m : null;
     } catch { return null; }
   }
@@ -101,7 +106,9 @@ export class ProxyLiveFeed implements LiveFeedPort {
     let url = (k: "positions" | "tripupdates" | "alerts", sig: string) => `${primary}/${k}?v=${sig}`;
     if (!meta && this.cfg.fallbackBase) {
       const fb = this.cfg.fallbackBase;
-      meta = await this.json(`${fb}meta.json?t=${Math.floor(Date.now() / 3000)}`);
+      meta = await this.json(`${fb}meta.json?t=${Math.floor(Date.now() / 3000)}`, false);
+      // una copia de respaldo vieja no sirve: mostraría los buses donde estaban hace rato. Es mejor quedarse sin datos (y decirlo) que dar un dato viejo.
+      if (meta && typeof meta.at === "number" && meta.at > 1e9 && Date.now() / 1000 - meta.at > MAX_FALLBACK_AGE_S) meta = null;
       source = "delayed";
       url = (k, sig) => `${fb}${k}.pb?v=${sig}`;
     }

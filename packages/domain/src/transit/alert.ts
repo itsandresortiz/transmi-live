@@ -62,10 +62,22 @@ export function alertReference(a: ServiceAlert): string {
   return a.headline.replace(/[*⚠️]+/g, "").replace(/\s+/g, " ").trim();
 }
 
-/** ¿El aviso está vigente en `nowSec`? Los vencidos y los que aún no empiezan no se muestran. */
+/** Desde noviembre de 2026 TransMilenio publica casi todos los avisos con un periodo de apenas unos segundos (empieza y termina en el mismo
+ *  instante): esa hora no es una vigencia, es el momento en que se reportó la novedad. Tomada al pie de la letra, todos los avisos salían
+ *  «vencidos» y la app no mostraba ninguno. */
+const INSTANT_S = 300;
+/** Cuánto tiempo se sigue mostrando una novedad reportada «en un instante» (mientras TransMilenio la siga publicando). */
+export const REPORT_WINDOW_S = 6 * 3600;
+export function isReportedAlert(a: ServiceAlert): boolean {
+  return a.startsAt != null && a.endsAt != null && a.endsAt - a.startsAt < INSTANT_S;
+}
+
+/** ¿El aviso está vigente en `nowSec`? Los vencidos y los que aún no empiezan no se muestran. Una novedad reportada en un instante se muestra
+ *  durante las horas siguientes al reporte. */
 export function isAlertActive(a: ServiceAlert, nowSec: number): boolean {
-  if (a.endsAt != null && a.endsAt < nowSec) return false;
   if (a.startsAt != null && a.startsAt > nowSec + 3600) return false;
+  if (isReportedAlert(a)) return nowSec - a.endsAt! < REPORT_WINDOW_S;
+  if (a.endsAt != null && a.endsAt < nowSec) return false;
   return true;
 }
 
@@ -74,6 +86,12 @@ export function alertValidity(a: ServiceAlert, nowSec: number = Date.now() / 100
   const year = (t: number) => Number(new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: "America/Bogota" }).format(new Date(t * 1000)));
   const thisYear = year(nowSec);
   const f = (t: number) => new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", ...(year(t) !== thisYear ? { year: "numeric" } : {}), timeZone: "America/Bogota" }).format(new Date(t * 1000)).replace(/\.$/, "");
+  // una novedad reportada en un instante no tiene «desde… hasta»: se dice cuándo se reportó, para que nadie la tome por algo de ahora mismo
+  if (isReportedAlert(a)) {
+    const hour = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Bogota" }).format(new Date(a.startsAt! * 1000));
+    const day = (t: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(t * 1000));
+    return day(a.startsAt!) === day(nowSec) ? `Reportado hoy a las ${hour}` : `Reportado el ${f(a.startsAt!)} a las ${hour}`;
+  }
   const parts: string[] = [];
   if (a.startsAt != null) parts.push(`Desde el ${f(a.startsAt)}`);
   if (a.endsAt != null) parts.push(`hasta el ${f(a.endsAt)}`);
