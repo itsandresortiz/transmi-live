@@ -19,7 +19,7 @@ import { usePlanner } from "@/planner/store";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { Card, IconDot, RoundButton, SectionTitle, Tap, PAGE } from "@/ui/kit";
 import { TripBanner } from "@/ui/TripBanner";
-import { radius, space, type, useColors } from "@/ui/theme";
+import { lift, radius, space, type, useColors } from "@/ui/theme";
 
 const greeting = () => {
   const h = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "America/Bogota" }).format(new Date()));
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space[5], paddingTop: space[2] },
   hero: { paddingHorizontal: space[5], marginTop: space[2] },
   searchWrap: { marginHorizontal: space[5], marginTop: space[5] },
-  search: { flexDirection: "row", alignItems: "center", gap: space[3], minHeight: 58, borderRadius: radius.xl, borderCurve: "continuous", paddingLeft: space[4], paddingRight: space[2], shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
+  search: { flexDirection: "row", alignItems: "center", gap: space[3], minHeight: 58, borderRadius: radius.xl, borderCurve: "continuous", paddingLeft: space[4], paddingRight: space[2], shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, ...lift(6, 18, 0.08) },
   filter: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
   quickRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: space[5] },
   quick: { alignItems: "center", gap: space[2], width: 76 },

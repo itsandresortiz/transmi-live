@@ -11,5 +11,5 @@ export function RouteBadge({ route }: { route: Route }) {
 }
 const styles = StyleSheet.create({
   badge: { minWidth: 52, paddingHorizontal: 8, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center", borderCurve: "continuous" },
-  text: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  text: { color: "#fff", fontWeight: "700", fontSize: 14, includeFontPadding: false, textAlignVertical: "center" },
 });

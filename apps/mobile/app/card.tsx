@@ -9,7 +9,7 @@ import { Tullave } from "../modules/tullave/src";
 import { useAccessibility } from "@/accessibility";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
-import { radius, space, type, useColors } from "@/ui/theme";
+import { lift, radius, space, type, useColors } from "@/ui/theme";
 
 const pesos = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toLocaleString("es-CO")}`;
 const KIND: Record<CardMovement["kind"], { label: string; symbol: SFSymbol }> = {
@@ -179,7 +179,7 @@ export default function CardScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: space[5], gap: space[3] },
-  face: { aspectRatio: 1.586, borderRadius: 26, borderCurve: "continuous", backgroundColor: "#16161a", padding: space[5], justifyContent: "space-between", overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 22, shadowOffset: { width: 0, height: 12 } },
+  face: { aspectRatio: 1.586, borderRadius: 26, borderCurve: "continuous", backgroundColor: "#16161a", padding: space[5], justifyContent: "space-between", overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 22, shadowOffset: { width: 0, height: 12 }, ...lift(12, 24, 0.28) },
   glowA: { position: "absolute", right: -70, top: -90, width: 260, height: 260, borderRadius: 130, backgroundColor: "#e11d2e", opacity: 0.55 },
   glowB: { position: "absolute", left: -90, bottom: -120, width: 260, height: 260, borderRadius: 130, backgroundColor: "#ffffff", opacity: 0.06 },
   faceTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },

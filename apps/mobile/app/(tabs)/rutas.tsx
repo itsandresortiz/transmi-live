@@ -11,7 +11,7 @@ import { useSaved } from "@/favorites";
 import { Card, PAGE, Tap } from "@/ui/kit";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { RouteBadge } from "@/ui/RouteBadge";
-import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
+import { lift, SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
 type Kind = "rutas" | "paradas";
 /** Una parada, estación o portal en la lista: a cuál abrir, cómo se llama y una línea que dice qué es. */
@@ -67,7 +67,7 @@ export default function Buscar() {
       <Text style={[type.largeTitle, styles.title, { color: c.text }]} accessibilityRole="header">Buscar</Text>
       <View style={[styles.search, { backgroundColor: c.card, shadowColor: c.shadow }]}>
         <SymbolView name="magnifyingglass" tintColor={c.muted} size={17} />
-        <TextInput
+        <TextInput selectionColor={c.accent} cursorColor={c.accent} underlineColorAndroid="transparent"
           value={query} onChangeText={setQuery} placeholder={kind === "rutas" ? "Ruta o destino (C15, Portal Norte…)" : "Parada, estación o código"} placeholderTextColor={c.muted}
           autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" returnKeyType="search"
           accessibilityLabel={kind === "rutas" ? "Buscar una ruta" : "Buscar una parada, estación o portal"} style={[type.body, styles.input, { color: c.text }]}
@@ -136,7 +136,7 @@ export default function Buscar() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   title: { paddingHorizontal: space[5], paddingTop: space[2] },
-  search: { flexDirection: "row", alignItems: "center", gap: space[2], marginHorizontal: space[5], marginTop: space[4], marginBottom: space[3], minHeight: 48, borderRadius: radius.lg, borderCurve: "continuous", paddingHorizontal: space[4], shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+  search: { flexDirection: "row", alignItems: "center", gap: space[2], marginHorizontal: space[5], marginTop: space[4], marginBottom: space[3], minHeight: 48, borderRadius: radius.lg, borderCurve: "continuous", paddingHorizontal: space[4], shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, ...lift(4, 14, 0.07) },
   input: { flex: 1, minHeight: 48 },
   segments: { marginHorizontal: space[5], marginBottom: space[3] },
   hintWrap: { marginHorizontal: space[5], marginBottom: space[3], gap: space[3] },

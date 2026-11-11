@@ -25,6 +25,7 @@
 - Swift: no escribir en una misma condición `a < b, c > d` (se interpreta como genérico y no compila): calcular cada comparación en una variable.
 - App: las tarjetas grandes con mucho texto que se pueden tocar usan `<Tap still>` (se atenúan); el rebote de encogerse deja las letras borrosas un instante en bloques grandes.
 - Android: no usar `transformOrigin` junto con `perspective` (Android gira sobre el centro): ver `groundStyles` en `RideScene.tsx`. Las ventanas en Android llevan `AppHeader` (se pone solo desde `_layout.tsx`); no usar el encabezado blanco del sistema.
+- Android: las sombras se ponen con `lift(y, desenfoque, opacidad)` de `theme.ts` junto a las de iPhone (las de iPhone no existen en Android; no usar `elevation` para tarjetas, da una sombra dura).
 - App: interruptores con `Toggle` (de `kit.tsx`), no con `Switch` directo (en iOS 26 queda descentrado).
 - App: las filas que se deslizan de lado deben llegar a los bordes de la pantalla (`marginHorizontal` negativo + `paddingHorizontal` en el contenido); si no, las fichas se recortan en seco en el margen.
 - App: nada pesado en el primer instante tras abrir (la carga de datos arranca con un pequeño retraso en `_layout.tsx`): si se ocupa el hilo antes del primer cuadro, la pantalla de arranque no se pinta y se ve negro.

@@ -49,7 +49,7 @@ export default function Personalizar() {
         <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>NOMBRE</Text>
         <View style={[styles.field, { backgroundColor: c.card, borderColor: c.line }]}>
           <SymbolView name="pencil" tintColor={c.muted} size={16} />
-          <TextInput value={name} onChangeText={setName} autoFocus maxLength={40} placeholder="Por ejemplo: La del colegio" placeholderTextColor={c.muted} returnKeyType="done" onSubmitEditing={save}
+          <TextInput selectionColor={c.accent} cursorColor={c.accent} underlineColorAndroid="transparent" value={name} onChangeText={setName} autoFocus maxLength={40} placeholder="Por ejemplo: La del colegio" placeholderTextColor={c.muted} returnKeyType="done" onSubmitEditing={save}
             autoCapitalize="sentences" clearButtonMode="while-editing" accessibilityLabel="Nombre de la parada" style={[type.body, styles.input, { color: c.text }]} />
         </View>
 

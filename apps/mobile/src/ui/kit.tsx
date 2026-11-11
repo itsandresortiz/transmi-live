@@ -5,7 +5,7 @@ import * as Haptics from "expo-haptics";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { SymbolView, type SFSymbol } from "@/ui/Symbol";
 import { useAccessibility } from "@/accessibility";
-import { radius, space, type, useColors } from "./theme";
+import { lift, radius, space, type, useColors } from "./theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -47,18 +47,25 @@ export function Glass({ children, style, interactive = false, tint, scheme }: { 
   const onMap = scheme === "light", mapDark = onMap && c.dark;      // «light» = va sobre el mapa, que en apariencia oscura también es oscuro
   if (reduceTransparency) return <View style={[{ backgroundColor: onMap ? (mapDark ? "rgba(28,28,30,0.94)" : "rgba(255,255,255,0.94)") : c.card }, style]}>{children}</View>;
   if (Platform.OS === "ios" && isLiquidGlassAvailable()) return <GlassView key={fresh} glassEffectStyle={scheme === "light" && !tint ? "clear" : "regular"} colorScheme={onMap ? (mapDark ? "dark" : "light") : scheme ?? "auto"} isInteractive={interactive} tintColor={tint} style={style}>{children}</GlassView>;
-  return <View style={[{ backgroundColor: tint ?? (onMap ? (mapDark ? "rgba(28,28,30,0.82)" : "rgba(255,255,255,0.86)") : c.dark ? "rgba(40,40,44,0.82)" : "rgba(255,255,255,0.86)") }, style]}>{children}</View>;
+  // sin vidrio (Android, iOS anterior al 26): como no hay desenfoque, el fondo va casi sólido para que el texto se lea sobre el mapa,
+  // con un borde fino y una sombra suave para que el control «flote»
+  const darkSurface = onMap ? mapDark : c.dark;
+  if (tint) return <View style={[{ backgroundColor: tint }, lift(6, 14, 0.18), style]}>{children}</View>;
+  return <View style={[{ backgroundColor: darkSurface ? "rgba(30,30,34,0.95)" : "rgba(255,255,255,0.96)", borderWidth: StyleSheet.hairlineWidth, borderColor: darkSurface ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)" }, lift(6, 18, 0.14), style]}>{children}</View>;
 }
 
 /** Botón redondo de vidrio con un símbolo de iOS (volver, ubicación, avisos…). */
 /** Interruptor del sistema, centrado en su fila. En iOS 26 el interruptor nativo mide 63×28 (antes 51×31) y React Native le sigue reservando
  *  el tamaño viejo, así que queda corrido; aquí se le da su caja real y se centra dentro de un espacio fijo. */
 export function Toggle({ value, onChange, label, disabled = false }: { value: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  const c = useColors();
   const glass = Platform.OS === "ios" && isLiquidGlassAvailable();
   const w = glass ? 63 : 51, h = glass ? 28 : 31;
   return (
     <View style={{ width: w, height: 44, alignItems: "center", justifyContent: "center" }}>
-      <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel={label} style={{ width: w, height: h }} />
+      {Platform.OS === "android"
+        ? <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel={label} trackColor={{ false: c.dark ? "#3a3a3e" : "#d5d5db", true: c.dark ? "#7a2630" : "#f3b1b8" }} thumbColor={value ? c.accent : c.dark ? "#a1a1a8" : "#ffffff"} />
+        : <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel={label} style={{ width: w, height: h }} />}
     </View>
   );
 }
@@ -127,7 +134,7 @@ export function IconDot({ symbol, tint, bg }: { symbol: SFSymbol; tint: string; 
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: radius.lg, borderCurve: "continuous", padding: space[4], shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
+  card: { borderRadius: radius.lg, borderCurve: "continuous", padding: space[4], shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, ...lift(6, 18, 0.08) },
   primary: { minHeight: 54, borderRadius: radius.pill, borderCurve: "continuous", overflow: "hidden", justifyContent: "center", alignItems: "center" },
   primaryRow: { flexDirection: "row", alignItems: "center", gap: space[2], paddingHorizontal: space[5], minHeight: 54 },
   round: { alignItems: "center", justifyContent: "center", overflow: "hidden" },

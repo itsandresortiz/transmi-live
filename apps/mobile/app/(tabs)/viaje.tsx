@@ -125,7 +125,7 @@ function FieldRow({ dot, label, value, placeholder, active, text, onFocus, onCha
       <View style={[styles.fdot, { backgroundColor: dot }]} />
       <View style={{ flex: 1 }}>
         <Text style={[type.caption, { color: c.muted }]}>{label}</Text>
-        <TextInput accessibilityLabel={label} value={active ? text : value} placeholder={placeholder} placeholderTextColor={c.muted} onFocus={onFocus} onChangeText={onChange}
+        <TextInput selectionColor={c.accent} cursorColor={c.accent} underlineColorAndroid="transparent" accessibilityLabel={label} value={active ? text : value} placeholder={placeholder} placeholderTextColor={c.muted} onFocus={onFocus} onChangeText={onChange}
           autoCorrect={false} returnKeyType="search" clearButtonMode="while-editing" style={[type.headline, { color: c.text, paddingVertical: 2, marginRight: 44 }]} />
       </View>
     </View>

@@ -1,4 +1,4 @@
-import { useColorScheme } from "react-native";
+import { Platform, useColorScheme, type ViewStyle } from "react-native";
 import type { SystemType } from "@transmi/domain";
 import { useAccessibility } from "@/accessibility";
 import { DARK, HIGH_DARK, HIGH_LIGHT, LIGHT } from "./palette";
@@ -24,6 +24,12 @@ export const type = {
   caption: { fontSize: 13, fontWeight: "500" },
   eyebrow: { fontSize: 12, fontWeight: "700", letterSpacing: 0.6 },
 } as const;
+
+/** Sombra suave en Android. Las sombras de iPhone (`shadowOpacity`, `shadowRadius`…) no existen allá, y sin ellas las tarjetas quedan planas
+ *  contra el fondo; la «elevación» de Android da una sombra dura y gris. `boxShadow` sí da la misma sombra difusa. En iPhone no agrega nada. */
+export function lift(y: number, blur: number, alpha: number): ViewStyle {
+  return Platform.OS === "android" ? { boxShadow: `0px ${y}px ${blur}px rgba(27, 27, 42, ${alpha})` } : {};
+}
 
 /** Colores del tema claro u oscuro, o la paleta de alto contraste si el teléfono tiene «Más contraste». */
 export function useColors() {

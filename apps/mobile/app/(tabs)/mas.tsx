@@ -17,7 +17,7 @@ import { useDemo } from "@/demo";
 import { usePlanner } from "@/planner/store";
 import { Tap, PAGE, Toggle } from "@/ui/kit";
 import { GlassSegments } from "@/ui/GlassSegments";
-import { radius, space, type, useColors } from "@/ui/theme";
+import { lift, radius, space, type, useColors } from "@/ui/theme";
 
 /** Una fila de lista al estilo de Ajustes de iOS: icono en un cuadro de color, título, un valor opcional a la derecha y la flecha. */
 function Row({ symbol, tint, title, value, onPress, last = false, link = false }: { symbol: SFSymbol; tint: string; title: string; value?: string; onPress(): void; last?: boolean; link?: boolean }) {
@@ -149,7 +149,7 @@ export default function Mas() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: space[5], gap: space[5], paddingBottom: space[10] * 3 },
-  hero: { borderRadius: 26, borderCurve: "continuous", backgroundColor: "#16161a", padding: space[5], gap: space[4], overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
+  hero: { borderRadius: 26, borderCurve: "continuous", backgroundColor: "#16161a", padding: space[5], gap: space[4], overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, ...lift(10, 20, 0.22) },
   glowA: { position: "absolute", right: -70, top: -90, width: 260, height: 260, borderRadius: 130, backgroundColor: "#e11d2e", opacity: 0.55 },
   glowB: { position: "absolute", left: -90, bottom: -120, width: 260, height: 260, borderRadius: 130, backgroundColor: "#ffffff", opacity: 0.06 },
   heroTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
