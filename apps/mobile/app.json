@@ -63,7 +63,8 @@
         }
       ],
       "./plugins/sin-push",
-      "./plugins/android-memoria"
+      "./plugins/android-memoria",
+      "./plugins/android-firma"
     ],
     "experiments": {
       "typedRoutes": true

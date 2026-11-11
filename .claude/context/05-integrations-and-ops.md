@@ -54,3 +54,7 @@ npx expo export --platform ios --output-dir <carpeta-temporal>   # ¿empaqueta?
 npx expo prebuild --platform ios --no-install                    # ¿arma el proyecto? (con y sin WIDGET=1) y borrar ios/ después
 ```
 Datos reales para validar: `git fetch origin +live-data:refs/remotes/origin/live-data` y leer `positions.pb`, `tripupdates.pb`, `gtfs-lite.zip` (ver `sessions/2026-11-10-datos-widget-y-pulido.md`).
+
+## Google Play (Android)
+- Paquete: `bash apps/mobile/scripts/playstore-local.sh` → `~/Desktop/TransMiLIVE-<compilación>.aab`, firmado con la llave de subida del Mac del dueño (`~/.transmilive/transmilive-subida.jks`; clave en el Llavero de macOS, elemento `transmilive-llave-subida`). Variables (solo nombres): `TM_UPLOAD_STORE`, `TM_UPLOAD_ALIAS`, `TM_UPLOAD_PASS`, `TM_VERSION_CODE`.
+- La subida es manual en Google Play Console (el dueño). Nombre del paquete: `com.transmilive.app`. Conviene usar «Firma de apps de Google Play» (si se pierde la llave de subida, Google deja cambiarla).
