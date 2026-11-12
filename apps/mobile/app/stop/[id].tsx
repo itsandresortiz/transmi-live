@@ -266,7 +266,7 @@ function RouteEmpty({ route }: { route?: Route }) {
   const down = liveDown();
   const [title, text] = st?.state === "ended" ? ["Ya no hay más buses hoy", (down ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`) + (st.nextFirstStart != null ? ` El próximo sale a las ${clockOfDay(st.nextFirstStart)}.` : "")]
     : st?.state === "before" ? ["Aún no empieza el servicio", `El primer bus sale a las ${clockOfDay(st.firstStart)}.`]
-    : down ? (downText().closed ? [downText().title, downText().detail] : ["Sin datos en vivo por ahora", "TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio."])
+    : down ? (downText().closed || downText().offline ? [downText().title, downText().detail] : ["Sin datos en vivo por ahora", "TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio."])
     : ["Ningún bus viene ahora", "Esta ruta no tiene buses acercándose a la parada en este momento."];
   return <Card><Text style={[type.headline, { color: c.text }]}>{title}</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{text}</Text></Card>;
 }

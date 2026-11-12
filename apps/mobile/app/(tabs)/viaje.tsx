@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { downText } from "@/lastService";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -94,6 +95,7 @@ export default function Viaje() {
             {local.map((r) => <Row key={`l${r.name}${r.position.lat}`} symbol={r.kind === "Portal" ? "building.2.fill" : r.kind === "Estación" ? "tram.fill" : "signpost.right.fill"} tint={r.kind === "Paradero" ? SYSTEM_COLOR.zonal : SYSTEM_COLOR.troncal} title={r.name} sub={r.detail} onPress={() => choose(r)} />)}
             {remote.map((r) => <Row key={`r${r.name}${r.position.lat}`} symbol="mappin.circle.fill" title={r.name.split(" · ")[0]!} sub={`Dirección o lugar · ${r.name.split(" · ").slice(1).join(" · ") || "Bogotá"}`} onPress={() => choose(r)} />)}
             {busy ? <ActivityIndicator style={{ marginTop: space[3] }} /> : null}
+            {text.trim().length >= 3 && !busy && !remote.length && downText().offline ? <Text style={[type.caption, { color: c.muted, padding: space[3] }]}>Sin conexión: ahora solo se pueden buscar paradas y estaciones, no direcciones.</Text> : null}
             {text.trim().length >= 3 && !busy && !local.length && !remote.length ? <Text style={[type.body, { color: c.muted, padding: space[3] }]}>No encontramos «{text.trim()}». Prueba con una estación, una calle con número o un lugar conocido.</Text> : null}
           </View>
         ) : p.dest ? (

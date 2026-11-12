@@ -216,3 +216,18 @@ describe("con el servicio terminado se dice cuándo sale el próximo bus", () =>
     expect(se.routeStatus("R", bogota(2026, 11, 11, 12, 0), 0)!.nextFirstStart).toBeUndefined();   // en servicio: no aplica
   });
 });
+
+import { isOffline, TransitState as TS2 } from "@transmi/application";
+describe("sin conexión", () => {
+  it("se deduce de consultas fallidas seguidas y manda sobre «servicio finalizado»", () => {
+    const st = new TS2(), now = 1_800_000_000_000;
+    expect(isOffline(st, now)).toBe(false);
+    st.pollFailures = 1; st.lastPollFailAt = now - 5_000;
+    expect(isOffline(st, now)).toBe(false);                       // una sola falla puede ser un tropiezo
+    st.pollFailures = 3;
+    expect(isOffline(st, now)).toBe(true);
+    st.lastPollOkAt = now - 10_000;
+    expect(isOffline(st, now)).toBe(false);                       // contestó hace poco: hay conexión
+    expect(liveDownText(Date.UTC(2026, 10, 12, 5, 10), true).title).toBe("Sin conexión a internet");   // a medianoche y sin red: se dice sin conexión
+  });
+});

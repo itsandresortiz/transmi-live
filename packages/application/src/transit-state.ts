@@ -20,6 +20,9 @@ export class TransitState {
   lastBatchAt: number | null = null;
   /** Última vez (ms) que la fuente respondió bien, haya traído datos nuevos o no. */
   lastPollOkAt: number | null = null;
+  /** Última vez (ms) que la consulta falló (sin red o sin respuesta) y cuántas van seguidas. */
+  lastPollFailAt: number | null = null;
+  pollFailures = 0;
   source: FeedSource | null = null;
   version = 0;
   /** Lo que se ha aprendido de cuánto tarda cada ruta por parada. */

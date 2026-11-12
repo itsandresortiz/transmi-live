@@ -1,4 +1,4 @@
-import { liveDownText, liveLevel } from "@transmi/application";
+import { isOffline, liveDownText, liveLevel } from "@transmi/application";
 import { transit } from "./composition-root";
 import { nowMs } from "./clock";
 /** «10:45 p. m.» a partir de segundos desde la medianoche (el horario puede pasar de 24 h). */
@@ -10,4 +10,4 @@ export function clockOfDay(seconds: number): string {
 export const liveDown = (): boolean => liveLevel(transit, nowMs()) === "none";
 
 /** Qué decir cuando no llegan buses: de noche, que el servicio ya terminó; de día, que no hay datos en vivo. */
-export const downText = () => liveDownText(nowMs());
+export const downText = () => liveDownText(nowMs(), isOffline(transit, nowMs()));

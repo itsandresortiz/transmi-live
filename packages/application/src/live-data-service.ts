@@ -25,6 +25,12 @@ export function liveLevel(state: TransitState, nowMs: number): LiveLevel {
   return n > 0 && age <= LIVE_LATE_S ? "few" : "none";
 }
 
+/** ¿El teléfono está sin conexión? Se deduce de las consultas: dos o más fallidas seguidas (falla el intermediario y también la copia
+ *  de respaldo) y ninguna buena en el último minuto. No hace falta pedirle permisos ni librerías al sistema. */
+export function isOffline(state: TransitState, nowMs: number): boolean {
+  return state.pollFailures >= 2 && state.lastPollFailAt != null && nowMs - state.lastPollFailAt < 90_000 && (state.lastPollOkAt == null || nowMs - state.lastPollOkAt > 45_000);
+}
+
 /** ¿A esta hora ya terminó el servicio? TransMilenio opera más o menos de 4:30 a. m. a 11 p. m. (domingos hasta las 10 p. m.).
  *  Solo sirve para **explicar** por qué no llegan buses de noche; nunca para esconder buses que sí están reportando. */
 export function serviceClosedNow(nowMs: number): boolean {
@@ -35,10 +41,12 @@ export function serviceClosedNow(nowMs: number): boolean {
 
 /** Qué decir cuando no llegan datos recientes de los buses. De noche la razón es que el servicio terminó, y así se dice
  *  («Sin datos en vivo» a medianoche suena a que la app está fallando). `short` es para rótulos chicos. */
-export function liveDownText(nowMs: number): { title: string; short: string; detail: string; closed: boolean } {
-  if (!serviceClosedNow(nowMs)) return { closed: false, title: "Sin datos en vivo por ahora", short: "Sin datos en vivo", detail: "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio." };
+export function liveDownText(nowMs: number, offline = false): { title: string; short: string; detail: string; closed: boolean; offline: boolean } {
+  // sin conexión es la explicación que manda: ni «servicio finalizado» ni «TransMilenio no envía datos» serían ciertos
+  if (offline) return { closed: false, offline: true, title: "Sin conexión a internet", short: "Sin conexión", detail: "No podemos traer los buses en vivo. Puedes seguir viendo rutas, paradas y horarios guardados en tu teléfono." };
+  if (!serviceClosedNow(nowMs)) return { closed: false, offline: false, title: "Sin datos en vivo por ahora", short: "Sin datos en vivo", detail: "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio." };
   const beforeMidnight = new Date(nowMs - 5 * 3600_000).getUTCHours() >= 12;
-  return { closed: true, title: beforeMidnight ? "Servicio finalizado por hoy" : "Servicio finalizado", short: "Servicio finalizado", detail: "Los buses vuelven a salir hacia las 4:30 a. m. Mientras tanto puedes consultar rutas, paradas y horarios." };
+  return { closed: true, offline: false, title: beforeMidnight ? "Servicio finalizado por hoy" : "Servicio finalizado", short: "Servicio finalizado", detail: "Los buses vuelven a salir hacia las 4:30 a. m. Mientras tanto puedes consultar rutas, paradas y horarios." };
 }
 
 /** Caso de uso: pedir a la fuente lo nuevo y aplicarlo al estado. */
@@ -60,6 +68,7 @@ export class LiveDataService {
     try {
       const poll = await this.feed.poll(this.signature);
       this.failures = 0;
+      this.state.pollFailures = 0;
       this.state.lastPollOkAt = this.clock.now();
       this.state.dropStale(this.clock.now());
       if (!poll) return false;
@@ -82,6 +91,11 @@ export class LiveDataService {
       return true;
     } catch (e) {
       this.failures++;
+      this.state.pollFailures++;
+      this.state.lastPollFailAt = this.clock.now();
+      // sin respuesta tampoco se dejan en pantalla buses viejos: antes solo se limpiaban cuando la consulta salía bien,
+      // así que sin internet los buses quedaban congelados indefinidamente
+      this.state.dropStale(this.clock.now());
       throw e;
     } finally {
       this.busy = false;

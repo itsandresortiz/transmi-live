@@ -131,7 +131,7 @@ export function Launch() {
   // «Sin datos en vivo» solo si el servidor ya contestó y de verdad no trajo buses; mientras no se sepa, sigue «Buscando buses en vivo»
   const answeredEmpty = transit.lastPollOkAt != null && sinceRoutes >= 3000;
   const stage = !routes ? "rutas" : buses > 0 ? "buses" : answeredEmpty ? "sin" : "buscando";
-  const line = stage === "rutas" ? "Preparando rutas y paradas" : stage === "buscando" ? "Buscando buses en vivo" : stage === "sin" ? (downText().closed ? "Servicio finalizado; puedes ver rutas y horarios" : "Sin datos en vivo; usamos los horarios") : `${count.toLocaleString("es-CO")} buses en la calle ahora`;
+  const line = stage === "rutas" ? "Preparando rutas y paradas" : stage === "buscando" ? (downText().offline ? "Sin conexión; abrimos con lo guardado" : "Buscando buses en vivo") : stage === "sin" ? (downText().closed ? "Servicio finalizado; puedes ver rutas y horarios" : "Sin datos en vivo; usamos los horarios") : `${count.toLocaleString("es-CO")} buses en la calle ahora`;
   const mid = { left: width / 2 - R0, top: height / 2 - R0, width: R0 * 2, height: R0 * 2, borderRadius: R0 } as const;
   const strips = Array.from({ length: EDGE }, (_, i) => 1 - i / EDGE);      // 1 → casi 0: el borde se funde con el fondo
   return (

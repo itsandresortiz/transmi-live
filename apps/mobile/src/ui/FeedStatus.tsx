@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { connectionStatus, liveDownText, liveLevel } from "@transmi/application";
+import { connectionStatus, isOffline, liveDownText, liveLevel } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
@@ -22,9 +22,9 @@ export function FeedStatus({ tint, light = false }: { tint?: string; light?: boo
   const live = level === "live" || level === "few";
   const demo = useDemo((d) => d.on);
   // de noche, sin datos o con datos viejos, la razón es que el servicio terminó: se dice eso y no «sin datos» ni «con retraso»
-  const down = liveDownText(nowMs()), closed = !live && down.closed;
-  const title = demo ? "Demostración" : closed ? down.title : level === "none" ? "Sin datos en vivo" : level === "late" ? "Datos con retraso" : "En vivo";
-  const detail = demo ? "buses de ejemplo" : closed ? "vuelve 4:30 a. m." : level === "few" ? `${n} ${n === 1 ? "bus" : "buses"} a esta hora` : st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
+  const down = liveDownText(nowMs(), isOffline(transit, nowMs())), closed = !live && down.closed, offline = down.offline;
+  const title = demo ? "Demostración" : offline ? down.short : closed ? down.title : level === "none" ? "Sin datos en vivo" : level === "late" ? "Datos con retraso" : "En vivo";
+  const detail = demo ? "buses de ejemplo" : offline ? "se ve lo guardado" : closed ? "vuelve 4:30 a. m." : level === "few" ? `${n} ${n === 1 ? "bus" : "buses"} a esta hora` : st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
   // un mensaje del dueño (accidente, manifestación…) ocupa por un rato el lugar de «En vivo · hace N s», en una sola línea que se desliza si es larga
   const msg = useActiveMessages()[0];
   const { width } = useWindowDimensions();
@@ -39,7 +39,7 @@ export function FeedStatus({ tint, light = false }: { tint?: string; light?: boo
   return (
     <Glass tint={tint} scheme={light ? "light" : undefined} style={styles.glass}>
       <View accessible accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}`} style={styles.pill}>
-        <View style={[styles.dot, { backgroundColor: demo ? "#8b5cf6" : live ? "#22c55e" : closed ? "#94a3b8" : "#f59e0b" }]} />
+        <View style={[styles.dot, { backgroundColor: demo ? "#8b5cf6" : offline ? "#dc2626" : live ? "#22c55e" : closed ? "#94a3b8" : "#f59e0b" }]} />
         <Text style={[type.caption, { color: c.text }]}>{title}</Text>
         {detail ? <Text style={[type.caption, { color: c.text, opacity: 0.7 }]} numberOfLines={1}>{detail}</Text> : null}
       </View>

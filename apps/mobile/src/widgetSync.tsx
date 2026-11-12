@@ -43,6 +43,14 @@ export function syncWidget(): void {
         const route = transit.routeById(p.routeId);
         if (route) for (const t of p.times) sched.push({ r: route.shortName, h: "", t: Math.round(midnight + t), c: SYSTEM_COLOR[route.system] });
       }
+      // cuando ya quedan pocas pasadas hoy (o ninguna: terminó el servicio), se agregan las primeras del siguiente día de servicio,
+      // para que de noche el widget diga a qué hora pasa el primer bus en vez de quedarse vacío
+      if (sched.length < 6) {
+        for (const p of transit.departures.nextAt(id, transit.serviceEnds.nextDayType(now * 1000), 0, 6)) {
+          const route = transit.routeById(p.routeId);
+          if (route) for (const t of p.times) sched.push({ r: route.shortName, h: "", t: Math.round(midnight + 86_400 + t), c: SYSTEM_COLOR[route.system] });
+        }
+      }
       sched.sort((a, b) => a.t - b.t); sched.splice(12);
     }
     return [{ id, name: saved.nicknames[id] || stopLabelText(transit.labelOf(stop)), arrivals, sched }];

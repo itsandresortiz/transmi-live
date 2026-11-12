@@ -34,6 +34,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - **Android, pendientes**: widget (Glance), notificación fija para el viaje en lugar de la isla dinámica, cuenta de Google Play (pago único; las cuentas personales nuevas deben hacer una prueba cerrada ~12 personas × 14 días **(?)** confirmar), ficha, formulario de seguridad de datos (misma declaración que en Apple), firma del paquete (AAB) y política (ya hay).
 
 ## Bugs conocidos / limitaciones
+- Sin conexión: el mapa base depende de internet (solo se ven las zonas que el teléfono ya tenía guardadas); rutas, paradas y horarios sí abren con la copia del teléfono. Idea: guardar un mapa base mínimo de Bogotá dentro de la app.
 - ✅ (2026-11-11) Avisos con nombre de ruta y sin prefijo «TM_».
 - ✅ (2026-11-12) Llegadas: el bus que ya debió pasar no se anuncia. **Pendiente**: la app anuncia la llegada ~40 s antes de lo real en hora pico (buses más lentos que el tiempo fijo por parada); repetir `eta-precision.yml` (ya corregido) en pico, valle y noche y decidir un factor por franja, o usar el perfil de `hop-stats`.
 - Mensajes del dueño: tardan ~5 min (caché de GitHub); si hace falta inmediato, servirlos por la función de Supabase.

@@ -78,7 +78,7 @@ export default function Inicio() {
           <Text style={[type.body, { color: c.muted }]}>{greeting()}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: space[2] }}>
             <Tap onPress={() => router.navigate("/mapa")} accessibilityRole="button" accessibilityLabel={live ? `${transit.fleet.size} buses en vivo. Abrir el mapa` : "Abrir el mapa"} style={[styles.livePill, { backgroundColor: c.card }]}>
-              <View style={[styles.liveDot, { backgroundColor: demo ? "#8b5cf6" : live ? "#22c55e" : "#f59e0b" }]} />
+              <View style={[styles.liveDot, { backgroundColor: demo ? "#8b5cf6" : live ? "#22c55e" : downText().offline ? "#dc2626" : downText().closed ? "#94a3b8" : "#f59e0b" }]} />
               <Text style={[type.caption, { color: c.text, fontVariant: ["tabular-nums"] }]}>{demo ? "Demostración" : live ? `${transit.fleet.size.toLocaleString("es-CO")} en vivo` : downText().short}</Text>
             </Tap>
             <View>
