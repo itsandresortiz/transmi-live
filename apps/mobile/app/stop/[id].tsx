@@ -9,7 +9,7 @@ import { transit } from "@/composition-root";
 import { nowMs, nowSec } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { etaText, stopsAwayText } from "@/format";
-import { clockOfDay, liveDown } from "@/lastService";
+import { clockOfDay, liveDown, downText } from "@/lastService";
 import { stopCode, stopKind, stopTag, stopText } from "@/stopname";
 import { useSaved } from "@/favorites";
 import { useMapFocus } from "@/map/focus";
@@ -266,7 +266,7 @@ function RouteEmpty({ route }: { route?: Route }) {
   const down = liveDown();
   const [title, text] = st?.state === "ended" ? ["Ya no hay más buses hoy", down ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`]
     : st?.state === "before" ? ["Aún no empieza el servicio", `El primer bus sale a las ${clockOfDay(st.firstStart)}.`]
-    : down ? ["Sin datos en vivo por ahora", "TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio."]
+    : down ? (downText().closed ? [downText().title, downText().detail] : ["Sin datos en vivo por ahora", "TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio."])
     : ["Ningún bus viene ahora", "Esta ruta no tiene buses acercándose a la parada en este momento."];
   return <Card><Text style={[type.headline, { color: c.text }]}>{title}</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{text}</Text></Card>;
 }
@@ -336,7 +336,7 @@ function NoBuses({ stopId, here, down, now }: { stopId: string; here: Route[]; d
   return (
     <>
       <Card>
-        <Text style={[type.headline, { color: c.text }]}>{every ? "Ya no hay más buses hoy" : down ? "Sin datos en vivo por ahora" : "Ningún bus viene ahora"}</Text>
+        <Text style={[type.headline, { color: c.text }]}>{every ? "Ya no hay más buses hoy" : down ? downText().title : "Ningún bus viene ahora"}</Text>
         <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>
           {every ? `${down ? "Según el horario, el" : "El"} servicio de las rutas de esta parada ya terminó por hoy.`
             : down ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: abajo ves el horario programado."

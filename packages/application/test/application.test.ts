@@ -182,3 +182,22 @@ describe("tráfico en vivo", () => {
     expect(trafficSegments(s, 1200).length).toBe(0);                 // dato viejo
   });
 });
+
+import { liveDownText, serviceClosedNow } from "@transmi/application";
+describe("de noche se dice que el servicio terminó, no que faltan datos", () => {
+  const bogota = (y: number, mo: number, d: number, h: number, mi = 0) => Date.UTC(y, mo - 1, d, h + 5, mi);
+  it("sabe a qué horas no hay servicio", () => {
+    expect(serviceClosedNow(bogota(2026, 11, 11, 23, 30))).toBe(true);     // miércoles 11:30 p. m.
+    expect(serviceClosedNow(bogota(2026, 11, 12, 0, 10))).toBe(true);      // medianoche
+    expect(serviceClosedNow(bogota(2026, 11, 12, 4, 0))).toBe(true);
+    expect(serviceClosedNow(bogota(2026, 11, 12, 4, 45))).toBe(false);     // ya arrancó
+    expect(serviceClosedNow(bogota(2026, 11, 11, 22, 30))).toBe(false);    // entre semana aún hay servicio
+    expect(serviceClosedNow(bogota(2026, 11, 15, 22, 30))).toBe(true);     // domingo termina antes
+    expect(serviceClosedNow(bogota(2026, 11, 11, 15, 0))).toBe(false);
+  });
+  it("elige el texto según la hora", () => {
+    expect(liveDownText(bogota(2026, 11, 11, 23, 30)).title).toBe("Servicio finalizado por hoy");
+    expect(liveDownText(bogota(2026, 11, 12, 0, 10)).title).toBe("Servicio finalizado");
+    expect(liveDownText(bogota(2026, 11, 11, 15, 0)).title).toBe("Sin datos en vivo por ahora");
+  });
+});

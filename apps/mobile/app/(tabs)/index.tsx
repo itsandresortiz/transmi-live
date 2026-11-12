@@ -7,7 +7,7 @@ import { transit } from "@/composition-root";
 import { useNow, useTransitVersion } from "@/hooks";
 import { upcomingAtStop } from "@transmi/application";
 import type { Route } from "@transmi/domain";
-import { clockOfDay } from "@/lastService";
+import { clockOfDay, downText } from "@/lastService";
 import { stopKind, stopTag } from "@/stopname";
 import { stopLabelText } from "@transmi/domain";
 import { nowSec } from "@/clock";
@@ -73,7 +73,7 @@ export default function Inicio() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: space[2] }}>
             <Tap onPress={() => router.navigate("/mapa")} accessibilityRole="button" accessibilityLabel={live ? `${transit.fleet.size} buses en vivo. Abrir el mapa` : "Abrir el mapa"} style={[styles.livePill, { backgroundColor: c.card }]}>
               <View style={[styles.liveDot, { backgroundColor: demo ? "#8b5cf6" : live ? "#22c55e" : "#f59e0b" }]} />
-              <Text style={[type.caption, { color: c.text, fontVariant: ["tabular-nums"] }]}>{demo ? "Demostración" : live ? `${transit.fleet.size.toLocaleString("es-CO")} en vivo` : "Sin datos en vivo"}</Text>
+              <Text style={[type.caption, { color: c.text, fontVariant: ["tabular-nums"] }]}>{demo ? "Demostración" : live ? `${transit.fleet.size.toLocaleString("es-CO")} en vivo` : downText().short}</Text>
             </Tap>
             <View>
               <RoundButton symbol={alerts ? "bell.badge.fill" : "bell"} label={alerts ? `Avisos del servicio: ${alerts}` : "Avisos del servicio"} onPress={() => router.push("/avisos")} />
@@ -120,7 +120,7 @@ export default function Inicio() {
                         <Text style={[type.caption, { color: c.muted, flex: 1, fontSize: 14 }]} numberOfLines={1}>Según el horario</Text>
                         <Text style={[type.headline, { color: c.text }]}>{clockOfDay(f.scheduled.time)}</Text>
                       </View>
-                    ) : <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>{live ? "Ningún bus viene ahora" : "Sin datos en vivo por ahora"}</Text>}
+                    ) : <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>{live ? "Ningún bus viene ahora" : downText().title}</Text>}
                   </View>
                 </Card>
               </Tap>

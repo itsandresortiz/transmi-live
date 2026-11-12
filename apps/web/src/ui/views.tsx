@@ -4,7 +4,7 @@ import {
 } from "@transmi/application";
 import { useRide } from "./ride";
 import { nowMode } from "./plannerStore";
-import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, liveDown } from "./liveStatus";
+import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, downText, liveDown } from "./liveStatus";
 import { haptic } from "./haptics";
 import { routeCodes, routeOfficialName, routeTitle, routeVariant, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert, ownerMessageUntil } from "@transmi/domain";
 import { useActiveMessages } from "./messages";
@@ -85,7 +85,7 @@ export function NoDataNote() {
   if (st.connection === "live" || st.connection === "waiting" || st.connection === "connecting" || transit.fleet.size > 0) return null;
   return (
     <div className="card nodata" role="status">
-      <div className="ct">{st.connection === "stale" ? "Sin señal con el servicio" : nowMode() === "schedule" ? LIVE_DOWN_TITLE : "Aún no hay buses en el mapa"}</div>
+      <div className="ct">{st.connection === "stale" ? "Sin señal con el servicio" : nowMode() === "schedule" ? downText().title : "Aún no hay buses en el mapa"}</div>
       <div className="cs">{st.connection === "stale" ? "No pudimos hablar con el servidor. Cuando vuelva la conexión se actualiza solo."
         : `TransMilenio no está publicando buses${st.ageSeconds != null ? ` desde hace ${agoShort(st.ageSeconds)}` : " por ahora"}. ${nowMode() === "schedule" ? "A esta hora debería haber servicio, así que el problema parece estar en la fuente de datos de TransMilenio, no en tu celular. Mientras vuelve, puedes consultar horarios y planear viajes según el horario programado." : "Es normal en la madrugada, antes de que empiece la operación; apenas reporten, aparecen aquí solos."}`}</div>
     </div>
@@ -163,7 +163,7 @@ function NoBusesNow({ th, act, system }: Props & { system: SystemType | null }) 
   return (
     <>
       <NoDataNote />
-      {nowMode() === "schedule" ? <Empty title={LIVE_DOWN_TITLE} text="Aquí aparecerán los buses en cuanto TransMilenio vuelva a enviar su ubicación. Mientras tanto, estas son las rutas que según el horario deberían estar funcionando." /> : <Empty title="Ningún bus en la calle ahora" text="Cuando TransMilenio vuelva a reportar, los buses aparecen aquí." />}
+      {nowMode() === "schedule" ? <Empty title={downText().title} text="Aquí aparecerán los buses en cuanto TransMilenio vuelva a enviar su ubicación. Mientras tanto, estas son las rutas que según el horario deberían estar funcionando." /> : <Empty title="Ningún bus en la calle ahora" text="Cuando TransMilenio vuelva a reportar, los buses aparecen aquí." />}
       {running.length > 0 && (
         <div className="endedrow" style={{ textAlign: "center" }}>
           <small>Rutas con servicio a esta hora, según su horario (en gris porque aún no reportan buses)</small>
@@ -370,7 +370,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
       )}
       <details className="morebuses">
         <summary>Ver los {d.vehicles.length} {d.vehicles.length === 1 ? "bus" : "buses"} de esta ruta</summary>
-        {d.vehicles.length ? <div className="list">{d.vehicles.slice(0, 40).map((v) => <BusRow key={v.id} v={v} th={th} act={act} />)}</div> : liveDown() ? <Empty title={LIVE_DOWN_TITLE} text="TransMilenio no está enviando la ubicación de los buses. Eso no significa que la ruta no tenga servicio: revisa su horario arriba." /> : <Empty title="Sin buses ahora" text="Ningún bus de esta ruta está reportando en este momento." />}
+        {d.vehicles.length ? <div className="list">{d.vehicles.slice(0, 40).map((v) => <BusRow key={v.id} v={v} th={th} act={act} />)}</div> : liveDown() ? <Empty title={downText().title} text="TransMilenio no está enviando la ubicación de los buses. Eso no significa que la ruta no tenga servicio: revisa su horario arriba." /> : <Empty title="Sin buses ahora" text="Ningún bus de esta ruta está reportando en este momento." />}
       </details>
     </>
   );

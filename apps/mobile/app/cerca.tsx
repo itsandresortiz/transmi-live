@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { liveDown } from "@/lastService";
+import { liveDown, downText } from "@/lastService";
 import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -78,7 +78,7 @@ export default function Cerca() {
                       <View style={styles.next}>
                         {next.map((u) => <View key={u.route.id} style={styles.chip}><RouteBadge route={u.route} /><Text style={[type.caption, { color: c.muted, flex: 1 }]} numberOfLines={1}>{u.headsign ? `Hacia ${u.headsign}` : ""}</Text><Eta at={u.buses[0]!.etaAt} style={[type.headline, { color: c.text }]} /></View>)}
                       </View>
-                    ) : <Text style={[type.caption, { color: c.muted }]}>{liveDown() ? "Sin datos en vivo por ahora" : "Ningún bus viene ahora"}</Text>}
+                    ) : <Text style={[type.caption, { color: c.muted }]}>{liveDown() ? downText().title : "Ningún bus viene ahora"}</Text>}
                   </Card>
                 </Tap>
               );

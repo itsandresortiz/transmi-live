@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { downText } from "./liveStatus";
 import { type Itinerary, nearestStops, planTrip, upcomingAtStop } from "@transmi/application";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
@@ -42,7 +43,7 @@ export function StarButton({ kind, id }: { kind: "stop" | "route"; id: string })
 function ScheduledChips({ stopId, th }: { stopId: string; th: MapTheme }) {
   const { type, secs } = transit.serviceEnds.dayAt(serverNowSec() * 1000);
   const rows = transit.departures.nextAt(stopId, type, secs, 1).slice(0, 3);
-  if (!rows.length) return <div className="cs">Sin datos en vivo por ahora</div>;
+  if (!rows.length) return <div className="cs">{downText().title}</div>;
   return (
     <>
       <div className="scr">

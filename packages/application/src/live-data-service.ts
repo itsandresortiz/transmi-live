@@ -25,6 +25,22 @@ export function liveLevel(state: TransitState, nowMs: number): LiveLevel {
   return n > 0 && age <= LIVE_LATE_S ? "few" : "none";
 }
 
+/** ¿A esta hora ya terminó el servicio? TransMilenio opera más o menos de 4:30 a. m. a 11 p. m. (domingos hasta las 10 p. m.).
+ *  Solo sirve para **explicar** por qué no llegan buses de noche; nunca para esconder buses que sí están reportando. */
+export function serviceClosedNow(nowMs: number): boolean {
+  const d = new Date(nowMs - 5 * 3600_000);      // hora de Bogotá (UTC−5 todo el año)
+  const minutes = d.getUTCHours() * 60 + d.getUTCMinutes(), sunday = d.getUTCDay() === 0;
+  return minutes < 4 * 60 + 30 || minutes >= (sunday ? 22 : 23) * 60;
+}
+
+/** Qué decir cuando no llegan datos recientes de los buses. De noche la razón es que el servicio terminó, y así se dice
+ *  («Sin datos en vivo» a medianoche suena a que la app está fallando). `short` es para rótulos chicos. */
+export function liveDownText(nowMs: number): { title: string; short: string; detail: string; closed: boolean } {
+  if (!serviceClosedNow(nowMs)) return { closed: false, title: "Sin datos en vivo por ahora", short: "Sin datos en vivo", detail: "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio." };
+  const beforeMidnight = new Date(nowMs - 5 * 3600_000).getUTCHours() >= 12;
+  return { closed: true, title: beforeMidnight ? "Servicio finalizado por hoy" : "Servicio finalizado", short: "Servicio finalizado", detail: "Los buses vuelven a salir hacia las 4:30 a. m. Mientras tanto puedes consultar rutas, paradas y horarios." };
+}
+
 /** Caso de uso: pedir a la fuente lo nuevo y aplicarlo al estado. */
 export class LiveDataService {
   private signature: FeedSignature = {};

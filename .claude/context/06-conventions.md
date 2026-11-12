@@ -9,6 +9,7 @@
 
 ## Reglas de datos mostrados (producto)
 - **Nunca presentar un dato viejo como en vivo.** La regla vive en `liveLevel()` (`packages/application`): si no llega nada reciente: «Sin datos en vivo por ahora» sin sugerir que no hay servicio; si llegan pocos buses pero con dato reciente (madrugada): «En vivo · N buses a esta hora»; si hay buses pero el dato tiene >5 min: «Datos con retraso» (`FeedStatus`).
+- De noche (11 p. m.–4:30 a. m.; domingos desde las 10 p. m.), si no llegan datos recientes se dice **«Servicio finalizado por hoy»** (`liveDownText`), no «Sin datos en vivo» ni «Datos con retraso»: al dueño esas palabras le suenan a falla de la app.
 - Cada tiempo de llegada indica si es en vivo o aproximado/programado; los tiempos en vivo llevan **segundos** (cuenta regresiva `3:05`) cuando el contexto lo permite.
 - Los buses conservan el **color de su sistema**: troncal rojo, dual morado, alimentador verde, zonal azul, otro gris. Las troncales/duales llevan el color de su línea (A, B, C…) en recuadros y estaciones.
 - Una parada debe listar **todas** las rutas que paran ahí aunque no tengan bus acercándose (con horario programado si existe), y el tiempo del bus más cercano.

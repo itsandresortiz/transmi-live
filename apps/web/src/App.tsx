@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
-import { connectionStatus, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus } from "@transmi/application";
+import { connectionStatus, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadDepartures, loadServiceEnds, networkSource, transit } from "./composition-root";
 import { nowSec } from "./clock";
@@ -435,6 +435,7 @@ function Status() {
   const cls = st.connection === "live" ? "live" : st.connection === "waiting" || st.connection === "idle" ? "warn" : st.connection === "stale" ? "bad" : "";
   const text =
     !online ? (st.ageSeconds != null ? `Sin internet · ${agoShort(st.ageSeconds)}` : "Sin internet")
+    : (st.connection === "idle" || st.connection === "stale") && serviceClosedNow(now) ? "Servicio finalizado · vuelve 4:30 a. m."
     : st.connection === "idle" ? (st.ageSeconds != null ? `Sin servicio · ${agoShort(st.ageSeconds)}` : "Sin servicio por ahora")
     : st.connection === "connecting" ? "Conectando…"
     : st.connection === "live" ? `En vivo · hace ${ago(st.ageSeconds!)}`

@@ -9,7 +9,7 @@ import { Directions } from "./icons";
 import { openPlannerTo } from "./planner";
 import { nowMs } from "../clock";
 import { FirstBadge, LastBadge, clockOfDay } from "./lastService";
-import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, liveDown } from "./liveStatus";
+import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, downText, liveDown } from "./liveStatus";
 import { labelOf, stopCode, stopKind, stopTag, stopText } from "./stopname";
 import { routesAtStop, siblingStops, frequencyText } from "@transmi/application";
 import { useMemo } from "react";
@@ -224,7 +224,7 @@ function NoBuses({ th, stopId, nowMs, act }: { th: MapTheme; stopId: string | nu
     <>
     <div className="empty">
       <Bus />
-      <b>{every ? "Ya no hay más buses hoy" : liveDown() ? LIVE_DOWN_TITLE : "Ningún bus viene ahora"}</b>
+      <b>{every ? "Ya no hay más buses hoy" : liveDown() ? downText().title : "Ningún bus viene ahora"}</b>
       {every ? `${liveDown() ? "Según el horario, el" : "El"} servicio de las rutas de esta parada ya terminó por hoy.` : liveDown() ? LIVE_DOWN_TEXT : "Cuando un bus se acerque a esta parada aparecerá aquí."}
     </div>
     <ScheduledAtStop stopId={stopId} th={th} act={act} nowMs={nowMs} />
@@ -252,6 +252,6 @@ function RouteEmpty({ routeId, nowMs }: { routeId: string; nowMs: number }) {
   const st = transit.routeStatus(routeId, nowMs);
   if (st?.state === "ended") return <Empty title="Ya no hay más buses hoy" text={liveDown() ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`} />;
   if (st?.state === "before") return <Empty title="Aún no empieza el servicio" text={`El primer bus sale a las ${clockOfDay(st.firstStart)}.`} />;
-  if (liveDown()) return <Empty title={LIVE_DOWN_TITLE} text="TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio." />;
+  if (liveDown()) return <Empty title={downText().title} text="TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio." />;
   return <Empty title="Ningún bus viene ahora" text="Esta ruta no tiene buses acercándose a la parada en este momento." />;
 }
