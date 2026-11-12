@@ -8,6 +8,7 @@ import { nowSec } from "./clock";
 import { useSaved } from "./favorites";
 import { isDemo } from "./demo";
 import { SYSTEM_COLOR } from "./ui/theme";
+import { TmWidget } from "../modules/tmwidget/src";
 
 /** Deja en el App Group lo que el widget necesita: tus paradas favoritas con la hora de llegada de los próximos buses. Solo existe en las compilaciones con el widget (WIDGET=1). */
 const extra = (Constants.expoConfig?.extra ?? {}) as { widget?: boolean; widgetGroup?: string };
@@ -21,6 +22,12 @@ if (Platform.OS === "ios" && extra.widget && extra.widgetGroup) {
     storage = new mod.ExtensionStorage(extra.widgetGroup);
     reload = () => mod.ExtensionStorage.reloadWidget();
   } catch { storage = null; }
+}
+
+if (Platform.OS === "android" && TmWidget) {
+  // en Android el widget va siempre incluido: recibe la misma instantánea por su propio módulo y se repinta solo al guardarla
+  const w = TmWidget;
+  storage = { set: (_key, value) => w.setSnapshot(value) };
 }
 
 let last = "";
