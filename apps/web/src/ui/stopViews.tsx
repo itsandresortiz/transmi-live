@@ -250,7 +250,7 @@ function NoBuses({ th, stopId, nowMs, act }: { th: MapTheme; stopId: string | nu
 
 function RouteEmpty({ routeId, nowMs }: { routeId: string; nowMs: number }) {
   const st = transit.routeStatus(routeId, nowMs);
-  if (st?.state === "ended") return <Empty title="Ya no hay más buses hoy" text={liveDown() ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`} />;
+  if (st?.state === "ended") return <Empty title="Ya no hay más buses hoy" text={(liveDown() ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`) + (st.nextFirstStart != null ? ` El próximo sale a las ${clockOfDay(st.nextFirstStart)}.` : "")} />;
   if (st?.state === "before") return <Empty title="Aún no empieza el servicio" text={`El primer bus sale a las ${clockOfDay(st.firstStart)}.`} />;
   if (liveDown()) return <Empty title={downText().title} text="TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio." />;
   return <Empty title="Ningún bus viene ahora" text="Esta ruta no tiene buses acercándose a la parada en este momento." />;

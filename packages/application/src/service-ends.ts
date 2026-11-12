@@ -34,6 +34,8 @@ export interface RouteDayStatus {
   state: "before" | "running" | "ended";
   firstStart: number;
   lastStart: number;
+  /** Con el servicio de hoy terminado: a qué hora sale el primero del siguiente día de servicio (segundos desde la medianoche), si se sabe. */
+  nextFirstStart?: number;
 }
 
 /** Reconoce los buses que hacen el último (o primer) viaje de su ruta, cruzando el viaje en vivo con el horario. */
@@ -78,6 +80,13 @@ export class ServiceEnds {
     if (!d) return undefined;
     const firstStart = d.first[1], lastStart = d.last[1];
     const state = secs < firstStart - 900 && activeBuses === 0 ? "before" : secs > lastStart && activeBuses === 0 ? "ended" : "running";
-    return { state, firstStart, lastStart };
+    const nextFirstStart = state === "ended" ? this.byRoute[routeId]?.[this.nextDayType(nowMs)]?.first[1] : undefined;
+    return { state, firstStart, lastStart, nextFirstStart };
+  }
+
+  /** Tipo de horario del día de servicio que sigue al actual (para decir cuándo sale el primer bus una vez terminó el de hoy). */
+  nextDayType(nowMs: number): DayType {
+    const { secs } = serviceDay(nowMs, this.dates);
+    return serviceDay(nowMs - secs * 1000 + 36 * 3600_000, this.dates).type;      // mediodía del día siguiente
   }
 }

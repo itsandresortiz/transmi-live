@@ -264,7 +264,7 @@ function RouteEmpty({ route }: { route?: Route }) {
   const c = useColors();
   const st = route ? transit.routeStatus(route.id, nowMs()) : undefined;
   const down = liveDown();
-  const [title, text] = st?.state === "ended" ? ["Ya no hay más buses hoy", down ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`]
+  const [title, text] = st?.state === "ended" ? ["Ya no hay más buses hoy", (down ? `Según el horario, el último salió a las ${clockOfDay(st.lastStart)}.` : `El último salió a las ${clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.`) + (st.nextFirstStart != null ? ` El próximo sale a las ${clockOfDay(st.nextFirstStart)}.` : "")]
     : st?.state === "before" ? ["Aún no empieza el servicio", `El primer bus sale a las ${clockOfDay(st.firstStart)}.`]
     : down ? (downText().closed ? [downText().title, downText().detail] : ["Sin datos en vivo por ahora", "TransMilenio no está enviando la ubicación de los buses, así que no podemos decir cuándo llega el próximo. Eso no significa que no haya servicio."])
     : ["Ningún bus viene ahora", "Esta ruta no tiene buses acercándose a la parada en este momento."];
@@ -279,7 +279,7 @@ function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string })
     const day = transit.serviceEnds.dayAt(nowSec() * 1000);
     const sched = new Map<string, number>();
     if (transit.departures.size) for (const p of transit.departures.nextAt(stopId, day.type, day.secs, 1)) if (p.times[0] != null) sched.set(`${p.routeId}|${p.direction}`, p.times[0]);
-    const seen = new Set<string>(), out: { route: Route; headsign: string; key: string; state?: string; next?: number; lastStart?: number; firstStart?: number }[] = [];
+    const seen = new Set<string>(), out: { route: Route; headsign: string; key: string; state?: string; next?: number; lastStart?: number; firstStart?: number; nextFirst?: number }[] = [];
     for (const [routeId, shapes] of transit.network.shapes) {
       const route = transit.routeById(routeId);
       if (!route) continue;
@@ -290,7 +290,7 @@ function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string })
         if (seen.has(dup)) continue;
         seen.add(dup);
         const st = transit.routeStatus(routeId, nowMs());
-        out.push({ route, headsign: sh.headsign, key, state: st?.state, next: sched.get(key), lastStart: st?.state === "ended" ? st.lastStart : undefined, firstStart: st?.state === "before" ? st.firstStart : undefined });
+        out.push({ route, headsign: sh.headsign, key, state: st?.state, next: sched.get(key), lastStart: st?.state === "ended" ? st.lastStart : undefined, nextFirst: st?.nextFirstStart, firstStart: st?.state === "before" ? st.firstStart : undefined });
       }
     }
     const rank = (x: { state?: string }) => (x.state === "ended" || x.state === "before" ? 1 : 0);
@@ -302,7 +302,7 @@ function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string })
       <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>TAMBIÉN PARAN AQUÍ</Text>
       {items.map((x) => {
         const off = x.state === "ended" || x.state === "before";
-        const sub = x.state === "ended" ? `Ya no hay más buses hoy${x.lastStart != null ? ` · el último salió a las ${clockOfDay(x.lastStart)}` : ""}`
+        const sub = x.state === "ended" ? `Ya no hay más buses hoy${x.nextFirst != null ? ` · el próximo sale a las ${clockOfDay(x.nextFirst)}` : x.lastStart != null ? ` · el último salió a las ${clockOfDay(x.lastStart)}` : ""}`
           : x.state === "before" ? `Aún no empieza${x.firstStart != null ? ` · primer bus a las ${clockOfDay(x.firstStart)}` : ""}`
           : x.next != null ? `Sin bus acercándose · según el horario, ${clockOfDay(x.next)}` : "Sin bus acercándose ahora";
         return (

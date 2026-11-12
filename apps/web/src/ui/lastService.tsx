@@ -50,7 +50,7 @@ export function RouteStatusNote({ routeId, nowMs, label }: { routeId: string; no
   return (
     <div className="lastnote" role="status">
       {st.state === "ended"
-        ? <><b>{label ? `${label}: ya` : "Ya"} no hay más buses hoy.</b><br />El último salió a las {clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.</>
+        ? <><b>{label ? `${label}: ya` : "Ya"} no hay más buses hoy.</b><br />El último salió a las {clockOfDay(st.lastStart)} y ya no queda ninguno en la calle.{st.nextFirstStart != null ? ` El próximo sale a las ${clockOfDay(st.nextFirstStart)}.` : ""}</>
         : <><b>{label ? `${label}: aún` : "Aún"} no empieza el servicio.</b><br />El primer bus sale a las {clockOfDay(st.firstStart)}.</>}
     </div>
   );

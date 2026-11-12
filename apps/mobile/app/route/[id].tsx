@@ -102,7 +102,7 @@ export default function RouteScreen() {
 
         {status && status.state !== "running" ? (
           <Card><Text style={[type.headline, { color: c.text }]}>{status.state === "ended" ? "Ya no hay más buses hoy" : "Aún no empieza el servicio"}</Text>
-            <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{status.state === "ended" ? `El último salió a las ${clockOfDay(status.lastStart)} y ya no queda ninguno en la calle.` : `El primer bus sale a las ${clockOfDay(status.firstStart)}.`}</Text></Card>
+            <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{status.state === "ended" ? `El último salió a las ${clockOfDay(status.lastStart)} y ya no queda ninguno en la calle.${status.nextFirstStart != null ? ` El próximo sale a las ${clockOfDay(status.nextFirstStart)}.` : ""}` : `El primer bus sale a las ${clockOfDay(status.firstStart)}.`}</Text></Card>
         ) : null}
 
         {d.alerts.map(({ alert, index }) => (

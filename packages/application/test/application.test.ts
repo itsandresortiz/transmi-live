@@ -201,3 +201,18 @@ describe("de noche se dice que el servicio terminó, no que faltan datos", () =>
     expect(liveDownText(bogota(2026, 11, 11, 15, 0)).title).toBe("Sin datos en vivo por ahora");
   });
 });
+
+import { ServiceEnds } from "@transmi/application";
+describe("con el servicio terminado se dice cuándo sale el próximo bus", () => {
+  const bogota = (y: number, mo: number, d: number, h: number, mi = 0) => Date.UTC(y, mo - 1, d, h + 5, mi);
+  const se = new ServiceEnds();
+  se.load({ v: 1, routes: { R: { wk: { first: ["a", 4 * 3600 + 1800], last: ["b", 22 * 3600] }, sa: { first: ["c", 5 * 3600], last: ["d", 21 * 3600] } } } });
+  it("entre semana, el de mañana; el viernes en la noche, el del sábado", () => {
+    const wed = se.routeStatus("R", bogota(2026, 11, 11, 23, 30), 0)!;       // miércoles 11:30 p. m.
+    expect(wed.state).toBe("ended"); expect(wed.nextFirstStart).toBe(4 * 3600 + 1800);
+    const afterMidnight = se.routeStatus("R", bogota(2026, 11, 12, 0, 30), 0)!;   // sigue siendo el día de servicio del miércoles
+    expect(afterMidnight.state).toBe("ended"); expect(afterMidnight.nextFirstStart).toBe(4 * 3600 + 1800);
+    expect(se.routeStatus("R", bogota(2026, 11, 13, 23, 30), 0)!.nextFirstStart).toBe(5 * 3600);   // viernes → sábado
+    expect(se.routeStatus("R", bogota(2026, 11, 11, 12, 0), 0)!.nextFirstStart).toBeUndefined();   // en servicio: no aplica
+  });
+});

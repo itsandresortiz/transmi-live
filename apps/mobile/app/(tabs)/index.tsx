@@ -46,12 +46,18 @@ export default function Inicio() {
     const arrivals = upcomingAtStop(transit, id, nowSec(), 2)
       .flatMap((u) => u.buses.map((b) => ({ key: `${u.route.id}|${u.direction}|${b.vehicle.id}`, route: u.route as Route, headsign: u.headsign, at: b.etaAt })))
       .sort((a, b) => a.at - b.at).slice(0, 3);
-    let scheduled: { route: Route; time: number } | undefined;
+    let scheduled: { route: Route; time: number; first?: boolean } | undefined;
     if (!arrivals.length && transit.departures.size) {
       const day = transit.serviceEnds.dayAt(nowSec() * 1000);
       const nx = transit.departures.nextAt(id, day.type, day.secs, 1).filter((x) => x.times[0] != null).sort((a, b) => a.times[0]! - b.times[0]!)[0];
       const r = nx ? transit.routeById(nx.routeId) : undefined;
       if (nx && r) scheduled = { route: r, time: nx.times[0]! };
+      // ya no pasa ninguno más hoy: el primero del siguiente día de servicio
+      if (!scheduled) {
+        const first = transit.departures.nextAt(id, transit.serviceEnds.nextDayType(nowSec() * 1000), 0, 1).filter((x) => x.times[0] != null).sort((p, q) => p.times[0]! - q.times[0]!)[0];
+        const fr = first ? transit.routeById(first.routeId) : undefined;
+        if (first && fr) scheduled = { route: fr, time: first.times[0]!, first: true };
+      }
     }
     return [{ id, stop, name: saved.nicknames[id] || transit.labelOf(stop).title, sub: [stopKind(stop), stopTag(stop)].filter(Boolean).join(" · "), arrivals, scheduled }];
   }), [saved.stops, saved.nicknames, version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -117,7 +123,7 @@ export default function Inicio() {
                     )) : f.scheduled ? (
                       <View style={styles.arrival}>
                         <RouteBadge route={f.scheduled.route} />
-                        <Text style={[type.caption, { color: c.muted, flex: 1, fontSize: 14 }]} numberOfLines={1}>Según el horario</Text>
+                        <Text style={[type.caption, { color: c.muted, flex: 1, fontSize: 14 }]} numberOfLines={1}>{f.scheduled.first ? "Primer bus" : "Según el horario"}</Text>
                         <Text style={[type.headline, { color: c.text }]}>{clockOfDay(f.scheduled.time)}</Text>
                       </View>
                     ) : <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>{live ? "Ningún bus viene ahora" : downText().title}</Text>}
