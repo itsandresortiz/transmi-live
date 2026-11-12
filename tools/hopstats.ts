@@ -49,6 +49,7 @@ async function main() {
   // (incluida la espera en paradas y semáforos: el tiempo de un bus detenido también se suma al tramo donde está).
   const state = new TransitState(); state.setNetwork(net);
   const last = new Map<string, { key: string; s: number; at: number }>();
+  const still = new Map<string, number>();      // bus -> segundos seguidos sin avanzar
   let events = 0, seen = 0, polls = 0;
   const end = Date.now() + SECONDS * 1000;
   while (Date.now() < end) {
@@ -74,7 +75,10 @@ async function main() {
           const d = new Date((v.reportedAt - 5 * 3600) * 1000);                                      // hora de Bogotá (UTC-5)
           const tag = `${dayType(d)}|${bucketOf(d.getUTCHours())}`;
           const add = (i: number, frac: number, secs: number) => { const acc = (run[`${key}|${i}|${tag}`] ??= { n: 0, sum: 0, sq: 0 }); acc.n += frac; acc.sum += secs; };
-          if (ds <= 5) { add(seq.index, 0, dt); events++; continue; }                               // detenido: el tiempo cuenta, el avance no
+          // detenido: el tiempo cuenta y el avance no (parada, semáforo, trancón). Pero un bus quieto más de 3 min seguidos está
+          // estacionado (cabecera, patio, varado), no en un tramo lento: ese tiempo no se suma, o inflaría el tramo
+          if (ds <= 5) { const q = (still.get(v.id) ?? 0) + dt; still.set(v.id, q); if (q <= 180) { add(seq.index, 0, dt); events++; } continue; }
+          still.delete(v.id);
           for (let i = 0; i < info.s.length - 1; i++) {
             const lo = Math.max(prev.s, info.s[i]!), hi = Math.min(hit.s, info.s[i + 1]!), len = info.s[i + 1]! - info.s[i]!;
             if (hi <= lo || len < 15) continue;
