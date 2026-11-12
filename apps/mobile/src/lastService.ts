@@ -7,7 +7,7 @@ export function clockOfDay(seconds: number): string {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h < 12 ? "a. m." : "p. m."}`;
 }
 /** No está llegando nada reciente de los buses. Pocos buses con dato fresco (madrugada) NO cuenta como caída. */
-export const liveDown = (): boolean => liveLevel(transit, nowMs()) === "none";
+export const liveDown = (): boolean => liveLevel(transit, nowMs()) === "none" || isOffline(transit, nowMs());      // sin conexión tampoco hay datos en vivo, aunque aún queden buses viejos por quitar
 
 /** Qué decir cuando no llegan buses: de noche, que el servicio ya terminó; de día, que no hay datos en vivo. */
 export const downText = () => liveDownText(nowMs(), isOffline(transit, nowMs()));

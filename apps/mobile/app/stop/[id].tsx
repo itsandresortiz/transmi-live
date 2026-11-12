@@ -275,11 +275,12 @@ function RouteEmpty({ route }: { route?: Route }) {
 function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string }) {
   const c = useColors();
   const skip = useMemo(() => new Set(skipKeys.split(",")), [skipKeys]);
+  const down = liveDown();
   const items = useMemo(() => {
     const day = transit.serviceEnds.dayAt(nowSec() * 1000);
-    const sched = new Map<string, number>();
-    if (transit.departures.size) for (const p of transit.departures.nextAt(stopId, day.type, day.secs, 1)) if (p.times[0] != null) sched.set(`${p.routeId}|${p.direction}`, p.times[0]);
-    const seen = new Set<string>(), out: { route: Route; headsign: string; key: string; state?: string; next?: number; lastStart?: number; firstStart?: number; nextFirst?: number }[] = [];
+    const sched = new Map<string, number>(), more = new Map<string, number[]>();
+    if (transit.departures.size) for (const p of transit.departures.nextAt(stopId, day.type, day.secs, 3)) if (p.times[0] != null) { sched.set(`${p.routeId}|${p.direction}`, p.times[0]); more.set(`${p.routeId}|${p.direction}`, p.times.slice(0, 3)); }
+    const seen = new Set<string>(), out: { route: Route; headsign: string; key: string; state?: string; next?: number; lastStart?: number; firstStart?: number; nextFirst?: number; times?: number[]; every?: number }[] = [];
     for (const [routeId, shapes] of transit.network.shapes) {
       const route = transit.routeById(routeId);
       if (!route) continue;
@@ -290,7 +291,7 @@ function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string })
         if (seen.has(dup)) continue;
         seen.add(dup);
         const st = transit.routeStatus(routeId, nowMs());
-        out.push({ route, headsign: sh.headsign, key, state: st?.state, next: sched.get(key), lastStart: st?.state === "ended" ? st.lastStart : undefined, nextFirst: st?.nextFirstStart, firstStart: st?.state === "before" ? st.firstStart : undefined });
+        out.push({ route, headsign: sh.headsign, key, state: st?.state, next: sched.get(key), times: more.get(key), every: transit.departures.headwayAt(routeId, day.type, day.secs), lastStart: st?.state === "ended" ? st.lastStart : undefined, nextFirst: st?.nextFirstStart, firstStart: st?.state === "before" ? st.firstStart : undefined });
       }
     }
     const rank = (x: { state?: string }) => (x.state === "ended" || x.state === "before" ? 1 : 0);
@@ -299,12 +300,15 @@ function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string })
   if (!items.length) return null;
   return (
     <>
-      <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>TAMBIÉN PARAN AQUÍ</Text>
+      <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>{down ? "HORARIO PROGRAMADO (APROXIMADO)" : "TAMBIÉN PARAN AQUÍ"}</Text>
+      {down ? <Text style={[type.caption, { color: c.muted, marginTop: -space[1] }]}>No son buses en vivo: son las horas a las que deberían pasar según el horario de TransMilenio.</Text> : null}
       {items.map((x) => {
         const off = x.state === "ended" || x.state === "before";
         const sub = x.state === "ended" ? `Ya no hay más buses hoy${x.nextFirst != null ? ` · el próximo sale a las ${clockOfDay(x.nextFirst)}` : x.lastStart != null ? ` · el último salió a las ${clockOfDay(x.lastStart)}` : ""}`
           : x.state === "before" ? `Aún no empieza${x.firstStart != null ? ` · primer bus a las ${clockOfDay(x.firstStart)}` : ""}`
-          : x.next != null ? `Sin bus acercándose · según el horario, ${clockOfDay(x.next)}` : "Sin bus acercándose ahora";
+          // sin datos en vivo (sin internet, o TransMilenio no envía): lo que dice el horario, que sí está guardado en el teléfono
+          : down && x.times?.length ? `Según el horario: ${x.times.map(clockOfDay).join(" · ")}${x.every ? ` · pasa cada ${Math.max(1, Math.round(x.every / 60))} min aprox.` : ""}`
+          : x.next != null ? `Sin bus acercándose · según el horario, ${clockOfDay(x.next)}` : down ? "Sin horario publicado para esta ruta" : "Sin bus acercándose ahora";
         return (
           <Tap key={x.key} onPress={() => router.push({ pathname: "/route/[id]", params: { id: x.route.id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${x.route.shortName}${x.headsign ? ` hacia ${x.headsign}` : ""}. ${sub}`} style={{ opacity: off ? 0.55 : 1 }}>
             <Card style={styles.row}>
