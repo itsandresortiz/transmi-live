@@ -51,3 +51,9 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Decisión**: ganancia 0,4 y tope 150 s (166 m de mediana, mejor p90, y el bus no se congela).
 - **Descartado**: mantener 0,5 con tope largo (178 m), subir la ganancia (peor en todo), 0,3 (algo menos de error mediano pero el bus queda 100 m atrás).
 - **Por revisar**: solo se midió en hora pico; en valle los buses van más rápido y podría convenir más ganancia. Usar el perfil de `hop-stats` por ruta y franja cuando haya datos.
+
+## 2026-11-12 · Cuándo dar un bus por pasado en una parada
+- **Contexto**: con el dato un minuto atrasado, la mitad de los buses que decían «llegando» ya se habían ido.
+- **Decisión**: si la cuenta a la parada venció hace más de 60 s, el bus no se anuncia en esa parada (77 % de probabilidad de que ya pasó).
+- **Descartado**: quitarlo apenas vence (solo 34 % había pasado en los primeros 30 s: se esconderían buses que sí vienen) o dejarlo siempre (lo que había).
+- **Costo conocido**: cerca de 1 de cada 4 buses que se quitan sí seguía viniendo (trancón); reaparece si su siguiente reporte lo muestra antes de la parada.

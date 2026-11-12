@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TransitState, arrivalAtIndex } from "@transmi/application";
+import { TransitState, arrivalAtIndex, arrivalOrPassed, upcomingAtStop } from "@transmi/application";
 import { TransitNetwork, type VehicleReport } from "@transmi/domain";
 
 const M_PER_DEG = 111_320 * Math.cos((4.65 * Math.PI) / 180);
@@ -37,5 +37,15 @@ describe("hora de llegada con la posición del bus", () => {
     st.applyPositions([{ ...rep("lejos", 300), position: { lat: 4.6536, lon: lonAt(300) } }], 1_000_000);   // 400 m al norte de la calle
     const t = arrivalAtIndex(st, st.fleet.get("lejos")!, shape, 0, 1, 995_000);
     expect(t - 1000).toBeGreaterThan(60);      // tramo entero (no se puede saber cuánto avanzó)
+  });
+  it("si la cuenta a la parada venció hace más de un minuto, el bus se da por pasado y no se anuncia", () => {
+    const { st, shape } = world();
+    st.applyPositions([rep("casi", 540)], 1_000_000);       // a 60 m de S1: la cuenta da unos segundos después de su reporte (t = 1000)
+    const v = st.fleet.get("casi")!;
+    expect(arrivalOrPassed(st, v, shape, 0, 1, 1_020_000)).not.toBeNull();     // 20 s después: «llegando»
+    expect(arrivalOrPassed(st, v, shape, 0, 1, 1_120_000)).toBeNull();         // 2 min después sin reporte nuevo: ya pasó
+    expect(arrivalOrPassed(st, v, shape, 0, 3, 1_120_000)).not.toBeNull();     // pero sigue viniendo hacia S3
+    expect(upcomingAtStop(st, "S1", 1120).length).toBe(0);
+    expect(upcomingAtStop(st, "S3", 1120).length).toBe(1);
   });
 });

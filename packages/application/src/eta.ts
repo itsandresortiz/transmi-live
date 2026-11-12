@@ -63,6 +63,19 @@ export function arrivalAtIndex(state: TransitState, v: Vehicle, shape: RouteShap
   return eta > now + 3 ? eta : now + Math.max(10, 0.3 * remaining);
 }
 
+/** Cuánto tiene que haberse vencido la cuenta a una parada para dar por hecho que el bus ya pasó por ella.
+ *  Medido el 2026-11-11 con 73.989 casos de buses a una parada de distancia (el dato llega con ~1 min de edad): si la cuenta no ha vencido,
+ *  el bus ya había pasado en el 7 % de los casos; vencida hace 0–30 s, 34 %; 30–60 s, 59 %; 60–120 s, 77 %. Antes se mostraban todos
+ *  como «llegando», y de esos la mitad ya se había ido. */
+export const PASSED_AFTER_S = 60;
+
+/** Hora de llegada para las listas de una parada, o `null` si lo más probable es que el bus ya pasó por ella. */
+export function arrivalOrPassed(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, to: number, nowMs = Date.now()): number | null {
+  const { eta, remaining } = rawArrival(state, v, shape, lastIndex, to, nowMs), now = nowMs / 1000;
+  if (eta < now - PASSED_AFTER_S) return null;
+  return eta > now + 3 ? eta : now + Math.max(10, 0.3 * remaining);
+}
+
 /** La cuenta sin retoques: puede dar una hora que ya pasó (el bus ya debió llegar a esa parada según el cálculo). */
 export function rawArrival(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, to: number, nowMs = Date.now()): { eta: number; remaining: number } {
   const stopIds = shape.stopIds;

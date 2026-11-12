@@ -1,5 +1,5 @@
 import type { SystemType } from "@transmi/domain";
-import { arrivalAtIndex } from "./eta";
+import { arrivalOrPassed } from "./eta";
 import type { TransitState } from "./transit-state";
 
 /** Llegadas por parada para el widget del teléfono. Un proceso las publica cada minuto repartidas en archivos pequeños («cajones»);
@@ -24,8 +24,8 @@ export function arrivalsByStop(state: TransitState, nowMs: number, perStop = 8, 
     if (!seq || !route) continue;
     const last = Math.min(seq.shape.stopIds.length - 1, seq.index + ahead);
     for (let j = seq.index + 1; j <= last; j++) {
-      const eta = arrivalAtIndex(state, v, seq.shape, seq.index, j, nowMs);
-      if (!(eta > now - 20)) continue;
+      const eta = arrivalOrPassed(state, v, seq.shape, seq.index, j, nowMs);
+      if (eta == null || !(eta > now - 20)) continue;       // si ya debió pasar por esa parada, no se anuncia
       if (eta - now > horizonSec) break;
       const id = seq.shape.stopIds[j]!, list = out.get(id) ?? out.set(id, []).get(id)!;
       list.push({ r: route.shortName, h: seq.shape.headsign, t: Math.round(eta), s: v.system });      // el sistema ya resuelto del bus (un alimentador puede venir mal clasificado en la ruta)

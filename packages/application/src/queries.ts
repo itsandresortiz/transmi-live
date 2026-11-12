@@ -1,5 +1,5 @@
 import { routeTitle, type Route, type SystemType, type Vehicle, type ServiceAlert, type Stop, alertSeverity } from "@transmi/domain";
-import { arrivalAtIndex, hav } from "./eta";
+import { arrivalOrPassed, hav } from "./eta";
 import type { TransitState } from "./transit-state";
 
 export const normalize = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -236,7 +236,9 @@ export function upcomingAtStop(state: TransitState, stopId: string, nowSec: numb
         if (!v.lastStopId) continue;
         const k = shape.stopIds.indexOf(v.lastStopId);
         if (k < 0 || k >= j) continue;                       // ya la pasó (o está en ella) o va por otro sentido
-        buses.push({ vehicle: v, etaAt: arrivalAtIndex(state, v, shape, k, j, nowSec * 1000), official: false, stopsAway: j - k });
+        const etaAt = arrivalOrPassed(state, v, shape, k, j, nowSec * 1000);
+        if (etaAt == null) continue;                         // la cuenta venció hace rato: lo más probable es que ya pasó por esta parada
+        buses.push({ vehicle: v, etaAt, official: false, stopsAway: j - k });
       }
       if (!buses.length) continue;
       buses.sort((a, b) => a.etaAt - b.etaAt);

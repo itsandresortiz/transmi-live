@@ -70,6 +70,9 @@ async function main() {
   for (const tr of tracks.values()) {
     const lastPt = tr.pts[tr.pts.length - 1]!;
     for (const p of tr.preds) {
+      // solo cuentan los pronósticos del primer tercio de la captura: así quedan al menos dos tercios para ver llegar el bus.
+      // (La corrida del 2026-11-11 contó también los del final, que no podían verse llegar: sus cifras de sesgo para 2+ paradas no valen.)
+      if (p.madeAt > batches[0]!.at + (endAt - batches[0]!.at) / 3) continue;
       let truth = cross(tr.pts, p.stopS);
       // si el bus siguió reportando hasta el final y aún no llegaba a la parada, se sabe que llegó DESPUÉS de su último reporte:
       // se cuenta como «muy tarde» (no se descarta: descartarlo haría ver los tiempos mejores de lo que son)
