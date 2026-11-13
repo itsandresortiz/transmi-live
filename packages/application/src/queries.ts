@@ -29,19 +29,47 @@ const textOf = (r: Route): string => { let t = routeText.get(r); if (t === undef
 const headsignText = new WeakMap<string[], string[]>();
 const headsignsOf = (hs: string[]): string[] => { let t = headsignText.get(hs); if (!t) { t = hs.map(normalize); headsignText.set(hs, t); } return t; };
 
-/** Rutas ordenadas por cantidad de buses; busca por nombre y por destino. */
-export function searchRoutes(state: TransitState, o: { query?: string; system?: SystemType | null } = {}): Route[] {
+const SYSTEM_ORDER: Record<SystemType, number> = { troncal: 0, dual: 1, alimentador: 2, zonal: 3, otro: 4 };
+
+/** Qué tan bien responde una ruta a lo que se escribió (menos es mejor): el nombre exacto primero («7» → la ruta 7, no las cien que
+ *  tienen un 7 en el nombre), luego las que empiezan así, las que lo contienen en el nombre y, al final, las que solo coinciden por
+ *  su destino o descripción. */
+function matchRank(r: Route, q: string): number {
+  const sn = normalize(r.shortName);
+  if (sn === q) return 0;
+  if (sn.startsWith(q)) return 1;
+  if (sn.includes(q)) return 2;
+  return 3;
+}
+
+/** Rutas que responden a la búsqueda. Sin texto, las de más buses primero. Con texto, por qué tan bien coinciden (`matchRank`) y,
+ *  entre iguales, troncales antes que zonales y las de más buses primero. Busca por nombre y por destino.
+ *  `mergeDirections`: TransMilenio publica cada sentido como una ruta aparte con el mismo nombre; con esto sale una sola por nombre
+ *  (la del sentido con más buses), para no mostrar dos «7» iguales. */
+export function searchRoutes(state: TransitState, o: { query?: string; system?: SystemType | null; mergeDirections?: boolean } = {}): Route[] {
   const q = normalize((o.query ?? "").trim());
   const counts = vehiclesByRoute(state);
-  return state.routes()
+  const n = (r: Route) => counts.get(r.id) ?? 0;
+  let list = state.routes()
     .filter((r) => {
       if (o.system && r.system !== o.system) return false;
       if (!q) return true;
       if (textOf(r).includes(q)) return true;
       const hs = state.network.headsigns.get(r.id);
       return !!hs && headsignsOf(hs).some((h) => h.includes(q));
-    })
-    .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || collator.compare(a.shortName, b.shortName));
+    });
+  // buses de la ruta contando sus dos sentidos (para ordenar): así el sentido con pocos buses no hunde a la ruta
+  const total = new Map<string, number>();
+  const key = (r: Route) => `${r.system}|${r.shortName}`;
+  for (const r of list) total.set(key(r), (total.get(key(r)) ?? 0) + n(r));
+  if (o.mergeDirections) {
+    const best = new Map<string, Route>();
+    for (const r of list) { const cur = best.get(key(r)); if (!cur || n(r) > n(cur)) best.set(key(r), r); }
+    list = [...best.values()];
+  }
+  const byBuses = (a: Route, b: Route) => (total.get(key(b)) ?? 0) - (total.get(key(a)) ?? 0) || collator.compare(a.shortName, b.shortName) || n(b) - n(a);
+  if (!q) return list.sort(byBuses);
+  return list.sort((a, b) => matchRank(a, q) - matchRank(b, q) || (matchRank(a, q) <= 1 ? SYSTEM_ORDER[a.system] - SYSTEM_ORDER[b.system] : 0) || byBuses(a, b));
 }
 
 /** Retraso en segundos para ordenar (los desconocidos al final). */

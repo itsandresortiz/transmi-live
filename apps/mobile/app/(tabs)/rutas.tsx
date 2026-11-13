@@ -27,7 +27,7 @@ export default function Buscar() {
   const saved = useSaved();
   const q = query.trim();
 
-  const routes = useMemo(() => searchRoutes(transit, { query }), [version, query]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const routes = useMemo(() => searchRoutes(transit, { query, mergeDirections: true }), [version, query]);   // eslint-disable-line react-hooks/exhaustive-deps
   const stops = useMemo<StopRow[]>(() => {
     if (q.length >= 2) return searchStopGroups(transit, q, 40).map((g) => {
       const d = describeStopGroup(transit, g);

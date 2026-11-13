@@ -255,3 +255,19 @@ describe("la misma ruta en sus dos sentidos", () => {
     expect(st.routeFamily("no-existe")).toEqual(["no-existe"]);
   });
 });
+
+describe("buscar una ruta: lo que se escribió primero", () => {
+  it("«7» da primero la ruta 7 (troncal antes que zonal), no las que solo tienen un 7 en el nombre", () => {
+    const st = new TS2(), net = new TN3();
+    const add = (id: string, shortName: string, system: "troncal" | "zonal" | "dual", longName = "") => net.routes.set(id, { id, shortName, longName, system });
+    add("a", "HB647", "zonal"); add("b", "HA708", "zonal"); add("c", "MK86", "dual", "Cra. 7 con Calle 107A");
+    add("7z", "7", "zonal"); add("7a", "7", "troncal", "Polo"); add("7b", "7", "troncal", "Portal Suba"); add("d", "73", "zonal"); add("e", "C17", "troncal");
+    st.setNetwork(net);
+    const names = searchRoutes(st, { query: "7" }).map((r) => `${r.shortName}/${r.system}`);
+    expect(names.slice(0, 3)).toEqual(["7/troncal", "7/troncal", "7/zonal"]);
+    expect(names[3]).toBe("73/zonal");                                  // luego las que empiezan por 7
+    expect(names.indexOf("MK86/dual")).toBe(names.length - 1);          // al final, la que solo coincide por su descripción
+    // en la app, los dos sentidos de la misma ruta salen como una sola
+    expect(searchRoutes(st, { query: "7", mergeDirections: true }).filter((r) => r.shortName === "7").map((r) => r.system)).toEqual(["troncal", "zonal"]);
+  });
+});
