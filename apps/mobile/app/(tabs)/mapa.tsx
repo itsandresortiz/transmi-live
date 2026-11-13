@@ -45,7 +45,12 @@ export default function Mapa() {
   useEffect(() => {
     if (!focused) return;
     const stop = focus.stopId ? transit.stopById(focus.stopId) : undefined;
-    const pts = [...(stop ? [stop.position] : []), ...focus.busIds.flatMap((id) => { const v = transit.fleet.get(id); return v ? [v.position] : []; })];
+    const buses = focus.busIds.flatMap((id) => { const v = transit.fleet.get(id); return v ? [v.position] : []; });
+    // con una parada, el encuadre va de la parada al bus QUE LLEGA PRIMERO (los demás quedan resaltados pero no alejan el mapa:
+    // con tres buses repartidos por la ciudad se veía todo Bogotá y no se distinguía el que venía)
+    // (la lista llega ordenada por hora de llegada: el primero es el que llega antes, que no siempre es el más cercano en línea recta)
+    const nearest = stop && buses.length ? [buses[0]!] : buses;
+    const pts = [...(stop ? [stop.position] : []), ...nearest];
     if (pts.length) setTimeout(() => map.current?.fit(pts, 80), 250);
   }, [focused, focus.stopId, focus.routeId]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
