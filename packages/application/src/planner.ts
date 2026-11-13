@@ -74,6 +74,10 @@ export interface PlanOptions {
 
 const WALK_MPS = 1.25, WALK_DETOUR = 1.25, TRANSFER_WALK_M = 260, MAX_ACCESS_M = 900;
 const DETOUR = 1.15;
+/** Hasta qué distancia una parada cuenta como «en el destino» (para proponer llegar hasta ella sin caminata final). */
+const DOOR_M = 250;
+/** Un tramo de una sola parada más corto que esto no justifica cambiar de bus (se camina). */
+const SHORT_HOP_M = 450;
 /** Tiempo en bus entre paradas = parada (frenar, subir y bajar) + distancia / velocidad de crucero. Con tramos largos (rutas exprés) la distancia pesa;
  *  con tramos cortos manda la parada. Los valores dan ~24 km/h en la troncal con paradas cada 700 m y ~35 km/h con tramos de 3 km. */
 const RIDE_MODEL: Record<SystemType, { dwell: number; cruise: number }> = {
@@ -205,12 +209,12 @@ interface LiveBus { eta: number; id: string; label?: string }
 interface RunResult { best: { k: number; arrive: number; stop: number }[]; parents: (Parent | undefined)[][]; tau: Float64Array[] }
 
 function raptor(ix: Index, live: Live, origin: GeoPoint, dest: GeoPoint, nowSec: number, banned: ReadonlySet<string>,
-  liveEtas: Map<number, Map<number, LiveBus[]>>, maxRounds: number, maxAccess: number): RunResult {
+  liveEtas: Map<number, Map<number, LiveBus[]>>, maxRounds: number, maxAccess: number, maxEgress = maxAccess): RunResult {
   const nS = ix.stopIds.length, INF = Infinity;
   const tau = Array.from({ length: maxRounds + 1 }, () => new Float64Array(nS).fill(INF));
   const parents: (Parent | undefined)[][] = Array.from({ length: maxRounds + 1 }, () => new Array<Parent | undefined>(nS));
   const bestAll = new Float64Array(nS).fill(INF);
-  const egress = stopsNear(ix, dest, maxAccess).map((x) => ({ s: x.s, sec: walkSeconds(x.m) }));
+  const egress = stopsNear(ix, dest, maxEgress).map((x) => ({ s: x.s, sec: walkSeconds(x.m) }));
   const egressSec = new Map(egress.map((e) => [e.s, e.sec]));
   let bound = INF;                                                    // mejor llegada al destino hasta ahora
   let marked = new Set<number>();
@@ -364,7 +368,9 @@ function build(state: TransitState, ix: Index, live: Live, run: RunResult, k: nu
   const shift = firstRide ? boardNearer(state, ix, all, firstRide, origin, nowSec) : 0;
   const rides = all.filter((l): l is RideLeg => l.kind === "ride");
   if (!rides.length) return null;
-  if (rides.length > 1 && rides.some((r) => r.stops < 2)) return null;           // cambiar de bus para avanzar una sola parada no tiene sentido
+  // cambiar de bus para avanzar una sola parada no tiene sentido… salvo que esa parada quede lejos (un expreso que salta varias estaciones,
+  // o el tramo que ahorra una caminata larga hasta el destino): solo se descarta si el salto es corto
+  if (rides.length > 1 && rides.some((r) => r.stops < 2 && hav(r.board.position, r.alight.position) < SHORT_HOP_M)) return null;
   const arriveAt = run.best.find((b) => b.k === k && b.stop === stop)!.arrive + shift;
   const walk = all.filter((l): l is WalkLeg => l.kind === "walk");
   return {
@@ -472,6 +478,26 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
     banned.add(main.shortName);
   }
 
+  // Llegar hasta la puerta: la búsqueda de arriba solo mira la hora de llegada, así que si bajarse antes y caminar 600 m tarda lo mismo
+  // que hacer un trasbordo corto, nunca proponía el trasbordo. Cuando el destino tiene una parada o estación al lado (≤250 m) se busca
+  // además cómo llegar justo ahí, sin esa caminata final: p. ej. «7 hasta Polo y B11 hasta Calle 85» en vez de solo «7 y caminar».
+  if (stopsNear(ix, dest.position, DOOR_M).length) {
+    const doorBanned = new Set<string>();
+    for (let pass = 0; pass < 3; pass++) {      // hasta tres alternativas distintas (la segunda y la tercera, sin la ruta principal de la anterior)
+      const run = raptor(ix, live, origin.position, dest.position, nowSec, doorBanned, liveEtas, maxRounds, maxAccess, DOOR_M);
+      let fastest: Itinerary | null = null;
+      for (const b of run.best) {
+        const it = build(state, ix, live, run, b.k, b.stop, origin, dest, nowSec);
+        if (!it) continue;
+        if (!candidates.has(sig(it))) candidates.set(sig(it), it);
+        if (!fastest || it.arriveAt < fastest.arriveAt) fastest = it;
+      }
+      const main = fastest?.legs.filter((l): l is RideLeg => l.kind === "ride").sort((x, y) => y.rideSeconds - x.rideSeconds)[0];
+      if (!main) break;
+      doorBanned.add(main.shortName);
+    }
+  }
+
   // a pie, si es corto
   const direct = hav(origin.position, dest.position);
   if (direct <= 2600) {
@@ -553,15 +579,18 @@ function searchStopGroupsLite(state: TransitState, q: string, limit: number): Pl
 
 /* ---------- con qué viajar ---------- */
 
-/** Lo que la persona puede elegir en «Cómo llegar»: TransMilenio (troncales y duales), SITP zonal (buses azules) y alimentadores (verdes). */
-export type TravelMode = "troncal" | "zonal" | "alimentador";
+/** Lo que la persona puede elegir en «Cómo llegar»: TransMilenio (troncales, de estación a estación), duales (buses de TransMilenio que
+ *  también paran en paraderos de la calle, como el MC84), SITP zonal (buses azules) y alimentadores (verdes).
+ *  Los duales van aparte desde el 2026-11-13: el dueño esperaba que «TransMilenio» diera solo troncales, como en la app oficial. */
+export type TravelMode = "troncal" | "dual" | "zonal" | "alimentador";
 export const TRAVEL_MODES: readonly { key: TravelMode; label: string; systems: readonly SystemType[] }[] = [
-  { key: "troncal", label: "TransMilenio", systems: ["troncal", "dual"] },
+  { key: "troncal", label: "TransMilenio", systems: ["troncal"] },
+  { key: "dual", label: "Dual", systems: ["dual"] },
   { key: "zonal", label: "SITP zonal", systems: ["zonal", "otro"] },
   { key: "alimentador", label: "Alimentador", systems: ["alimentador"] },
 ];
 export type TravelModes = Record<TravelMode, boolean>;
-export const ALL_MODES: TravelModes = { troncal: true, zonal: true, alimentador: true };
+export const ALL_MODES: TravelModes = { troncal: true, dual: true, zonal: true, alimentador: true };
 /** Los sistemas permitidos para `planTrip`, o `undefined` si están todos (sin filtro). */
 export function systemsFor(modes: TravelModes): SystemType[] | undefined {
   return TRAVEL_MODES.every((m) => modes[m.key]) ? undefined : TRAVEL_MODES.filter((m) => modes[m.key]).flatMap((m) => [...m.systems]);

@@ -57,3 +57,8 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Decisión**: si la cuenta a la parada venció hace más de 60 s, el bus no se anuncia en esa parada (77 % de probabilidad de que ya pasó).
 - **Descartado**: quitarlo apenas vence (solo 34 % había pasado en los primeros 30 s: se esconderían buses que sí vienen) o dejarlo siempre (lo que había).
 - **Costo conocido**: cerca de 1 de cada 4 buses que se quitan sí seguía viniendo (trancón); reaparece si su siguiente reporte lo muestra antes de la parada.
+
+## 2026-11-13 · Duales fuera del modo «TransMilenio» en «Cómo llegar»
+- **Contexto**: «TransMilenio» incluía troncales y duales; el dueño vio el MC84 (dual, para en paraderos) y lo tomó por un error. La app oficial no muestra duales al filtrar por TransMilenio.
+- **Decisión**: cuarto modo «Dual», prendido por defecto con los demás; «TransMilenio» = solo troncales.
+- **Descartado**: renombrar a «TransMilenio y duales» (no permitía excluirlos) o quitar los duales (son rutas reales y a veces la mejor opción).

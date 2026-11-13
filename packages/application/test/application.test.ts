@@ -231,3 +231,13 @@ describe("sin conexión", () => {
     expect(liveDownText(Date.UTC(2026, 10, 12, 5, 10), true).title).toBe("Sin conexión a internet");   // a medianoche y sin red: se dice sin conexión
   });
 });
+
+import { ALL_MODES, TRAVEL_MODES, systemsFor } from "@transmi/application";
+describe("con qué viajar: los duales van aparte de TransMilenio", () => {
+  it("«TransMilenio» solo da troncales; los duales tienen su propio modo", () => {
+    expect(TRAVEL_MODES.find((m) => m.key === "troncal")!.systems).toEqual(["troncal"]);
+    expect(systemsFor({ ...ALL_MODES, dual: false, zonal: false, alimentador: false })).toEqual(["troncal"]);
+    expect(systemsFor({ ...ALL_MODES, zonal: false, alimentador: false })).toEqual(["troncal", "dual"]);
+    expect(systemsFor(ALL_MODES)).toBeUndefined();
+  });
+});
