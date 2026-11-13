@@ -280,7 +280,7 @@ function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string })
     const day = transit.serviceEnds.dayAt(nowSec() * 1000);
     const sched = new Map<string, number>(), more = new Map<string, number[]>();
     if (transit.departures.size) for (const p of transit.departures.nextAt(stopId, day.type, day.secs, 3)) if (p.times[0] != null) { sched.set(`${p.routeId}|${p.direction}`, p.times[0]); more.set(`${p.routeId}|${p.direction}`, p.times.slice(0, 3)); }
-    const seen = new Set<string>(), out: { route: Route; headsign: string; key: string; state?: string; next?: number; lastStart?: number; firstStart?: number; nextFirst?: number; times?: number[]; every?: number }[] = [];
+    const seen = new Set<string>(), out: { route: Route; headsign: string; key: string; state?: string; next?: number; lastStart?: number; firstStart?: number; nextFirst?: number; times?: number[]; every?: number; inMin?: number }[] = [];
     for (const [routeId, shapes] of transit.network.shapes) {
       const route = transit.routeById(routeId);
       if (!route) continue;
@@ -291,11 +291,12 @@ function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string })
         if (seen.has(dup)) continue;
         seen.add(dup);
         const st = transit.routeStatus(routeId, nowMs());
-        out.push({ route, headsign: sh.headsign, key, state: st?.state, next: sched.get(key), times: more.get(key), every: transit.departures.headwayAt(routeId, day.type, day.secs), lastStart: st?.state === "ended" ? st.lastStart : undefined, nextFirst: st?.nextFirstStart, firstStart: st?.state === "before" ? st.firstStart : undefined });
+        out.push({ route, headsign: sh.headsign, key, state: st?.state, next: sched.get(key), inMin: sched.has(key) ? Math.round((sched.get(key)! - day.secs) / 60) : undefined, times: more.get(key), every: transit.departures.headwayAt(routeId, day.type, day.secs), lastStart: st?.state === "ended" ? st.lastStart : undefined, nextFirst: st?.nextFirstStart, firstStart: st?.state === "before" ? st.firstStart : undefined });
       }
     }
     const rank = (x: { state?: string }) => (x.state === "ended" || x.state === "before" ? 1 : 0);
-    return out.sort((a, b) => rank(a) - rank(b) || a.route.shortName.localeCompare(b.route.shortName, "es", { numeric: true })).slice(0, 40);
+    // primero las que pasan antes según el horario; las que no tienen hora, por nombre
+    return out.sort((a, b) => rank(a) - rank(b) || (a.next ?? Infinity) - (b.next ?? Infinity) || a.route.shortName.localeCompare(b.route.shortName, "es", { numeric: true })).slice(0, 40);
   }, [stopId, skip, transit.version]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!items.length) return null;
   return (
@@ -308,7 +309,7 @@ function OtherRoutes({ stopId, skipKeys }: { stopId: string; skipKeys: string })
           : x.state === "before" ? `Aún no empieza${x.firstStart != null ? ` · primer bus a las ${clockOfDay(x.firstStart)}` : ""}`
           // sin datos en vivo (sin internet, o TransMilenio no envía): lo que dice el horario, que sí está guardado en el teléfono
           : down && x.times?.length ? `Según el horario: ${x.times.map(clockOfDay).join(" · ")}${x.every ? ` · pasa cada ${Math.max(1, Math.round(x.every / 60))} min aprox.` : ""}`
-          : x.next != null ? `Sin bus acercándose · según el horario, ${clockOfDay(x.next)}` : down ? "Sin horario publicado para esta ruta" : "Sin bus acercándose ahora";
+          : x.next != null ? `Aún sin bus en camino · según el horario pasa a las ${(x.times ?? [x.next]).slice(0, 2).map(clockOfDay).join(" y ")}${x.inMin != null && x.inMin <= 90 ? ` (en unos ${Math.max(1, x.inMin)} min)` : ""}` : down ? "Sin horario publicado para esta ruta" : "Sin bus acercándose ahora";
         return (
           <Tap key={x.key} onPress={() => router.push({ pathname: "/route/[id]", params: { id: x.route.id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${x.route.shortName}${x.headsign ? ` hacia ${x.headsign}` : ""}. ${sub}`} style={{ opacity: off ? 0.55 : 1 }}>
             <Card style={styles.row}>

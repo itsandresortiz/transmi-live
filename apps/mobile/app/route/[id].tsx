@@ -61,6 +61,12 @@ export default function RouteScreen() {
     }
     return out.sort((a, b) => b.k - a.k);
   }, [d, cur, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // próximas salidas programadas de este sentido desde su primera parada (para cuando aún no hay ningún bus en la calle)
+  const nextStarts = useMemo(() => {
+    if (!cur?.stopIds[0] || !transit.departures.size) return [];
+    const dd = transit.serviceEnds.dayAt(nowMs());
+    return transit.departures.nextAt(cur.stopIds[0], dd.type, dd.secs, 2).find((p) => p.routeId === id && p.direction === cur.direction)?.times ?? [];
+  }, [id, cur, Math.floor(now / 30)]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!d) return <View style={[styles.empty, { backgroundColor: c.bg }]}><CloseToolbar /><Text style={[type.headline, { color: c.text }]}>Ruta no encontrada</Text><Text style={[type.body, { color: c.muted }]}>Ya no aparece en el servicio.</Text></View>;
   const route = d.route, color = SYSTEM_COLOR[route.system];
@@ -141,7 +147,10 @@ export default function RouteScreen() {
             })}
             {buses.length > MAX_BUSES ? <Text style={[type.caption, { color: c.muted, padding: space[3] }]}>y {buses.length - MAX_BUSES} buses más, en el mapa.</Text> : null}
           </Card>
-        ) : <Card><Text style={[type.headline, { color: c.text }]}>{liveDown() ? downText().title : "Sin buses en este sentido ahora"}</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{liveDown() ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: mira el horario abajo." : "Ningún bus de esta ruta va en este sentido en este momento."}</Text></Card>}
+        ) : <Card><Text style={[type.headline, { color: c.text }]}>{liveDown() ? downText().title : "Sin buses en este sentido ahora"}</Text><Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{liveDown() ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: mira el horario abajo." : "Ningún bus de esta ruta va en este sentido en este momento."}</Text>
+          {/* un bus solo aparece en los datos cuando ya salió: antes de eso, lo único que se sabe es a qué hora debería salir */}
+          {nextStarts.length ? <Text style={[type.body, { color: c.text, marginTop: space[2] }]}>Según el horario, {nextStarts.length > 1 ? "los próximos salen" : "el próximo sale"} de {stopText(transit.stopById(cur!.stopIds[0]), "su primera parada")} a las {nextStarts.map(clockOfDay).join(" y ")}.</Text> : null}
+          </Card>}
 
         {cur && cur.stopIds.length ? (
           <>
