@@ -241,3 +241,17 @@ describe("con qué viajar: los duales van aparte de TransMilenio", () => {
     expect(systemsFor(ALL_MODES)).toBeUndefined();
   });
 });
+
+import { TransitNetwork as TN3 } from "@transmi/domain";
+describe("la misma ruta en sus dos sentidos", () => {
+  it("agrupa las rutas con el mismo nombre y sistema (TransMilenio publica cada sentido aparte)", () => {
+    const st = new TS2(), net = new TN3();
+    net.routes.set("14047", { id: "14047", shortName: "7", longName: "Polo", system: "troncal" });
+    net.routes.set("14048", { id: "14048", shortName: "7", longName: "Portal Suba", system: "troncal" });
+    net.routes.set("13906", { id: "13906", shortName: "7", longName: "zonal", system: "zonal" });
+    st.setNetwork(net);
+    expect([...st.routeFamily("14047")].sort()).toEqual(["14047", "14048"]);     // el 7 zonal es otra ruta
+    expect(st.routeFamily("13906")).toEqual(["13906"]);
+    expect(st.routeFamily("no-existe")).toEqual(["no-existe"]);
+  });
+});

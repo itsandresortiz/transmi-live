@@ -89,6 +89,7 @@ export class BusRenderer {
 
   private frame(t: number) {
     const o = this.options(), th = this.theme();
+    const family = o.routeId ? new Set(this.state.routeFamily(o.routeId)) : null;
     const zoom = this.mapc.zoom, nowMs = clockNow(), nowSec = nowMs / 1000;
     if (!o.visible) { if (this.canvasOn) { this.canvas.clear(); this.canvasOn = false; } this.mapc.setBuses(EMPTY); this.lastDots = t; return; }
     const tau = o.motion === "predict" ? TAU_PREDICT_MS : TAU_REPORTED_MS;
@@ -101,7 +102,7 @@ export class BusRenderer {
       const features: Feature<Point>[] = [];
       for (const v of this.state.fleet.values()) {
         if (o.system && v.system !== o.system) continue;
-        if (o.routeId && v.routeId !== o.routeId) continue;
+        if (family && !family.has(v.routeId)) continue;      // la ruta elegida y su sentido contrario
         const w = this.step(v.id, v.world, nowMs, tau);   // vista lejana: sin adelantar (en línea recta se saldrían de la calle)
         const g = toGeo(w);
         features.push({ type: "Feature", properties: { id: v.id, o: isStaleReport(v, nowMs / 1000) ? 0.38 : 1, m: v.system === "troncal" || v.system === "dual" ? 1 : 0, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th) }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } });
@@ -121,7 +122,7 @@ export class BusRenderer {
     for (const v of this.state.fleet.values()) {
       if (v.world.x < x0 || v.world.x > x1 || v.world.y < y0 || v.world.y > y1) continue;
       if (o.system && v.system !== o.system) continue;
-      if (o.routeId && v.routeId !== o.routeId) continue;
+      if (family && !family.has(v.routeId)) continue;      // la ruta elegida y su sentido contrario
       const w = o.motion === "predict" ? this.motion.step(v, nowSec) : this.step(v.id, v.world, nowMs, TAU_REPORTED_MS);
       if (o.motion === "predict") this.shown.set(v.id, { x: w.x, y: w.y, t: nowMs });
       const g = toGeo(w);

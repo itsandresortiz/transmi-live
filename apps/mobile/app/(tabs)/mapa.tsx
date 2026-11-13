@@ -190,7 +190,7 @@ export default function Mapa() {
               ) : (() => {
                 // qué ruta es, hacia dónde va y cuántos buses suyos hay en la calle; al tocar se abre su ficha
                 const r = transit.routeById(focus.routeId!);
-                let n = 0; for (const v of transit.fleet.values()) if (v.routeId === focus.routeId) n++;
+                const fam = new Set(transit.routeFamily(focus.routeId!)); let n = 0; for (const v of transit.fleet.values()) if (fam.has(v.routeId)) n++;      // los dos sentidos
                 return (
                   <Tap style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: space[2] }} onPress={() => router.push({ pathname: "/route/[id]", params: { id: focus.routeId! } })} accessibilityRole="button"
                     accessibilityLabel={`Ruta ${r?.shortName ?? ""} ${r?.longName ?? ""}, ${n} ${n === 1 ? "bus" : "buses"} en la calle. Ver la ruta`}>

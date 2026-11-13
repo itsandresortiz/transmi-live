@@ -43,6 +43,20 @@ export class TransitState {
   /** Rutas conocidas: las del GTFS o, mientras no cargan, las deducidas de los buses. */
   routes(): Route[] { return this.network.routes.size ? [...this.network.routes.values()] : [...this.provisional.values()]; }
   routeById(id: string): Route | undefined { return this.network.routes.get(id) ?? this.provisional.get(id); }
+
+  private families: Map<string, string[]> | null = null;
+  /** Las rutas que para la gente son «la misma»: mismo nombre y mismo sistema. TransMilenio publica cada sentido como una ruta aparte
+   *  (el 7 hacia Polo y el 7 hacia Portal Suba tienen códigos distintos; pasa con 261 de 668 nombres). Al elegir «el 7» hay que mostrar
+   *  los buses de los dos sentidos: antes salían solo los de uno y parecía que faltaban buses en el mapa. Incluye siempre la propia ruta. */
+  routeFamily(routeId: string): readonly string[] {
+    const r = this.routeById(routeId);
+    if (!r) return [routeId];
+    if (!this.families) {
+      this.families = new Map();
+      for (const x of this.network.routes.values()) { const k = `${x.system}|${x.shortName}`; (this.families.get(k) ?? this.families.set(k, []).get(k)!).push(x.id); }
+    }
+    return this.families.get(`${r.system}|${r.shortName}`) ?? [routeId];
+  }
   routeOf(v: Vehicle): Route | undefined { return this.routeById(v.routeId); }
   stopById(id: string | undefined): Stop | undefined { return id ? this.network.stops.get(id) : undefined; }
 
@@ -198,7 +212,7 @@ export class TransitState {
 
   setNetwork(network: TransitNetwork): void {
     this.network = network;
-    this.seq.clear(); this.trunk = null; this.served = null; this.labels.clear(); this.fixedStops.clear();
+    this.seq.clear(); this.trunk = null; this.served = null; this.labels.clear(); this.fixedStops.clear(); this.families = null;
     this.resolveSystems();
     this.reconcileLastStops();
     this.touch();

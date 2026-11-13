@@ -23,6 +23,7 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
     if (!enabled || !view) { setData(EMPTY); return; }
     const onlySet = only ? new Set(only.split(",")) : null;
     const build = () => {
+      const family = routeId ? new Set(transit.routeFamily(routeId)) : null;
       const t = nowSec();
       const padX = (view.east - view.west) * 0.05, padY = (view.north - view.south) * 0.05;
       const features: Feature<Point>[] = [];
@@ -30,7 +31,7 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       let seen = 0;
       const labels = view.zoom >= 15;
       for (const v of transit.fleet.values()) {
-        if (routeId && v.routeId !== routeId) continue;
+        if (family && !family.has(v.routeId)) continue;      // la ruta elegida y su sentido contrario (TransMilenio los publica como rutas distintas)
         if (onlySet && !onlySet.has(v.routeId)) continue;
         if (system && v.system !== system) continue;
         // primero se descartan por su último reporte los que están lejos de la pantalla (un bus no avanza más de unos 3 km entre reportes): así el motor de movimiento calcula cientos de buses por tanda y no miles

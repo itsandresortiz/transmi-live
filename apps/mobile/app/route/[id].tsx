@@ -35,6 +35,8 @@ export default function RouteScreen() {
   const [dir, setDir] = useState<string | null>(null);
   const fav = useSaved((f) => f.routes.includes(id)), toggle = useSaved((f) => f.toggleRoute);
   const d = routeDetail(transit, id);
+  // TransMilenio publica cada sentido como una ruta aparte: si existe el contrario, se ofrece el salto
+  const otherId = transit.routeFamily(id).find((x) => x !== id), other = otherId ? transit.routeById(otherId) : undefined;
   const shapes = transit.network.shapes.get(id) ?? [];
   const cur = shapes.find((s) => s.direction === dir) ?? shapes[0];
 
@@ -87,6 +89,8 @@ export default function RouteScreen() {
           <View style={{ flex: 1 }}>
             <Text style={[type.title, { color: c.text }]} numberOfLines={2}>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName ? routeTitle(route) : SYSTEM_LABEL[route.system]}</Text>
             {route.longName ? <Text style={[type.caption, { color: c.muted }]}>Nombre oficial: {routeOfficialName(route)}</Text> : null}
+            {other ? <Tap haptic={false} onPress={() => router.replace({ pathname: "/route/[id]", params: { id: other.id } })} accessibilityRole="button" accessibilityLabel={`Ver el ${route.shortName} en el sentido contrario${other.longName ? `, ${other.longName}` : ""}`} style={{ marginTop: 4, alignSelf: "flex-start" }}>
+              <Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>Ver el sentido contrario{other.longName ? ` (${other.longName})` : ""} ›</Text></Tap> : null}
           </View>
           <RoundButton symbol={fav ? "star.fill" : "star"} label={fav ? "Quitar de favoritos" : "Guardar en favoritos"} onPress={() => toggle(id)} />
         </View>
