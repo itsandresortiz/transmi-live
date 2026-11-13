@@ -51,7 +51,7 @@ describe("estado del tránsito", () => {
     net.shapes.set("100", [{ routeId: "100", direction: "0", headsign: "x", points: [], stopIds: ["S8", "S9", "S10", "S11"] }]);
     s.setNetwork(net);
     s.applyPositions([rep("a", "100", 1000, { tripId: "T1", lastStopId: "S9" })], 0);
-    s.applyTripUpdates([{ tripId: "T1", routeId: "100", delaySeconds: 720, nextStop: { stopId: "S9", arrivalAt: 950 } }]);
+    s.applyTripUpdates([{ tripId: "T1", routeId: "100", delaySeconds: 720, reportedAt: 990, nextStop: { stopId: "S9", arrivalAt: 950 } }]);
     const v = s.fleet.get("a")!;
     expect(s.delayOf(v)).toMatchObject({ kind: "late", minutes: 12, severe: true });
     expect(s.nextStopOf(v, 1_000_000)?.stopId).toBe("S10");
@@ -269,5 +269,21 @@ describe("buscar una ruta: lo que se escribió primero", () => {
     expect(names.indexOf("MK86/dual")).toBe(names.length - 1);          // al final, la que solo coincide por su descripción
     // en la app, los dos sentidos de la misma ruta salen como una sola
     expect(searchRoutes(st, { query: "7", mergeDirections: true }).filter((r) => r.shortName === "7").map((r) => r.system)).toEqual(["troncal", "zonal"]);
+  });
+});
+
+describe("puntualidad: solo si el dato es de ahora", () => {
+  it("un retraso de hace horas no se muestra como puntualidad del bus", () => {
+    const s = new TransitState();
+    s.applyPositions([rep("a", "100", 100_000, { tripId: "T1" }), rep("b", "100", 100_000, { tripId: "T2" }), rep("c", "100", 100_000, { tripId: "T3" })], 0);
+    s.applyTripUpdates([
+      { tripId: "T1", routeId: "100", delaySeconds: 300, reportedAt: 100_000 - 120 },        // de hace 2 min: vale
+      { tripId: "T2", routeId: "100", delaySeconds: 300, reportedAt: 100_000 - 3 * 3600 },   // de hace 3 h: no vale
+      { tripId: "T3", routeId: "100", delaySeconds: 300 },                                    // sin hora: no se puede saber si es actual
+    ]);
+    expect(s.delayOf(s.fleet.get("a")!).kind).toBe("late");
+    expect(s.delayOf(s.fleet.get("b")!).kind).toBe("unknown");
+    expect(s.delayOf(s.fleet.get("c")!).kind).toBe("unknown");
+    expect(s.hasDelays()).toBe(true);
   });
 });

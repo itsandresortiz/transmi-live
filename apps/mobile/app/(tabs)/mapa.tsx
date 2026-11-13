@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
 import { SymbolView } from "@/ui/Symbol";
 import { router, useIsFocused, usePathname } from "expo-router";
-import { hav } from "@transmi/application";
+import { hav, upcomingAtStop } from "@transmi/application";
 import { SYSTEMS, SYSTEM_LABEL, routeTitle, type SystemType } from "@transmi/domain";
 import { toGeo } from "@transmi/domain";
 import { transit } from "@/composition-root";
@@ -187,7 +187,23 @@ export default function Mapa() {
         <View style={[styles.focusChip, { top: insets.top + 72 }]}>
           <Glass interactive scheme="light" style={styles.focusGlass}>
             <View style={styles.focusRow}>
-              {focus.stopId ? (
+              {focus.stopId && focus.routeId ? (() => {
+                // se llegó desde una ruta de esa parada («ver en el mapa»): el recuadro habla de ESA ruta y su bus, no de la parada,
+                // y al tocarlo vuelve a esa ruta en esa parada (antes mostraba y abría la parada, y se perdía lo que se estaba mirando)
+                const r = transit.routeById(focus.routeId), stopName = stopText(transit.stopById(focus.stopId), "");
+                const fam = new Set(transit.routeFamily(focus.routeId));
+                const first = upcomingAtStop(transit, focus.stopId, nowS, 1).filter((u) => fam.has(u.route.id)).flatMap((u) => u.buses).sort((x, y) => x.etaAt - y.etaAt)[0];
+                return (
+                  <Tap style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: space[2] }} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: focus.stopId!, route: focus.routeId! } })} accessibilityRole="button"
+                    accessibilityLabel={`Ruta ${r?.shortName ?? ""}${first ? `, llega a ${stopName} ${etaText(first.etaAt, nowS)}` : ""}. Ver esta ruta en la parada`}>
+                    {r ? <RouteBadge route={r} /> : null}
+                    <View style={{ flex: 1 }}>
+                      <Text style={[type.headline, { color: om.ink, fontSize: 15 }]} numberOfLines={1}>{first ? (etaText(first.etaAt, nowS) === "llegando" ? "Llegando" : `Llega en ${etaText(first.etaAt, nowS)}`) : r ? routeTitle(r) : "Ruta"}</Text>
+                      <Text style={[type.caption, { color: om.sub }]} numberOfLines={1}>a {stopName} · toca para ver más</Text>
+                    </View>
+                  </Tap>
+                );
+              })() : focus.stopId ? (
                 <Tap style={{ flex: 1 }} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: focus.stopId! } })} accessibilityRole="button" accessibilityLabel={`Parada ${stopText(transit.stopById(focus.stopId), "")}. Ver sus llegadas`}>
                   <Text style={[type.caption, { color: om.sub }]}>Parada · toca para ver llegadas</Text>
                   <Text style={[type.headline, { color: om.ink, fontSize: 15 }]} numberOfLines={1}>{stopText(transit.stopById(focus.stopId), "")}</Text>

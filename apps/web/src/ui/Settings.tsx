@@ -5,6 +5,7 @@ import { SYSTEMS, SYSTEM_LABEL } from "@transmi/domain";
 import type { MapTheme } from "../map/theme";
 import { Close } from "./icons";
 import { useUi } from "./store";
+import { transit } from "../composition-root";
 import { ServiceStats } from "./views";
 
 const Switch = ({ label, on, set }: { label: string; on: boolean; set(v: boolean): void }) =>
@@ -46,7 +47,8 @@ export function Settings({ th }: { th: MapTheme }) {
           </div>
         )}
         <div className="grp"><h3>Color de los buses</h3>
-          <Seg value={u.colorMode} set={u.setColorMode} opts={[["system", "Por sistema"], ["delay", "Por puntualidad"]]} />
+          {/* «por puntualidad» solo se ofrece si TransMilenio está publicando ese dato al día (en nov. 2026 no lo hace) */}
+          {(transit.hasDelays() || u.colorMode === "delay") && <Seg value={u.colorMode} set={u.setColorMode} opts={[["system", "Por sistema"], ["delay", "Por puntualidad"]]} />}
           <div className="legend">
             {u.colorMode === "system"
               ? SYSTEMS.map((s) => <span key={s} style={{ ["--c" as string]: th.system[s] }}><i />{SYSTEM_LABEL[s]}</span>)

@@ -38,9 +38,12 @@ export default function BusSheet() {
         </View>
       </View>
       <Card>
-        <Text style={[type.eyebrow, { color: c.muted }]}>ESTADO</Text>
-        <Text style={[type.title, { color: tone }]}>{d.kind === "unknown" ? "Sin dato de puntualidad" : delayText(d)}</Text>
-        {Math.round(now - v.reportedAt) > 90 ? <Text style={[type.caption, { color: c.muted }]}>Último reporte hace {Math.round((now - v.reportedAt) / 60)} min</Text> : null}
+        {/* la puntualidad solo se muestra si TransMilenio la publica al día; si no, lo que sí se sabe: hace cuánto reportó su posición */}
+        <Text style={[type.eyebrow, { color: c.muted }]}>{d.kind === "unknown" ? "ÚLTIMO REPORTE" : "ESTADO"}</Text>
+        {d.kind === "unknown"
+          ? <Text style={[type.title, { color: c.text }]}>{now - v.reportedAt < 120 ? `Hace ${Math.max(1, Math.round(now - v.reportedAt))} s` : `Hace ${Math.round((now - v.reportedAt) / 60)} min`}</Text>
+          : <Text style={[type.title, { color: tone }]}>{delayText(d)}</Text>}
+        {d.kind !== "unknown" && Math.round(now - v.reportedAt) > 90 ? <Text style={[type.caption, { color: c.muted }]}>Último reporte hace {Math.round((now - v.reportedAt) / 60)} min</Text> : null}
       </Card>
       <Card>
         <Text style={[type.eyebrow, { color: c.muted }]}>PRÓXIMA PARADA</Text>

@@ -9,6 +9,9 @@ import { TravelTimes } from "./travel-times";
 import type { FeedSource } from "./ports";
 
 /** Estado vivo de todo lo que sabe la aplicación: flota, red, retrasos y avisos. */
+/** Antigüedad máxima (s) del dato de retraso de un viaje frente al reporte de posición de su bus para tomarlo como puntualidad. */
+const DELAY_MAX_AGE_S = 600;
+
 export class TransitState {
   readonly fleet = new Fleet();
   network = new TransitNetwork();
@@ -73,7 +76,17 @@ export class TransitState {
     return this.serviceEnds.routeStatus(routeId, nowMs, n);
   }
 
-  delayOf(v: Vehicle): Delay { return delayFromSeconds(v.tripId ? this.tripUpdates.get(v.tripId)?.delaySeconds : null); }
+  /** Puntualidad del bus según TransMilenio, o «sin dato». Solo vale si ese dato es de la misma época que la posición del bus:
+   *  en nov. 2026 el archivo de retrasos trae datos de hace horas (mediana 3,5 h; solo 231 de 4.079 buses, todos zonales, y más de la
+   *  mitad con retraso «0» exacto). Mostrar eso como puntualidad sería presentar un dato viejo como actual: se descarta si tiene más
+   *  de 10 minutos respecto al reporte de posición. Si TransMilenio vuelve a publicarlo al día, reaparece solo. */
+  delayOf(v: Vehicle): Delay {
+    const tu = v.tripId ? this.tripUpdates.get(v.tripId) : undefined;
+    if (!tu || tu.reportedAt == null || v.reportedAt - tu.reportedAt > DELAY_MAX_AGE_S) return delayFromSeconds(null);
+    return delayFromSeconds(tu.delaySeconds);
+  }
+  /** ¿Hay puntualidad vigente de algún bus? Si no, la interfaz esconde todo lo que hable de puntualidad. */
+  hasDelays(): boolean { for (const v of this.fleet.values()) if (this.delayOf(v).kind !== "unknown") return true; return false; }
   /** La parada tiene al menos una ruta que se detiene en ella (hay paradas del archivo sin servicio). */
   isServed(id: string): boolean {
     if (!this.served) { this.served = new Set(); for (const shapes of this.network.shapes.values()) for (const sh of shapes) for (const sid of sh.stopIds) this.served.add(sid); }

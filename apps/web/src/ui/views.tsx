@@ -71,7 +71,7 @@ export function ServiceStats() {
     <div className="stats">
       <div className="stat"><b>{k.vehicles.toLocaleString("es-CO")}</b><span>Buses en vivo</span></div>
       <div className="stat"><b>{k.routes}</b><span>Rutas activas</span></div>
-      <div className="stat late"><b>{k.late}</b><span>Muy tarde</span></div>
+      {transit.hasDelays() && <div className="stat late"><b>{k.late}</b><span>Muy tarde</span></div>}
       <button className="stat" onClick={go(() => setTab("avisos"))}><b>{k.alerts}</b><span>Avisos</span></button>
     </div>
   );
@@ -139,7 +139,7 @@ function BusRow({ v, th, act }: { v: Vehicle } & Props) {
     <button className="row" onClick={() => act.focusBus(v.id)}>
       <span className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r, v.system) }}>{r?.shortName ?? v.routeId}</span>
       <span className="rm"><span className="rt">{v.plate || v.label || v.id}</span><span className="rs">{r?.longName ? routeTitle(r) : SYSTEM_LABEL[v.system]}</span></span>
-      <span className={`pill ${delayClass(d)}`}>{delayText(d)}</span>
+      {d.kind !== "unknown" && <span className={`pill ${delayClass(d)}`}>{delayText(d)}</span>}
     </button>
   );
 }
@@ -398,7 +398,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
       <dl>
         <dt>Próxima parada</dt><dd>{stopText(ns?.stop, "—")}</dd>
         <dt>Llega</dt><dd>{untilText(ns?.arrivalAt, nowSec)}</dd>
-        <dt>Puntualidad</dt><dd><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></dd>
+        {d.kind !== "unknown" && <><dt>Puntualidad</dt><dd><span className={`pill ${delayClass(d)}`}>{delayText(d)}</span></dd></>}
         {(mark?.isLast || mark?.isFirst) && <><dt>Salida programada</dt><dd>{clockOfDay(mark.startSeconds)}</dd></>}
         <dt>Último reporte</dt><dd>hace {Math.max(0, Math.round(nowSec - v.reportedAt))} s</dd>
       </dl>
