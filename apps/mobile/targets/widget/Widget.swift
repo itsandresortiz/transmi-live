@@ -244,12 +244,14 @@ struct StopWidgetView: View {
   private var statusText: String {
     if isDemo { return "Demostración" }
     if isScheduled { return "Programado" }
+    if list.isEmpty { return "Sin datos ahora" }      // sin buses ni horario que mostrar no se puede decir «En vivo»
     if ageMinutes >= 20 { return "Hace \(ageMinutes) min" }
     return "En vivo"
   }
   private var statusColor: Color {
     if isDemo { return Color(hex: "#8b5cf6") }
     if isScheduled { return Color.secondary }
+    if list.isEmpty { return Color.secondary }
     if ageMinutes >= 20 { return Color(hex: "#f59e0b") }
     return Color(hex: "#22c55e")
   }

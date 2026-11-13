@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { AppState, Platform } from "react-native";
 import Constants from "expo-constants";
-import { upcomingAtStop } from "@transmi/application";
+import { spreadArrivals, upcomingAtStop } from "@transmi/application";
 import { stopLabelText } from "@transmi/domain";
 import { transit } from "./composition-root";
 import { nowSec } from "./clock";
@@ -39,14 +39,14 @@ export function syncWidget(): void {
   const stops = saved.stops.slice(0, 3).flatMap((id) => {
     const stop = transit.stopById(id);
     if (!stop) return [];
-    const arrivals = upcomingAtStop(transit, id, now, 3)
+    const arrivals = spreadArrivals(upcomingAtStop(transit, id, now, 6)
       .flatMap((u) => u.buses.map((b) => ({ r: u.route.shortName, h: u.headsign, t: Math.round(b.etaAt), c: SYSTEM_COLOR[u.route.system] })))
-      .sort((a, b) => a.t - b.t).slice(0, 8);      // varios, para que el widget siga con buses en vivo un buen rato después de cerrar la app
+      .sort((a, b) => a.t - b.t));      // varios, para que el widget siga con buses en vivo un buen rato después de cerrar la app
     // respaldo para cuando el dato en vivo se venza y la app no esté abierta: las próximas pasadas según el horario (el widget las rotula «Programado»)
     const sched: typeof arrivals = [];
     if (transit.departures.size) {
       const day = transit.serviceEnds.dayAt(now * 1000), midnight = now - day.secs;
-      for (const p of transit.departures.nextAt(id, day.type, day.secs, 6)) {
+      for (const p of transit.departures.nextAt(id, day.type, day.secs, 24)) {
         const route = transit.routeById(p.routeId);
         if (route) for (const t of p.times) sched.push({ r: route.shortName, h: "", t: Math.round(midnight + t), c: SYSTEM_COLOR[route.system] });
       }
@@ -58,7 +58,9 @@ export function syncWidget(): void {
           if (route) for (const t of p.times) sched.push({ r: route.shortName, h: "", t: Math.round(midnight + 86_400 + t), c: SYSTEM_COLOR[route.system] });
         }
       }
-      sched.sort((a, b) => a.t - b.t); sched.splice(12);
+      // repartido en el tiempo y para varias horas: si el teléfono no deja refrescar el widget y la app no se abre, el horario sigue respondiendo
+      sched.sort((a, b) => a.t - b.t);
+      const spread = spreadArrivals(sched, 40, 6, 240); sched.length = 0; sched.push(...spread);
     }
     return [{ id, name: saved.nicknames[id] || stopLabelText(transit.labelOf(stop)), arrivals, sched }];
   });

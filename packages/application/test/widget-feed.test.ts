@@ -26,3 +26,15 @@ describe("llegadas por parada para el widget", () => {
     expect(by.get("S2")![0]!.t).toBeLessThan(by.get("S3")![0]!.t);
   });
 });
+
+import { spreadArrivals } from "@transmi/application";
+describe("llegadas repartidas para el widget", () => {
+  it("conserva las más próximas y luego una cada cierto tiempo, para que duren hasta el siguiente refresco", () => {
+    const every30s = Array.from({ length: 100 }, (_, i) => ({ t: 1000 + i * 30 }));      // parada con mucho movimiento: un bus cada 30 s
+    const kept = spreadArrivals(every30s);
+    expect(kept.slice(0, 4).map((a) => a.t)).toEqual([1000, 1030, 1060, 1090]);          // las 4 más próximas, tal cual
+    expect(kept.length).toBe(16);
+    expect(kept[kept.length - 1]!.t - 1000).toBeGreaterThan(25 * 60);                    // cubre más de 25 min (antes: 8 buses = 3,5 min)
+    expect(spreadArrivals([{ t: 5 }, { t: 9000 }])).toHaveLength(2);                     // con pocos buses no quita ninguno
+  });
+});
