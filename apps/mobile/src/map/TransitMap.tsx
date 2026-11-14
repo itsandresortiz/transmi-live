@@ -113,7 +113,9 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   const geo = useMemo(() => (transit.network.stops.size && transit.network.shapes.size ? buildStationGeometry(transit, trunkStations(transit), CORRIDORS) : null), [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   const stationGeo = useMemo(() => {
     const j = (x: unknown) => JSON.stringify(x ?? { type: "FeatureCollection", features: [] });
-    return geo ? { bases: j(geo.bases), links: j(geo.links), capsules: j(geo.capsules), doors: j(geo.doors), labels: j(geo.labels), chips: j(geo.chips) } : null;
+    // siempre con datos (vacíos mientras cargan las rutas): las capas quedan montadas desde el principio, porque agregarlas con el mapa ya abierto puede cerrar la app
+    const g: Partial<NonNullable<typeof geo>> = geo ?? {};
+    return { bases: j(g.bases), links: j(g.links), capsules: j(g.capsules), doors: j(g.doors), labels: j(g.labels), chips: j(g.chips) };
   }, [geo]);
 
   /** Estaciones y portales de la troncal: un punto en el centro de sus vagones, su nombre y la letra de su línea (A, B, C…), que le da el color. */
@@ -206,7 +208,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       )}
 
 
-      {stationGeo ? (
+      {(
         <>
           <GeoJSONSource id="station-bases" data={stationGeo.bases} onPress={(e) => { const ids = (e.nativeEvent.features[0]?.properties?.all as string | undefined)?.split(",")[0]; if (ids) onStop?.(ids); }}>
             <Layer id="station-base-fill" type="fill" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#2b2e36" : "#dde2ea", fillOpacity: ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] })} />
@@ -230,7 +232,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
             <Layer id="station-chip-labels" type="symbol" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 14.5, 13, 18, 17], textAnchor: "bottom", textOffset: [0, -0.5], textMaxWidth: 12, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2.4 })} />
           </GeoJSONSource>
         </>
-      ) : null}
+      )}
       {(
         <GeoJSONSource id="semaforos" data={signalsJson}>
           <Layer id="semaforos-dots" type="circle" minzoom={13.2} maxzoom={15.4} {...sp({ visibility: showSignals ? "visible" : "none", circleRadius: ["interpolate", ["linear"], ["zoom"], 13.2, 1.6, 15.4, 3.2], circleColor: "#e8503f", circleStrokeColor: "#ffffff", circleStrokeWidth: 1 })} />

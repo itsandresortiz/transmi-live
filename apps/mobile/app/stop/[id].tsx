@@ -79,7 +79,7 @@ export default function StopSheet() {
         <Text style={[type.largeTitle, { color: c.text }]}>{nick || label.title}</Text>
         {nick ? <Text style={[type.caption, { color: c.muted }]}>{label.title}</Text> : null}
         <Text style={[type.body, { color: c.muted }]}>
-          {tag ? `${tag} · ` : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta con bus en camino" : "rutas con bus en camino"}${hereCount > rows.length ? ` · ${hereCount} paran aquí` : ""}` : down ? "Sin datos en vivo por ahora" : "Sin buses acercándose"}
+          {tag ? `${tag} · ` : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta con bus en camino" : "rutas con bus en camino"}${hereCount > rows.length ? ` · ${hereCount} paran aquí` : ""}` : down ? downText().short : "Sin buses acercándose"}
         </Text>
 
         <View style={styles.actions}>
@@ -344,7 +344,7 @@ function NoBuses({ stopId, here, down, now }: { stopId: string; here: Route[]; d
         <Text style={[type.headline, { color: c.text }]}>{every ? "Ya no hay más buses hoy" : down ? downText().title : "Ningún bus viene ahora"}</Text>
         <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>
           {every ? `${down ? "Según el horario, el" : "El"} servicio de las rutas de esta parada ya terminó por hoy.`
-            : down ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: abajo ves el horario programado."
+            : down ? `${downText().detail}${scheduled.length ? " Abajo ves el horario programado." : ""}`
             : "Cuando un bus se acerque a esta parada aparecerá aquí."}
         </Text>
       </Card>

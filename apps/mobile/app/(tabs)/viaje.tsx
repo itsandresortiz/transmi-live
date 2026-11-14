@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { downText } from "@/lastService";
-import { ActivityIndicator, Keyboard, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Keyboard, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { router, useIsFocused } from "expo-router";
+import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { SymbolView } from "@/ui/Symbol";
 import * as Haptics from "expo-haptics";
 import { TRAVEL_MODES, type Itinerary, type PlanPlace, type PlanSort, searchPlanPlaces } from "@transmi/application";
@@ -53,6 +53,15 @@ export default function Viaje() {
   const saved = useSaved();
   // desde «Guardar casa / trabajo» de Inicio: se abre el buscador del destino y lo que se elija se guarda
   useEffect(() => { if (saveAs) { setEditing("dest"); setText(""); } }, [saveAs]);
+  // si otra pantalla pone el destino o el origen («Cómo llegar a esta parada», «Casa», «Buscar otra opción»), se muestran los resultados,
+  // no lo que quedó a medio escribir en el buscador
+  const placed = useRef({ dest: p.dest, origin: p.origin });
+  useEffect(() => {
+    if (placed.current.dest === p.dest && placed.current.origin === p.origin) return;
+    placed.current = { dest: p.dest, origin: p.origin };
+    setEditing(null); setText("");
+    if (usePlanner.getState().saveAs) usePlanner.getState().setSaveAs(null);
+  }, [p.dest, p.origin]);
   const choose = (place: PlanPlace) => {
     if (editing === "origin") p.setOrigin(place);
     else {
@@ -163,6 +172,8 @@ function SavePlace({ dest }: { dest: PlanPlace }) {
   );
 }
 
+const clock = (d: Date) => d.toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" });
+
 function WhenRow({ when, onChange }: { when: When; onChange(w: When): void }) {
   const c = useColors();
   const [time, setTime] = useState(() => { const d = new Date(Date.now() + 3600_000); d.setMinutes(0, 0, 0); return d; });
@@ -177,7 +188,15 @@ function WhenRow({ when, onChange }: { when: When; onChange(w: When): void }) {
       {when.mode !== "now" ? (
         <View style={styles.pickerRow}>
           <Text style={[type.body, { color: c.muted }]}>{when.mode === "depart" ? "Hora de salida" : "Hora de llegada"}</Text>
-          <DateTimePicker value={time} mode="time" display="compact" locale="es-CO" onChange={(_, d) => { if (d) { setTime(d); apply(when.mode as "depart" | "arrive", d); } }} />
+          {Platform.OS === "android" ? (
+            // en Android el reloj es una ventana: se abre solo al tocar (montado en la pantalla se reabría solo y no dejaba salir)
+            <Tap onPress={() => DateTimePickerAndroid.open({ value: time, mode: "time", onChange: (e, d) => { if (e.type === "set" && d) { setTime(d); apply(when.mode as "depart" | "arrive", d); } } })}
+              accessibilityRole="button" accessibilityLabel={`Cambiar la hora: ${clock(time)}`} style={[styles.timeBtn, { backgroundColor: c.cardAlt }]}>
+              <Text style={[type.headline, { color: c.text }]}>{clock(time)}</Text>
+            </Tap>
+          ) : (
+            <DateTimePicker value={time} mode="time" display="compact" locale="es-CO" onChange={(_, d) => { if (d) { setTime(d); apply(when.mode as "depart" | "arrive", d); } }} />
+          )}
         </View>
       ) : null}
     </View>
@@ -190,6 +209,15 @@ function Results() {
   const now = useNow() / 1000;
   const list = sorted(p.results, p.sortBy);
   const noService = p.when.mode === "now" && nowMode() === "none";
+  // «Salir ahora» con resultados de hace rato: los tiempos y los buses en vivo ya no valen. Se recalcula al volver a la pestaña y cada minuto.
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (!focused || p.when.mode !== "now") return;
+    const again = () => { const st = usePlanner.getState(); if (st.dest && !st.busy && st.results && Date.now() - st.plannedAt > 60_000) void st.plan(); };
+    again();
+    const t = setInterval(again, 30_000);
+    return () => clearInterval(t);
+  }, [focused, p.when.mode]);
 
   if (p.busy && !p.results) return <View style={styles.pad}><Card><Text style={[type.headline, { color: c.text }]}>Buscando cómo llegar…</Text><Text style={[type.body, { color: c.muted }]}>Combinando rutas y buses que van en vivo.</Text></Card></View>;
   if (!p.results) return null;
@@ -285,6 +313,7 @@ const styles = StyleSheet.create({
   sugg: { flexDirection: "row", alignItems: "center", gap: space[3], paddingVertical: space[3] },
   sico: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   chips: { flexDirection: "row", gap: space[2] },
+  timeBtn: { paddingHorizontal: space[3], paddingVertical: space[2], borderRadius: radius.md },
   pickerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: space[3] },
   tripTop: { flexDirection: "row", gap: space[3] },
   tags: { flexDirection: "row", gap: space[2], flexWrap: "wrap" },

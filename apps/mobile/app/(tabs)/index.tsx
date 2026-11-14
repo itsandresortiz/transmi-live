@@ -5,12 +5,12 @@ import { SymbolView } from "@/ui/Symbol";
 import { router } from "expo-router";
 import { transit } from "@/composition-root";
 import { useNow, useTransitVersion } from "@/hooks";
-import { upcomingAtStop } from "@transmi/application";
+import { liveLevel, upcomingAtStop } from "@transmi/application";
 import type { Route } from "@transmi/domain";
 import { clockOfDay, downText } from "@/lastService";
 import { stopKind, stopTag } from "@/stopname";
 import { stopLabelText } from "@transmi/domain";
-import { nowSec } from "@/clock";
+import { nowMs, nowSec } from "@/clock";
 import { etaText } from "@/format";
 import { Eta } from "@/ui/Eta";
 import { useActiveMessages } from "@/messages";
@@ -35,6 +35,8 @@ export default function Inicio() {
   const now = useNow(5000) / 1000;
   // «en vivo» = hay buses reportando. TransMilenio publica con ~1–3 min de retraso, así que la edad del lote solo sirve para decir «hace X min», no para negar el servicio
   const live = !liveDown();      // pocos buses con dato reciente (madrugada) también es en vivo
+  // pero si el último dato tiene más de 5 min no se dice «en vivo» con punto verde: «Datos con retraso», en ámbar, como en el mapa
+  const late = live && liveLevel(transit, nowMs()) === "late";
 
   const saved = useSaved();
   const demo = useDemo((d) => d.on);
@@ -77,9 +79,9 @@ export default function Inicio() {
         <View style={styles.topRow}>
           <Text style={[type.body, { color: c.muted }]}>{greeting()}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: space[2] }}>
-            <Tap onPress={() => router.navigate("/mapa")} accessibilityRole="button" accessibilityLabel={live ? `${transit.fleet.size} buses en vivo. Abrir el mapa` : "Abrir el mapa"} style={[styles.livePill, { backgroundColor: c.card }]}>
-              <View style={[styles.liveDot, { backgroundColor: demo ? "#8b5cf6" : live ? "#22c55e" : downText().offline ? "#dc2626" : downText().closed ? "#94a3b8" : "#f59e0b" }]} />
-              <Text style={[type.caption, { color: c.text, fontVariant: ["tabular-nums"] }]}>{demo ? "Demostración" : live ? `${transit.fleet.size.toLocaleString("es-CO")} en vivo` : downText().short}</Text>
+            <Tap onPress={() => router.navigate("/mapa")} accessibilityRole="button" accessibilityLabel={late ? "Datos con retraso. Abrir el mapa" : live ? `${transit.fleet.size} buses en vivo. Abrir el mapa` : "Abrir el mapa"} style={[styles.livePill, { backgroundColor: c.card }]}>
+              <View style={[styles.liveDot, { backgroundColor: demo ? "#8b5cf6" : late ? "#f59e0b" : live ? "#22c55e" : downText().offline ? "#dc2626" : downText().closed ? "#94a3b8" : "#f59e0b" }]} />
+              <Text style={[type.caption, { color: c.text, fontVariant: ["tabular-nums"] }]}>{demo ? "Demostración" : late ? "Datos con retraso" : live ? `${transit.fleet.size.toLocaleString("es-CO")} en vivo` : downText().short}</Text>
             </Tap>
             <View>
               <RoundButton symbol={alerts ? "bell.badge.fill" : "bell"} label={alerts ? `Avisos del servicio: ${alerts}` : "Avisos del servicio"} onPress={() => router.push("/avisos")} />
@@ -132,6 +134,9 @@ export default function Inicio() {
               </Tap>
             ))}
           </ScrollView>
+        ) : saved.stops.length && !transit.network.stops.size ? (
+          // tienes paradas guardadas, pero las rutas aún no cargan: no se muestra la invitación a guardar paradas
+          <View style={{ paddingHorizontal: space[5] }}><Card><Text style={[type.body, { color: c.muted }]}>Cargando tus paradas…</Text></Card></View>
         ) : (
           <View style={{ paddingHorizontal: space[5] }}>
             <Card style={{ gap: space[2] }}>

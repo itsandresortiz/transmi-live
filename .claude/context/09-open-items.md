@@ -17,6 +17,8 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - Probar todo lo que depende de buses **de día** (de noche el servicio termina): llegadas, «Seguir bus», «Voy en este bus» (avisos), widget con tiempos.
 
 - **«Cómo llegar», cambiar de destino** (2026-11-14): elegir un destino y, sin salir, borrar y buscar otro (iPhone y Android); tocar un campo y cerrar el teclado sin escribir (deben volver las opciones).
+- **Revisión 1.0.3** (2026-11-14, sin ver en teléfono): Android «Salir a las…» (tocar la hora, elegir, que no se reabra); «Voy en este bus» que termine solo si se baja con la app cerrada; aviso «viene con retraso»; volver a «Cómo llegar» tras un rato (resultados nuevos); primera apertura sin señal (que carguen las rutas al volver la señal).
+- Sin arreglar de la revisión (dudosos o menores): el mapa podría volver a encuadrar la parada al cerrar una hoja; `plan()` sin número de secuencia (un resultado viejo podría pisar al nuevo si la ubicación tarda); «Mi ubicación» puede salir de una posición vieja (`getLastKnownPositionAsync` sin edad máxima); barra de estado oscura sobre el mapa oscuro; en Android, el botón atrás en la bienvenida; avisos de TransMilenio vencidos que siguen si el archivo no cambia; llegadas de un mismo bus fuera de orden con reportes de >3 min; «Cómo llegar» con origen igual al destino da una opción «A pie» de 0 m.
 - **«Seguir este viaje»** (nuevo): probar un viaje real con trasbordo; ¿los avisos llegan a tiempo?, ¿avanza de paso al llegar a la parada / subir / bajar?, ¿el aviso abre el viaje?
 - Interruptores centrados (`Toggle`), tarjeta «Vas en este bus» en el mapa, aviso del viaje que abre el viaje: sin ver en teléfono.
 

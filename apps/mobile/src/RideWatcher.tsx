@@ -16,6 +16,9 @@ import { useLaunch } from "./ui/Launch";
 
 const TAG = "ride";
 const EVERY_MS = 5000;
+/** Si el bus deja de reportar este tiempo (con otros buses sí reportando), se da el viaje por terminado. */
+const GONE_MS = 10 * 60_000;
+let lastAlight: string | null = null;
 
 /** Vigila el viaje en curso mientras la app esté abierta: mantiene la pantalla encendida, vibra y reprograma los avisos con la hora más reciente de llegada. */
 export function RideWatcher() {
@@ -23,15 +26,24 @@ export function RideWatcher() {
 
   useEffect(() => {
     if (!busId || !alightId) { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); return; }
-    let warned = 99, shown = "";
+    let warned = 99, shown = "", seen = false, missingSince = 0;
+    // si se cambió la parada de bajada, los avisos de la anterior ya no sirven
+    if (lastAlight && lastAlight !== alightId) void cancelAlerts();
+    lastAlight = alightId;
     void activateKeepAwakeAsync(TAG).catch(() => undefined);
+    const finish = () => { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); useRide.getState().clear(); };
 
     const tick = () => {
       const v = transit.fleet.get(busId), target = transit.stopById(alightId);
       const seq = v ? transit.sequenceForDisplay(v) : undefined;
-      if (!v || !seq || !target) return;
+      // el bus dejó de reportar (y otros sí): tras un rato se da por terminado, para no dejar la pantalla encendida y el aviso fijo para siempre
+      if (!v) { if (transit.fleet.size > 0) { missingSince ||= Date.now(); if (seen && Date.now() - missingSince > GONE_MS) finish(); } return; }
+      missingSince = 0;
+      if (!seq || !target) return;
       const ti = seq.shape.stopIds.indexOf(alightId, Math.max(0, seq.index));
-      if (ti < 0) return;
+      // ya pasó tu parada (p. ej. la app estaba cerrada cuando llegó): el viaje terminó
+      if (ti < 0) { if (seen) finish(); return; }
+      seen = true;
       const left = ti - seq.index, now = nowMs();
       const name = stopText(target, "tu parada");
       const at = (j: number) => arrivalAtIndex(transit, v, seq.shape, seq.index, j, now);
@@ -58,7 +70,7 @@ export function RideWatcher() {
           }).then((ok) => { if (!ok && shown === key) shown = ""; });   // si no se pudo mostrar (permiso aún en pantalla), se reintenta
         }
       }
-      if (left <= 0) { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); useRide.getState().clear(); }
+      if (left <= 0) finish();
     };
     tick();
     const timer = setInterval(() => { if (AppState.currentState === "active") tick(); }, EVERY_MS);

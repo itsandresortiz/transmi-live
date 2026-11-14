@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
@@ -86,6 +86,9 @@ export default function CardScreen() {
   const [card, setCard] = useState<{ data: TuLlaveCard; at: number; raw: CardReading } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // al volver de Ajustes (p. ej. tras encender el NFC) se repinta para leer de nuevo el estado
+  const [, setBack] = useState(0);
+  useEffect(() => { const sub = AppState.addEventListener("change", (s) => { if (s === "active") setBack((n) => n + 1); }); return () => sub.remove(); }, []);
   const available = (() => { try { return Tullave?.isAvailable() ?? false; } catch { return false; } })();
   const nfc = (() => { try { return Tullave?.nfcState?.() ?? (available ? "on" : "none"); } catch { return "none" as const; } })();
   // en iPhone la antena está arriba; en Android casi siempre en el centro de la parte de atrás

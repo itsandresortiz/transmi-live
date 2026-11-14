@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { liveDown, downText } from "@/lastService";
-import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SymbolView } from "@/ui/Symbol";
@@ -26,7 +26,14 @@ export default function Cerca() {
   useTransitVersion();
   const now = useNow(5000) / 1000;
   const [me, setMe] = useState<{ lat: number; lon: number } | null | undefined>(undefined);
-  useEffect(() => { void locateMe().then(setMe); }, []);
+  // se vuelve a ubicar al volver a la app (p. ej. después de dar el permiso en Ajustes) y cada minuto, por si la persona camina
+  useEffect(() => {
+    const again = () => void locateMe().then((p) => setMe((cur) => p ?? cur ?? null));
+    again();
+    const sub = AppState.addEventListener("change", (s) => { if (s === "active") again(); });
+    const t = setInterval(() => { if (AppState.currentState === "active") again(); }, 60_000);
+    return () => { sub.remove(); clearInterval(t); };
+  }, []);
 
   const rows = useMemo(() => {
     if (!me) return [];

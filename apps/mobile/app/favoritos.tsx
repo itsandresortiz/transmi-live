@@ -37,7 +37,10 @@ export default function Favoritos() {
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
       <CloseToolbar />
-      {!stops.length && !routes.length ? (
+      {!transit.network.stops.size && (saved.stops.length || saved.routes.length) ? (
+        // los favoritos están guardados, pero las rutas aún no cargan: no se dice «aún no tienes favoritos»
+        <Card><Text style={[type.headline, { color: c.text }]}>Cargando tus favoritos…</Text></Card>
+      ) : !stops.length && !routes.length ? (
         <Card style={{ gap: space[2] }}>
           <SymbolView name="star" tintColor={c.accent} size={26} />
           <Text style={[type.headline, { color: c.text }]}>Aún no tienes favoritos</Text>

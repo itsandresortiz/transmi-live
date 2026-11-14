@@ -4,7 +4,7 @@ import { Platform, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View
 import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { liveDown } from "@/lastService";
+import { liveDown, downText } from "@/lastService";
 import Constants from "expo-constants";
 import { SymbolView, type SFSymbol } from "@/ui/Symbol";
 import { connectionStatus } from "@transmi/application";
@@ -97,13 +97,13 @@ export default function Mas() {
           </View>
         </Tap>
 
-        <Group title="SERVICIO" footer={!hasBuses ? "TransMilenio no está enviando la ubicación de los buses. Eso no significa que no haya servicio: puedes consultar horarios y planear viajes." : late && ageMin != null ? `El último dato de los buses tiene ${ageMin} min.` : undefined}>
+        <Group title="SERVICIO" footer={!hasBuses ? downText().detail : late && ageMin != null ? `El último dato de los buses tiene ${ageMin} min.` : undefined}>
           <Pressable onPress={secretTap} accessible={false}>
           <View style={styles.row}>
             <View style={[styles.tile, { backgroundColor: hasBuses && !late ? "#22c55e" : "#f59e0b" }]}><SymbolView name="dot.radiowaves.left.and.right" tintColor="#ffffff" size={17} /></View>
-            <View style={[styles.rowBody, { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.line }]} accessible accessibilityLabel={hasBuses ? `${transit.fleet.size} buses en la calle` : "Sin datos en vivo por ahora"}>
+            <View style={[styles.rowBody, { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.line }]} accessible accessibilityLabel={hasBuses ? `${transit.fleet.size} buses en la calle` : downText().title}>
               <Text style={[type.body, { color: c.text, flex: 1 }]}>{demo.on ? "Buses de ejemplo" : hasBuses ? "Buses en la calle" : "Datos en vivo"}</Text>
-              <Text style={[type.body, { color: c.muted, fontVariant: ["tabular-nums"] }]}>{hasBuses ? transit.fleet.size.toLocaleString("es-CO") : "Sin datos por ahora"}</Text>
+              <Text style={[type.body, { color: c.muted, fontVariant: ["tabular-nums"] }]}>{hasBuses ? transit.fleet.size.toLocaleString("es-CO") : downText().short}</Text>
             </View>
           </View>
           </Pressable>

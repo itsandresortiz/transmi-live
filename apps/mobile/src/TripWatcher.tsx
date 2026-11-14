@@ -20,6 +20,7 @@ export function TripWatcher() {
   useEffect(() => {
     if (!it) { void cancelTrip(); void endTripActivity(); return; }
     let here: { lat: number; lon: number } | null = null, hereAt = 0, gone = false, lastKey = "", actKey = "", lateFor = -1;
+    let late: { id: string; at: number; title: string; body: string } | null = null;
     let sub: Location.LocationSubscription | undefined;
     void (async () => {
       try {
@@ -44,7 +45,9 @@ export function TripWatcher() {
         // el bus que esperas viene bastante más tarde de lo previsto: se avisa una vez por tramo
         if (st.guide.phase === "wait" && live != null && live >= 300 && lateFor !== st.guide.leg) {
           lateFor = st.guide.leg;
-          void scheduleTrip([...pendingAlerts(it, st.guide, placeText, shift), { id: `late-${st.guide.leg}`, at: Date.now() / 1000 + 3, title: `El ${leg.shortName} viene con retraso`, body: `Llega unos ${Math.round(live / 60)} min más tarde de lo previsto. Abre el viaje para ver otra opción.` }]);
+          // va en la misma lista que los demás avisos: si se programara aparte, la siguiente reprogramación lo borraría antes de sonar
+          late = { id: `late-${st.guide.leg}`, at: Date.now() / 1000 + 6, title: `El ${leg.shortName} viene con retraso`, body: `Llega unos ${Math.round(live / 60)} min más tarde de lo previsto. Abre el viaje para ver otra opción.` };
+          lastKey = "";
         }
       }
       const g = advanceGuide(it, st.guide, fresh, now, shift);
@@ -55,7 +58,8 @@ export function TripWatcher() {
       const key = `${g.leg}${g.phase}${Math.round(shift / 20)}`;
       if (key !== lastKey) {
         lastKey = key;
-        void scheduleTrip(pendingAlerts(it, g, placeText, shift));
+        if (late && late.at < Date.now() / 1000) late = null;
+        void scheduleTrip(late ? [...pendingAlerts(it, g, placeText, shift), late] : pendingAlerts(it, g, placeText, shift));
       }
       // el mismo paso, en la pantalla de bloqueo y la isla dinámica (si el teléfono lo permite y la app trae el widget).
       // Va con su propia marca: si no se pudo mostrar (p. ej. el permiso de avisos aún estaba en pantalla), se reintenta en la siguiente vuelta.

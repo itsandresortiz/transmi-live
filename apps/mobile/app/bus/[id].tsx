@@ -21,7 +21,7 @@ export default function BusSheet() {
   useTransitVersion();
   const now = useNow() / 1000;
   const v = transit.fleet.get(id);
-  if (!v) return <View style={[styles.screen, { flex: 1, backgroundColor: c.bg, paddingTop: space[4], paddingBottom: insets.bottom + space[6] }]}><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>{transit.lastBatchAt == null ? "Cargando el bus…" : "Este bus dejó de reportar"}</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
+  if (!v) return <View style={[styles.screen, { flex: 1, backgroundColor: c.bg, paddingTop: space[4], paddingBottom: insets.bottom + space[6] }]}><CloseToolbar /><Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>{transit.lastBatchAt == null ? "Cargando el bus…" : "Este bus dejó de reportar"}</Text><Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido.</Text></View>;
   const r = transit.routeOf(v), d = transit.delayOf(v), ns = transit.nextStopOf(v, nowMs());
   const headsign = transit.sequenceForDisplay(v)?.shape.headsign;
   const tone = delayClass(d) === "bad" ? "#dc2626" : delayClass(d) === "warn" ? "#d97706" : delayClass(d) === "ok" ? "#16a34a" : c.muted;

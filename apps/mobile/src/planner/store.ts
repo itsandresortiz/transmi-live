@@ -42,6 +42,8 @@ interface PlannerState {
   when: When;
   sortBy: PlanSort;
   results: Itinerary[] | null;
+  /** Cuándo se calcularon los resultados (ms), para renovarlos si ya pasó un rato. */
+  plannedAt: number;
   sel: number;
   busy: boolean;
   /** Si es «home» o «work», el próximo lugar que se elija como destino se guarda como casa o trabajo. */
@@ -60,7 +62,7 @@ interface PlannerState {
 }
 
 export const usePlanner = create<PlannerState>((set, get) => ({
-  origin: null, dest: null, when: { mode: "now" }, sortBy: "mejor", results: null, sel: 0, busy: false, saveAs: null,
+  origin: null, dest: null, when: { mode: "now" }, sortBy: "mejor", results: null, plannedAt: 0, sel: 0, busy: false, saveAs: null,
   setSaveAs: (saveAs) => set({ saveAs }),
   setDest: (dest) => { set({ dest, results: null, sel: 0 }); void get().plan(); },
   setOrigin: (origin) => { set({ origin, results: null, sel: 0 }); void get().plan(); },
@@ -84,7 +86,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     if (!origin) { set({ busy: false, results: [] }); return; }
     // un instante después, para que se vea «Buscando…» antes de que el cálculo ocupe el hilo principal
     setTimeout(() => {
-      try { const results = planFor(origin, s.dest!, s.when, systemsFor(s.modes)); set((c) => ({ results, busy: false, sel: Math.min(c.sel, Math.max(0, results.length - 1)) })); }
+      try { const results = planFor(origin, s.dest!, s.when, systemsFor(s.modes)); set((c) => ({ results, plannedAt: Date.now(), busy: false, sel: Math.min(c.sel, Math.max(0, results.length - 1)) })); }
       catch { set({ results: [], busy: false }); }
     }, 30);
   },
