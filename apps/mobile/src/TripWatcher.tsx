@@ -19,7 +19,7 @@ export function TripWatcher() {
 
   useEffect(() => {
     if (!it) { void cancelTrip(); void endTripActivity(); return; }
-    let here: { lat: number; lon: number } | null = null, hereAt = 0, gone = false, lastKey = "", lateFor = -1;
+    let here: { lat: number; lon: number } | null = null, hereAt = 0, gone = false, lastKey = "", actKey = "", lateFor = -1;
     let sub: Location.LocationSubscription | undefined;
     void (async () => {
       try {
@@ -56,7 +56,11 @@ export function TripWatcher() {
       if (key !== lastKey) {
         lastKey = key;
         void scheduleTrip(pendingAlerts(it, g, placeText, shift));
-        // el mismo paso, en la pantalla de bloqueo y la isla dinámica (si el teléfono lo permite y la app trae el widget)
+      }
+      // el mismo paso, en la pantalla de bloqueo y la isla dinámica (si el teléfono lo permite y la app trae el widget).
+      // Va con su propia marca: si no se pudo mostrar (p. ej. el permiso de avisos aún estaba en pantalla), se reintenta en la siguiente vuelta.
+      if (key !== actKey) {
+        actKey = key;
         const cur = it.legs[g.leg], nowDo = guideNow(it, g, placeText), times = legTimes(it)[g.leg];
         void showTripActivity(st.dest, {
           title: nowDo.title, detail: nowDo.body,
@@ -64,7 +68,7 @@ export function TripWatcher() {
           until: (cur?.kind === "ride" ? (g.phase === "wait" ? cur.departAt : cur.arriveAt) : times?.end ?? 0) + shift,
           untilLabel: cur?.kind === "ride" ? (g.phase === "wait" ? "Llega en" : "Te bajas en") : g.leg === it.legs.length - 1 ? "Llegas en" : "Caminando",
           step: g.leg + 1, steps: it.legs.length, arrive: it.arriveAt + shift, link: "transmilive:///trip",
-        });
+        }).then((ok) => { if (!ok && actKey === key) actKey = ""; });
       }
     };
     tick();

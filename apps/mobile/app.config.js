@@ -8,6 +8,8 @@ module.exports = ({ config }) => {
     ios: {
       ...config.ios,
       ...(widget ? { appleTeamId: process.env.TEAM_ID } : {}),
+      // Apple exige un número de compilación distinto en cada entrega: el script lo pone con la fecha y la hora (vale para la app y para el widget)
+      ...(process.env.TM_BUILD_NUMBER ? { buildNumber: process.env.TM_BUILD_NUMBER } : {}),
       entitlements: { ...config.ios?.entitlements, ...(widget ? { "com.apple.security.application-groups": [GROUP] } : {}) },
     },
     // Google Play exige que cada paquete que se sube tenga un número mayor que el anterior: el script de la tienda lo pone con la fecha y la hora

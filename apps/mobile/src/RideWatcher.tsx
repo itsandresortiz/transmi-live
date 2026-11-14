@@ -55,7 +55,7 @@ export function RideWatcher() {
             title: `Vas en el ${route?.shortName ?? "bus"}`, detail: left === 1 ? `La siguiente parada es la tuya: ${name}.` : `Te bajas en ${name}. Faltan ${left} paradas.`,
             badge: route?.shortName ?? "", color: SYSTEM_COLOR[v.system], until: eta, untilLabel: "Te bajas en",
             step: total - left, steps: total, arrive: eta, link: `transmilive:///ride/${busId}`,
-          });
+          }).then((ok) => { if (!ok && shown === key) shown = ""; });   // si no se pudo mostrar (permiso aún en pantalla), se reintenta
         }
       }
       if (left <= 0) { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); useRide.getState().clear(); }

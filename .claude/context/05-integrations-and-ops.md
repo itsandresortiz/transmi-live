@@ -67,3 +67,5 @@ Datos reales para validar: `git fetch origin +live-data:refs/remotes/origin/live
 - `hop-stats` depende solo del horario de GitHub: lleva días sin actualizarse (pendiente).
 - **Cambios del feed de TransMilenio vistos en noviembre de 2026**: los avisos traen periodos de segundos (hora del reporte) y `tripupdates.pb` ya no trae paradas ni horas de llegada (solo retraso por viaje; ~5 % de los buses en la calle tienen viaje con dato). `hop-stats` mide ahora con posiciones y se relanza solo.
 - `positions.pb` (nov. 2026): `stop_id` y `current_stop_sequence` son fijos por viaje (no indican por dónde va el bus). Lo único fiable es posición, hora del GPS, ruta, viaje y placa. Todo lo que dependa de «última parada» debe salir de la posición.
+
+- (2026-11-14) iPhone: el número de compilación lo pone `testflight-local.sh` en `TM_BUILD_NUMBER` (fecha y hora) antes de `expo prebuild`; `app.config.js` lo pasa a `ios.buildNumber`. Android: `TM_VERSION_CODE` (igual idea).

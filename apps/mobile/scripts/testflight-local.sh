@@ -36,9 +36,11 @@ else
 fi
 
 npm install
+# El número de compilación va en la configuración ANTES de generar ios/: así queda escrito en la app y en el widget (pasarlo solo a xcodebuild no llegaba a la app).
+BUILD="$(date +%y%m%d%H%M)"; export TM_BUILD_NUMBER="$BUILD"
 npx expo prebuild --platform ios                      # genera ios/ (y corre pod install)
 WS="$(ls -d ios/*.xcworkspace | head -1)"; SCHEME="$(basename "$WS" .xcworkspace)"
-BUILD="$(date +%y%m%d%H%M)"; OUT="build/ios"; rm -rf "$OUT"; mkdir -p "$OUT"
+OUT="build/ios"; rm -rf "$OUT"; mkdir -p "$OUT"
 
 # El registro completo queda en build/ios/archive.log; si falla, abajo salen solo los errores.
 show_errors() { echo; echo "=== ERRORES ($1) ==="; grep -a "error:" "$OUT/$1.log" | sort -u | head -25; echo "Registro completo: $OUT/$1.log"; }
@@ -58,6 +60,7 @@ cat > "$OUT/ExportOptions.plist" <<PLIST
   <key>teamID</key><string>$TEAM_ID</string>
   <key>signingStyle</key><string>automatic</string>
   <key>uploadSymbols</key><true/>
+  <key>manageAppVersionAndBuildNumber</key><false/>
 </dict></plist>
 PLIST
 if ! xcodebuild -exportArchive -archivePath "$OUT/App.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}" > "$OUT/export.log" 2>&1; then
