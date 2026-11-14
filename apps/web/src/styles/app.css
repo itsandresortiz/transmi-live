@@ -435,3 +435,9 @@ button.stat:active{transform:scale(.97)}
 /* mensaje del dueño en la línea de estado: una sola línea que se desliza si no cabe */
 .st.msg{color:var(--fg);font-weight:600;max-width:min(62vw,340px)}
 .st.msg .mq{flex:1;min-width:0}
+
+/* tiempos con segundos: la cifra que cambia entra desde abajo (ver ui/Rolling.tsx) */
+.roll{display:inline-flex;overflow:hidden;vertical-align:bottom;font-variant-numeric:tabular-nums}
+.roll .rc{display:inline-block;animation:roll-in .32s cubic-bezier(.2,.8,.2,1)}
+@keyframes roll-in{from{transform:translateY(70%);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.roll .rc{animation:none}}

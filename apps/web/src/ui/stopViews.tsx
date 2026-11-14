@@ -15,6 +15,7 @@ import { routesAtStop, siblingStops, frequencyText } from "@transmi/application"
 import { useMemo } from "react";
 import { useTransitVersion } from "./hooks";
 import { etaText, stopsAwayText } from "./format";
+import { Rolling } from "./Rolling";
 import { useUi } from "./store";
 import type { Actions } from "./views";
 
@@ -54,7 +55,7 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
                     <span className="rt">{r.headsign ? `Hacia ${r.headsign}` : routeTitle(r.route)}</span>
                     <span className="rs">{first.official || first.stopsAway === 0 ? "" : "aprox. "}{stopsAwayText(first.stopsAway)}{next ? ` · luego ${etaText(next.etaAt, nowSec)}` : ""}{(first.vehicle && transit.serviceOf(first.vehicle)?.isLast) || (next && transit.serviceOf(next.vehicle)?.isLast) ? " · " : ""}{first.vehicle && transit.serviceOf(first.vehicle)?.isLast ? <LastBadge mark={transit.serviceOf(first.vehicle)} /> : next && transit.serviceOf(next.vehicle)?.isLast ? <><LastBadge mark={transit.serviceOf(next.vehicle)} /></> : null}</span>
                   </span>
-                  <span className={`etabig${first.etaAt - nowSec <= 60 ? " soon" : ""}${first.vehicle && nowSec - first.vehicle.reportedAt > 90 ? " old" : ""}`} title={first.vehicle && nowSec - first.vehicle.reportedAt > 90 ? `El bus reportó hace ${Math.round(nowSec - first.vehicle.reportedAt)} s: la hora puede variar` : undefined}>{first.stopsAway === 0 ? "Por salir" : <>{first.vehicle && nowSec - first.vehicle.reportedAt > 90 ? "≈ " : ""}{etaText(first.etaAt, nowSec)}</>}</span>
+                  <span className={`etabig${first.etaAt - nowSec <= 60 ? " soon" : ""}${first.vehicle && nowSec - first.vehicle.reportedAt > 90 ? " old" : ""}`} title={first.vehicle && nowSec - first.vehicle.reportedAt > 90 ? `El bus reportó hace ${Math.round(nowSec - first.vehicle.reportedAt)} s: la hora puede variar` : undefined}>{first.stopsAway === 0 ? "Por salir" : <Rolling text={`${first.vehicle && nowSec - first.vehicle.reportedAt > 90 ? "≈ " : ""}${etaText(first.etaAt, nowSec)}`} />}</span>
                   <span className="chev"><Chevron /></span>
                 </button>
               );
@@ -138,7 +139,7 @@ export function StopRouteView({ th, act }: { th: MapTheme; act: Actions }) {
           {transit.serviceOf(hero.vehicle)?.isLast && <div className="lastnote"><LastBadge mark={transit.serviceOf(hero.vehicle)} long /><br />Es el último viaje programado de hoy en esta ruta: después de este no hay más buses.</div>}
           <div className="hero" style={{ ["--rc" as string]: color }}>
             <small>Próximo bus</small>
-            <b>{hero.stopsAway === 0 ? "Por salir" : <>{etaText(hero.etaAt, nowSec)}{!hero.official && <i>aprox.</i>}</>}{hero.vehicle && nowSec - hero.vehicle.reportedAt > 90 && <i> · dato de hace {Math.round((nowSec - hero.vehicle.reportedAt) / 60)} min</i>}</b>
+            <b>{hero.stopsAway === 0 ? "Por salir" : <><Rolling text={etaText(hero.etaAt, nowSec)} />{!hero.official && <i>aprox.</i>}</>}{hero.vehicle && nowSec - hero.vehicle.reportedAt > 90 && <i> · dato de hace {Math.round((nowSec - hero.vehicle.reportedAt) / 60)} min</i>}</b>
             <span>
               {hero.stopsAway <= 0 ? `Está en la plataforma, a punto de salir.` : hero.stopsAway <= 1 ? `Ya va hacia esta parada.` : `Ahora va hacia ${stopText(heroNext, "su próxima parada")}, ${stopsAwayText(hero.stopsAway)} de aquí.`}
             </span>

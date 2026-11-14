@@ -17,6 +17,7 @@ import { usePlanner } from "@/planner/store";
 import { reportProblem } from "@/report";
 import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
+import { Eta } from "@/ui/Eta";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
@@ -150,7 +151,8 @@ function ArrivalRow({ r, now, onPress }: { r: UpcomingRoute; now: number; onPres
           <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{sub}</Text>
           {mark?.isLast ? <ServicePill text="Último servicio" tone="#dc2626" /> : mark?.isFirst ? <ServicePill text="Primer servicio" tone="#16a34a" /> : null}
         </View>
-        <Text style={[type.title, { color: soon ? c.accent : c.text, opacity: old ? 0.6 : 1 }]}>{first.stopsAway === 0 ? "Por salir" : <>{old ? "≈ " : ""}{etaText(first.etaAt, now)}</>}</Text>
+        {first.stopsAway === 0 ? <Text style={[type.title, { color: c.text }]}>Por salir</Text>
+          : <Eta at={first.etaAt} prefix={old ? "≈ " : ""} style={[type.title, { color: soon ? c.accent : c.text }]} containerStyle={{ opacity: old ? 0.6 : 1 }} />}
         <SymbolView name="chevron.right" tintColor={c.muted} size={13} />
       </Card>
     </Tap>
@@ -197,7 +199,12 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
 
           <View style={[styles.hero, { backgroundColor: color }]}>
             <Text style={[type.eyebrow, { color: "#ffffff", opacity: 0.8 }]}>PRÓXIMO BUS</Text>
-            <Text style={[type.number, { color: "#ffffff" }]}>{hero.stopsAway === 0 ? "Por salir" : <>{etaText(hero.etaAt, now)}{!hero.official ? <Text style={type.title}> aprox.</Text> : null}</>}</Text>
+            {hero.stopsAway === 0 ? <Text style={[type.number, { color: "#ffffff" }]}>Por salir</Text> : (
+              <View style={styles.heroTime}>
+                <Eta at={hero.etaAt} style={[type.number, { color: "#ffffff" }]} />
+                {!hero.official ? <Text style={[type.title, { color: "#ffffff" }]}> aprox.</Text> : null}
+              </View>
+            )}
             {now - hero.vehicle.reportedAt > 90 ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.85 }]}>Dato de hace {Math.round((now - hero.vehicle.reportedAt) / 60)} min</Text> : null}
             <Text style={[type.body, { color: "#ffffff" }]}>{hero.stopsAway <= 0 ? "Está en la plataforma, a punto de salir." : hero.stopsAway <= 1 ? "Ya va hacia esta parada." : `Ahora va hacia ${stopText(heroNext, "su próxima parada")}, ${stopsAwayText(hero.stopsAway)} de aquí.`}</Text>
             {frequencyText(row.buses.map((b) => b.etaAt), now) ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.9 }]}>{frequencyText(row.buses.map((b) => b.etaAt), now)}</Text> : null}
@@ -381,6 +388,7 @@ function NoBuses({ stopId, here, down, now }: { stopId: string; here: Route[]; d
 }
 
 const styles = StyleSheet.create({
+  heroTime: { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap" },
   screen: { padding: space[5], gap: space[3] },
   actions: { flexDirection: "row", gap: space[3], marginVertical: space[2] },
   busHere: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 9, height: 24, borderRadius: 12, marginTop: 4 },
