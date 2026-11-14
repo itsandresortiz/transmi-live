@@ -140,9 +140,9 @@ function ArrivalRow({ r, now, onPress }: { r: UpcomingRoute; now: number; onPres
   const first = r.buses[0]!, next = r.buses[1];
   const soon = first.etaAt - now <= 60, old = !!first.vehicle && now - first.vehicle.reportedAt > 90;
   const mark = first.vehicle ? transit.serviceOf(first.vehicle) : undefined;
-  const sub = `${first.official ? "" : "aprox. "}${stopsAwayText(first.stopsAway)}${next ? ` · luego ${etaText(next.etaAt, now)}` : ""}`;
+  const sub = `${first.official || first.stopsAway === 0 ? "" : "aprox. "}${stopsAwayText(first.stopsAway)}${next ? ` · luego ${etaText(next.etaAt, now)}` : ""}`;
   return (
-    <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={`Ruta ${r.route.shortName}${r.headsign ? ` hacia ${r.headsign}` : ""}, llega en ${etaText(first.etaAt, now)}, ${sub}`}>
+    <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={`Ruta ${r.route.shortName}${r.headsign ? ` hacia ${r.headsign}` : ""}, ${first.stopsAway === 0 ? "en la plataforma, por salir" : `llega en ${etaText(first.etaAt, now)}`}, ${sub}`}>
       <Card style={styles.row}>
         <RouteBadge route={r.route} />
         <View style={{ flex: 1, gap: 2 }}>
@@ -150,7 +150,7 @@ function ArrivalRow({ r, now, onPress }: { r: UpcomingRoute; now: number; onPres
           <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{sub}</Text>
           {mark?.isLast ? <ServicePill text="Último servicio" tone="#dc2626" /> : mark?.isFirst ? <ServicePill text="Primer servicio" tone="#16a34a" /> : null}
         </View>
-        <Text style={[type.title, { color: soon ? c.accent : c.text, opacity: old ? 0.6 : 1 }]}>{old ? "≈ " : ""}{etaText(first.etaAt, now)}</Text>
+        <Text style={[type.title, { color: soon ? c.accent : c.text, opacity: old ? 0.6 : 1 }]}>{first.stopsAway === 0 ? "Por salir" : <>{old ? "≈ " : ""}{etaText(first.etaAt, now)}</>}</Text>
         <SymbolView name="chevron.right" tintColor={c.muted} size={13} />
       </Card>
     </Tap>
@@ -197,9 +197,9 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
 
           <View style={[styles.hero, { backgroundColor: color }]}>
             <Text style={[type.eyebrow, { color: "#ffffff", opacity: 0.8 }]}>PRÓXIMO BUS</Text>
-            <Text style={[type.number, { color: "#ffffff" }]}>{etaText(hero.etaAt, now)}{!hero.official ? <Text style={type.title}> aprox.</Text> : null}</Text>
+            <Text style={[type.number, { color: "#ffffff" }]}>{hero.stopsAway === 0 ? "Por salir" : <>{etaText(hero.etaAt, now)}{!hero.official ? <Text style={type.title}> aprox.</Text> : null}</>}</Text>
             {now - hero.vehicle.reportedAt > 90 ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.85 }]}>Dato de hace {Math.round((now - hero.vehicle.reportedAt) / 60)} min</Text> : null}
-            <Text style={[type.body, { color: "#ffffff" }]}>{hero.stopsAway <= 1 ? "Ya va hacia esta parada." : `Ahora va hacia ${stopText(heroNext, "su próxima parada")}, ${stopsAwayText(hero.stopsAway)} de aquí.`}</Text>
+            <Text style={[type.body, { color: "#ffffff" }]}>{hero.stopsAway <= 0 ? "Está en la plataforma, a punto de salir." : hero.stopsAway <= 1 ? "Ya va hacia esta parada." : `Ahora va hacia ${stopText(heroNext, "su próxima parada")}, ${stopsAwayText(hero.stopsAway)} de aquí.`}</Text>
             {frequencyText(row.buses.map((b) => b.etaAt), now) ? <Text style={[type.caption, { color: "#ffffff", opacity: 0.9 }]}>{frequencyText(row.buses.map((b) => b.etaAt), now)}</Text> : null}
             <View style={styles.heroActs}>
               <Tap onPress={() => onMap(ids, hero.vehicle.id)} accessibilityRole="button" accessibilityLabel="Seguir este bus" style={[styles.heroBtn, { backgroundColor: "#ffffff" }]}><Text style={[type.headline, { color: "#111111" }]}>Seguir este bus</Text></Tap>

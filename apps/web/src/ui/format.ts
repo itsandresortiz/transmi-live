@@ -18,7 +18,7 @@ export function etaText(at: number, nowSec: number): string {
   const s = Math.round(at - nowSec);
   return s <= 15 ? "llegando" : s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
 }
-export const stopsAwayText = (n: number) => (n <= 1 ? "su próxima parada" : `a ${n - 1} ${n - 1 === 1 ? "parada" : "paradas"}`);
+export const stopsAwayText = (n: number) => (n <= 0 ? "en la plataforma, por salir" : n <= 1 ? "su próxima parada" : `a ${n - 1} ${n - 1 === 1 ? "parada" : "paradas"}`);
 
 /** Versión corta para espacios chicos: «45 s», «9 min», «3 h». */
 export function agoShort(seconds: number): string {

@@ -393,7 +393,7 @@ export function BusPopup({ v, th, onFollow, onRoute, following }: { v: Vehicle; 
       </div>
       {target && toTarget && (
         <div className="tgt">Llega {toTarget.official ? "en" : "en aprox."} <b>{etaText(toTarget.etaAt, nowSec)}</b> a <b>{stopText(transit.stopById(target))}</b>
-          <small>{toTarget.stopsAway <= 1 ? "es su próxima parada" : `le faltan ${toTarget.stopsAway - 1} ${toTarget.stopsAway - 1 === 1 ? "parada" : "paradas"} antes`}</small></div>
+          <small>{toTarget.stopsAway <= 0 ? "está en la plataforma, por salir" : toTarget.stopsAway <= 1 ? "es su próxima parada" : `le faltan ${toTarget.stopsAway - 1} ${toTarget.stopsAway - 1 === 1 ? "parada" : "paradas"} antes`}</small></div>
       )}
       <dl>
         <dt>Próxima parada</dt><dd>{stopText(ns?.stop, "—")}</dd>

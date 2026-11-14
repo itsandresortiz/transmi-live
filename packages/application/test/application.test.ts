@@ -60,6 +60,23 @@ describe("estado del tránsito", () => {
     expect(upcomingAtStop(s, "S8", 1000, 3)).toHaveLength(0);                   // S8 ya la pasó
     expect(kpis(s)).toMatchObject({ vehicles: 1, routes: 1, late: 1 });
   });
+  it("en un portal, el bus que espera en la plataforma para salir es el próximo (uno solo, aunque esperen varios)", () => {
+    const s = new TransitState();
+    const net = new TransitNetwork();
+    net.routes.set("7", { id: "7", shortName: "7", longName: "Polo", system: "troncal" });
+    net.stops.set("P", { id: "P", code: "P", name: "Portal", position: { lat: 4.7465, lon: -74.0957 } });
+    net.stops.set("Q", { id: "Q", code: "Q", name: "Siguiente", position: { lat: 4.74, lon: -74.09 } });
+    net.shapes.set("7", [{ routeId: "7", direction: "0", headsign: "Polo", points: [], stopIds: ["P", "Q"] }]);
+    s.setNetwork(net);
+    s.applyPositions([
+      rep("a", "7", 1000, { lastStopId: "P", position: { lat: 4.7466, lon: -74.0957 } }),   // a 10 m de la plataforma
+      rep("b", "7", 1000, { lastStopId: "P", position: { lat: 4.7467, lon: -74.0957 } }),   // otro esperando
+      rep("c", "7", 1000, { lastStopId: "P", position: { lat: 4.7300, lon: -74.0900 } }),   // ya salió (lejos)
+    ], 1_000_000);
+    const buses = upcomingAtStop(s, "P", 1000, 3)[0]!.buses;
+    expect(buses.filter((b) => b.stopsAway === 0).map((b) => b.vehicle.id)).toEqual(["a"]);
+    expect(buses.some((b) => b.vehicle.id === "c")).toBe(false);
+  });
   it("busca rutas y buses, y arma el detalle de una ruta", () => {
     const s = new TransitState();
     s.applyPositions([

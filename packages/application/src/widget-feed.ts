@@ -1,5 +1,5 @@
 import type { SystemType } from "@transmi/domain";
-import { arrivalOrPassed } from "./eta";
+import { arrivalOrPassed, hav } from "./eta";
 import type { TransitState } from "./transit-state";
 
 /** Llegadas por parada para el widget del teléfono. Un proceso las publica cada minuto repartidas en archivos pequeños («cajones»);
@@ -31,10 +31,22 @@ export function spreadArrivals<T extends { t: number }>(sorted: readonly T[], ma
  *  Solo buses con reporte reciente y llegadas dentro de la próxima hora, repartidas en el tiempo (`spreadArrivals`). */
 export function arrivalsByStop(state: TransitState, nowMs: number, perStop = 16, ahead = 70, horizonSec = 3600): Map<string, WidgetArrival[]> {
   const now = nowMs / 1000, out = new Map<string, WidgetArrival[]>();
+  const waiting = new Set<string>();
   for (const v of state.fleet.values()) {
     if (now - v.reportedAt > 180) continue;
     const seq = state.sequenceForDisplay(v), route = state.routeOf(v);
     if (!seq || !route) continue;
+    // el bus que espera en la primera parada de su recorrido (un portal) es el próximo en salir de ahí: antes solo se contaban los que
+    // «vienen» hacia la parada y el widget de esa plataforma mostraba otro bus a 20 min. Uno por ruta y sentido.
+    if (seq.index === 0) {
+      const id = seq.shape.stopIds[0]!, first = state.stopById(id), key = `${id}|${route.id}|${seq.shape.headsign}`;
+      if (first && !waiting.has(key) && hav(v.position, first.position) <= 200) {
+        waiting.add(key);
+        const list = out.get(id) ?? out.set(id, []).get(id)!;
+        // hora de salida desconocida: «en 1–2 min» (los widgets descartan las horas ya pasadas y se refrescan cada pocos minutos)
+        list.push({ r: route.shortName, h: seq.shape.headsign, t: Math.round(now + 90), s: v.system });
+      }
+    }
     const last = Math.min(seq.shape.stopIds.length - 1, seq.index + ahead);
     for (let j = seq.index + 1; j <= last; j++) {
       const eta = arrivalOrPassed(state, v, seq.shape, seq.index, j, nowMs);

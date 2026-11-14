@@ -241,13 +241,15 @@ export interface UpcomingBus {
   etaAt: number;
   /** `true` si es la hora oficial de TransMilenio (el bus va hacia esa parada); si no, es un cálculo. */
   official: boolean;
-  /** Paradas que le faltan hasta llegar (1 = la siguiente). */
+  /** Paradas que le faltan hasta llegar (1 = la siguiente; 0 = ya está en esta parada, que es la primera de su recorrido, esperando para salir). */
   stopsAway: number;
 }
 export interface UpcomingRoute { route: Route; headsign: string; direction: string; buses: UpcomingBus[] }
 
 /** Para cada ruta que pasa por la parada: los próximos buses que vienen hacia ella, con su hora estimada de llegada.
  *  Un bus «viene» si su última parada queda antes que ésta en su recorrido (si ya la pasó, no cuenta). */
+/** Qué tan cerca de la primera parada debe estar un bus para contarlo como «en la plataforma, por salir». */
+const AT_ORIGIN_M = 200;
 export function upcomingAtStop(state: TransitState, stopId: string, nowSec: number, perRoute = 3): UpcomingRoute[] {
   const out: UpcomingRoute[] = [];
   const byRoute = new Map<string, Vehicle[]>();
@@ -260,14 +262,25 @@ export function upcomingAtStop(state: TransitState, stopId: string, nowSec: numb
       const j = shape.stopIds.indexOf(stopId);
       if (j < 0) continue;
       const buses: UpcomingBus[] = [];
+      const here = j === 0 ? state.stopById(stopId) : undefined;
+      let waiting: { v: Vehicle; d: number } | null = null;
       for (const v of vehicles) {
         if (!v.lastStopId) continue;
         const k = shape.stopIds.indexOf(v.lastStopId);
+        // en la primera parada del recorrido (un portal), el bus que ya está ahí esperando para salir es el próximo:
+        // antes no contaba (solo se miraban los que «vienen» hacia la parada) y se mostraba otro bus a 20 min
+        if (here && k === 0 && nowSec - v.reportedAt <= 300 && hav(v.position, here.position) <= AT_ORIGIN_M) {
+          // si hay varios esperando no se sabe cuál sale primero: se muestra uno solo (el más cerca de la plataforma)
+          const d = hav(v.position, here.position);
+          if (!waiting || d < waiting.d) waiting = { v, d };
+          continue;
+        }
         if (k < 0 || k >= j) continue;                       // ya la pasó (o está en ella) o va por otro sentido
         const etaAt = arrivalOrPassed(state, v, shape, k, j, nowSec * 1000);
         if (etaAt == null) continue;                         // la cuenta venció hace rato: lo más probable es que ya pasó por esta parada
         buses.push({ vehicle: v, etaAt, official: false, stopsAway: j - k });
       }
+      if (waiting) buses.push({ vehicle: waiting.v, etaAt: nowSec, official: false, stopsAway: 0 });
       if (!buses.length) continue;
       buses.sort((a, b) => a.etaAt - b.etaAt);
       out.push({ route, headsign: shape.headsign, direction: shape.direction, buses: buses.slice(0, perRoute) });
