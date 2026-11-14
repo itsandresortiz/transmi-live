@@ -72,6 +72,24 @@ export function searchRoutes(state: TransitState, o: { query?: string; system?: 
   return list.sort((a, b) => matchRank(a, q) - matchRank(b, q) || (matchRank(a, q) <= 1 ? SYSTEM_ORDER[a.system] - SYSTEM_ORDER[b.system] : 0) || byBuses(a, b));
 }
 
+/** Código de un bus para comparar: sin guiones, espacios ni ceros. El número pintado en el bus («A1438») y el que llega en los datos
+ *  («A10438», con un 0 de relleno) quedan iguales; lo mismo «Z10-4413» y «Z104413», o la placa «FVL 335» y «FVL335». */
+export const busCode = (s: string): string => s.toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/0/g, "");
+/** ¿El texto parece el código o la placa de un bus (letras y al menos tres cifras)? */
+export const looksLikeBus = (q: string): boolean => /^[A-Za-z]{1,3}[\s-]?\d[\d\s-]{2,6}$/.test(q.trim());
+
+/** Buses cuya placa o código coincide con lo escrito (los exactos primero). Ignora guiones, espacios y ceros de relleno. */
+export function findBuses(state: TransitState, query: string, limit = 5): Vehicle[] {
+  const q = busCode(query);
+  if (q.length < 3 || !/\d/.test(q)) return [];
+  const hits: { v: Vehicle; exact: boolean }[] = [];
+  for (const v of state.fleet.values()) {
+    const plate = busCode(v.plate ?? ""), label = busCode(v.label ?? "");
+    if (plate.includes(q) || label.includes(q)) hits.push({ v, exact: plate === q || label === q });
+  }
+  return hits.sort((a, b) => Number(b.exact) - Number(a.exact) || b.v.reportedAt - a.v.reportedAt).slice(0, limit).map((h) => h.v);
+}
+
 /** Retraso en segundos para ordenar (los desconocidos al final). */
 const lateness = (state: TransitState, v: Vehicle) => state.delayOf(v).seconds ?? -1e9;
 
@@ -84,7 +102,9 @@ export function listVehicles(state: TransitState, o: { query?: string; system?: 
     if (o.lateOnly) { const d = state.delayOf(v); if (!(d.kind === "late" && d.severe)) continue; }
     if (q) {
       const r = state.routeOf(v);
-      if (!normalize(`${v.plate ?? ""} ${v.label ?? ""} ${r?.shortName ?? v.routeId} ${r?.longName ?? ""}`).includes(q)) continue;
+      const code = busCode(o.query ?? "");
+      const byCode = code.length >= 3 && /\d/.test(code) && (busCode(v.plate ?? "").includes(code) || busCode(v.label ?? "").includes(code));
+      if (!byCode && !normalize(`${v.plate ?? ""} ${v.label ?? ""} ${r?.shortName ?? v.routeId} ${r?.longName ?? ""}`).includes(q)) continue;
     }
     out.push(v);
   }

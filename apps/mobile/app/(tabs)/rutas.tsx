@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SymbolView, type SFSymbol } from "@/ui/Symbol";
 import { router } from "expo-router";
-import { describeStopGroup, searchRoutes, searchStopGroups } from "@transmi/application";
+import { describeStopGroup, findBuses, looksLikeBus, searchRoutes, searchStopGroups } from "@transmi/application";
 import { SYSTEM_LABEL, routeCodes, routeTitle, routeVariant, stopLabelText, type Route } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { useTransitVersion } from "@/hooks";
@@ -42,10 +42,36 @@ export default function Buscar() {
     });
   }, [version, q, saved.stops, saved.nicknames]);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  // si lo escrito parece la placa o el código de un bus («FVL335», «A1438»), se buscan también los buses que están reportando
+  const busQuery = looksLikeBus(q);
+  const buses = useMemo(() => (busQuery ? findBuses(transit, q, 5) : []), [version, q, busQuery]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   const loading = !transit.network.routes.size;
   const count = (n: number) => (q.length >= 2 && n ? ` (${n})` : "");
   const header = (
     <View>
+      {busQuery ? (
+        <View style={styles.hintWrap}>
+          <Text style={[type.eyebrow, { color: c.muted }]}>BUSES</Text>
+          {buses.length ? buses.map((v) => {
+            const r = transit.routeOf(v), head = transit.sequenceForDisplay(v)?.shape.headsign;
+            return (
+              <Tap key={v.id} onPress={() => router.push({ pathname: "/bus/[id]", params: { id: v.id } })} accessibilityRole="button" accessibilityLabel={`Bus ${v.plate ?? v.label}, ruta ${r?.shortName ?? ""}`} style={styles.rowWrap0}>
+                <Card style={styles.row}>
+                  {r ? <RouteBadge route={r} /> : <View style={[styles.ico, { backgroundColor: SYSTEM_COLOR[v.system] }]}><SymbolView name="bus.fill" tintColor="#ffffff" size={16} /></View>}
+                  <View style={styles.rowText}>
+                    <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{[v.label, v.plate].filter(Boolean).join(" · ")}</Text>
+                    <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{head ? `Hacia ${head}` : r ? routeTitle(r) : SYSTEM_LABEL[v.system]}</Text>
+                  </View>
+                  <SymbolView name="chevron.right" tintColor={c.muted} size={14} />
+                </Card>
+              </Tap>
+            );
+          }) : (
+            <Text style={[type.caption, { color: c.muted }]}>{loading ? "Cargando…" : `Ningún bus con «${q}» está enviando su ubicación ahora. Puede que haya terminado su recorrido o que TransMilenio no esté recibiendo su señal.`}</Text>
+          )}
+        </View>
+      ) : null}
       {kind === "paradas" && q.length < 2 ? (
         <View style={styles.hintWrap}>
           <Text style={[type.caption, { color: c.muted }]}>Escribe el nombre de la parada, estación o portal, o el código que sale en el paradero.</Text>
@@ -68,7 +94,7 @@ export default function Buscar() {
       <View style={[styles.search, { backgroundColor: c.card, shadowColor: c.shadow }]}>
         <SymbolView name="magnifyingglass" tintColor={c.muted} size={17} />
         <TextInput selectionColor={c.accent} cursorColor={c.accent} underlineColorAndroid="transparent"
-          value={query} onChangeText={setQuery} placeholder={kind === "rutas" ? "Ruta o destino (C15, Portal Norte…)" : "Parada, estación o código"} placeholderTextColor={c.muted}
+          value={query} onChangeText={setQuery} placeholder={kind === "rutas" ? "Ruta, destino o bus (C15, FVL335…)" : "Parada, estación o código"} placeholderTextColor={c.muted}
           autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" returnKeyType="search"
           accessibilityLabel={kind === "rutas" ? "Buscar una ruta" : "Buscar una parada, estación o portal"} style={[type.body, styles.input, { color: c.text }]}
         />
@@ -82,6 +108,7 @@ export default function Buscar() {
         <FlatList<Route>
           key="rutas"
           data={routes}
+          ListHeaderComponent={header}
           keyExtractor={(r) => r.id}
           keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled"
           contentContainerStyle={[PAGE, { paddingBottom: space[10] * 3 }]}

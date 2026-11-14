@@ -327,3 +327,23 @@ describe("puntualidad: solo si el dato es de ahora", () => {
     expect(s.hasDelays()).toBe(true);
   });
 });
+
+import { busCode, findBuses, looksLikeBus } from "@transmi/application";
+describe("buscar un bus por placa o código", () => {
+  it("el número pintado y el de los datos coinciden (sin guiones, espacios ni ceros de relleno)", () => {
+    expect(busCode("A1438")).toBe(busCode("A10438"));
+    expect(busCode("Z10-4413")).toBe(busCode("z104413"));
+    expect(busCode("FVL 335")).toBe("FVL335");
+    expect(looksLikeBus("A1438")).toBe(true);
+    expect(looksLikeBus("FVL335")).toBe(true);
+    expect(looksLikeBus("Portal Norte")).toBe(false);
+    expect(looksLikeBus("B11")).toBe(false);
+  });
+  it("encuentra el bus por su código pintado o por la placa", () => {
+    const s = new TransitState();
+    s.applyPositions([rep("x", "1", 1000, { label: "A10438", plate: "GUV978" }), rep("y", "1", 1000, { label: "A10433", plate: "GUV970" })], 1_000_000);
+    expect(findBuses(s, "A1438").map((v) => v.id)).toEqual(["x"]);
+    expect(findBuses(s, "guv 978").map((v) => v.id)).toEqual(["x"]);
+    expect(findBuses(s, "B11")).toEqual([]);      // tres letras/cifras sin parecer bus: no se busca por código… salvo que coincida
+  });
+});
