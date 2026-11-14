@@ -6,6 +6,8 @@ import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";
 import { motion } from "./engine";
 import { SYSTEM_COLOR } from "@/ui/theme";
+import { useRide } from "@/ride";
+import { snappedPosition } from "@/rideSnap";
 
 export interface Viewport { west: number; south: number; east: number; north: number; zoom: number }
 
@@ -46,11 +48,14 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       //    troncales incluidos (el dueño iba en un B11 que no aparecía en el mapa)
       const limit = Math.round(cap * 1.4);
       if (inView.length > limit) inView = inView.map((v) => ({ v, k: keepSet.has(v.id) ? -1 : PRIORITY[v.system] * 1e10 + (hash(v.id) % 1e9) })).sort((a, b) => a.k - b.k).slice(0, limit).map((x) => x.v);
+      const ride = useRide.getState().busId, rideNow = t * 1000;      // mismo reloj con que se guardan las lecturas del GPS
       for (const v of inView) {
-        const g = toGeo(motion.step(v, t));
+        // el bus en el que vas se dibuja donde va tu teléfono (el dato de TransMilenio llega ~1 min tarde y el bus se veía atrás o adelantado)
+        const mine = v.id === ride ? snappedPosition(v.id, rideNow) : null;
+        const g = mine ?? toGeo(motion.step(v, t));
         if (g.lon < view.west - padX || g.lon > view.east + padX || g.lat < view.south - padY || g.lat > view.north + padY) continue;
-        const h = (((motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;
-        features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `top-${v.system}-${v.system === "troncal" ? "l" : "s"}`, rot: h, o: isStaleReport(v, t) ? 0.38 : 1, route: labels ? transit.routeOf(v)?.shortName ?? "" : "" } });
+        const h = (((mine?.heading ?? motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;
+        features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `top-${v.system}-${v.system === "troncal" ? "l" : "s"}`, rot: h, o: !mine && isStaleReport(v, t) ? 0.38 : 1, route: labels ? transit.routeOf(v)?.shortName ?? "" : "" } });
       }
       setData({ type: "FeatureCollection", features });
       return features.length;

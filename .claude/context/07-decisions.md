@@ -62,3 +62,8 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Contexto**: «TransMilenio» incluía troncales y duales; el dueño vio el MC84 (dual, para en paraderos) y lo tomó por un error. La app oficial no muestra duales al filtrar por TransMilenio.
 - **Decisión**: cuarto modo «Dual», prendido por defecto con los demás; «TransMilenio» = solo troncales.
 - **Descartado**: renombrar a «TransMilenio y duales» (no permitía excluirlos) o quitar los duales (son rutas reales y a veces la mejor opción).
+
+## 2026-11-14 · El bus en el que vas se dibuja con el GPS del teléfono, solo en el teléfono
+- **Contexto:** TransMilenio entrega cada posición con ~1 min de atraso; en «Voy en este bus» el bus se veía atrás (o adelantado por la predicción) y los avisos de bajada se corrían.
+- **Decisión:** mientras la app está abierta y el GPS confirma que vas sobre la vía y cerca de donde puede ir el bus, el bus se dibuja donde vas tú y las paradas/tiempos se cuentan desde ahí; si no cuadra un rato estando en movimiento, se pregunta.
+- **Descartado:** (1) seguir la ubicación con la app cerrada (pide el permiso «Siempre», más fricción y revisión de Apple); (2) enviar las ubicaciones a un servidor para aprender rutas y tiempos (exige consentimiento, cambiar las declaraciones de privacidad y un servidor; con pocos usuarios aporta poco: los tiempos ya se aprenden con `hop-stats` usando solo datos de TransMilenio).

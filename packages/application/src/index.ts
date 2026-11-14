@@ -13,3 +13,4 @@ export * from "./station-geometry";
 export * from "./trip-guide";
 export * from "./trunk-data";
 export * from "./widget-feed";
+export * from "./ride-match";
