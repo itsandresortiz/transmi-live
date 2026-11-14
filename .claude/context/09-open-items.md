@@ -63,6 +63,8 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - El mapa de la app mueve los buses por saltos (GeoJSON a 4 Hz); no hay interpolación nativa. Mejora grande posible: capa nativa o canvas propio.
 - `README.md` raíz y `docs/TESTFLIGHT.md` describen el camino antiguo con Capacitor; actualizar.
 
+- **Comparar con datos oficiales de TransMilenio** (2026-11-14): su web no planea viajes; su «Buscador de Servicios» (buscador-rutas.transmilenio.gov.co) tiene paradas y horarios oficiales por ruta. Falta permiso del dueño para consultarlo de forma automática; con eso se puede revisar el orden de paradas del GTFS (p. ej. H15/Calle 57) y los horarios. Para «Cómo llegar» la referencia es la app oficial (capturas del dueño).
+
 ## Deuda técnica
 - ✅ (2026-11-14, **sin probar en el Mac**) iOS: el número de compilación ya sale de la fecha para la app y el widget (`TM_BUILD_NUMBER`). Comprobar en la próxima entrega que Transporter muestre un número con la fecha y no «3» o «4».
 - Abrir la app procesa `network.json.gz` (leer ~18 MB de JSON + armar la red) en el hilo principal: en teléfonos lentos puede congelar la app unos segundos. Si se nota, mover a un hilo aparte o guardar un formato más compacto/binario.
