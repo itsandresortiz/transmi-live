@@ -68,8 +68,22 @@ export default function Buscar() {
               </Tap>
             );
           }) : (
-            <Text style={[type.caption, { color: c.muted }]}>{loading ? "Cargando…" : `Ningún bus con «${q}» está enviando su ubicación ahora. Puede que haya terminado su recorrido o que TransMilenio no esté recibiendo su señal.`}</Text>
+            <>
+              <Text style={[type.caption, { color: c.muted }]}>{loading ? "Cargando…" : `Ningún bus con «${q}» está enviando su ubicación ahora. Puede que haya terminado su recorrido o que TransMilenio no esté recibiendo su señal.`}</Text>
+              {loading ? null : <Tap onPress={() => router.push("/enbus")} accessibilityRole="button" accessibilityLabel="Voy en ese bus: seguirme con mi ubicación"><Text style={[type.headline, { color: c.accent }]}>¿Vas en ese bus? Te seguimos con tu ubicación ›</Text></Tap>}
+            </>
           )}
+        </View>
+      ) : null}
+      {kind === "rutas" && q.length < 2 ? (
+        <View style={styles.hintWrap}>
+          <Tap onPress={() => router.push("/enbus")} accessibilityRole="button" accessibilityLabel="¿En qué bus vas? Encontrarlo con mi ubicación" style={styles.rowWrap0}>
+            <Card style={styles.row}>
+              <View style={[styles.ico, { backgroundColor: c.accent }]}><SymbolView name="bus.fill" tintColor="#ffffff" size={16} /></View>
+              <View style={styles.rowText}><Text style={[type.headline, { color: c.text }]}>¿En qué bus vas?</Text><Text style={[type.caption, { color: c.muted }]}>Lo encontramos con tu ubicación, aunque no salga en el mapa</Text></View>
+              <SymbolView name="chevron.right" tintColor={c.muted} size={14} />
+            </Card>
+          </Tap>
         </View>
       ) : null}
       {kind === "paradas" && q.length < 2 ? (

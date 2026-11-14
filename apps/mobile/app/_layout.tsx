@@ -48,6 +48,7 @@ export default function RootLayout() {
         <Stack.Screen name="avisos" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "Avisos del servicio", headerTintColor: "#e11d2e" }} />
         <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="personalizar/[id]" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "Personalizar parada", headerShadowVisible: false, contentStyle: { backgroundColor: c.bg } }} />
+        <Stack.Screen name="enbus" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "¿En qué bus vas?", headerTintColor: "#e11d2e" }} />
         <Stack.Screen name="cerca" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "Cerca de mí", headerTintColor: "#e11d2e" }} />
         <Stack.Screen name="favoritos" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "Favoritos", headerTintColor: "#e11d2e" }} />
         <Stack.Screen name="card" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "Mi tarjeta", headerTintColor: "#e11d2e" }} />

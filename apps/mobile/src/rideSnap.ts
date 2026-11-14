@@ -2,6 +2,7 @@ import { type RideCheck, type RideSnap, rideArrival, shapeStops } from "@transmi
 import { type RouteShape, type Stop, type Vehicle, bearingDegrees, toGeo } from "@transmi/domain";
 import { transit } from "./composition-root";
 import { nowMs as clockMs } from "./clock";
+import { rideSequence } from "./virtualRide";
 
 /** Mientras vas en un bus («Voy en este bus»), su posición sale de TU teléfono, no del reporte de TransMilenio (que llega ~1 min tarde):
  *  aquí se guarda dónde vas sobre el recorrido. La ubicación no sale del teléfono ni se guarda: vive solo en memoria mientras dura el viaje. */
@@ -45,7 +46,7 @@ export function snappedPosition(busId: string, nowMs = clockMs()): { lat: number
 /** La próxima parada del bus en el que vas, contada desde tu ubicación (o `undefined` si el GPS no lo confirma ahora). */
 export function rideNextStop(v: Vehicle, nowMs = clockMs()): { stopId: string; stop: Stop | undefined; arrivalAt: number } | undefined {
   const mine = rideSnapOf(v.id, nowMs);
-  const seq = mine ? transit.sequenceForDisplay(v) : undefined;
+  const seq = mine ? rideSequence(v) : undefined;
   if (!mine || !seq || seq.shape !== mine.shape) return undefined;
   const stopId = seq.shape.stopIds[mine.nextIndex];
   if (!stopId) return undefined;

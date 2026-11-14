@@ -8,6 +8,7 @@ import { motion } from "./engine";
 import { SYSTEM_COLOR } from "@/ui/theme";
 import { useRide } from "@/ride";
 import { snappedPosition } from "@/rideSnap";
+import { isVirtualRide, virtualParts } from "@/virtualRide";
 
 export interface Viewport { west: number; south: number; east: number; north: number; zoom: number }
 
@@ -56,6 +57,11 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
         if (g.lon < view.west - padX || g.lon > view.east + padX || g.lat < view.south - padY || g.lat > view.north + padY) continue;
         const h = (((mine?.heading ?? motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;
         features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `top-${v.system}-${v.system === "troncal" ? "l" : "s"}`, rot: h, o: !mine && isStaleReport(v, t) ? 0.38 : 1, route: labels ? transit.routeOf(v)?.shortName ?? "" : "" } });
+      }
+      // el bus en el que vas, si no aparece en los datos de TransMilenio: se dibuja donde va tu teléfono
+      if (isVirtualRide(ride) && (!system || transit.routeById(virtualParts(ride)?.routeId ?? "")?.system === system)) {
+        const g = snappedPosition(ride, rideNow), vp = virtualParts(ride), r = vp ? transit.routeById(vp.routeId) : undefined;
+        if (g && r) features.push({ type: "Feature", id: ride, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: ride, color: SYSTEM_COLOR[r.system], sprite: `top-${r.system}-${r.system === "troncal" ? "l" : "s"}`, rot: ((g.heading % 360) + 360) % 360, o: 1, route: labels ? r.shortName : "" } });
       }
       setData({ type: "FeatureCollection", features });
       return features.length;

@@ -8,6 +8,7 @@ import { useRide } from "@/ride";
 import { SymbolView } from "@/ui/Symbol";
 import { arrivalAtIndex, rideArrival } from "@transmi/application";
 import { rideSnapOf } from "@/rideSnap";
+import { isVirtualRide, rideSequence, rideVehicle } from "@/virtualRide";
 import { SYSTEM_LABEL, routeTitle } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
@@ -38,9 +39,10 @@ export default function Ride() {
   const setAlightId = (stop: string | null, total = 0) => { if (stop) { void allowAlerts(); useRide.getState().set(id, stop, total); } else useRide.getState().clear(); };
   // «Voy en este bus» también es seguirlo: al cerrar esta ventana, el mapa lo acompaña y deja arriba su tarjeta
   useEffect(() => { if (id && useMapFocus.getState().followBusId !== id) useMapFocus.getState().set({ followBusId: id }); }, [id]);
-  const v = transit.fleet.get(id);
+  const v = rideVehicle(id);
+  const virtual = isVirtualRide(id);
   const r = v ? transit.routeOf(v) : undefined;
-  const seq = v ? transit.sequenceForDisplay(v) : undefined;
+  const seq = v ? rideSequence(v) : undefined;
   const color = v ? SYSTEM_COLOR[v.system] : c.accent;
 
   // si vas en este bus y tu GPS lo confirma, las paradas y tiempos se cuentan desde donde vas tú (el reporte del bus llega ~1 min tarde)
@@ -64,7 +66,8 @@ export default function Ride() {
       <Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>{transit.lastBatchAt == null ? "Cargando el bus…" : "Este bus dejó de reportar"}</Text>
       <Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido. Revisa por la ventana del bus.</Text>
       {/* el aviso de bajada se puede quitar aunque el bus ya no aparezca */}
-      {alightId && transit.lastBatchAt != null ? <View style={{ marginTop: space[5] }}><PrimaryButton label="Quitar el aviso" symbol="bell.slash" a11y="Quitar el aviso de bajada" onPress={() => { setAlightId(null); router.back(); }} /></View> : null}
+      {transit.lastBatchAt != null ? <View style={{ marginTop: space[5] }}><PrimaryButton label="Sigo en el bus: seguirme con mi ubicación" symbol="location.fill" a11y="Sigo en el bus: seguirme con mi ubicación" onPress={() => router.replace({ pathname: "/enbus", params: r ? { route: r.id } : {} })} /></View> : null}
+      {alightId && transit.lastBatchAt != null ? <View style={{ marginTop: space[3] }}><PrimaryButton tone="ink" label="Quitar el aviso" symbol="bell.slash" a11y="Quitar el aviso de bajada" onPress={() => { setAlightId(null); router.back(); }} /></View> : null}
     </View>
   );
   const silent = now - v.reportedAt > 120;
@@ -101,6 +104,7 @@ export default function Ride() {
               <RideScene system={v.system} color={color} moving={!arrived && !silent} width={width} />
             </View>
 
+            {virtual ? <Card><Text style={[type.headline, { color: c.text }]}>Te seguimos con tu ubicación</Text><Text style={[type.body, { color: c.muted }]}>Este bus no aparece en los datos de TransMilenio en este momento. Mientras tengas la app abierta, el bus va donde vas tú y las paradas se cuentan desde ahí.</Text></Card> : null}
             {silent ? <Card><Text style={[type.headline, { color: "#d97706" }]}>Perdimos la señal de este bus</Text><Text style={[type.body, { color: c.muted }]}>Hace {Math.round((now - v.reportedAt) / 60)} min que no reporta. Los tiempos son aproximados.</Text></Card> : null}
 
             <View style={[styles.info, { backgroundColor: c.cardAlt }]}>

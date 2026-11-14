@@ -97,6 +97,9 @@ export default function RouteScreen() {
             {route.longName ? <Text style={[type.caption, { color: c.muted }]}>Nombre oficial: {routeOfficialName(route)}</Text> : null}
             {other ? <Tap haptic={false} onPress={() => router.replace({ pathname: "/route/[id]", params: { id: other.id } })} accessibilityRole="button" accessibilityLabel={`Ver el ${route.shortName} en el sentido contrario${other.longName ? `, ${other.longName}` : ""}`} style={{ marginTop: 4, alignSelf: "flex-start" }}>
               <Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>Ver el sentido contrario{other.longName ? ` (${other.longName})` : ""} ›</Text></Tap> : null}
+            {/* si vas en un bus de esta ruta que no sale en el mapa (su GPS no reporta), te seguimos con tu ubicación */}
+            <Tap haptic={false} onPress={() => router.push({ pathname: "/enbus", params: { route: id } })} accessibilityRole="button" accessibilityLabel={`Voy en un ${route.shortName}: encontrarlo con mi ubicación`} style={{ marginTop: 4, alignSelf: "flex-start" }}>
+              <Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>Voy en un {route.shortName} ›</Text></Tap>
           </View>
           <RoundButton symbol={fav ? "star.fill" : "star"} label={fav ? "Quitar de favoritos" : "Guardar en favoritos"} onPress={() => toggle(id)} />
         </View>

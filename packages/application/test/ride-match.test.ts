@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TransitNetwork, type VehicleReport } from "@transmi/domain";
-import { TransitState, checkRide, rideArrival } from "../src";
+import { TransitState, checkOnShape, checkRide, guessMyBus, rideArrival } from "../src";
 
 // Una ruta recta hacia el norte por la Av. Suba: paradas cada ~1 km
 const LAT0 = 4.70, LON = -74.08, M = 1 / 111_000;
@@ -56,5 +56,28 @@ describe("ir en el bus: el teléfono y el bus", () => {
     expect(checkRide(s, v, shape, last, { ...fix(1600), accuracy: 200 }, NOW * 1000).kind).toBe("unknown");
     expect(checkRide(s, v, shape, last, { ...fix(1600), at: NOW * 1000 - 60_000 }, NOW * 1000).kind).toBe("unknown");
     expect(checkRide(s, v, shape, last, null, NOW * 1000).kind).toBe("unknown");
+  });
+});
+
+describe("¿en qué bus vas?", () => {
+  it("sin bus en los datos: te sigue sobre el recorrido con tu GPS", () => {
+    const s = world(), shape = s.network.shapes.get("7")![0]!;
+    const r = checkOnShape(s, shape, 1, fix(2300), NOW * 1000);
+    expect(r.kind).toBe("on");
+    if (r.kind === "on") expect(shape.stopIds[r.snap.nextIndex]).toBe("D");
+    expect(checkOnShape(s, shape, 1, fix(2300, 8, 500), NOW * 1000).kind).toBe("off-route");
+  });
+  it("propone el bus que va por tu vía, en tu sentido y donde puede estar; y las rutas que pasan por ahí", () => {
+    const { s } = withBus(1200, 60);
+    const prev = { ...at(1500), at: NOW * 1000 - 5000, accuracy: 10, speed: 8 }, now = fix(1540);
+    const g = guessMyBus(s, now, prev, NOW * 1000);
+    expect(g.moving).toBe(true);
+    expect(g.buses.map((b) => b.vehicle.id)).toEqual(["bus"]);
+    expect(g.routes.map((r) => r.route.shortName)).toEqual(["7"]);
+    expect(g.routes[0]!.fromIndex).toBe(1);
+    // yendo en sentido contrario, ni el bus ni la ruta cuadran
+    const back = guessMyBus(s, { ...fix(1500), at: NOW * 1000 }, { ...at(1540), at: NOW * 1000 - 5000, accuracy: 10, speed: 8 }, NOW * 1000);
+    expect(back.buses).toEqual([]);
+    expect(back.routes).toEqual([]);
   });
 });

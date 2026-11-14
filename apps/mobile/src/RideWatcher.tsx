@@ -3,7 +3,8 @@ import { Alert, AppState } from "react-native";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { type PhoneFix, arrivalAtIndex, checkRide, rideArrival } from "@transmi/application";
+import { type PhoneFix, arrivalAtIndex, checkOnShape, checkRide, rideArrival } from "@transmi/application";
+import { isVirtualRide, rideSequence, rideVehicle, virtualParts } from "./virtualRide";
 import { clearRideSnap, rideCheckOf, rideSnapOf, setRideCheck } from "./rideSnap";
 import { transit } from "./composition-root";
 import { nowMs } from "./clock";
@@ -45,8 +46,14 @@ export function RideWatcher() {
       if (gone || !perm?.granted) return;
       sub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 5 }, (p) => {
         const now = nowMs(), fix: PhoneFix = { lat: p.coords.latitude, lon: p.coords.longitude, at: now, accuracy: p.coords.accuracy, speed: p.coords.speed };
-        const v = transit.fleet.get(busId), seq = v ? transit.sequenceForDisplay(v) : undefined;
-        if (v && seq) setRideCheck(busId, seq.shape, seq.index, checkRide(transit, v, seq.shape, seq.index, fix, now, prevFix), now);
+        if (isVirtualRide(busId)) {
+          // sin bus en los datos: solo se mira que vayas sobre el recorrido (desde la parada en que vienes)
+          const vp = virtualParts(busId), seq = vp ? rideSequence(rideVehicle(busId, now)!) : undefined;
+          if (vp && seq) setRideCheck(busId, vp.shape, seq.index, checkOnShape(transit, vp.shape, seq.index, fix, now, prevFix), now);
+        } else {
+          const v = transit.fleet.get(busId), seq = v ? transit.sequenceForDisplay(v) : undefined;
+          if (v && seq) setRideCheck(busId, seq.shape, seq.index, checkRide(transit, v, seq.shape, seq.index, fix, now, prevFix), now);
+        }
         prevFix = fix;
       }).catch(() => undefined);
       if (gone) sub?.remove();
@@ -75,8 +82,8 @@ export function RideWatcher() {
     };
 
     const tick = () => {
-      const v = transit.fleet.get(busId), target = transit.stopById(alightId);
-      const seq = v ? transit.sequenceForDisplay(v) : undefined;
+      const v = rideVehicle(busId), target = transit.stopById(alightId);
+      const seq = v ? rideSequence(v) : undefined;
       // el bus dejó de reportar (y otros sí): tras un rato se da por terminado, para no dejar la pantalla encendida y el aviso fijo para siempre
       if (!v) { if (transit.fleet.size > 0) { missingSince ||= Date.now(); if (seen && Date.now() - missingSince > GONE_MS) finish(); } return; }
       missingSince = 0;

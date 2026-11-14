@@ -27,6 +27,7 @@ import { Glass, RoundButton, Tap, Toggle } from "@/ui/kit";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { SYSTEM_COLOR, space, type, useColors, useOnMap } from "@/ui/theme";
 import { rideNextStop } from "@/rideSnap";
+import { rideVehicle } from "@/virtualRide";
 
 /** El mapa se centra en tu ubicación solo la primera vez que se abre en cada sesión (después respeta por dónde lo dejaste). */
 let centeredOnce = false;
@@ -70,7 +71,7 @@ export default function Mapa() {
   // el bus que se sigue: su ruta y su próxima parada con la hora a la que llega
   useTransitVersion();
   const nowS = useNow(2000) / 1000;
-  const followV = focus.followBusId ? transit.fleet.get(focus.followBusId) : undefined;
+  const followV = focus.followBusId ? rideVehicle(focus.followBusId) : undefined;
   const followRoute = followV ? transit.routeOf(followV) : undefined;
   // si vas en este bus y tu GPS lo confirma, la próxima parada y su tiempo salen de donde vas tú (el reporte del bus llega ~1 min tarde)
   const followNext = followV ? rideNextStop(followV) ?? transit.nextStopOf(followV, nowMs()) : undefined;
