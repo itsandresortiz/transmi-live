@@ -75,7 +75,9 @@ export class Vehicle {
     this.routeId = r.routeId || this.routeId;
     this.tripId = r.tripId ?? this.tripId;
     this.lastStopId = r.lastStopId ?? this.lastStopId;
-    if (r.reportedAt === this.reportedAt) return false;
+    // un reporte igual o MÁS VIEJO que el que ya se tiene no mueve el bus: pasa cuando falla el intermediario y se cae en la copia
+    // de respaldo, que va unos minutos atrás; aplicarlo devolvería los buses a donde estaban y se verían como «en vivo»
+    if (r.reportedAt <= this.reportedAt) return false;
 
     const next = toWorld(r.position);
     const moved = distanceMeters(this.world, next);

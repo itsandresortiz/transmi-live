@@ -91,8 +91,11 @@ export class LiveDataService {
       return true;
     } catch (e) {
       this.failures++;
-      this.state.pollFailures++;
-      this.state.lastPollFailAt = this.clock.now();
+      // «sin conexión» solo cuenta cuando no hubo respuesta: si el servidor contestó pero el dato no sirve (copia vieja, lote cortado), hay internet
+      if (!(e as { reachable?: boolean } | null)?.reachable && !/^Lote incompleto/.test((e as Error | null)?.message ?? "")) {
+        this.state.pollFailures++;
+        this.state.lastPollFailAt = this.clock.now();
+      }
       // sin respuesta tampoco se dejan en pantalla buses viejos: antes solo se limpiaban cuando la consulta salía bien,
       // así que sin internet los buses quedaban congelados indefinidamente
       this.state.dropStale(this.clock.now());

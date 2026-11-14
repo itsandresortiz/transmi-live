@@ -117,6 +117,29 @@ describe("servicio de datos en vivo", () => {
   });
 });
 
+describe("respaldo y reportes viejos", () => {
+  it("un reporte más viejo que el que ya se tenía no devuelve el bus atrás", () => {
+    const s = new TransitState();
+    s.applyPositions([rep("a", "1", 1000, { position: { lat: 4.65, lon: -74.07 } })], 1_000_000);
+    s.applyPositions([rep("a", "1", 600, { position: { lat: 4.6, lon: -74.1 } })], 1_010_000);
+    const v = s.fleet.toArray()[0]!;
+    expect(v.reportedAt).toBe(1000);
+    expect(v.position.lat).toBe(4.65);
+  });
+  it("un solo reporte con la hora muy adelantada no hace ver el lote como reciente", () => {
+    const s = new TransitState();
+    s.applyPositions([...Array.from({ length: 9 }, (_, i) => rep("b" + i, "1", 1000)), rep("z", "1", 1000 + 3600)], 1_000_000);
+    expect(s.lastBatchAt).toBe(1000);
+  });
+  it("si el servidor contestó pero el dato no sirve, no se dice «sin conexión»", async () => {
+    const state = new TransitState(), c = clock();
+    const feed: LiveFeedPort = { poll: async () => { throw Object.assign(new Error("Copia de respaldo vieja"), { reachable: true }); } };
+    const svc = new LiveDataService(feed, state, c);
+    await svc.refresh(true).catch(() => undefined); c.advance(20_000); await svc.refresh(true).catch(() => undefined);
+    expect(state.pollFailures).toBe(0);
+  });
+});
+
 describe("lotes incompletos", () => {
   it("descarta un lote con muchos menos buses que el anterior", async () => {
     const feed = new FakeFeed(), state = new TransitState(), c = clock(), svc = new LiveDataService(feed, state, c);

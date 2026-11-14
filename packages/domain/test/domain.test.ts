@@ -268,4 +268,18 @@ describe("mensajes del dueño", () => {
     expect(activeOwnerMessages(list, at(8)).map((m) => m.text)).toEqual(["B", "A"]);
     expect(activeOwnerMessages(list, at(12)).map((m) => m.text)).toEqual(["A"]);
   });
+  it("un «hasta» sin hora vale todo ese día; fechas imposibles se descartan; acepta segundos", () => {
+    const list = parseOwnerMessages({ mensajes: [{ texto: "Marcha hoy", desde: "2026-11-14", hasta: "2026-11-14" }] });
+    const at = (d: number, h: number) => Date.UTC(2026, 10, d, h + 5) / 1000;
+    expect(activeOwnerMessages(list, at(14, 15)).length).toBe(1);
+    expect(activeOwnerMessages(list, at(15, 1)).length).toBe(0);
+    expect(parseBogotaTime("2026-11-31")).toBeUndefined();
+    expect(parseBogotaTime("2026-13-45 99:99")).toBeUndefined();
+    expect(parseBogotaTime("2026-11-12 06:30:00")).toBe(Date.UTC(2026, 10, 12, 11, 30) / 1000);
+  });
+  it("mensajes vencidos arriba en el archivo no tapan a uno vigente; repetidos cuentan una vez", () => {
+    const old = Array.from({ length: 6 }, (_, i) => ({ texto: `Viejo ${i}`, hasta: "2026-01-01 10:00" }));
+    const list = parseOwnerMessages({ mensajes: [...old, { texto: "Vigente" }, { texto: "Vigente" }] });
+    expect(activeOwnerMessages(list, Date.UTC(2026, 10, 14, 20) / 1000).map((m) => m.text)).toEqual(["Vigente"]);
+  });
 });

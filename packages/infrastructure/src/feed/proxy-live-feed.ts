@@ -108,7 +108,10 @@ export class ProxyLiveFeed implements LiveFeedPort {
       const fb = this.cfg.fallbackBase;
       meta = await this.json(`${fb}meta.json?t=${Math.floor(Date.now() / 3000)}`, false);
       // una copia de respaldo vieja no sirve: mostraría los buses donde estaban hace rato. Es mejor quedarse sin datos (y decirlo) que dar un dato viejo.
-      if (meta && typeof meta.at === "number" && meta.at > 1e9 && Date.now() / 1000 - meta.at > MAX_FALLBACK_AGE_S) meta = null;
+      if (meta && typeof meta.at === "number" && meta.at > 1e9 && Date.now() / 1000 - meta.at > MAX_FALLBACK_AGE_S) {
+        // hubo respuesta (hay internet), solo que no sirve: se marca para que no se confunda con «teléfono sin conexión»
+        throw Object.assign(new Error("Copia de respaldo vieja"), { reachable: true });
+      }
       source = "delayed";
       url = (k, sig) => `${fb}${k}.pb?v=${sig}`;
     }

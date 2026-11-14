@@ -10,15 +10,19 @@ export interface OwnerMessage {
   readonly important: boolean;
 }
 
-const MAX_TEXT = 280, MAX_MESSAGES = 5;
+const MAX_TEXT = 280, MAX_MESSAGES = 5, MAX_READ = 50;
 
-/** «2026-11-12 06:30» (hora de Bogotá, UTC−5 todo el año) → segundos desde 1970. También acepta «2026-11-12» (inicio del día) y números. */
-export function parseBogotaTime(v: unknown): number | undefined {
+/** «2026-11-12 06:30» (hora de Bogotá, UTC−5 todo el año) → segundos desde 1970. También acepta «2026-11-12» y números.
+ *  Una fecha sin hora es el inicio del día, o el final si `endOfDay` (un «hasta el 14» vale todo el día 14). Fechas imposibles → `undefined`. */
+export function parseBogotaTime(v: unknown, endOfDay = false): number | undefined {
   if (typeof v === "number" && Number.isFinite(v) && v > 1e9) return v > 1e12 ? Math.round(v / 1000) : v;
   if (typeof v !== "string") return undefined;
-  const m = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?\s*$/.exec(v);
+  const m = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::\d{2})?)?\s*$/.exec(v);
   if (!m) return undefined;
-  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] ?? 0) + 5, Number(m[5] ?? 0)) / 1000;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]), hasTime = m[4] != null, h = Number(m[4] ?? 0), mi = Number(m[5] ?? 0);
+  if (mo < 1 || mo > 12 || d < 1 || h > 23 || mi > 59) return undefined;
+  if (new Date(Date.UTC(y, mo - 1, d)).getUTCDate() !== d) return undefined;   // 31 de noviembre, 30 de febrero…
+  const t = Date.UTC(y, mo - 1, d, h + 5, mi) / 1000 + (!hasTime && endOfDay ? 86_400 : 0);
   return Number.isFinite(t) ? t : undefined;
 }
 
@@ -31,20 +35,23 @@ export function parseOwnerMessages(raw: unknown): OwnerMessage[] {
     const o = item as Record<string, unknown>;
     const text = typeof o.texto === "string" ? o.texto.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT) : "";
     if (!text) continue;
-    const startsAt = parseBogotaTime(o.desde), endsAt = parseBogotaTime(o.hasta);
+    const startsAt = parseBogotaTime(o.desde), endsAt = parseBogotaTime(o.hasta, true);
     // una fecha escrita pero mal formada no se toma como «sin fecha»: el mensaje se descarta, para no dejarlo puesto para siempre por un error de dedo
     if ((o.desde != null && o.desde !== "" && startsAt == null) || (o.hasta != null && o.hasta !== "" && endsAt == null)) continue;
     let h = 5381; const key = `${text}|${startsAt ?? ""}|${endsAt ?? ""}`;
     for (let i = 0; i < key.length; i++) h = ((h << 5) + h + key.charCodeAt(i)) | 0;
-    out.push({ id: (h >>> 0).toString(36), text, startsAt, endsAt, important: typeof o.tipo === "string" && /importante|urgente|alerta/i.test(o.tipo) });
-    if (out.length >= MAX_MESSAGES) break;
+    const id = (h >>> 0).toString(36);
+    if (out.some((x) => x.id === id)) continue;   // el mismo mensaje escrito dos veces
+    out.push({ id, text, startsAt, endsAt, important: typeof o.tipo === "string" && /importante|urgente|alerta/i.test(o.tipo) });
+    if (out.length >= MAX_READ) break;
   }
   return out;
 }
 
-/** Los mensajes que toca mostrar en `nowSec`: primero los importantes. */
+/** Los mensajes que toca mostrar en `nowSec`: primero los importantes; cinco como máximo (el tope va después de mirar la vigencia,
+ *  para que mensajes vencidos que sigan en el archivo no tapen a los vigentes). */
 export function activeOwnerMessages(all: readonly OwnerMessage[], nowSec: number): OwnerMessage[] {
-  return all.filter((m) => (m.startsAt == null || m.startsAt <= nowSec) && (m.endsAt == null || m.endsAt > nowSec)).sort((a, b) => Number(b.important) - Number(a.important));
+  return all.filter((m) => (m.startsAt == null || m.startsAt <= nowSec) && (m.endsAt == null || m.endsAt > nowSec)).sort((a, b) => Number(b.important) - Number(a.important)).slice(0, MAX_MESSAGES);
 }
 
 /** «Hasta hoy a las 12:00 p. m.» / «Hasta el 14 nov.» (hora de Bogotá). */

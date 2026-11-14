@@ -49,7 +49,7 @@ describe("fuente en vivo con respaldo", () => {
   });
   it("no usa una copia de respaldo vieja (el proceso que la publica se detuvo): prefiere quedarse sin datos", async () => {
     const twoHoursAgo = Math.floor(Date.now() / 1000) - 7200;
-    await expect(make(false, [], twoHoursAgo).poll({})).rejects.toThrow(/Sin conexión/);
+    await expect(make(false, [], twoHoursAgo).poll({})).rejects.toThrow(/respaldo vieja/);
     const fresh = await make(false, [], Math.floor(Date.now() / 1000) - 40).poll({});
     expect(fresh!.source).toBe("delayed");
   });

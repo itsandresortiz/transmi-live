@@ -199,7 +199,10 @@ export class TransitState {
     this.fleet.ingest(reports.filter((r) => r.reportedAt >= nowMs / 1000 - MAX_REPORT_AGE_S), nowMs);
     this.reconcileLastStops();
     let latest = this.lastBatchAt ?? 0;
-    for (const r of reports) if (r.reportedAt > latest) latest = r.reportedAt;
+    // un reporte con la hora muy adelantada (dato malo de la fuente) no puede hacer pasar por reciente todo el lote: se ignoran los que
+    // van más de 10 min por delante de la mitad del lote (no se compara con el reloj del teléfono, que puede estar mal puesto)
+    const times = reports.map((r) => r.reportedAt).sort((a, b) => a - b), mid = times[times.length >> 1] ?? 0;
+    for (const t of times) if (t > latest && t <= mid + 600) latest = t;
     if (latest) this.lastBatchAt = latest;
     this.resolveSystems();
     this.travelTimes.observe(this);
