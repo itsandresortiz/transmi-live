@@ -17,13 +17,13 @@ const hash = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h 
 const EMPTY: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
 
 /** Buses de la pantalla como puntos para el mapa, recalculados con el motor de movimiento a la cadencia de `cadenceMs`. Solo los que se ven. */
-export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; /** Solo los buses de estas rutas (las de un viaje, por ejemplo). */ routeIds?: readonly string[] | null; enabled?: boolean; everyMs?: number } = {}): FeatureCollection<Point> {
+export function useBusFeatures(view: Viewport | null, opts: { system?: SystemType | null; routeId?: string | null; /** Solo los buses de estas rutas (las de un viaje, por ejemplo). */ routeIds?: readonly string[] | null; enabled?: boolean; everyMs?: number; /** Buses que nunca se dejan fuera de la muestra (el resaltado, el bus en el que vas). */ keepIds?: readonly string[] } = {}): FeatureCollection<Point> {
   const [data, setData] = useState<FeatureCollection<Point>>(EMPTY);
   const { system = null, routeId = null, routeIds = null, enabled = true, everyMs = 0 } = opts;
-  const only = routeIds?.join(",") ?? "";
+  const only = routeIds?.join(",") ?? "", keep = opts.keepIds?.join(",") ?? "";
   useEffect(() => {
     if (!enabled || !view) { setData(EMPTY); return; }
-    const onlySet = only ? new Set(only.split(",")) : null;
+    const onlySet = only ? new Set(only.split(",")) : null, keepSet = new Set(keep ? keep.split(",") : []);
     const build = () => {
       const family = routeId ? new Set(transit.routeFamily(routeId)) : null;
       const t = nowSec();
@@ -45,7 +45,7 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       //    conserva TODOS los troncales y duales: antes se cortaba por orden de llegada y la mayoría de los buses no salía,
       //    troncales incluidos (el dueño iba en un B11 que no aparecía en el mapa)
       const limit = Math.round(cap * 1.4);
-      if (inView.length > limit) inView = inView.map((v) => ({ v, k: PRIORITY[v.system] * 1e10 + (hash(v.id) % 1e9) })).sort((a, b) => a.k - b.k).slice(0, limit).map((x) => x.v);
+      if (inView.length > limit) inView = inView.map((v) => ({ v, k: keepSet.has(v.id) ? -1 : PRIORITY[v.system] * 1e10 + (hash(v.id) % 1e9) })).sort((a, b) => a.k - b.k).slice(0, limit).map((x) => x.v);
       for (const v of inView) {
         const g = toGeo(motion.step(v, t));
         if (g.lon < view.west - padX || g.lon > view.east + padX || g.lat < view.south - padY || g.lat > view.north + padY) continue;
@@ -65,6 +65,6 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
     };
     loop();
     return () => { stopped = true; clearTimeout(timer); };
-  }, [view, system, routeId, only, enabled, everyMs]);
+  }, [view, system, routeId, only, keep, enabled, everyMs]);
   return data;
 }

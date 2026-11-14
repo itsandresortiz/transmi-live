@@ -268,7 +268,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
  *  Los estilos de las capas se crean una sola vez: en cada tanda lo único que cambia son los datos. */
 const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null, active, calm, highlightIds, dark, onBus }: { view: Viewport | null; system: SystemType | null; routeId: string | null; routeIds?: readonly string[] | null; active: boolean; calm: boolean; highlightIds: string[]; dark: boolean; onBus?: (id: string) => void }) {
   const { reduceMotion } = useAccessibility();
-  const buses = useBusFeatures(view, { system, routeId, routeIds, enabled: active, everyMs: calm ? 2000 : reduceMotion ? 250 : 0 });
+  const buses = useBusFeatures(view, { system, routeId, routeIds, enabled: active, everyMs: calm ? 2000 : reduceMotion ? 250 : 0, keepIds: highlightIds });
   const json = useMemo(() => JSON.stringify(buses), [buses]);
   const ringKey = highlightIds.join(",");
   const st = useMemo(() => ({

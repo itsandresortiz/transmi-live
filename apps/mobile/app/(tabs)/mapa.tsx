@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Location from "expo-location";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
@@ -75,6 +75,8 @@ export default function Mapa() {
   // si además marcaste «Voy en este bus», la tarjeta lo dice y recuerda dónde te bajas
   const rideBus = useRide((s) => s.busId), rideStop = useRide((s) => s.alightId);
   const riding = !!focus.followBusId && rideBus === focus.followBusId;
+  // el bus en el que vas queda siempre resaltado en el mapa (aunque hayas salido de su pantalla o estés mirando otra cosa)
+  const rideHighlight = useMemo(() => (rideBus && rideStop && !focus.busIds.includes(rideBus) ? [...focus.busIds, rideBus] : focus.busIds), [rideBus, rideStop, focus.busIds]);
   const alight = riding && rideStop ? transit.stopById(rideStop) : undefined;
   const stopFollowing = () => { if (riding) useRide.getState().clear(); focus.clear(); };
   useEffect(() => {
@@ -115,8 +117,9 @@ export default function Mapa() {
       {focused ? <StatusBar style="dark" /> : null}
       {/* el mapa no se lee con VoiceOver: las pestañas Rutas y Cómo llegar dicen lo mismo con texto */}
       <View style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <TransitMap ref={map} system={system} active={focused} calm={calm} showSignals={layers.signals} showStations={layers.stations} showTraffic={layers.traffic} onView={onView} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={focus.busIds}
-        onBus={(id) => { void Haptics.selectionAsync(); router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
+      <TransitMap ref={map} system={system} active={focused} calm={calm} showSignals={layers.signals} showStations={layers.stations} showTraffic={layers.traffic} onView={onView} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={rideHighlight}
+        // el bus en el que vas abre tu viaje, no la ficha con «Voy en este bus»
+        onBus={(id) => { void Haptics.selectionAsync(); if (id === useRide.getState().busId && useRide.getState().alightId) router.navigate({ pathname: "/ride/[id]", params: { id } }); else router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
         onStop={(id) => router.navigate({ pathname: "/stop/[id]", params: { id } })} />
       </View>
       {/* velo bajo la hora y la batería: el mapa es claro y el texto del sistema no siempre contrasta */}
