@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { downText } from "@/lastService";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Keyboard, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -59,9 +59,14 @@ export default function Viaje() {
       p.setDest(place);
       if (saveAs) { saved.setPlace(saveAs, place); usePlanner.getState().setSaveAs(null); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }
     }
-    setEditing(null); setText("");
+    setEditing(null); setText(""); Keyboard.dismiss();
   };
-  const useMe = () => { p.setOrigin(null); setEditing(null); setText(""); };
+  const useMe = () => { p.setOrigin(null); setEditing(null); setText(""); Keyboard.dismiss(); };
+  // Al elegir un lugar el campo puede seguir con el cursor puesto: si la persona vuelve a escribir o borra ahí mismo,
+  // no llega un «foco» nuevo, así que la búsqueda se reabre también con el primer cambio de texto.
+  // Si la persona toca un campo y cierra el teclado sin escribir nada, vuelven las opciones del viaje (antes quedaba la pantalla vacía).
+  const leave = (f: Field) => () => { if (!text.trim() && !saveAs) setEditing((e) => (e === f ? null : e)); };
+  const typeIn = (f: Field) => (t: string) => { if (editing !== f) setEditing(f); setText(t); };
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
@@ -80,9 +85,9 @@ export default function Viaje() {
 
         <View style={styles.pad}>
           <Card style={styles.fields}>
-            <FieldRow dot="#3b82f6" label="Desde" value={p.origin?.name ?? "Mi ubicación"} active={editing === "origin"} text={text} onFocus={() => { setEditing("origin"); setText(""); }} onChange={setText} />
+            <FieldRow dot="#3b82f6" label="Desde" value={p.origin?.name ?? "Mi ubicación"} active={editing === "origin"} text={text} onFocus={() => { setEditing("origin"); setText(""); }} onChange={typeIn("origin")} onBlur={leave("origin")} />
             <View style={[styles.sep, { backgroundColor: c.line }]} />
-            <FieldRow dot={c.accent} label="Hasta" value={p.dest?.name ?? ""} placeholder="¿A dónde vas?" active={editing === "dest"} text={text} onFocus={() => { setEditing("dest"); setText(""); }} onChange={setText} />
+            <FieldRow dot={c.accent} label="Hasta" value={p.dest?.name ?? ""} placeholder="¿A dónde vas?" active={editing === "dest"} text={text} onFocus={() => { setEditing("dest"); setText(""); }} onChange={typeIn("dest")} onBlur={leave("dest")} />
             <Tap onPress={() => void p.swap()} accessibilityRole="button" accessibilityLabel="Intercambiar origen y destino" style={[styles.swap, { backgroundColor: c.ink }]}>
               <SymbolView name="arrow.up.arrow.down" tintColor={c.onInk} size={16} />
             </Tap>
@@ -120,14 +125,14 @@ export default function Viaje() {
   );
 }
 
-function FieldRow({ dot, label, value, placeholder, active, text, onFocus, onChange }: { dot: string; label: string; value: string; placeholder?: string; active: boolean; text: string; onFocus(): void; onChange(t: string): void }) {
+function FieldRow({ dot, label, value, placeholder, active, text, onFocus, onChange, onBlur }: { dot: string; label: string; value: string; placeholder?: string; active: boolean; text: string; onFocus(): void; onChange(t: string): void; onBlur(): void }) {
   const c = useColors();
   return (
     <View style={styles.field}>
       <View style={[styles.fdot, { backgroundColor: dot }]} />
       <View style={{ flex: 1 }}>
         <Text style={[type.caption, { color: c.muted }]}>{label}</Text>
-        <TextInput selectionColor={c.accent} cursorColor={c.accent} underlineColorAndroid="transparent" accessibilityLabel={label} value={active ? text : value} placeholder={placeholder} placeholderTextColor={c.muted} onFocus={onFocus} onChangeText={onChange}
+        <TextInput selectionColor={c.accent} cursorColor={c.accent} underlineColorAndroid="transparent" accessibilityLabel={label} value={active ? text : value} placeholder={placeholder} placeholderTextColor={c.muted} onFocus={onFocus} onBlur={onBlur} onChangeText={onChange}
           autoCorrect={false} returnKeyType="search" clearButtonMode="while-editing" style={[type.headline, { color: c.text, paddingVertical: 2, marginRight: 44 }]} />
       </View>
     </View>

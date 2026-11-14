@@ -77,7 +77,8 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     get().plan();
   },
   setEditing: (editing) => set({ editing }),
-  setText: (f, t) => set((s) => ({ text: { ...s.text, [f]: t } })),
+  // también reabre la búsqueda: tras elegir un lugar el campo puede seguir con el cursor y no llega un «foco» nuevo
+  setText: (f, t) => set((s) => ({ editing: f, text: { ...s.text, [f]: t } })),
   setPicking: (picking) => set({ picking, editing: null }),
   swap: () => {
     const s = get(), me = useLocation.getState().me;
