@@ -23,6 +23,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - **Rodillo de los segundos** (2026-11-14): ver en Inicio, favoritos, cerca y la ficha de parada que solo rueden las cifras que cambian, sin cortes arriba/abajo (letra grande del «Próximo bus») y sin calentar el teléfono.
 - **Bus en el que vas, resaltado en el mapa** (2026-11-14): con «Voy en este bus» y parada de bajada marcada, salir al mapa y ver el anillo en tu bus; tocarlo debe abrir tu viaje.
 - **«Voy en este bus» con GPS** (2026-11-14): en un viaje real, con la parada de bajada marcada: ¿el bus va contigo en el mapa (sin saltos), cuadran «próxima parada» y los tiempos, suena «Bájate aquí» a tiempo? Probar también marcar un bus que no es (otro de la misma ruta) y bajarse antes: debe preguntar a los ~30 s. Ajustar umbrales (150 m, 3 m/s, 30 s) si pregunta de más o de menos.
+- **«Cómo llegar» y avisos** (2026-11-14): Portal Suba → Calle 85 debe mostrar «7 + B11» (sin caminar) y no «a pie 2,7 km» de primera; «Bájate aquí» debe sonar una sola vez. **Comparar con la app oficial de TransMilenio**: Claude no tiene acceso a ella ni a su sitio desde el contenedor; el dueño puede mandar capturas de 10–20 viajes para contrastar.
 - **«Seguir este viaje»** (nuevo): probar un viaje real con trasbordo; ¿los avisos llegan a tiempo?, ¿avanza de paso al llegar a la parada / subir / bajar?, ¿el aviso abre el viaje?
 - Interruptores centrados (`Toggle`), tarjeta «Vas en este bus» en el mapa, aviso del viaje que abre el viaje: sin ver en teléfono.
 

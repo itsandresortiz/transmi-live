@@ -61,10 +61,20 @@ describe("planificador de viajes", () => {
 });
 
 describe("orden de las opciones", () => {
-  const mk = (arriveAt: number, transfers: number, walkMeters: number): Itinerary => ({ legs: [], departAt: 0, arriveAt, seconds: arriveAt, walkMeters, walkSeconds: 0, waitSeconds: 0, transfers, live: false, tags: [] });
-  const a = mk(1000, 1, 300), b = mk(1500, 0, 900), c = mk(1200, 0, 400), d = mk(1100, 2, 100);
+  const ride = { kind: "ride" } as unknown as Itinerary["legs"][number];
+  const mk = (arriveAt: number, transfers: number, walkMeters: number): Itinerary => ({ legs: [ride], departAt: 0, arriveAt, seconds: arriveAt, walkMeters, walkSeconds: 0, waitSeconds: 0, transfers, live: false, tags: [] });
+  const a = mk(1000, 1, 300), b = mk(1500, 0, 650), c = mk(1200, 0, 400), d = mk(1100, 2, 100);
   it("«mejor» pone primero las que no tienen trasbordos, aunque lleguen después", () => {
     expect(sortItineraries([a, b, c, d], "mejor")).toEqual([c, b, a, d]);
+  });
+  it("«mejor»: una caminata final larga pesa como un trasbordo, y caminar todo el trayecto solo va primero si es corto", () => {
+    const walk = (m: number) => ({ kind: "walk", meters: m } as unknown as Itinerary["legs"][number]);
+    const direct = { ...mk(1000, 0, 575), legs: [ride, walk(575)] };          // «7 y caminar 580 m»
+    const hop = { ...mk(1100, 1, 100), legs: [ride, ride, walk(100)] };        // «7 y un bus corto hasta la estación»
+    const plain = { ...mk(1300, 0, 50), legs: [ride, walk(50)] };              // un bus directo hasta la puerta
+    const longWalk = { ...mk(900, 0, 2700), legs: [walk(2700)] }, shortWalk = { ...mk(950, 0, 600), legs: [walk(600)] };
+    expect(sortItineraries([direct, hop, plain, longWalk], "mejor")).toEqual([plain, hop, direct, longWalk]);
+    expect(sortItineraries([direct, shortWalk], "mejor")[0]).toBe(shortWalk);
   });
   it("«más rápida» ordena por llegada y «menos caminata» por metros", () => {
     expect(sortItineraries([a, b, c, d], "rapida")).toEqual([a, d, c, b]);

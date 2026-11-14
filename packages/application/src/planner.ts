@@ -22,6 +22,9 @@ export interface PlanPlace {
   kind?: "Estación" | "Portal" | "Paradero";
   /** Una línea que lo describe («Estación de TransMilenio · 3 vagones», «Paradero del SITP · pasan 12, 291, T25»). */
   detail?: string;
+  /** Si es una estación o un portal: sus vagones y plataformas. Subir o bajar en cualquiera de ellos ya es estar ahí (sin caminar hasta
+   *  el punto central de la estación, que en una estación larga puede quedar a 250 m o más de un vagón). */
+  stopIds?: readonly string[];
 }
 export interface StopRef { id: string; name: string; position: GeoPoint }
 
@@ -76,6 +79,14 @@ const WALK_MPS = 1.25, WALK_DETOUR = 1.25, TRANSFER_WALK_M = 260, MAX_ACCESS_M =
 const DETOUR = 1.15;
 /** Hasta qué distancia una parada cuenta como «en el destino» (para proponer llegar hasta ella sin caminata final). */
 const DOOR_M = 250;
+/** Para rematar con un bus corto: paradas a esta distancia en línea recta del destino cuentan como «en la puerta». Es la caminata final
+ *  máxima («larga» desde 400 m a pie) pasada a línea recta: si fuera mayor, un bus que deja a 430 m le ganaba al que deja en la estación
+ *  y luego se descartaba por caminar mucho, y el bueno nunca salía. Los vagones de una estación elegida como destino cuentan siempre. */
+const DOOR_FINISH_M = 320;
+/** Una caminata final más larga que esto se siente como un trasbordo más (cruzar avenidas, puentes): en «Mejor» pesa como tal. */
+export const LONG_FINAL_WALK_M = 400;
+/** A pie solo se propone si es de verdad corto: más que esto ya es una caminata larga en Bogotá y la gente busca un bus. */
+const WALK_ONLY_MAX_M = 1500;
 /** Un tramo de una sola parada más corto que esto no justifica cambiar de bus (se camina). */
 const SHORT_HOP_M = 450;
 /** Tiempo en bus entre paradas = parada (frenar, subir y bajar) + distancia / velocidad de crucero. Con tramos largos (rutas exprés) la distancia pesa;
@@ -206,20 +217,31 @@ type Parent =
 
 /** Un bus real que se acerca a una parada: cuándo llega y cuál es. */
 interface LiveBus { eta: number; id: string; label?: string }
+/** Paradas que ya son el origen o el destino (los vagones de la estación elegida), con caminata cero. */
+interface Ends { /** parada → metros a pie desde el origen */ from: ReadonlyMap<number, number>; to: ReadonlySet<number> }
+const NO_ENDS: Ends = { from: new Map(), to: new Set() };
+function endsOf(ix: Index, origin: PlanPlace, dest: PlanPlace): Ends {
+  const idx = (ids?: readonly string[]) => (ids ?? []).map((id) => ix.stopIdx.get(id)).filter((i): i is number => i != null);
+  return { from: new Map(idx(origin.stopIds).map((i) => [i, 0] as [number, number])), to: new Set(idx(dest.stopIds)) };
+}
+
 interface RunResult { best: { k: number; arrive: number; stop: number }[]; parents: (Parent | undefined)[][]; tau: Float64Array[] }
 
 function raptor(ix: Index, live: Live, origin: GeoPoint, dest: GeoPoint, nowSec: number, banned: ReadonlySet<string>,
-  liveEtas: Map<number, Map<number, LiveBus[]>>, maxRounds: number, maxAccess: number, maxEgress = maxAccess): RunResult {
+  liveEtas: Map<number, Map<number, LiveBus[]>>, maxRounds: number, maxAccess: number, maxEgress = maxAccess, ends: Ends = NO_ENDS): RunResult {
   const nS = ix.stopIds.length, INF = Infinity;
   const tau = Array.from({ length: maxRounds + 1 }, () => new Float64Array(nS).fill(INF));
   const parents: (Parent | undefined)[][] = Array.from({ length: maxRounds + 1 }, () => new Array<Parent | undefined>(nS));
   const bestAll = new Float64Array(nS).fill(INF);
-  const egress = stopsNear(ix, dest, maxEgress).map((x) => ({ s: x.s, sec: walkSeconds(x.m) }));
-  const egressSec = new Map(egress.map((e) => [e.s, e.sec]));
+  const egressSec = new Map(stopsNear(ix, dest, maxEgress).map((x) => [x.s, walkSeconds(x.m)] as [number, number]));
+  for (const s of ends.to) egressSec.set(s, 0);                         // los vagones de la estación de destino: ya llegaste
+  const egress = [...egressSec].map(([s, sec]) => ({ s, sec }));
   let bound = INF;                                                    // mejor llegada al destino hasta ahora
   let marked = new Set<number>();
 
-  for (const a of stopsNear(ix, origin, maxAccess)) {
+  const access = stopsNear(ix, origin, maxAccess);
+  for (const [s, m] of ends.from) access.push({ s, m });                // los vagones de la estación de origen (ya estás ahí) o una parada fija
+  for (const a of access) {
     const t = nowSec + walkSeconds(a.m);
     if (t < tau[0]![a.s]!) { tau[0]![a.s] = t; parents[0]![a.s] = { t: "access", sec: walkSeconds(a.m) }; bestAll[a.s] = t; marked.add(a.s); }
   }
@@ -324,7 +346,7 @@ function build(state: TransitState, ix: Index, live: Live, run: RunResult, k: nu
   // egreso
   const lastStop = stopRef(state, ix, stop);
   const egress = walkLeg(lastStop.position, dest.position, lastStop.name, dest.name);
-  if (egress.meters > 20) legs.push(egress);
+  if (egress.meters > 20 && !dest.stopIds?.includes(lastStop.id)) legs.push(egress);
   let round = k, s = stop;
   const rev: Leg[] = [];
   let firstRide: { pat: Pattern; bi: number; ai: number; dep: number; live: boolean } | null = null;
@@ -334,7 +356,7 @@ function build(state: TransitState, ix: Index, live: Live, run: RunResult, k: nu
     if (par.t === "access") {
       const first = stopRef(state, ix, s);
       const w = walkLeg(origin.position, first.position, origin.name, first.name);
-      if (w.meters > 20) rev.push(w);
+      if (w.meters > 20 && !origin.stopIds?.includes(first.id)) rev.push(w);
       break;
     }
     if (par.t === "walk") {
@@ -460,10 +482,11 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
     liveEtas.set(a.s, per);
   }
 
+  const ends = endsOf(ix, origin, dest);
   const candidates = new Map<string, Itinerary>();
   const banned = new Set<string>();
   for (let pass = 0; pass < 6; pass++) {
-    const run = raptor(ix, live, origin.position, dest.position, nowSec, banned, liveEtas, maxRounds, maxAccess);
+    const run = raptor(ix, live, origin.position, dest.position, nowSec, banned, liveEtas, maxRounds, maxAccess, maxAccess, ends);
     if (!run.best.length) break;
     let fastest: Itinerary | null = null;
     for (const b of run.best) {
@@ -481,10 +504,10 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   // Llegar hasta la puerta: la búsqueda de arriba solo mira la hora de llegada, así que si bajarse antes y caminar 600 m tarda lo mismo
   // que hacer un trasbordo corto, nunca proponía el trasbordo. Cuando el destino tiene una parada o estación al lado (≤250 m) se busca
   // además cómo llegar justo ahí, sin esa caminata final: p. ej. «7 hasta Polo y B11 hasta Calle 85» en vez de solo «7 y caminar».
-  if (stopsNear(ix, dest.position, DOOR_M).length) {
+  if (stopsNear(ix, dest.position, DOOR_M).length || ends.to.size) {
     const doorBanned = new Set<string>();
     for (let pass = 0; pass < 3; pass++) {      // hasta tres alternativas distintas (la segunda y la tercera, sin la ruta principal de la anterior)
-      const run = raptor(ix, live, origin.position, dest.position, nowSec, doorBanned, liveEtas, maxRounds, maxAccess, DOOR_M);
+      const run = raptor(ix, live, origin.position, dest.position, nowSec, doorBanned, liveEtas, maxRounds, maxAccess, DOOR_M, ends);
       let fastest: Itinerary | null = null;
       for (const b of run.best) {
         const it = build(state, ix, live, run, b.k, b.stop, origin, dest, nowSec);
@@ -498,9 +521,46 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
     }
   }
 
+  // Seguir en el mismo bus y rematar con un bus corto hasta la puerta. Si la opción directa termina con una caminata larga
+  // (p. ej. «7 hasta Polo y caminar 580 m»), lo natural es seguir en ese bus y cambiar a uno que llegue a la estación del destino
+  // («7 hasta Escuela Militar y B11 hasta Calle 85», como lo propone TransMilenio). La búsqueda «hasta la puerta» de arriba no lo encuentra
+  // porque solo se queda con las combinaciones más rápidas; aquí se buscan solo con las rutas de ese viaje y las que llegan al destino.
+  const protect = new Set<string>();
+  const doorStops = [...stopsNear(ix, dest.position, DOOR_FINISH_M), ...[...ends.to].map((s) => ({ s, m: 0 }))];
+  if (doorStops.length) {
+    const doorRoutes = new Set<string>();
+    for (const d of doorStops) for (const a of ix.atStop[d.s] ?? []) doorRoutes.add(ix.patterns[a.p]!.route.shortName);
+    const allNames = new Set(ix.patterns.map((pt) => pt.route.shortName));
+    // hasta tres opciones con caminata final larga, una por cada primer bus distinto (las de menos trasbordos y que llegan antes)
+    const seenFirst = new Set<string>();
+    const longWalk = [...candidates.values()].filter((it) => it.transfers >= 0 && it.transfers <= 1 && finalWalk(it) > LONG_FINAL_WALK_M)
+      .sort((a, b) => a.transfers - b.transfers || a.arriveAt - b.arriveAt)
+      .filter((it) => { const f = it.legs.find((l): l is RideLeg => l.kind === "ride")?.shortName ?? ""; if (seenFirst.has(f)) return false; seenFirst.add(f); return true; })
+      .slice(0, 3);
+    for (const base of longWalk) {
+      const keep = new Set([...base.legs.filter((l): l is RideLeg => l.kind === "ride").map((l) => l.shortName), ...doorRoutes]);
+      const onlyThese = new Set([...allNames].filter((n) => !keep.has(n)));
+      // se sale solo de la parada donde se toma ese primer bus: si no, la búsqueda prefiere otras combinaciones y nunca prueba «seguir en el mismo»
+      const baseFirst = base.legs.find((l): l is RideLeg => l.kind === "ride"), boardIx = baseFirst ? ix.stopIdx.get(baseFirst.board.id) : undefined;
+      if (boardIx == null) continue;
+      const from = new Map([[boardIx, ends.from.has(boardIx) ? 0 : walkMetersOf(origin.position, baseFirst!.board.position)]]);
+      const run = raptor(ix, live, origin.position, dest.position, nowSec, onlyThese, liveEtas, maxRounds, 0, DOOR_FINISH_M, { from, to: ends.to });
+      for (const b of run.best) {
+        const it = build(state, ix, live, run, b.k, b.stop, origin, dest, nowSec);
+        if (!it || finalWalk(it) > LONG_FINAL_WALK_M) continue;
+        // solo si de verdad sigue en el mismo primer bus del viaje directo (si no, ya lo cubren las búsquedas de arriba)
+        const first = it.legs.find((l): l is RideLeg => l.kind === "ride"), baseFirst = base.legs.find((l): l is RideLeg => l.kind === "ride");
+        if (!first || !baseFirst || first.shortName !== baseFirst.shortName) continue;
+        const k = sig(it);
+        if (!candidates.has(k)) candidates.set(k, it);
+        protect.add(k);
+      }
+    }
+  }
+
   // a pie, si es corto
   const direct = hav(origin.position, dest.position);
-  if (direct <= 2600) {
+  if (direct * WALK_DETOUR <= WALK_ONLY_MAX_M) {
     const w = walkLeg(origin.position, dest.position, origin.name, dest.name);
     candidates.set("walk", { legs: [w], departAt: nowSec, arriveAt: nowSec + w.seconds, seconds: w.seconds, walkMeters: w.meters, walkSeconds: w.seconds, waitSeconds: 0, transfers: -1, live: false, tags: [] });
   }
@@ -509,13 +569,13 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   let list = [...candidates.values()].sort((a, b) => score(a) - score(b));
   if (!list.length) return [];
   // quita lo que otra opción supera en todo: llega antes o igual (±1 min), con menos o igual trasbordos y caminata
-  list = list.filter((a, i) => !list.some((b, j) => j !== i && b.arriveAt <= a.arriveAt + 60 && b.transfers <= a.transfers && b.walkMeters <= a.walkMeters + 50
+  list = list.filter((a, i) => protect.has(sig(a)) || !list.some((b, j) => j !== i && b.arriveAt <= a.arriveAt + 60 && b.transfers <= a.transfers && b.walkMeters <= a.walkMeters + 50
     && (b.arriveAt < a.arriveAt - 60 || b.transfers < a.transfers || b.walkMeters < a.walkMeters - 50 || (j < i && b.arriveAt <= a.arriveAt))));
   // y las que llegan mucho después de la mejor (más de 35 min o el doble del tiempo)
   const best = [...list].sort((a, b) => a.arriveAt - b.arriveAt)[0]!;
   // (una opción sin trasbordos se conserva aunque sea bastante más lenta: mucha gente prefiere no cambiar de bus)
-  list = list.filter((a) => (a.transfers <= 0 ? a.seconds <= Math.max(best.seconds * 2.2, best.seconds + 1800) : a.seconds <= Math.max(best.seconds * 1.8, best.seconds + 900) && a.seconds <= best.seconds + 2400));
-  list = list.slice(0, limit);
+  list = list.filter((a) => (protect.has(sig(a)) && a.seconds <= Math.max(best.seconds * 1.8, best.seconds + 1200)) || (a.transfers <= 0 ? a.seconds <= Math.max(best.seconds * 2.2, best.seconds + 1800) : a.seconds <= Math.max(best.seconds * 1.8, best.seconds + 900) && a.seconds <= best.seconds + 2400));
+  list = [...list.slice(0, limit), ...list.slice(limit).filter((a) => protect.has(sig(a)))];      // el «mismo bus + uno corto» no se pierde por el tope
 
   const rideOnes = list.filter((x) => x.transfers >= 0);
   const mark = (it: Itinerary | undefined, tag: string) => { if (it && !it.tags.includes(tag)) it.tags.push(tag); };
@@ -529,13 +589,27 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   return list.map((it) => ({ ...it, transfers: Math.max(0, it.transfers) }));
 }
 
+/** Metros que se caminan al final (desde que se baja del último bus hasta el destino). */
+export function finalWalk(it: Itinerary): number {
+  const last = it.legs[it.legs.length - 1];
+  return last && last.kind === "walk" && it.legs.some((l) => l.kind === "ride") ? last.meters : 0;
+}
+
 export type PlanSort = "mejor" | "rapida" | "trasbordos" | "caminata";
 /** Ordena las opciones. «Mejor» pone primero las que no tienen trasbordos (aunque lleguen un poco después) y, dentro de cada grupo, la que llega antes. */
 export function sortItineraries(list: readonly Itinerary[], by: PlanSort): Itinerary[] {
   const r = list.slice();
   if (by === "rapida") r.sort((a, b) => a.arriveAt - b.arriveAt);
   else if (by === "caminata") r.sort((a, b) => a.walkMeters - b.walkMeters || a.arriveAt - b.arriveAt);
-  else r.sort((a, b) => a.transfers - b.transfers || a.arriveAt - b.arriveAt);          // «mejor» y «trasbordos»
+  else if (by === "trasbordos") r.sort((a, b) => a.transfers - b.transfers || a.arriveAt - b.arriveAt);
+  else {
+    // «Mejor»: pocos cambios de bus y poca caminata. Una caminata final larga (cruzar avenidas desde otra estación) pesa como un trasbordo;
+    // caminar todo el trayecto solo va primero si es corto. Dentro de cada grupo, la que llega antes.
+    const walkOnly = (x: Itinerary) => !x.legs.some((l) => l.kind === "ride");
+    // la caminata final larga pesa algo más que un trasbordo: «7 y B11 hasta la estación» va antes que «7 y caminar 580 m desde Polo»
+    const weight = (x: Itinerary) => (walkOnly(x) ? (x.walkMeters <= 800 ? 0 : 2) : x.transfers + (finalWalk(x) > LONG_FINAL_WALK_M ? 1.5 : 0) + (x.walkMeters > 700 ? 1 : 0));
+    r.sort((a, b) => weight(a) - weight(b) || a.arriveAt - b.arriveAt);
+  }
   return r;
 }
 
@@ -563,10 +637,11 @@ function tidyName(name: string): string {
 export function describeStopGroup(state: TransitState, g: StopGroup): PlanPlace & { kind: "Estación" | "Portal" | "Paradero"; detail: string } {
     const portal = g.stops.some((s) => state.labelOf(s).platform), station = !portal && g.stops.some((s) => state.labelOf(s).wagon);
     const title = tidyName(g.title);
-    if (portal) return { name: /^(portal|terminal)\b/i.test(title) ? title : `Portal ${title}`, position: g.position, kind: "Portal" as const, detail: "Portal de TransMilenio" };
+    const stopIds = g.stops.map((s) => s.id);
+    if (portal) return { name: /^(portal|terminal)\b/i.test(title) ? title : `Portal ${title}`, position: g.position, kind: "Portal" as const, detail: "Portal de TransMilenio", stopIds };
     if (station) {
       const wagons = new Set(g.stops.map((s) => state.labelOf(s).wagon).filter(Boolean)).size;
-      return { name: /^estaci[oó]n\b/i.test(title) ? title : `Estación ${title}`, position: g.position, kind: "Estación" as const, detail: `Estación de TransMilenio${wagons > 1 ? ` · ${wagons} vagones` : ""}` };
+      return { name: /^estaci[oó]n\b/i.test(title) ? title : `Estación ${title}`, position: g.position, kind: "Estación" as const, detail: `Estación de TransMilenio${wagons > 1 ? ` · ${wagons} vagones` : ""}`, stopIds };
     }
     // paradero de la calle: las rutas que pasan ayudan a reconocerlo
     const names = [...new Set(g.stops.flatMap((s) => routesAtStop(state, s.id).map((r) => r.shortName)))];
