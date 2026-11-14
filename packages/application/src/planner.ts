@@ -85,6 +85,9 @@ const DOOR_M = 250;
 const DOOR_FINISH_M = 320;
 /** Una caminata final más larga que esto se siente como un trasbordo más (cruzar avenidas, puentes): en «Mejor» pesa como tal. */
 export const LONG_FINAL_WALK_M = 400;
+/** Si sales de una estación (o vas a una), no se te manda caminar a otra estación lejana: a pie solo hasta esta distancia de la elegida.
+ *  Medido en 120 viajes entre estaciones: en 53 la app proponía caminar 300–900 m hasta otra estación (de Castellana a pie hasta Polo). */
+const STATION_EDGE_M = 300;
 /** A pie solo se propone si es de verdad corto: más que esto ya es una caminata larga en Bogotá y la gente busca un bus. */
 const WALK_ONLY_MAX_M = 1500;
 /** Un tramo de una sola parada más corto que esto no justifica cambiar de bus (se camina). */
@@ -194,12 +197,18 @@ function liveInfo(state: TransitState, ix: Index, nowMs: number, scheduled = fal
   const hasLive = !scheduled && state.fleet.size >= 50;
   const headway = new Map<string, number>(), running = new Set<string>();
   for (const [routeId, list] of ix.byRoute) {
-    const pat = ix.patterns[list[0]!]!, n = scheduled ? 0 : counts.get(routeId) ?? 0;
+    const pat = ix.patterns[list[0]!]!;
+    // TransMilenio publica cada sentido de una ruta con un código distinto, pero los buses son los mismos (van y vuelven): se cuentan los
+    // de los dos sentidos y el recorrido completo de ida y vuelta. Si no, un sentido sin buses en ese instante parecía «no operando» (Islandia
+    // → Prado sin resultado) y la frecuencia salía de los buses de un solo sentido («el 7 pasa cada ~30 min»).
+    const family = state.routeFamily(routeId).filter((id) => ix.byRoute.has(id));
+    const n = scheduled ? 0 : family.reduce((a, id) => a + (counts.get(id) ?? 0), 0);
     const status = (hasLive ? state.routeStatus(routeId, nowMs) : state.serviceEnds.routeStatus(routeId, nowMs, 0))?.state;
     if (status === "ended" || status === "before") continue;                   // fuera de su horario de hoy
     if (scheduled && status === undefined) continue;                           // a otra hora, sin horario conocido no se puede asegurar que funcione
     if (hasLive && n === 0 && status !== "running") continue;                  // con datos en vivo y sin buses ni horario que la respalde
-    const cycle = list.reduce((a, p) => a + ix.patterns[p]!.runSeconds, 0) + (list.length > 1 ? 2 : 1) * LAYOVER_S;
+    const famPatterns = family.length > 1 ? family.flatMap((id) => ix.byRoute.get(id) ?? []) : list;
+    const cycle = famPatterns.reduce((a, p) => a + ix.patterns[p]!.runSeconds, 0) + (famPatterns.length > 1 ? 2 : 1) * LAYOVER_S;
     const sched = scheduled ? state.departures.headwayAt(routeId, state.serviceEnds.dayAt(nowMs).type, state.serviceEnds.dayAt(nowMs).secs) : undefined;
     const h = sched ?? (n > 0 ? cycle / n : DEFAULT_HEADWAY[pat.route.system]);
     headway.set(routeId, Math.min(1800, Math.max(75, h)));
@@ -483,10 +492,12 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   }
 
   const ends = endsOf(ix, origin, dest);
+  // con una estación como origen o destino, poco a pie fuera de ella (lo normal es subir y bajar ahí mismo)
+  const accessM = ends.from.size ? Math.min(maxAccess, STATION_EDGE_M) : maxAccess, egressM = ends.to.size ? Math.min(maxAccess, STATION_EDGE_M) : maxAccess;
   const candidates = new Map<string, Itinerary>();
   const banned = new Set<string>();
   for (let pass = 0; pass < 6; pass++) {
-    const run = raptor(ix, live, origin.position, dest.position, nowSec, banned, liveEtas, maxRounds, maxAccess, maxAccess, ends);
+    const run = raptor(ix, live, origin.position, dest.position, nowSec, banned, liveEtas, maxRounds, accessM, egressM, ends);
     if (!run.best.length) break;
     let fastest: Itinerary | null = null;
     for (const b of run.best) {
@@ -507,7 +518,7 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   if (stopsNear(ix, dest.position, DOOR_M).length || ends.to.size) {
     const doorBanned = new Set<string>();
     for (let pass = 0; pass < 3; pass++) {      // hasta tres alternativas distintas (la segunda y la tercera, sin la ruta principal de la anterior)
-      const run = raptor(ix, live, origin.position, dest.position, nowSec, doorBanned, liveEtas, maxRounds, maxAccess, DOOR_M, ends);
+      const run = raptor(ix, live, origin.position, dest.position, nowSec, doorBanned, liveEtas, maxRounds, accessM, DOOR_M, ends);
       let fastest: Itinerary | null = null;
       for (const b of run.best) {
         const it = build(state, ix, live, run, b.k, b.stop, origin, dest, nowSec);

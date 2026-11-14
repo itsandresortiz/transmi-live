@@ -69,3 +69,5 @@ Datos reales para validar: `git fetch origin +live-data:refs/remotes/origin/live
 - `positions.pb` (nov. 2026): `stop_id` y `current_stop_sequence` son fijos por viaje (no indican por dónde va el bus). Lo único fiable es posición, hora del GPS, ruta, viaje y placa. Todo lo que dependa de «última parada» debe salir de la posición.
 
 - (2026-11-14) iPhone: el número de compilación lo pone `testflight-local.sh` en `TM_BUILD_NUMBER` (fecha y hora) antes de `expo prebuild`; `app.config.js` lo pasa a `ios.buildNumber`. Android: `TM_VERSION_CODE` (igual idea).
+
+- (2026-11-14) Entorno de nube personal «TransMi LIVE» (para este repo): red limitada + `www.transmilenio.gov.co`, `transmilenio.gov.co`, `gtfs.transmilenio.gov.co`. El entorno «Default» no permite esos dominios.
