@@ -16,7 +16,7 @@ const secs = (ms: number) => `${Math.round(ms / 1000)} s`;
 /** Lo que se puede decir con las marcas: duración del ciclo y de cada color, y si se repite igual (tiempo fijo) o cambia.
  *  En Colombia el amarillo sale dos veces por vuelta (antes del rojo y, junto al rojo, antes del verde): el ciclo se mide entre dos
  *  verdes o entre dos rojos, nunca entre amarillos, y cada amarillo se cuenta según lo que viene después. */
-export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Record<Color, number[]>; preGreen: number[]; text: string } {
+export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Record<Color, number[]>; preGreen: number[]; text: string; cycle?: number } {
   const dur: Record<Color, number[]> = { g: [], y: [], r: [] }, preGreen: number[] = [], cycles: number[] = [];
   // la primera marca de una medición puede no ser un cambio (se empieza a mirar con la luz ya encendida): no se cuenta como inicio
   for (let i = 2; i < marks.length; i++) {
@@ -65,7 +65,7 @@ export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Reco
     : fit === total ? " Se repite igual: parece de tiempo fijo."
     : fit / total >= 0.7 ? ` ${fit} de ${total} cambios caen justo en un ciclo fijo; ${total - fit} se corrieron hasta ${secs(worst)} (puede ser el toque o que se adapte al tráfico).`
     : ` Solo ${fit} de ${total} cambios caen en un ciclo fijo: parece adaptarse al tráfico.`;
-  return { cycles, dur, preGreen, text: `Ciclo de ${secs(cyc)} (${rounds} ${rounds === 1 ? "vuelta" : "vueltas"})${parts.length ? `: ${parts.join(", ")}` : ""}.${steady}` };
+  return { cycles, dur, preGreen, cycle: cyc, text: `Ciclo de ${secs(cyc)} (${rounds} ${rounds === 1 ? "vuelta" : "vueltas"})${parts.length ? `: ${parts.join(", ")}` : ""}.${steady}` };
 }
 
 /** Modelo de un semáforo de tiempo fijo a partir de las marcas: el orden de colores desde que se pone rojo, cuánto dura cada uno y
@@ -88,9 +88,16 @@ function clean(marks: readonly Mark[]): Mark[] {
 
 export function signalModel(all: readonly Mark[]): SignalModel | null {
   const marks = lastSession(all), s = summarize(marks);
-  const anchor = [...marks].reverse().find((m) => m.c === "r")?.t;
-  if (!s.cycles.length || anchor == null || !s.dur.r.length || !s.dur.g.length) return null;
-  const cycle = refineCycle(clean(all), med(s.cycles));
+  const last = [...marks].reverse().find((m) => m.c === "r")?.t;
+  if (!s.cycles.length || last == null || !s.dur.r.length || !s.dur.g.length) return null;
+  // los semáforos cuentan en segundos enteros: si el ciclo medido queda a menos de medio segundo de uno (119,84 → 120), se usa ese,
+  // para que el error no se acumule con las horas (0,16 s por vuelta son ~5 s en una hora)
+  const measured = s.cycle ?? refineCycle(clean(all), med(s.cycles)), whole = Math.round(measured / 1000) * 1000;
+  const cycle = Math.abs(measured - whole) < 500 ? whole : measured;
+  // la referencia: el promedio de todos los inicios de rojo bien marcados (no un solo toque, que puede venir tarde o temprano)
+  const reds = marks.filter((m, i) => m.c === "r" && i > 0 && m.t - marks[i - 1]!.t <= 100_000).map((m) => m.t);
+  const res = reds.map((t) => { const d = t - last; return d - Math.round(d / cycle) * cycle; }).filter((r) => Math.abs(r) <= 3000);
+  const anchor = last + (res.length ? res.reduce((a, b) => a + b, 0) / res.length : 0);
   const raw = [{ c: "r" as Color, d: med(s.dur.r) }, { c: "y" as Color, d: s.preGreen.length ? med(s.preGreen) : 0 }, { c: "g" as Color, d: med(s.dur.g) }, { c: "y" as Color, d: s.dur.y.length ? med(s.dur.y) : 0 }].filter((x) => x.d > 0);
   const k = cycle / raw.reduce((a, x) => a + x.d, 0);       // se ajusta para que sume exactamente el ciclo medido
   return { cycle, anchor, segs: raw.map((x) => ({ c: x.c, d: x.d * k })) };
