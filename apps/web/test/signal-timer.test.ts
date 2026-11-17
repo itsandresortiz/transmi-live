@@ -8,6 +8,11 @@ describe("cronómetro de semáforos", () => {
     for (let k = 0; k < 4; k++) { const b = t0 + k * 90_000; marks.push({ t: b, c: "g" }, { t: b + 45_000, c: "y" }, { t: b + 48_000, c: "r" }); }
     const s = summarize(marks);
     expect(s.text).toBe("Ciclo de 90 s (3 vueltas): verde 45 s, amarillo 3 s, rojo 42 s. Se repite igual: parece de tiempo fijo.");
-    expect(summarize(marks.slice(0, 3)).text).toMatch(/^Marca al menos 3 cambios/);
+    expect(summarize(marks.slice(0, 3)).text).toMatch(/^Marca al menos dos veces/);
+  });
+  it("con el amarillo antes del verde (como en Colombia): medidas reales del dueño, Cra. 102B Bis × Calle 145", () => {
+    const raw: [string, "g" | "y" | "r"][] = [["2026-11-17T07:34:38.884Z", "y"], ["2026-11-17T07:34:41.243Z", "r"], ["2026-11-17T07:35:14.586Z", "y"], ["2026-11-17T07:35:16.403Z", "g"], ["2026-11-17T07:36:09.333Z", "y"], ["2026-11-17T07:36:11.166Z", "r"], ["2026-11-17T07:36:44.420Z", "y"], ["2026-11-17T07:36:46.344Z", "g"], ["2026-11-17T07:37:38.652Z", "y"], ["2026-11-17T07:37:41.472Z", "r"]];
+    const s = summarize(raw.map(([t, c]) => ({ t: Date.parse(t), c })));
+    expect(s.text).toBe("Ciclo de 90 s (2 vueltas): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. Se repite igual: parece de tiempo fijo.");
   });
 });

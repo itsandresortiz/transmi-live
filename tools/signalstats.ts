@@ -32,7 +32,10 @@ const BUCKETS = ["0-6", "6-10", "10-16", "16-20", "20-24"];
 const bucketOf = (h: number) => (h < 6 ? 0 : h < 10 ? 1 : h < 16 ? 2 : h < 20 ? 3 : 4);
 const dayType = (d: Date) => { const w = d.getUTCDay(); return w === 0 ? "su" : w === 6 ? "sa" : "wk"; };
 
-interface Acc { n: number; still: number; slow: number; sumV: number; phase: number[] }   // phase: 12 casillas de 5 s dentro del minuto (solo detenciones)
+/** phase: 12 casillas de 5 s dentro del minuto (solo detenciones). p90 / p120: lo mismo dentro de vueltas de 90 y 120 s contadas desde
+ *  la medianoche (desde el 2026-11-17): un ciclo de 90 s medido en la calle (Cra. 102B Bis × Calle 145) no deja huella en el minuto,
+ *  porque cada vuelta cae corrida 30 s. */
+interface Acc { n: number; still: number; slow: number; sumV: number; phase: number[]; p90?: number[]; p120?: number[] }
 type Stats = Record<string, Acc>;                      // "lon,lat|tipoDía|franja|dirección" (antes de v2, sin dirección)
 
 function clone(branch: string): string | null {
@@ -103,10 +106,14 @@ async function main() {
           if (best < 0 || nearStop(r.position.lon, r.position.lat)) continue;
           const d = new Date((r.reportedAt - 5 * 3600) * 1000);
           const k = `${sig[best]![0]},${sig[best]![1]}|${dayType(d)}|${bucketOf(d.getUTCHours())}|${dir}`;
-          const a = (run[k] ??= { n: 0, still: 0, slow: 0, sumV: 0, phase: new Array(12).fill(0) });
+          const a = (run[k] ??= { n: 0, still: 0, slow: 0, sumV: 0, phase: new Array(12).fill(0), p90: new Array(18).fill(0), p120: new Array(24).fill(0) });
           a.n++; a.sumV += speed; obs++;
           if (speed < 4) a.slow++;
-          if (speed < STILL_MPS) { a.still++; a.phase[Math.floor(((r.reportedAt % 60) + 60) % 60 / 5)]!++; }
+          if (speed < STILL_MPS) {
+            a.still++; a.phase[Math.floor(((r.reportedAt % 60) + 60) % 60 / 5)]!++;
+            const sec = ((r.reportedAt - 5 * 3600) % 86_400 + 86_400) % 86_400;      // segundo del día en Bogotá
+            a.p90![Math.floor((sec % 90) / 5)]!++; a.p120![Math.floor((sec % 120) / 5)]!++;
+          }
         }
       }
     } catch (e) { console.log("consulta fallida:", (e as Error).message); }
@@ -122,6 +129,8 @@ async function main() {
   for (const [k, a] of Object.entries(run)) {
     const t = (total[k] ??= { n: 0, still: 0, slow: 0, sumV: 0, phase: new Array(12).fill(0) });
     t.n += a.n; t.still += a.still; t.slow += a.slow; t.sumV += a.sumV; a.phase.forEach((v, i) => { t.phase[i] = (t.phase[i] ?? 0) + v; });
+    if (a.p90) { t.p90 ??= new Array(18).fill(0); a.p90.forEach((v, i) => { t.p90![i] = (t.p90![i] ?? 0) + v; }); }
+    if (a.p120) { t.p120 ??= new Array(24).fill(0); a.p120.forEach((v, i) => { t.p120![i] = (t.p120![i] ?? 0) + v; }); }
   }
   const out = mkdtempSync(join(tmpdir(), "ss-out-"));
   mkdirSync(out, { recursive: true });

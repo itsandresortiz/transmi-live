@@ -26,17 +26,30 @@ const med = (a: number[]) => { const s = [...a].sort((x, y) => x - y); return s.
 const secs = (ms: number) => `${Math.round(ms / 1000)} s`;
 const clock = (t: number) => new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true, timeZone: "America/Bogota" }).format(new Date(t));
 
-/** Lo que se puede decir con las marcas: duración del ciclo y de cada color, y si se repite igual (tiempo fijo) o cambia. */
-export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Record<Color, number[]>; text: string } {
-  const dur: Record<Color, number[]> = { g: [], y: [], r: [] }, cycles: number[] = [];
-  for (let i = 1; i < marks.length; i++) { const a = marks[i - 1]!, b = marks[i]!; if (a.c !== b.c && b.t - a.t < 600_000) dur[a.c].push(b.t - a.t); }
-  const lastOf: Partial<Record<Color, number>> = {}, per: Record<Color, number> = { g: 0, y: 0, r: 0 };
-  for (const m of marks) { const p = lastOf[m.c]; if (p != null && m.t - p < 900_000 && m.t - p > 10_000) { cycles.push(m.t - p); per[m.c]++; } lastOf[m.c] = m.t; }
-  const rounds = Math.max(per.g, per.y, per.r);      // vueltas completas medidas (cada color da su propia medida del ciclo)
-  if (cycles.length < 2) return { cycles, dur, text: "Marca al menos 3 cambios del mismo color (unas 3 vueltas) para calcular el ciclo." };
+/** Lo que se puede decir con las marcas: duración del ciclo y de cada color, y si se repite igual (tiempo fijo) o cambia.
+ *  En Colombia el amarillo sale dos veces por vuelta (antes del rojo y, junto al rojo, antes del verde): el ciclo se mide entre dos
+ *  verdes o entre dos rojos, nunca entre amarillos, y cada amarillo se cuenta según lo que viene después. */
+export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Record<Color, number[]>; preGreen: number[]; text: string } {
+  const dur: Record<Color, number[]> = { g: [], y: [], r: [] }, preGreen: number[] = [], cycles: number[] = [];
+  for (let i = 1; i < marks.length; i++) {
+    const a = marks[i - 1]!, b = marks[i]!;
+    if (a.c === b.c || b.t - a.t >= 600_000) continue;
+    if (a.c === "y" && b.c === "g") preGreen.push(b.t - a.t);      // amarillo antes del verde
+    else dur[a.c].push(b.t - a.t);
+  }
+  const lastOf: Partial<Record<"g" | "r", number>> = {}, per = { g: 0, r: 0 };
+  for (const m of marks) {
+    if (m.c === "y") continue;
+    const p = lastOf[m.c];
+    if (p != null && m.t - p < 900_000 && m.t - p > 10_000) { cycles.push(m.t - p); per[m.c]++; }
+    lastOf[m.c] = m.t;
+  }
+  const rounds = Math.max(per.g, per.r);
+  if (!cycles.length) return { cycles, dur, preGreen, text: "Marca al menos dos veces el mismo color (verde o rojo) para calcular el ciclo: unas 2–3 vueltas." };
   const spread = Math.max(...cycles) - Math.min(...cycles);
-  const parts = (["g", "y", "r"] as Color[]).filter((c) => dur[c].length).map((c) => `${NAMES[c]} ${secs(med(dur[c]))}`);
-  return { cycles, dur, text: `Ciclo de ${secs(med(cycles))} (${rounds} ${rounds === 1 ? "vuelta" : "vueltas"})${parts.length ? `: ${parts.join(", ")}` : ""}. ${spread <= 4000 ? "Se repite igual: parece de tiempo fijo." : `Varía ${secs(spread)} entre vueltas: puede adaptarse al tráfico.`}` };
+  const parts = [dur.g.length ? `verde ${secs(med(dur.g))}` : "", dur.y.length ? `amarillo ${secs(med(dur.y))}` : "", dur.r.length ? `rojo ${secs(med(dur.r))}` : "", preGreen.length ? `amarillo antes del verde ${secs(med(preGreen))}` : ""].filter(Boolean);
+  const steady = cycles.length < 2 ? "" : spread <= 4000 ? " Se repite igual: parece de tiempo fijo." : ` Varía ${secs(spread)} entre vueltas: puede adaptarse al tráfico.`;
+  return { cycles, dur, preGreen, text: `Ciclo de ${secs(med(cycles))} (${rounds} ${rounds === 1 ? "vuelta" : "vueltas"})${parts.length ? `: ${parts.join(", ")}` : ""}.${steady}` };
 }
 
 export function SignalTimer() {
