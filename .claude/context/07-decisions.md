@@ -93,3 +93,8 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Descartado**: la notificación diaria (el dueño: «decirle todos los días se vuelve cansón»).
 - **Por qué**: la tarjeta de la parada en Inicio dice «Último … a las …» solo en la última hora; quien lo necesita lo ve sin que le llegue nada.
 
+## 2026-11-17 · El color «en vivo» de un semáforo no se muestra a los usuarios
+- **Contexto**: con el ciclo medido a mano se puede predecir el color de un semáforo de tiempo fijo (la prueba del dueño coincidió con la calle).
+- **Descartado**: mostrarlo a todos en el mapa. Alguien podría cruzar o arrancar guiándose por la app; el plan cambia según la hora y Movilidad puede ajustarlo sin aviso.
+- **Por qué**: queda como herramienta del dueño (modo de pruebas) para validar, y lo medido se usa por dentro (p. ej. tiempo de espera del bus en ese rojo para las llegadas).
+

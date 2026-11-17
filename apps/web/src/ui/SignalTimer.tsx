@@ -55,8 +55,16 @@ export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Reco
 /** Modelo de un semáforo de tiempo fijo a partir de las marcas: el orden de colores desde que se pone rojo, cuánto dura cada uno y
  *  la hora de un inicio de rojo medido. `null` si aún no hay con qué (falta medir al menos una vuelta completa). */
 export interface SignalModel { cycle: number; anchor: number; segs: { c: Color; d: number }[] }
-export function signalModel(marks: readonly Mark[]): SignalModel | null {
-  const s = summarize(marks);
+/** Las marcas de la última sesión de medición: si pasaron más de 15 min entre dos marcas, es otra medición (puede ser otro plan del
+ *  semáforo: de noche, en hora pico…), y mezclarlas daría un ciclo que no existe. */
+export function lastSession(marks: readonly Mark[]): Mark[] {
+  let i = marks.length - 1;
+  while (i > 0 && marks[i]!.t - marks[i - 1]!.t <= 15 * 60_000) i--;
+  return marks.slice(Math.max(0, i));
+}
+
+export function signalModel(all: readonly Mark[]): SignalModel | null {
+  const marks = lastSession(all), s = summarize(marks);
   const anchor = [...marks].reverse().find((m) => m.c === "r")?.t;
   if (!s.cycles.length || anchor == null || !s.dur.r.length || !s.dur.g.length) return null;
   const cycle = med(s.cycles);
@@ -95,11 +103,18 @@ export function SignalTimer() {
   const add = (c: Color) => { const next = { ...all, [id]: [...marks, { t: nowMs(), c }] }; setAll(next); saveAll(next); if (navigator.vibrate) navigator.vibrate(30); };
   const undo = () => { const next = { ...all, [id]: marks.slice(0, -1) }; setAll(next); saveAll(next); };
   const clear = () => { if (!confirm("¿Borrar las marcas de este semáforo?")) return; const next = { ...all }; delete next[id]; setAll(next); saveAll(next); };
-  const sum = summarize(marks), last = marks[marks.length - 1], model = signalModel(marks), live = model ? signalNow(model, nowMs()) : null;
+  const session = lastSession(marks), sum = summarize(session), last = marks[marks.length - 1], model = signalModel(marks), live = model ? signalNow(model, nowMs()) : null;
+  const sessions = marks.length ? marks.reduce((n, m, i) => n + (i > 0 && m.t - marks[i - 1]!.t > 15 * 60_000 ? 1 : 0), 1) : 0;
   const copy = async () => {
     const data = { semaforo: { titulo: s.title, lat: s.lat, lon: s.lon, transmilenio: s.tm }, resumen: sum.text, marcas: marks.map((m) => [new Date(m.t).toISOString(), NAMES[m.c]]) };
     const txt = `Medidas del semáforo ${s.title}${s.tm ? " (TM)" : ""}\n${sum.text}\n${JSON.stringify(data)}`;
     try { await navigator.clipboard.writeText(txt); setMsg("Copiado: pégalo en el chat."); }
+    catch { try { await navigator.share?.({ text: txt }); } catch { setMsg("No se pudo copiar."); } }
+  };
+  const copyAll = async () => {
+    const data = Object.entries(loadAll()).filter(([, m]) => m.length).map(([key, m]) => ({ semaforo: key, resumen: summarize(lastSession(m)).text, marcas: m.map((x) => [new Date(x.t).toISOString(), NAMES[x.c]]) }));
+    const txt = `Medidas de ${data.length} semáforo${data.length === 1 ? "" : "s"} (TransMi LIVE)\n${JSON.stringify(data)}`;
+    try { await navigator.clipboard.writeText(txt); setMsg(`Copiadas las medidas de ${data.length} semáforo${data.length === 1 ? "" : "s"}: pégalas en el chat.`); }
     catch { try { await navigator.share?.({ text: txt }); } catch { setMsg("No se pudo copiar."); } }
   };
   const btn = (c: Color, label: string, bg: string) => <button className="btn" style={{ flex: 1, minHeight: 64, fontSize: 17, background: bg, color: c === "y" ? "#111" : "#fff" }} onClick={() => add(c)}>{label}</button>;
@@ -115,7 +130,7 @@ export function SignalTimer() {
       <p className="cs" style={{ fontSize: 12.5, margin: "6px 0 10px", opacity: 0.8 }}>{s.text}</p>
       <div style={{ display: "flex", gap: 8 }}>{btn("g", "Verde", "#16a34a")}{btn("y", "Amarillo", "#f5b301")}{btn("r", "Rojo", "#dc2626")}</div>
       <p style={{ fontSize: 14, margin: "10px 0 4px" }}>{last ? `Último: ${NAMES[last.c]} a las ${clock(last.t)} · hace ${secs(nowMs() - last.t)}` : "Toca el color en el momento en que cambia la luz."}</p>
-      <p className="cs" style={{ fontSize: 13.5, margin: "0 0 8px" }}>{marks.length} marcas · {sum.text}</p>
+      <p className="cs" style={{ fontSize: 13.5, margin: "0 0 8px" }}>{sessions > 1 ? `Medición más reciente (${session.length} marcas; ${sessions} mediciones guardadas)` : `${marks.length} marcas`} · {sum.text}</p>
       {live ? (
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 10px", padding: "8px 10px", borderRadius: 12, background: "var(--hover)" }}>
           <span aria-hidden style={{ width: 22, height: 22, borderRadius: 11, background: COLORS[live.c], boxShadow: `0 0 12px ${COLORS[live.c]}` }} />
@@ -125,6 +140,7 @@ export function SignalTimer() {
       {live ? <p className="cs" style={{ fontSize: 12, margin: "-4px 0 8px", opacity: 0.75 }}>Es una predicción con tus medidas (tiempo fijo). Si no coincide con la calle, cambió de plan: vuelve a medir.</p> : null}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="btn primary" onClick={() => void copy()} disabled={!marks.length}>Copiar medidas</button>
+        <button className="btn" onClick={() => void copyAll()}>Copiar todos</button>
         <button className="btn" onClick={undo} disabled={!marks.length}>Deshacer</button>
         <button className="btn" onClick={clear} disabled={!marks.length}>Borrar</button>
       </div>

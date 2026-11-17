@@ -31,3 +31,13 @@ describe("semáforo en vivo (predicción)", () => {
     expect(at("2026-11-17T07:52:45Z")).toBe("r");
   });
 });
+
+import { lastSession } from "../src/ui/SignalTimer";
+describe("varias mediciones del mismo semáforo", () => {
+  it("usa la última (pueden ser planes distintos)", () => {
+    const t = 1_800_000_000_000;
+    const marks = [{ t, c: "r" as const }, { t: t + 30_000, c: "g" as const }, { t: t + 3_600_000, c: "r" as const }, { t: t + 3_640_000, c: "g" as const }];
+    expect(lastSession(marks)).toHaveLength(2);
+    expect(lastSession(marks.slice(0, 2))).toHaveLength(2);
+  });
+});
