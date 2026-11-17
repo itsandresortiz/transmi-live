@@ -118,9 +118,10 @@ export default function Viaje() {
             <WhenRow when={p.when} onChange={p.setWhen} />
             <View style={[styles.pad, { marginBottom: space[4] }]}>
               <Text style={[type.caption, { color: c.muted, marginBottom: space[2] }]}>Viajar en</Text>
-              <View style={styles.chips}>
+              {/* se desliza de lado (no caben las cuatro): llega a los bordes de la pantalla para que las fichas no se corten en el margen */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[5] }} contentContainerStyle={[styles.chips, { paddingHorizontal: space[5] }]}>
                 {TRAVEL_MODES.map((m) => <Chip key={m.key} label={m.label} selected={p.modes[m.key]} dot={SYSTEM_COLOR[m.systems[0]!]} onPress={() => p.toggleMode(m.key)} />)}
-              </View>
+              </ScrollView>
             </View>
             <Results />
           </>
@@ -180,11 +181,11 @@ function WhenRow({ when, onChange }: { when: When; onChange(w: When): void }) {
   const apply = (mode: "depart" | "arrive", t: Date) => { const at = t.getTime() < Date.now() - 60_000 ? t.getTime() + 86_400_000 : t.getTime(); onChange({ mode, at }); };
   return (
     <View style={styles.pad}>
-      <View style={styles.chips}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[5] }} contentContainerStyle={[styles.chips, { paddingHorizontal: space[5] }]}>
         <Chip label="Salir ahora" selected={when.mode === "now"} onPress={() => onChange({ mode: "now" })} />
         <Chip label="Salir a las…" selected={when.mode === "depart"} onPress={() => apply("depart", time)} />
         <Chip label="Llegar a las…" selected={when.mode === "arrive"} onPress={() => apply("arrive", time)} />
-      </View>
+      </ScrollView>
       {when.mode !== "now" ? (
         <View style={styles.pickerRow}>
           <Text style={[type.body, { color: c.muted }]}>{when.mode === "depart" ? "Hora de salida" : "Hora de llegada"}</Text>
@@ -209,6 +210,8 @@ function Results() {
   const now = useNow() / 1000;
   const list = sorted(p.results, p.sortBy);
   const noService = p.when.mode === "now" && nowMode() === "none";
+  // si apagaste medios de transporte («Viajar en»), sin resultados se dice cuáles: suele ser la razón
+  const on = TRAVEL_MODES.filter((m) => p.modes[m.key]).map((m) => m.label), off = TRAVEL_MODES.filter((m) => !p.modes[m.key]).map((m) => m.label);
   // «Salir ahora» con resultados de hace rato: los tiempos y los buses en vivo ya no valen. Se recalcula al volver a la pestaña y cada minuto.
   const focused = useIsFocused();
   useEffect(() => {
@@ -227,6 +230,7 @@ function Results() {
         <Text style={[type.headline, { color: c.text }]}>{noService ? "Ahora no hay buses en servicio" : "No encontramos una forma de llegar"}</Text>
         <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{noService
           ? "TransMilenio no está reportando buses en este momento. Elige «Salir a las…» o «Llegar a las…» y una hora (por ejemplo, mañana 5:00 a. m.) para ver las rutas que funcionan a esa hora."
+          : off.length ? `Solo estás buscando en ${on.join(" y ")}. Toca ${off.join(", ")} arriba para incluirlos y ver más opciones.`
           : "Prueba moviendo el origen o el destino unos metros, o cambiando la hora."}</Text>
       </Card>
     </View>
