@@ -72,7 +72,7 @@ async function main() {
       if (!lastPt || v.reportedAt > lastPt.t) tr.pts.push({ t: v.reportedAt, s: hit.s });
       for (let j = seq.index + 1; j <= Math.min(seq.index + 6, info.s.length - 1); j++) {
         const alt = VARIANTS.map((_, k) => { useVariant(k); return rawArrival(state, v, seq.shape, seq.index, j, b.at * 1000).eta; });
-        useVariant(0);
+        useVariant(2);      // las correcciones (× tramo, + segundos) se prueban sobre lo que usa la app (aprendido, sin mezcla)
         const rw = rawArrival(state, v, seq.shape, seq.index, j, b.at * 1000);
         useVariant(1);
         tr.preds.push({ stopS: info.s[j]!, away: j - seq.index, madeAt: b.at, shown: arrivalAtIndex(state, v, seq.shape, seq.index, j, b.at * 1000), raw: rw.eta, remaining: rw.remaining, alt });
@@ -85,9 +85,9 @@ async function main() {
     return null;
   };
   const endAt = batches[batches.length - 1]!.at;
-  const FACTORS = [1, 1.2, 1.4, 1.6, 1.8], BUCKETS = ["no vencida", "vencida 0–30 s", "30–60 s", "60–120 s", "más de 120 s"];
+  const FACTORS = [1, 1.1, 1.2, 1.3, 1.4], OFFSETS = [15, 30, 45], BUCKETS = ["no vencida", "vencida 0–30 s", "30–60 s", "60–120 s", "más de 120 s"];
   const bucket = (d: number) => (d < 0 ? 0 : d < 30 ? 1 : d < 60 ? 2 : d < 120 ? 3 : 4);
-  interface G { n: number; gone: number; lleg: number; llegGone: number; exp: { n: number; gone: number }[]; err: number[][]; shown: number[]; alt: number[][] }
+  interface G { n: number; gone: number; lleg: number; llegGone: number; exp: { n: number; gone: number }[]; err: number[][]; off: number[][]; shown: number[]; alt: number[][] }
   const by = new Map<number, G>();
   for (const tr of tracks.values()) {
     const lastPt = tr.pts[tr.pts.length - 1]!;
@@ -101,7 +101,7 @@ async function main() {
       const late = truth == null && lastPt.s < p.stopS && endAt - lastPt.t < 150 && lastPt.t > p.madeAt;
       if (truth == null && !late) continue;
       if (late) truth = Infinity;
-      const g2 = by.get(p.away) ?? by.set(p.away, { n: 0, gone: 0, lleg: 0, llegGone: 0, exp: BUCKETS.map(() => ({ n: 0, gone: 0 })), err: FACTORS.map(() => []), shown: [], alt: VARIANTS.map(() => []) }).get(p.away)!;
+      const g2 = by.get(p.away) ?? by.set(p.away, { n: 0, gone: 0, lleg: 0, llegGone: 0, exp: BUCKETS.map(() => ({ n: 0, gone: 0 })), err: FACTORS.map(() => []), off: OFFSETS.map(() => []), shown: [], alt: VARIANTS.map(() => []) }).get(p.away)!;
       g2.n++;
       const says = p.shown - p.madeAt <= 15, passed = truth! < p.madeAt;
       const e = g2.exp[bucket(p.madeAt - p.raw)]!; e.n++; if (passed) e.gone++;
@@ -110,6 +110,7 @@ async function main() {
       g2.shown.push(p.shown - truth!);
       p.alt.forEach((eta, k) => g2.alt[k]!.push(eta - truth!));
       FACTORS.forEach((f, k) => g2.err[k]!.push(p.raw + p.remaining * (f - 1) - truth!));
+      OFFSETS.forEach((o, k) => g2.off[k]!.push(p.raw + o - truth!));
     }
   }
   const med = (a: number[]) => pct(a, 0.5), fin = (x: number) => (Number.isFinite(x) ? x.toFixed(0) : "más de lo medible");
@@ -120,7 +121,8 @@ async function main() {
     console.log("   según cuánto hace que venció la cuenta → ya había pasado: " + g2.exp.map((e, k) => `${BUCKETS[k]}: ${e.n ? (100 * e.gone / e.n).toFixed(0) : "-"} % (n=${e.n})`).join(" · "));
     console.log(`   lo mostrado: sesgo ${fin(med(g2.shown))} s, error mediano ${fin(med(g2.shown.map(Math.abs)))} s`);
     VARIANTS.forEach((x, k) => console.log(`   ${x.name}: sesgo ${fin(med(g2.alt[k]!))} s, error mediano ${fin(med(g2.alt[k]!.map(Math.abs)))} s, p75 ${fin(pct(g2.alt[k]!.map(Math.abs), 0.75))} s (n=${g2.alt[k]!.length})`));
-    FACTORS.forEach((f, k) => console.log(`   tiempo por tramo × ${f}: sesgo ${fin(med(g2.err[k]!))} s, error mediano ${fin(med(g2.err[k]!.map(Math.abs)))} s, p75 ${fin(pct(g2.err[k]!.map(Math.abs), 0.75))} s (n=${g2.err[k]!.length})`));
+    OFFSETS.forEach((o, k) => console.log(`   aprendido + ${o} s: sesgo ${fin(med(g2.off[k]!))} s, error mediano ${fin(med(g2.off[k]!.map(Math.abs)))} s, p75 ${fin(pct(g2.off[k]!.map(Math.abs), 0.75))} s (n=${g2.off[k]!.length})`));
+    FACTORS.forEach((f, k) => console.log(`   aprendido, tramo × ${f}: sesgo ${fin(med(g2.err[k]!))} s, error mediano ${fin(med(g2.err[k]!.map(Math.abs)))} s, p75 ${fin(pct(g2.err[k]!.map(Math.abs), 0.75))} s (n=${g2.err[k]!.length})`));
   }
 }
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -1,6 +1,7 @@
 import { type GeoPoint, type Route, type RouteShape, RoadPath, type SystemType, toWorld } from "@transmi/domain";
 import { hav } from "./eta";
 import type { TransitState } from "./transit-state";
+import { hopTag } from "./hop-profile";
 import { type StopGroup, searchStopGroups, upcomingAtStop, routesAtStop } from "./queries";
 
 /* ====================================================================================================
@@ -112,10 +113,14 @@ const walkMetersOf = (a: GeoPoint, b: GeoPoint) => hav(a, b) * WALK_DETOUR;
 interface Pattern {
   routeId: string; route: Route; shape: RouteShape; shapeIndex: number;
   stops: Int32Array;          // índices de parada
-  cum: Float64Array;          // segundos acumulados en bus desde la primera parada
+  cum: Float64Array;          // segundos acumulados en bus desde la primera parada (según la hora: ver `timeIndex`)
   runSeconds: number;
+  /** Posición en el recorrido (`shape.stopIds`) de cada parada del patrón, y el tiempo de cada tramo según el modelo fijo. */
+  shapePos: Int32Array; base: Float64Array;
 }
 interface Index {
+  /** Para qué franja y perfil están calculados los `cum` de los patrones. */
+  timeKey: string;
   stopIds: string[]; stopIdx: Map<string, number>; lat: Float64Array; lon: Float64Array;
   patterns: Pattern[];
   /** parada → (patrón, posición) */
@@ -144,26 +149,46 @@ function buildIndex(state: TransitState): Index {
   for (const [routeId, shapes] of state.network.shapes) {
     const route = state.routeById(routeId); if (!route || route.provisional) continue;
     shapes.forEach((shape, shapeIndex) => {
-      const ids = shape.stopIds.map(idxOf).filter((i) => i >= 0);
+      const pos: number[] = [], ids: number[] = [];
+      shape.stopIds.forEach((id, q) => { const i = idxOf(id); if (i >= 0) { ids.push(i); pos.push(q); } });
       if (ids.length < 2) return;
-      const cum = new Float64Array(ids.length), model = RIDE_MODEL[route.system];
+      const cum = new Float64Array(ids.length), base = new Float64Array(ids.length), model = RIDE_MODEL[route.system];
       for (let k = 1; k < ids.length; k++) {
         const a = ids[k - 1]!, b = ids[k]!;
         const m = hav({ lat: lat[a]!, lon: lon[a]! }, { lat: lat[b]!, lon: lon[b]! }) * DETOUR;
-        cum[k] = cum[k - 1]! + m / model.cruise + model.dwell;
+        base[k] = m / model.cruise + model.dwell;
+        cum[k] = cum[k - 1]! + base[k]!;
       }
       const list = byRoute.get(routeId) ?? byRoute.set(routeId, []).get(routeId)!;
       list.push(patterns.length);
-      patterns.push({ routeId, route, shape, shapeIndex, stops: Int32Array.from(ids), cum, runSeconds: cum[ids.length - 1]! });
+      patterns.push({ routeId, route, shape, shapeIndex, stops: Int32Array.from(ids), cum, runSeconds: cum[ids.length - 1]!, shapePos: Int32Array.from(pos), base });
     });
   }
   const atStop: { p: number; i: number }[][] = stopIds.map(() => []);
   patterns.forEach((pt, p) => pt.stops.forEach((s, i) => atStop[s]!.push({ p, i })));
   const grid = new Map<string, number[]>();
   stopIds.forEach((_, i) => { const k = cellKey(lat[i]!, lon[i]!); (grid.get(k) ?? grid.set(k, []).get(k)!).push(i); });
-  const out: Index = { stopIds, stopIdx, lat: Float64Array.from(lat), lon: Float64Array.from(lon), patterns, atStop, grid, neighbors: new Map(), byRoute };
+  const out: Index = { timeKey: "", stopIds, stopIdx, lat: Float64Array.from(lat), lon: Float64Array.from(lon), patterns, atStop, grid, neighbors: new Map(), byRoute };
   indexCache.set(state.network, out);
   return out;
+}
+
+/** Pone en cada patrón el tiempo en bus de esta hora: lo que tardan de verdad los buses en cada tramo (perfil `hop-stats`, por tipo de
+ *  día y franja) donde se sabe, y el modelo fijo donde no. Medido en hora pico, lo aprendido erró la mitad que el valor fijo en las
+ *  llegadas. Solo se recalcula al cambiar de franja o de perfil. */
+function timeIndex(state: TransitState, ix: Index, nowMs: number): void {
+  const prof = state.hopProfile, tag = hopTag(nowMs);
+  const key = prof.apply && prof.size ? `${prof.updated}|${tag.day}|${tag.bucket}|${prof.minN}|${prof.priorN}` : "fijo";
+  if (ix.timeKey === key) return;
+  ix.timeKey = key;
+  for (const pat of ix.patterns) {
+    for (let k = 1; k < pat.stops.length; k++) {
+      const q = pat.shapePos[k - 1]!, consecutive = pat.shapePos[k]! === q + 1;
+      const sec = key !== "fijo" && consecutive ? prof.seconds(pat.shape, q, nowMs, pat.base[k]!) : pat.base[k]!;
+      pat.cum[k] = pat.cum[k - 1]! + sec;
+    }
+    pat.runSeconds = pat.cum[pat.stops.length - 1]!;
+  }
 }
 
 function stopsNear(ix: Index, p: GeoPoint, meters: number): { s: number; m: number }[] {
@@ -484,6 +509,7 @@ function planTripCore(state: TransitState, origin: PlanPlace, dest: PlanPlace, o
   const limit = opts.limit ?? 7, maxRounds = (opts.maxTransfers ?? 3) + 1, maxAccess = opts.maxAccessMeters ?? MAX_ACCESS_M;
   const ix = buildIndex(state);
   if (!ix.patterns.length) return [];
+  timeIndex(state, ix, nowMs);
   let live = liveInfo(state, ix, nowMs, opts.scheduled);
   if (opts.systems) {
     // la persona eligió con qué viajar: las rutas de los demás sistemas se tratan como si no operaran
