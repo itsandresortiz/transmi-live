@@ -1,4 +1,4 @@
-import { applyStopPatches } from "./patches";
+import { applyStopPatches, applyTempStopChanges, tempNoticeAlerts } from "./patches";
 import JSZip from "jszip";
 import { type GeoPoint, TransitNetwork, classifyRoute } from "@transmi/domain";
 import { csvRows } from "./csv";
@@ -91,6 +91,7 @@ export async function parseGtfsLite(data: ArrayBuffer | Uint8Array): Promise<Net
 /** Convierte lo leído en la entidad de dominio. */
 export function buildNetwork(dto: NetworkDto): TransitNetwork {
   applyStopPatches(dto);
+  applyTempStopChanges(dto);
   const net = new TransitNetwork();
   for (const r of dto.routes) {
     net.routes.set(r.id, {
@@ -107,5 +108,6 @@ export function buildNetwork(dto: NetworkDto): TransitNetwork {
       routeId: sh.routeId, direction: sh.direction, headsign: sh.headsign, points, stopIds: sh.stopIds,
     });
   }
+  net.notices = tempNoticeAlerts(Date.now(), (sn) => [...net.routes.values()].filter((r) => r.shortName === sn).map((r) => r.id));
   return net;
 }

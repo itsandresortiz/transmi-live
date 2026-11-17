@@ -20,21 +20,27 @@ export interface ServiceAlert {
   readonly stopIds: readonly string[];
   readonly startsAt?: number;
   readonly endsAt?: number;
+  /** Solo en avisos escritos aquí (no vienen de TransMilenio), p. ej. cierres de vagones anunciados en sus redes: título y texto ya legibles. */
+  readonly title?: string;
+  readonly text?: string;
 }
 
 /** «Novedad en la operacion en linea HF615\416A11_Br. X\064A09_Br. Y» → «La ruta HF615 se desvía entre Br. X y Br. Y». */
 /** `routeName` traduce el número interno de la ruta (así la nombra TransMilenio desde nov. 2026: «10772») al nombre que conoce la gente («T21»). */
-export function describeAlert(a: ServiceAlert, routeName?: (id: string) => string | undefined): string {
+/** Si no se sabe qué ruta es y el código es un número interno (5 dígitos, que nadie reconoce), dice «Una ruta». */
+export function describeAlert(a: ServiceAlert, routeName?: (id: string, alert: ServiceAlert) => string | undefined): string {
+  if (a.text) return a.text;
   const d = a.description;
   if (!d) return a.headline;
   const parts = d.split("\\");
   if (parts.length < 2) return d.replace(/^Novedad en la operacion en linea\s*/i, "");
-  const code = parts[0]!.replace(/^.*\s/, ""), line = routeName?.(code) ?? code;
+  const code = parts[0]!.replace(/^.*\s/, ""), named = routeName?.(code, a);
+  const who = named ? `La ruta ${named}` : /^\d{5,}$/.test(code) ? "Una ruta" : `La ruta ${code}`;
   const places = parts.slice(1).map((x) => x.replace(/^\w+?_/, "").replace(/^TM_/, "").trim()).filter(Boolean);
   const verb = a.effect === "noService" ? "no presta servicio" : a.effect === "detour" ? "se desvía" : a.effect === "delays" ? "va con demoras" : a.effect === "reduced" ? "tiene servicio reducido" : a.effect === "additional" ? "tiene servicio adicional" : "tiene cambios";
-  if (places.length === 2) return `La ruta ${line} ${verb} entre ${places[0]} y ${places[1]}.`;
-  if (places.length === 1) return `La ruta ${line} ${verb} cerca de ${places[0]}.`;
-  return `La ruta ${line} ${verb}: pasa por ${places.join(" → ")}.`;
+  if (places.length === 2) return `${who} ${verb} entre ${places[0]} y ${places[1]}.`;
+  if (places.length === 1) return `${who} ${verb} cerca de ${places[0]}.`;
+  return `${who} ${verb}: pasa por ${places.join(" → ")}.`;
 }
 
 const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
@@ -51,12 +57,22 @@ const MOTIVOS: [RegExp, string][] = [
   [/^\W*EM[A-Z]/, "Emergencia en la vía"],
   [/^\W*TP[\s-]*\d/, "Plan de tránsito"],
   [/CABECERA|SALIDA|LLEGADA/, "Cambio en la cabecera de la ruta"],
+  [/RELEVO/, "Cambio de turno de los conductores"],
+  [/CICLOVIA/, "Ciclovía"],
+  [/RETORNO/, "Cambio en el retorno de la ruta"],
+  [/MANTENIMIENTO|REPARACION/, "Obras en la vía"],
+  [/EVENTO|CONCIERTO|PARTIDO|ESTADIO/, "Evento"],
 ];
 /** Título legible: los avisos llegan con códigos internos («EMCONTRAVIACR20ACONCL72A», «PMTCIERRE1MAYOCONCRA11»); se deduce el motivo. */
 export function alertTitle(a: ServiceAlert): string {
+  return a.title ?? alertMotive(a) ?? "Novedad en el recorrido";
+}
+/** El motivo que se puede leer en el código del aviso («Obras en la vía», «Ciclovía»…), o `null` si el código no dice nada entendible
+ *  («TM01», «tp73 por tm02»: claves internas de los operadores). */
+export function alertMotive(a: ServiceAlert): string | null {
   const h = strip(a.headline);
   for (const [re, label] of MOTIVOS) if (re.test(h)) return label;
-  return "Novedad en el recorrido";
+  return null;
 }
 /** El código original del aviso, por si alguien quiere consultarlo. */
 export function alertReference(a: ServiceAlert): string {

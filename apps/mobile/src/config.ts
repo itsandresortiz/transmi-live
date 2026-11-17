@@ -7,4 +7,6 @@ export const CONFIG = {
   /** Mensajes del dueño (accidentes, manifestaciones…): un archivo que se edita a mano en la raíz del repositorio. */
   messagesUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/main/mensajes.json",
   scheduleBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/schedule-data/",
+  /** Tiempos reales entre paradas por hora del día (los aprende el workflow «hop-stats»). */
+  hopBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/hop-stats/",
 } as const;

@@ -1,9 +1,10 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ALERT_EFFECT_LABEL, alertTitle, alertValidity, describeAlert, ownerMessageUntil } from "@transmi/domain";
+import { ownerMessageUntil } from "@transmi/domain";
 import { useActiveMessages } from "@/messages";
 import { nowMs } from "@/clock";
+import { alertView, searchAlerts } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { useTransitVersion } from "@/hooks";
 import { Card } from "@/ui/kit";
@@ -16,7 +17,7 @@ export default function Avisos() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   useTransitVersion();
-  const list = transit.alerts;
+  const list = searchAlerts(transit);      // sin repetidos, los más graves primero
   const own = useActiveMessages();
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -34,15 +35,15 @@ export default function Avisos() {
         );
       })}
       {!list.length && !own.length ? <Card><Text style={[type.headline, { color: c.text }]}>Sin avisos</Text><Text style={[type.body, { color: c.muted }]}>No hay novedades del servicio en este momento.</Text></Card> : null}
-      {list.map((a, i) => {
-        const tone = a.effect === "noService" ? "#dc2626" : a.effect === "additional" ? "#16a34a" : "#d97706";
+      {list.map(({ alert: a, index }) => {
+        const tone = a.effect === "noService" ? "#dc2626" : a.effect === "additional" ? "#16a34a" : a.title ? "#2563eb" : "#d97706", v = alertView(transit, a, nowMs() / 1000);
         return (
-          <Card key={i} style={{ gap: space[2] }}>
-            <View style={[styles.pill, { backgroundColor: tone + "22" }]}><Text style={[type.caption, { color: tone }]}>{ALERT_EFFECT_LABEL[a.effect]}</Text></View>
-            <Text style={[type.headline, { color: c.text }]}>{alertTitle(a)}</Text>
-            <Text style={[type.body, { color: c.muted }]}>{describeAlert(a, (id) => transit.routeById(id)?.shortName)}</Text>
-            {alertValidity(a) ? <Text style={[type.caption, { color: c.muted }]}>{alertValidity(a)}</Text> : null}
-            <View style={styles.routes}>{a.routeIds.slice(0, 10).map((id) => { const r = transit.routeById(id); return r ? <RouteBadge key={id} route={r} /> : null; })}</View>
+          <Card key={index} style={{ gap: space[2] }}>
+            <View style={[styles.pill, { backgroundColor: tone + "22" }]}><Text style={[type.caption, { color: tone }]}>{v.tag}</Text></View>
+            <Text style={[type.headline, { color: c.text }]}>{v.title}</Text>
+            <Text style={[type.body, { color: c.muted }]}>{v.body}</Text>
+            {v.reason || v.when ? <Text style={[type.caption, { color: c.muted }]}>{[v.reason, v.when].filter(Boolean).join(" · ")}</Text> : null}
+            {v.routes.length ? <View style={styles.routes}>{v.routes.slice(0, 10).map((r) => <RouteBadge key={r.id} route={r} />)}</View> : null}
           </Card>
         );
       })}

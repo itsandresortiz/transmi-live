@@ -4,6 +4,7 @@ import { type OwnerMessage, activeOwnerMessages, parseOwnerMessages } from "@tra
 import { CONFIG } from "../config";
 import { nowMs } from "../clock";
 import { useNow } from "./hooks";
+import { transit } from "../composition-root";
 
 /** Mensajes del dueño de la app (accidentes, manifestaciones, novedades propias). Se leen de `mensajes.json` del repositorio cada par de minutos. */
 export const useMessages = create<{ all: OwnerMessage[] }>(() => ({ all: [] }));
@@ -30,5 +31,7 @@ export function useMessagesPolling(): void {
 export function useActiveMessages(): OwnerMessage[] {
   const all = useMessages((s) => s.all);
   const tick = Math.floor(useNow(15_000) / 15_000);
-  return useMemo(() => activeOwnerMessages(all, nowMs() / 1000), [all, tick]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // un cierre anunciado puede estar también en mensajes.json (para las apps viejas, que no traen los anuncios en la red): aquí no se repite
+  const notices = transit.network.notices;
+  return useMemo(() => activeOwnerMessages(all, nowMs() / 1000).filter((m) => !notices.some((n) => n.text === m.text)), [all, tick, notices]);   // eslint-disable-line react-hooks/exhaustive-deps
 }

@@ -224,7 +224,7 @@ describe("avisos legibles y vigentes", () => {
   it("usa el nombre de la ruta y limpia los prefijos de las paradas", () => {
     const d = "Novedad en la operacion en linea 10772\\483A09_TM_Br. Jiménez de Quesada\\167A09_TM_Pq. Paso Ancho";
     expect(describe2({ ...base, description: d }, (id) => (id === "10772" ? "T21" : undefined))).toBe("La ruta T21 se desvía entre Br. Jiménez de Quesada y Pq. Paso Ancho.");
-    expect(describe2({ ...base, description: d })).toBe("La ruta 10772 se desvía entre Br. Jiménez de Quesada y Pq. Paso Ancho.");
+    expect(describe2({ ...base, description: d })).toBe("Una ruta se desvía entre Br. Jiménez de Quesada y Pq. Paso Ancho.");
   });
   it("solo muestra los vigentes", () => {
     const now = 1_800_000_000;

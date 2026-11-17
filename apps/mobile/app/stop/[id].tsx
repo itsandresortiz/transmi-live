@@ -3,8 +3,8 @@ import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SymbolView } from "@/ui/Symbol";
-import { alertsFor, frequencyText, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
-import { ALERT_EFFECT_LABEL, SYSTEM_LABEL, alertTitle, routeTitle, stopLabelText, type Route } from "@transmi/domain";
+import { alertView, alertsFor, frequencyText, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
+import { ALERT_EFFECT_LABEL, SYSTEM_LABEL,  routeTitle, stopLabelText, type Route } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs, nowSec } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
@@ -111,10 +111,11 @@ export default function StopSheet() {
         ) : null}
 
         {alerts.map(({ alert, index }) => (
-          <Tap key={index} onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel={`Aviso: ${alertTitle(alert)}`}>
+          <Tap key={index} onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel={`Aviso: ${alertView(transit, alert).title}`}>
             <Card style={{ gap: space[1] }}>
-              <Text style={[type.caption, { color: alert.effect === "noService" ? "#dc2626" : "#d97706" }]}>{ALERT_EFFECT_LABEL[alert.effect]}</Text>
-              <Text style={[type.headline, { color: c.text }]} numberOfLines={2}>{alertTitle(alert)}</Text>
+              <Text style={[type.caption, { color: alert.effect === "noService" ? "#dc2626" : "#d97706" }]}>{alertView(transit, alert).tag}</Text>
+              <Text style={[type.headline, { color: c.text }]} numberOfLines={2}>{alertView(transit, alert).title}</Text>
+              <Text style={[type.body, { color: c.muted }]} numberOfLines={4}>{alertView(transit, alert).body}</Text>
             </Card>
           </Tap>
         ))}

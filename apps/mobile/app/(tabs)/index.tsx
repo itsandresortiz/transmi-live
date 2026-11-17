@@ -5,7 +5,7 @@ import { SymbolView } from "@/ui/Symbol";
 import { router } from "expo-router";
 import { transit } from "@/composition-root";
 import { useNow, useTransitVersion } from "@/hooks";
-import { liveLevel, upcomingAtStop } from "@transmi/application";
+import { liveLevel, searchAlerts, upcomingAtStop } from "@transmi/application";
 import type { Route } from "@transmi/domain";
 import { clockOfDay, downText } from "@/lastService";
 import { stopKind, stopTag } from "@/stopname";
@@ -40,7 +40,7 @@ export default function Inicio() {
 
   const saved = useSaved();
   const demo = useDemo((d) => d.on);
-  const alerts = transit.alerts.length + useActiveMessages().length;      // los avisos de TransMilenio y los mensajes propios
+  const alerts = searchAlerts(transit).length + useActiveMessages().length;      // los avisos de TransMilenio y los mensajes propios
   // tus paradas con los próximos buses de cada una (los 3 más cercanos, de cualquier ruta); sin buses, la próxima hora del horario
   const favStops = useMemo(() => saved.stops.slice(0, 6).flatMap((id) => {
     const stop = transit.stopById(id);

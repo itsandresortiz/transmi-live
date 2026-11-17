@@ -1,6 +1,7 @@
 import type { GeoPoint } from "../shared/geo";
 import type { Route, RouteId } from "./route";
 import type { Stop, StopId } from "./stop";
+import type { ServiceAlert } from "./alert";
 
 /** Trazado representativo de una ruta en un sentido. */
 export interface RouteShape {
@@ -18,6 +19,8 @@ export class TransitNetwork {
   /** Destinos conocidos por ruta (para buscar por destino). */
   readonly headsigns = new Map<RouteId, string[]>();
   readonly shapes = new Map<RouteId, RouteShape[]>();
+  /** Avisos que trae la red misma (cierres temporales de vagones anunciados por TransMilenio que no vienen en sus avisos en vivo). */
+  notices: ServiceAlert[] = [];
 
   get isLoaded(): boolean { return this.routes.size > 0 && !this.hasOnlyProvisional(); }
   private hasOnlyProvisional(): boolean {

@@ -6,7 +6,7 @@ import { useRide } from "./ride";
 import { nowMode } from "./plannerStore";
 import { LIVE_DOWN_TEXT, LIVE_DOWN_TITLE, downText, liveDown } from "./liveStatus";
 import { haptic } from "./haptics";
-import { routeCodes, routeOfficialName, routeTitle, routeVariant, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, alertReference, alertTitle, alertValidity, describeAlert, ownerMessageUntil } from "@transmi/domain";
+import { routeCodes, routeOfficialName, routeTitle, routeVariant, ALERT_EFFECT_LABEL, SYSTEMS, SYSTEM_LABEL, type Route, type SystemType, type Vehicle, ownerMessageUntil } from "@transmi/domain";
 import { useActiveMessages } from "./messages";
 import { transit } from "../composition-root";
 import estaciones from "../data/estaciones.json";
@@ -18,7 +18,7 @@ import { FavoritesSection, NearbySection, QuickTrips, StarButton } from "./mine"
 import { ShareButton } from "./share";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
-import { serviceDay, alertsFor, connectionStatus, nearestStops, routeIdsAtStops } from "@transmi/application";
+import { alertView, serviceDay, alertsFor, connectionStatus, nearestStops, routeIdsAtStops } from "@transmi/application";
 import { useState } from "react";
 import { useUi } from "./store";
 import { agoShort, delayClass, delayText, etaText, stopsAwayText, untilText } from "./format";
@@ -281,19 +281,18 @@ export function AlertsView({ th, act }: Props) {
       {!list.length ? (own.length ? null : <Empty title="Sin avisos" text={scope === "all" ? "No hay novedades del servicio en este momento." : "Nada que te afecte por ahora."} />) : null}
       {!list.length ? null : list.map(({ alert, index }) => (
         <div key={index} className="card" role="group">
-          <span className={`pill ${alert.effect === "noService" ? "bad" : alert.effect === "additional" ? "ok" : "warn"}`}>{ALERT_EFFECT_LABEL[alert.effect]}</span>
-          <div className="ct">{alertTitle(alert)}</div>
-          <div className="cs">{describeAlert(alert, (id) => transit.routeById(id)?.shortName)}</div>
-          <div className="cs faint" style={{ fontSize: 12, marginTop: 4 }}>{[alertValidity(alert), alert.headline ? `Ref. ${alertReference(alert)}` : ""].filter(Boolean).join(" · ")}</div>
-          {alert.routeIds.length > 0 && (
+          {(() => { const v = alertView(transit, alert); return (<>
+          <span className={`pill ${alert.effect === "noService" ? "bad" : alert.effect === "additional" ? "ok" : "warn"}`}>{v.tag}</span>
+          <div className="ct">{v.title}</div>
+          <div className="cs">{v.body}</div>
+          <div className="cs faint" style={{ fontSize: 12, marginTop: 4 }}>{[v.reason, v.when].filter(Boolean).join(" · ")}</div>
+          {v.routes.length > 0 && (
             <div className="rbs">
-              {alert.routeIds.slice(0, openAlert === index ? 99 : 12).map((id) => {
-                const r = transit.routeById(id);
-                return <button key={id} className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r) }} onClick={() => r && act.openRoute(id)}>{r?.shortName ?? id}</button>;
-              })}
-              {alert.routeIds.length > 12 && openAlert !== index && <button className="chip" onClick={() => setOpenAlert(index)}>+{alert.routeIds.length - 12}</button>}
+              {v.routes.slice(0, openAlert === index ? 99 : 12).map((r) => <button key={r.id} className="rb sm" style={{ ["--c" as string]: routeBadgeColor(th, r) }} onClick={() => act.openRoute(r.id)}>{r.shortName}</button>)}
+              {v.routes.length > 12 && openAlert !== index && <button className="chip" onClick={() => setOpenAlert(index)}>+{v.routes.length - 12}</button>}
             </div>
           )}
+          </>); })()}
           {alert.stopIds.length > 0 && <button className="btn" onClick={() => act.focusAlert(index)}>Ver en el mapa</button>}
         </div>
       ))}
@@ -345,7 +344,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
       )}
       <RouteStatusNote routeId={id} nowMs={nowSec * 1000} />
       {!bus && <RouteSchedule routeId={id} nowMs={nowSec * 1000} />}
-      {d.alerts.map(({ alert, index }) => <div key={index} className="card"><span className="pill warn">{ALERT_EFFECT_LABEL[alert.effect]}</span><div className="ct" style={{ marginTop: 8 }}>{alertTitle(alert)}</div><div className="cs">{describeAlert(alert, (id) => transit.routeById(id)?.shortName)}</div>{alertValidity(alert) && <div className="cs" style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{alertValidity(alert)}</div>}</div>)}
+      {d.alerts.map(({ alert, index }) => { const v = alertView(transit, alert); return <div key={index} className="card"><span className="pill warn">{v.tag}</span><div className="ct" style={{ marginTop: 8 }}>{v.title}</div><div className="cs">{v.body}</div>{(v.reason || v.when) && <div className="cs" style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{[v.reason, v.when].filter(Boolean).join(" · ")}</div>}</div>; })}
       {cur && cur.stopIds.length > 0 && (
         <>
           <div className="sec">{bus ? "Por dónde va este bus" : "Paradas"}</div>

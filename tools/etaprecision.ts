@@ -8,7 +8,8 @@
  *
  * Uso: npx tsx tools/etaprecision.ts [segundos] [espera_entre_descargas]
  */
-import { TransitState, arrivalAtIndex, rawArrival, shapeStops } from "@transmi/application";
+import { gunzipSync } from "node:zlib";
+import { TransitState, arrivalAtIndex, buildHopProfile, rawArrival, shapeStops } from "@transmi/application";
 import type { VehicleReport } from "@transmi/domain";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 
@@ -35,8 +36,26 @@ async function main() {
   if (batches.length < 6) { console.log("Muy pocos lotes. No se mide."); return; }
 
   const state = new TransitState(); state.setNetwork(net);
+  // tiempos reales por tramo (rama hop-stats): se compara el valor fijo con varias formas de usarlos
+  try {
+    const h = await fetch(`https://raw.githubusercontent.com/${REPO}/hop-stats/stats.json.gz`);
+    const raw = JSON.parse(gunzipSync(new Uint8Array(await h.arrayBuffer())).toString());
+    const stops = new Map<string, number>();
+    for (const shapes of net.shapes.values()) for (const sh of shapes) stops.set(`${sh.routeId}|${sh.direction}`, sh.stopIds.length);
+    state.hopProfile.load(buildHopProfile(raw.stats ?? {}, (k) => stops.get(k), raw.updated ?? "", 1));
+    console.log(`perfil de tramos: ${state.hopProfile.size} recorridos (datos de ${raw.updated})`);
+  } catch (e) { console.log("sin perfil de tramos:", e instanceof Error ? e.message : e); }
+  const VARIANTS: { name: string; apply: boolean; minN: number; priorN: number }[] = [
+    { name: "valor fijo (antes)", apply: false, minN: 0, priorN: 0 },
+    { name: "aprendido, mín 3, mezcla 3", apply: true, minN: 3, priorN: 3 },
+    { name: "aprendido, mín 3, sin mezcla", apply: true, minN: 3, priorN: 0 },
+    { name: "aprendido, mín 8, mezcla 3", apply: true, minN: 8, priorN: 3 },
+    { name: "aprendido, mín 1, mezcla 10", apply: true, minN: 1, priorN: 10 },
+  ];
+  const useVariant = (k: number) => { const x = VARIANTS[k]!; state.hopProfile.apply = x.apply; state.hopProfile.minN = x.minN; state.hopProfile.priorN = x.priorN; };
+  useVariant(1);
   // por bus: por dónde ha ido (metros sobre su trazado, hora del GPS) y qué se le pronosticó
-  type Pred = { stopS: number; away: number; madeAt: number; shown: number; raw: number; remaining: number };
+  type Pred = { stopS: number; away: number; madeAt: number; shown: number; raw: number; remaining: number; alt: number[] };
   const tracks = new Map<string, { key: string; pts: { t: number; s: number }[]; preds: Pred[] }>();
   for (const b of batches) {
     state.applyPositions(b.reports, b.at * 1000);
@@ -52,8 +71,11 @@ async function main() {
       const lastPt = tr.pts[tr.pts.length - 1];
       if (!lastPt || v.reportedAt > lastPt.t) tr.pts.push({ t: v.reportedAt, s: hit.s });
       for (let j = seq.index + 1; j <= Math.min(seq.index + 6, info.s.length - 1); j++) {
+        const alt = VARIANTS.map((_, k) => { useVariant(k); return rawArrival(state, v, seq.shape, seq.index, j, b.at * 1000).eta; });
+        useVariant(0);
         const rw = rawArrival(state, v, seq.shape, seq.index, j, b.at * 1000);
-        tr.preds.push({ stopS: info.s[j]!, away: j - seq.index, madeAt: b.at, shown: arrivalAtIndex(state, v, seq.shape, seq.index, j, b.at * 1000), raw: rw.eta, remaining: rw.remaining });
+        useVariant(1);
+        tr.preds.push({ stopS: info.s[j]!, away: j - seq.index, madeAt: b.at, shown: arrivalAtIndex(state, v, seq.shape, seq.index, j, b.at * 1000), raw: rw.eta, remaining: rw.remaining, alt });
       }
     }
   }
@@ -65,7 +87,7 @@ async function main() {
   const endAt = batches[batches.length - 1]!.at;
   const FACTORS = [1, 1.2, 1.4, 1.6, 1.8], BUCKETS = ["no vencida", "vencida 0–30 s", "30–60 s", "60–120 s", "más de 120 s"];
   const bucket = (d: number) => (d < 0 ? 0 : d < 30 ? 1 : d < 60 ? 2 : d < 120 ? 3 : 4);
-  interface G { n: number; gone: number; lleg: number; llegGone: number; exp: { n: number; gone: number }[]; err: number[][]; shown: number[] }
+  interface G { n: number; gone: number; lleg: number; llegGone: number; exp: { n: number; gone: number }[]; err: number[][]; shown: number[]; alt: number[][] }
   const by = new Map<number, G>();
   for (const tr of tracks.values()) {
     const lastPt = tr.pts[tr.pts.length - 1]!;
@@ -79,13 +101,14 @@ async function main() {
       const late = truth == null && lastPt.s < p.stopS && endAt - lastPt.t < 150 && lastPt.t > p.madeAt;
       if (truth == null && !late) continue;
       if (late) truth = Infinity;
-      const g2 = by.get(p.away) ?? by.set(p.away, { n: 0, gone: 0, lleg: 0, llegGone: 0, exp: BUCKETS.map(() => ({ n: 0, gone: 0 })), err: FACTORS.map(() => []), shown: [] }).get(p.away)!;
+      const g2 = by.get(p.away) ?? by.set(p.away, { n: 0, gone: 0, lleg: 0, llegGone: 0, exp: BUCKETS.map(() => ({ n: 0, gone: 0 })), err: FACTORS.map(() => []), shown: [], alt: VARIANTS.map(() => []) }).get(p.away)!;
       g2.n++;
       const says = p.shown - p.madeAt <= 15, passed = truth! < p.madeAt;
       const e = g2.exp[bucket(p.madeAt - p.raw)]!; e.n++; if (passed) e.gone++;
       if (says) { g2.lleg++; if (passed) g2.llegGone++; }
       if (passed) { g2.gone++; continue; }
       g2.shown.push(p.shown - truth!);
+      p.alt.forEach((eta, k) => g2.alt[k]!.push(eta - truth!));
       FACTORS.forEach((f, k) => g2.err[k]!.push(p.raw + p.remaining * (f - 1) - truth!));
     }
   }
@@ -96,6 +119,7 @@ async function main() {
     console.log(`\na ${away} parada(s): n=${g2.n} · ya había pasado al mostrarse: ${(100 * g2.gone / g2.n).toFixed(0)} % · decía «llegando»: ${(100 * g2.lleg / g2.n).toFixed(0)} % (de esos, ya había pasado: ${g2.lleg ? (100 * g2.llegGone / g2.lleg).toFixed(0) : "-"} %)`);
     console.log("   según cuánto hace que venció la cuenta → ya había pasado: " + g2.exp.map((e, k) => `${BUCKETS[k]}: ${e.n ? (100 * e.gone / e.n).toFixed(0) : "-"} % (n=${e.n})`).join(" · "));
     console.log(`   lo mostrado: sesgo ${fin(med(g2.shown))} s, error mediano ${fin(med(g2.shown.map(Math.abs)))} s`);
+    VARIANTS.forEach((x, k) => console.log(`   ${x.name}: sesgo ${fin(med(g2.alt[k]!))} s, error mediano ${fin(med(g2.alt[k]!.map(Math.abs)))} s, p75 ${fin(pct(g2.alt[k]!.map(Math.abs), 0.75))} s (n=${g2.alt[k]!.length})`));
     FACTORS.forEach((f, k) => console.log(`   tiempo por tramo × ${f}: sesgo ${fin(med(g2.err[k]!))} s, error mediano ${fin(med(g2.err[k]!.map(Math.abs)))} s, p75 ${fin(pct(g2.err[k]!.map(Math.abs), 0.75))} s (n=${g2.err[k]!.length})`));
   }
 }

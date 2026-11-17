@@ -67,3 +67,24 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Contexto:** TransMilenio entrega cada posición con ~1 min de atraso; en «Voy en este bus» el bus se veía atrás (o adelantado por la predicción) y los avisos de bajada se corrían.
 - **Decisión:** mientras la app está abierta y el GPS confirma que vas sobre la vía y cerca de donde puede ir el bus, el bus se dibuja donde vas tú y las paradas/tiempos se cuentan desde ahí; si no cuadra un rato estando en movimiento, se pregunta.
 - **Descartado:** (1) seguir la ubicación con la app cerrada (pide el permiso «Siempre», más fricción y revisión de Apple); (2) enviar las ubicaciones a un servidor para aprender rutas y tiempos (exige consentimiento, cambiar las declaraciones de privacidad y un servidor; con pocos usuarios aporta poco: los tiempos ya se aprenden con `hop-stats` usando solo datos de TransMilenio).
+
+## 2026-11-17 · No forzar el acceso al buscador de TransMilenio
+- **Contexto**: el dueño pidió usar las paradas oficiales, horarios y mapas de estación del «Buscador de Servicios». Su servidor responde 403 a todo lo que no venga de su página.
+- **Descartado**: mandar las consultas haciéndose pasar por su página (cambiando el origen de la consulta). Funcionaría, pero es saltarse un control de acceso y va contra la regla de no suplantar a TransMilenio.
+- **Por qué**: se usa solo lo que es abierto (GTFS, datos en vivo). Para lo demás: pedir acceso a TransMilenio o capturas del dueño.
+
+## 2026-11-17 · Los tiempos aprendidos se encienden desde los datos
+- **Contexto**: el perfil por tramo (`hop-stats`) aún no se midió de día contra el valor fijo; en 2026-11-11 lo aprendido en cada teléfono erraba más que el fijo.
+- **Descartado**: encenderlo de una vez en el código de la app (si empeora, hace falta una versión nueva para apagarlo).
+- **Por qué**: el archivo publicado trae `use`; la app lo obedece. Se mide, y se enciende o apaga cambiando una línea en `tools/hopstats.ts`.
+
+## 2026-11-17 · Cierres temporales en el código, aplicados a la red publicada
+- **Contexto**: TransMilenio anuncia cierres de vagones solo en redes; ni el GTFS ni los avisos en vivo los traen.
+- **Descartado**: solo un mensaje en `mensajes.json` (avisa, pero «Cómo llegar» seguiría mandando al vagón cerrado) o arreglarlo solo en el código de la app (las versiones publicadas no lo tendrían).
+- **Por qué**: con fechas en `patches.ts`, el workflow diario rearma `network.json.gz` con el cambio (llega a todas las apps) y se deshace solo al vencer. El anuncio va en la red (`notices`) y, para apps viejas, en `mensajes.json`.
+
+## 2026-11-17 · Avisos: deducir la ruta, nunca mostrar el número interno
+- **Contexto**: los avisos traen números de ruta que no están en el GTFS.
+- **Descartado**: mostrar el número (nadie lo entiende) o adivinar la ruta más probable cuando varias pasan por ahí.
+- **Por qué**: solo se nombra una ruta si es la única que pasa por esas paradas en ese orden (cruzando los avisos del mismo número); si hay pocas posibles se dicen todas, y si no, «una ruta zonal».
+

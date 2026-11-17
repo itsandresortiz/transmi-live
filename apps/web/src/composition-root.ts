@@ -39,6 +39,17 @@ export async function loadDepartures(): Promise<void> {
   } catch { /* sin conexión o archivo aún no publicado */ }
 }
 
+/** Carga los tiempos reales por tramo y hora (para calcular mejor las llegadas). Si falla, se usa el valor fijo por parada. */
+export async function loadHopProfile(): Promise<void> {
+  try {
+    if (typeof DecompressionStream === "undefined") return;
+    const res = await cachedFetch(`${CONFIG.hopBase}profile.json.gz?t=${Math.floor(Date.now() / 3_600_000)}`);
+    if (!res.ok || !res.body) return;
+    const text = await new Response(res.body.pipeThrough(new DecompressionStream("gzip"))).text();
+    transit.hopProfile.load(JSON.parse(text));
+  } catch { /* sin conexión o archivo aún no publicado */ }
+}
+
 /** Carga el primer y último viaje de cada ruta para marcar el «último servicio». Si falla, la app sigue sin esa marca. */
 export async function loadServiceEnds(): Promise<void> {
   try {

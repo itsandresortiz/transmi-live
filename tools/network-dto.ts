@@ -7,7 +7,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
-import { parseGtfsLite } from "@transmi/infrastructure";
+import { applyStopPatches, applyTempStopChanges, parseGtfsLite } from "@transmi/infrastructure";
 
 const [src, out] = process.argv.slice(2);
 if (!src || !out) { console.error("Uso: npx tsx tools/network-dto.ts <gtfs-lite.zip> <network.json.gz>"); process.exit(1); }
@@ -15,6 +15,9 @@ const r5 = (n: number) => Math.round(n * 1e5) / 1e5;
 
 void (async () => {
   const dto = await parseGtfsLite(new Uint8Array(readFileSync(src)).buffer as ArrayBuffer);
+  // las correcciones y los cierres temporales de hoy van ya aplicados: así les llegan también a las apps publicadas (que traen la lista vieja)
+  applyStopPatches(dto);
+  for (const c of applyTempStopChanges(dto)) console.log(`cambio temporal: ${c.route} ${c.stop}${c.replaceWith ? ` → ${c.replaceWith}` : " (se salta)"}`);
   for (const s of dto.stops) { s.lat = r5(s.lat); s.lon = r5(s.lon); }
   for (const sh of dto.shapes) sh.pts = sh.pts.map(r5);
   const gz = gzipSync(JSON.stringify({ v: 1, ...dto }), { level: 9 });

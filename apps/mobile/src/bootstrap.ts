@@ -38,6 +38,10 @@ export function startData(): () => void {
     if (!(haveNet && haveEnds && haveDeps) && started) { retry = setTimeout(() => void loadStatic(), wait); wait = Math.min(wait * 2, 5 * 60_000); }
   };
   void loadStatic();
+  // tiempos reales por tramo (~0,5 MB): opcionales y sin apuro; se leen unos segundos después para no frenar la apertura
+  const hops = setTimeout(() => {
+    void gz<unknown>(`${CONFIG.hopBase}profile.json.gz?t=${hour}`, "hop-profile.json.gz").then((d) => { if (d) transit.hopProfile.load(d); });
+  }, 4000);
 
   const poll = () => { if (AppState.currentState === "active" && !isDemo()) void liveData.refresh().catch(() => undefined); };      // en demostración no se piden datos reales (se mezclarían)
   poll();
@@ -45,5 +49,5 @@ export function startData(): () => void {
   void refreshMessages();
   const msgTimer = setInterval(() => { if (AppState.currentState === "active") void refreshMessages(); }, 120_000);
   const sub = AppState.addEventListener("change", (s) => { if (s !== "active") return; void loadStatic(); void refreshMessages(); if (!isDemo()) void liveData.refresh(true).catch(() => undefined); });
-  return () => { clearInterval(timer); clearInterval(msgTimer); clearTimeout(retry); sub.remove(); started = false; };
+  return () => { clearTimeout(hops); clearInterval(timer); clearInterval(msgTimer); clearTimeout(retry); sub.remove(); started = false; };
 }

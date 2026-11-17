@@ -6,6 +6,8 @@ import { arrivalAtIndex, displayNextIndex, shapeStops } from "./eta";
 import { type RouteDayStatus, ServiceEnds, type ServiceMark } from "./service-ends";
 import { Departures } from "./departures";
 import { TravelTimes } from "./travel-times";
+import { HopProfile } from "./hop-profile";
+import { alertRouteCode, alertRouteName } from "./alert-route";
 import type { FeedSource } from "./ports";
 
 /** Estado vivo de todo lo que sabe la aplicación: flota, red, retrasos y avisos. */
@@ -17,6 +19,8 @@ export class TransitState {
   network = new TransitNetwork();
   tripUpdates = new Map<string, TripUpdate>();
   alerts: ServiceAlert[] = [];
+  /** Los últimos avisos recibidos de TransMilenio (sin los de la red), para volver a armar la lista si cambia la red. */
+  private feedAlerts: readonly ServiceAlert[] = [];
   alertsByRoute = new Map<string, number[]>();
   alertsByStop = new Map<string, number[]>();
   /** Hora del último lote de posiciones (segundos desde 1970). */
@@ -30,6 +34,8 @@ export class TransitState {
   version = 0;
   /** Lo que se ha aprendido de cuánto tarda cada ruta por parada. */
   readonly travelTimes = new TravelTimes();
+  /** Tiempos reales por tramo y hora (rama `hop-stats`); vacío hasta que la app los descarga. */
+  readonly hopProfile = new HopProfile();
   /** Primer y último viaje de cada ruta, para marcar «último servicio». */
   readonly serviceEnds = new ServiceEnds();
   readonly departures = new Departures();
@@ -216,11 +222,17 @@ export class TransitState {
 
   applyAlerts(alerts: readonly ServiceAlert[], nowMs: number = Date.now()): void {
     // solo los avisos vigentes: los vencidos (o que aún no empiezan) no le sirven a nadie
-    this.alerts = alerts.filter((a) => isAlertActive(a, nowMs / 1000));
+    this.feedAlerts = alerts;
+    this.alerts = [...this.network.notices, ...alerts].filter((a) => isAlertActive(a, nowMs / 1000));
     this.alertsByRoute = new Map();
     this.alertsByStop = new Map();
     this.alerts.forEach((a, i) => {
       for (const r of a.routeIds) (this.alertsByRoute.get(r) ?? this.alertsByRoute.set(r, []).get(r)!).push(i);
+      // casi todos traen un número de ruta que no está en el GTFS: se cuelga de la ruta que se deduce (ver `alertRouteName`)
+      if (!a.routeIds.some((r) => this.network.routes.has(r))) {
+        const name = alertRouteName(this, alertRouteCode(a), a);
+        if (name) for (const r of this.network.routes.values()) if (r.shortName === name) (this.alertsByRoute.get(r.id) ?? this.alertsByRoute.set(r.id, []).get(r.id)!).push(i);
+      }
       for (const s of a.stopIds) (this.alertsByStop.get(s) ?? this.alertsByStop.set(s, []).get(s)!).push(i);
     });
     this.touch();
@@ -231,7 +243,7 @@ export class TransitState {
     this.seq.clear(); this.trunk = null; this.served = null; this.labels.clear(); this.fixedStops.clear(); this.families = null;
     this.resolveSystems();
     this.reconcileLastStops();
-    this.touch();
+    this.applyAlerts(this.feedAlerts);       // los cierres que trae la red y las rutas deducidas de los avisos dependen de la red
   }
 
   /** Asigna el sistema a cada bus: por la ruta del GTFS o, sin GTFS, por votación de sus reportes. */

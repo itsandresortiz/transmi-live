@@ -79,7 +79,8 @@ export function arrivalOrPassed(state: TransitState, v: Vehicle, shape: RouteSha
 /** La cuenta sin retoques: puede dar una hora que ya pasó (el bus ya debió llegar a esa parada según el cálculo). */
 export function rawArrival(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, to: number, nowMs = Date.now()): { eta: number; remaining: number } {
   const stopIds = shape.stopIds;
-  const hop = (i: number) => estimateTravelSeconds(state, v, stopIds, i, i + 1, nowMs);
+  // cada tramo: lo que tardan de verdad los buses en él a esta hora (si se sabe), si no el valor fijo
+  const hop = (i: number) => state.hopProfile.seconds(shape, i, nowMs, estimateTravelSeconds(state, v, stopIds, i, i + 1, nowMs));
   let eta: number;
   let remaining = 0;
   for (let i = lastIndex; i < to; i++) remaining += hop(i);

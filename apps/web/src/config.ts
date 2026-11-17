@@ -7,4 +7,6 @@ export const CONFIG = {
   messagesUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/main/mensajes.json",
   /** Horarios resumidos (primer y último viaje de cada ruta), publicados cada día por GitHub Actions. */
   scheduleBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/schedule-data/",
+  /** Tiempos reales entre paradas por hora del día (los aprende el workflow «hop-stats»). */
+  hopBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/hop-stats/",
 } as const;

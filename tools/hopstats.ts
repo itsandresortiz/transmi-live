@@ -16,10 +16,13 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { TransitState, shapeStops } from "@transmi/application";
+import { TransitState, buildHopProfile, shapeStops } from "@transmi/application";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 
 const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 10_000;
+/** ¿La app usa ya estos tiempos para las llegadas? Se enciende cuando `tools/etaprecision.ts` muestre, de día, que aciertan más que el
+ *  valor fijo. Mientras sea `false` el perfil se publica igual (para medirlo) y la app lo ignora. */
+const PROFILE_USE = false;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live", TOKEN = process.env.GITHUB_TOKEN ?? "";
 const url = (b: string) => `https://${TOKEN ? `x-access-token:${TOKEN}@` : ""}github.com/${REPO}.git`;
 
@@ -105,6 +108,10 @@ async function main() {
   const round = (x: number) => Math.round(x * 10) / 10;
   const compact = Object.fromEntries(Object.entries(total).map(([k, a]) => [k, { n: Math.round(a.n * 100) / 100, sum: round(a.sum), sq: Math.round(a.sq) }]));
   writeFileSync(join(out, "stats.json.gz"), gzipSync(JSON.stringify({ ...meta, stats: compact }), { level: 9 }));
+  // el perfil que bajan la app y la web (~0,5 MB): segundos y pasadas por tramo, solo de los recorridos que existen hoy
+  const stops = new Map<string, number>();
+  for (const shapes of net.shapes.values()) for (const sh of shapes) stops.set(`${sh.routeId}|${sh.direction}`, sh.stopIds.length);
+  writeFileSync(join(out, "profile.json.gz"), gzipSync(JSON.stringify(buildHopProfile(compact, (k) => stops.get(k), meta.updated, undefined, PROFILE_USE)), { level: 9 }));
   execFileSync("bash", ["scripts/publish.sh", out], { stdio: "inherit", env: { ...process.env, BRANCH: "hop-stats", GITHUB_REPOSITORY: REPO, GITHUB_TOKEN: TOKEN } });
   console.log("acumulado:", JSON.stringify(meta));
 }

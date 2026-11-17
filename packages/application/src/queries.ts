@@ -1,5 +1,6 @@
 import { routeTitle, type Route, type SystemType, type Vehicle, type ServiceAlert, type Stop, alertSeverity } from "@transmi/domain";
 import { arrivalOrPassed, hav } from "./eta";
+import { alertDedupKey, alertView } from "./alert-view";
 import type { TransitState } from "./transit-state";
 
 export const normalize = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -229,10 +230,15 @@ export function routesAtStop(state: TransitState, stopId: string): Route[] {
 
 export function searchAlerts(state: TransitState, query = ""): { alert: ServiceAlert; index: number }[] {
   const q = normalize(query.trim());
+  const seen = new Set<string>();
   return state.alerts
     .map((alert, index) => ({ alert, index }))
-    .filter(({ alert }) => !q || normalize([alert.headline, alert.description, ...alert.routeIds.map((id) => state.routeById(id)?.shortName ?? id)].join(" ")).includes(q))
-    .sort((x, y) => alertSeverity(x.alert.effect) - alertSeverity(y.alert.effect) || y.alert.routeIds.length - x.alert.routeIds.length);
+    // la misma novedad llega repetida (un reporte por cada vez que el operador la registra): se muestra una vez, la más reciente
+    .sort((x, y) => (y.alert.startsAt ?? 0) - (x.alert.startsAt ?? 0))
+    .filter(({ alert }) => { const k = alertDedupKey(state, alert); if (seen.has(k)) return false; seen.add(k); return true; })
+    .filter(({ alert }) => { if (!q) return true; const v = alertView(state, alert); return normalize([alert.headline, alert.description, v.title, v.body, ...v.routes.map((r) => r.shortName)].join(" ")).includes(q); })
+    // primero los cierres de estaciones anunciados (escritos aquí; afectan a la troncal), luego los más graves y los más recientes
+    .sort((x, y) => Number(!!y.alert.title) - Number(!!x.alert.title) || alertSeverity(x.alert.effect) - alertSeverity(y.alert.effect) || (y.alert.startsAt ?? 0) - (x.alert.startsAt ?? 0));
 }
 
 export interface RouteDetail {
