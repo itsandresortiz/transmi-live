@@ -97,7 +97,7 @@ describe("cruce coordinado (1 p. m.): rojos fijos cada 120 s, verde variable", (
   it("da 120 s y dice que el rojo cae siempre igual", () => {
     const l = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
     const t = summarize(lastSession(l[0]!.marks)).text;
-    expect(t).toMatch(/^Ciclo de 120 s .*verde 73 s, amarillo 2 s, rojo 43 s, amarillo antes del verde 2 s\. El rojo empieza siempre en el mismo punto del ciclo/);
+    expect(t).toMatch(/^Ciclo de 120 s .*El rojo empieza siempre en el mismo punto del ciclo/);      // las duraciones cambian con cada vuelta nueva que se guarda
     expect(model2(l[0]!.marks)!.cycle).toBe(120_000);
   });
 });

@@ -4,6 +4,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-17 · Prueba del cronómetro: ya no fija las duraciones del plan de la 1 p. m. (cambian con cada vuelta guardada).
 
 - 2026-11-17 · núcleo, datos · Medición de 1:10–1:14 p. m.: sigue el ciclo fijo de 120 s con rojos en la misma cuadrícula (1:11:29, 1:13:29) y rojo de 41–49 s. Cronómetro: dos toques del mismo color en <10 s cuentan como uno (un amarillo marcado como rojo) y no se cuentan duraciones que empiezan tras una pausa larga.
 - 2026-11-17 · núcleo, web · Semáforos en vivo desfasados entre sí (captura del dueño: 3 en rojo y 1 en verde; debían ser 2 y 2): el primero usaba las marcas del navegador y los que lo siguen las guardadas. Ahora todos salen de las mismas marcas: las del semáforo de referencia guardadas + las del navegador (`measuredSignals` devuelve `ref`; la web arma un mapa semáforo → al que sigue).
