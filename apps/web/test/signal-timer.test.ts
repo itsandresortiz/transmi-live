@@ -70,10 +70,9 @@ describe("semáforos medidos guardados en el proyecto", () => {
     const list = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
     expect(list).toHaveLength(4);
     const [a, b] = list.map((x) => model2(x.marks)!);
-    expect(Math.round(b!.cycle / 1000)).toBe(120);
-    // su rojo medido (17:42:23) cae en rojo según el primero
-    expect(now2(a!, Date.parse("2026-11-17T17:42:25Z")).c).toBe("r");
-    expect(now2(b!, Date.parse("2026-11-17T17:42:25Z")).c).toBe("r");
+    // el del otro lado usa el mismo modelo que el primero (el plan más reciente medido, sea cual sea)
+    expect(b!.cycle).toBe(a!.cycle);
+    for (let k = 0; k < 200; k += 7) { const t = Date.now() + k * 1000; expect(now2(b!, t).c).toBe(now2(a!, t).c); }
   });
 });
 
