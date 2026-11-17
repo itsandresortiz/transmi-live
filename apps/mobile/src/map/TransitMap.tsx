@@ -1,5 +1,5 @@
 import { type ComponentProps, forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
-import { StyleSheet } from "react-native";
+import { Alert, StyleSheet } from "react-native";
 import * as Location from "expo-location";
 import { Camera, GeoJSONSource, Images, Layer, Map, UserLocation, type CameraRef } from "@maplibre/maplibre-react-native";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
@@ -254,7 +254,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         </>
       )}
       {(
-        <GeoJSONSource id="semaforos" data={signalsJson}>
+        <GeoJSONSource id="semaforos" data={signalsJson} onPress={(e) => { const pr = e.nativeEvent.features[0]?.properties; if (pr?.title) Alert.alert(String(pr.title), String(pr.text ?? "")); }}>
           <Layer id="semaforos-dots" type="circle" minzoom={13.2} maxzoom={15.4} {...sp({ visibility: showSignals ? "visible" : "none", circleRadius: ["interpolate", ["linear"], ["zoom"], 13.2, 1.6, 15.4, 3.2], circleColor: "#e8503f", circleStrokeColor: "#ffffff", circleStrokeWidth: 1 })} />
           <Layer id="semaforos-icons" type="symbol" minzoom={15.4} {...sp({ visibility: showSignals ? "visible" : "none", iconImage: "semaforo", iconSize: ["interpolate", ["linear"], ["zoom"], 15.4, 0.2, 18, 0.36], iconAllowOverlap: true, iconIgnorePlacement: true })} />
           <Layer id="semaforos-labels" type="symbol" minzoom={17.2} {...sp({ visibility: showSignals ? "visible" : "none", textField: ["get", "dir"], textFont: ["Noto Sans Regular"], textSize: 10.5, textOffset: [0, 1.35], textAnchor: "top", textOptional: true, textColor: c.dark ? "#b4b4bb" : "#6c6c70", textHaloColor: c.dark ? "#0b0b0d" : "#eef0f3", textHaloWidth: 1.2 })} />

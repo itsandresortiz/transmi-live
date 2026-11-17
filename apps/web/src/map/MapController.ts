@@ -1,7 +1,7 @@
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
-import { flowDash, trafficBand } from "@transmi/application";
+import { type SignalRow, flowDash, signalInfo, trafficBand } from "@transmi/application";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
@@ -346,7 +346,19 @@ export class MapController {
     m.on("click", (e) => {
       if (this.pickHandler) { const h = this.pickHandler; this.pickHandler = null; h({ lat: e.lngLat.lat, lon: e.lngLat.lng }); return; }
       const hit = pick(e.point);
-      if (!hit) { this.events.onMapTap?.(); return; }
+      if (!hit) {
+        // un semáforo: qué cruce es y cuántos semáforos tiene (cada punto es un cruce, no cada semáforo de la calle)
+        const sig = m.getLayer("semaforos-icons") ? m.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ["semaforos-icons", "semaforos-dots"] })[0] : undefined;
+        if (sig) {
+          const el = document.createElement("div"), h = document.createElement("b"), p = document.createElement("div");
+          h.textContent = String(sig.properties?.title ?? "Semáforo"); p.textContent = String(sig.properties?.text ?? ""); p.style.marginTop = "4px";
+          el.append(h, p);
+          const g = (sig.geometry as unknown as { coordinates: [number, number] }).coordinates;
+          this.showPopup({ lon: g[0], lat: g[1] }, el);
+          return;
+        }
+        this.events.onMapTap?.(); return;
+      }
       if (hit.kind === "bus") this.events.onBusClick(String(hit.id));
       else if (hit.kind === "stop") this.events.onStopClick(String(hit.id));
       else if (hit.kind === "group") this.events.onGroupClick?.(String(hit.id).split(","));
@@ -436,11 +448,11 @@ export class MapController {
   }
   private signalsLoaded = false;
   /** Pone los semáforos en el mapa (se llama la primera vez que el usuario enciende la capa). */
-  setSignals(rows: readonly (readonly [number, number, string, string, string])[]) {
+  setSignals(rows: readonly SignalRow[]) {
     this.signalsLoaded = true;
     (this.map.getSource("semaforos") as GeoJSONSource | undefined)?.setData({
       type: "FeatureCollection",
-      features: rows.map((r) => ({ type: "Feature", properties: { dir: r[2], loc: r[3], tipo: r[4] }, geometry: { type: "Point", coordinates: [r[0], r[1]] } })),
+      features: rows.map((r) => { const i = signalInfo(r); return { type: "Feature", properties: { dir: r[2], loc: r[3], tipo: r[4], title: i.title, text: i.text }, geometry: { type: "Point", coordinates: [r[0], r[1]] } }; }),
     });
   }
   get hasSignals(): boolean { return this.signalsLoaded; }

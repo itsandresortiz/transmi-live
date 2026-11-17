@@ -145,3 +145,16 @@ describe("último bus que se acerca", () => {
     expect(lastBusSoon(s, "B", [], at("2026-11-17T22:20:00"))).toEqual([]);                 // ya pasó
   });
 });
+
+describe("semáforos", () => {
+  it("cuenta los grupos de señal y arma el texto del cruce", async () => {
+    const { countSignalGroups, signalInfo } = await import("../src");
+    expect(countSignalGroups("1,2,3")).toBe(3);
+    expect(countSignalGroups("N/A")).toBe(0);
+    expect(countSignalGroups("22,23,31 (Reg)")).toBe(3);
+    const i = signalInfo([-74.05, 4.75, "KR 16 X CL 187", "Usaquén", "VEHICULAR, PEATONAL", 3, 0, 3, 0, 4, "PMT"]);
+    expect(i.title).toBe("KR 16 X CL 187");
+    expect(i.text).toBe("Cruce con 6 semáforos: 3 para carros, 3 peatonales. Cambia en 4 fases por ciclo. Ahora funciona con un plan de manejo de tránsito (obras o desvíos). Localidad: Usaquén.");
+    expect(signalInfo([-74, 4.7, "AK 7 X CL 1", "", ""]).text).toBe("Cruce con semáforo.");      // archivo viejo
+  });
+});

@@ -7,6 +7,7 @@ export * from "./hop-profile";
 export * from "./alert-route";
 export * from "./alert-view";
 export * from "./last-bus";
+export * from "./signals";
 export * from "./motion";
 export * from "./eta";
 export * from "./service-ends";

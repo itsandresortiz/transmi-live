@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
-import { alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
+import { type SignalRow, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, networkSource, transit } from "./composition-root";
 import { nowSec } from "./clock";
@@ -206,7 +206,7 @@ export function App() {
       try {
         const r = await fetch(new URL("semaforos.json", new URL(import.meta.env.BASE_URL, location.href)).href);
         if (!r.ok) throw new Error(String(r.status));
-        const d = (await r.json()) as { rows: [number, number, string, string, string][] };
+        const d = (await r.json()) as { rows: SignalRow[] };
         m.setSignals(d.rows);
       } catch { uiRef.current.showToast("Todavía no hay datos de semáforos disponibles"); }
     });

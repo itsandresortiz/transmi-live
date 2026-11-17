@@ -9,6 +9,10 @@
  * Además guarda, por semáforo, un histograma de la hora del minuto (segundos 0-59 de cada minuto en pasos de 5 s) de las detenciones:
  * si un semáforo es de tiempo fijo con ciclo de 60/90/120 s, la «huella» queda visible tras varios días.
  *
+ * Desde el 2026-11-17 (v2) cada conteo va además por **dirección del bus** al llegar al cruce (N, E, S, O, o «?» si aún no se sabe):
+ * en un mismo cruce, quien va de norte a sur puede esperar distinto que quien va de oriente a occidente. Las claves viejas (sin dirección)
+ * se conservan tal cual.
+ *
  * Uso: npx tsx tools/signalstats.ts [segundos_de_grabación]
  */
 import { execFileSync } from "node:child_process";
@@ -29,7 +33,7 @@ const bucketOf = (h: number) => (h < 6 ? 0 : h < 10 ? 1 : h < 16 ? 2 : h < 20 ? 
 const dayType = (d: Date) => { const w = d.getUTCDay(); return w === 0 ? "su" : w === 6 ? "sa" : "wk"; };
 
 interface Acc { n: number; still: number; slow: number; sumV: number; phase: number[] }   // phase: 12 casillas de 5 s dentro del minuto (solo detenciones)
-type Stats = Record<string, Acc>;                      // "lon,lat|tipoDía|franja"
+type Stats = Record<string, Acc>;                      // "lon,lat|tipoDía|franja|dirección" (antes de v2, sin dirección)
 
 function clone(branch: string): string | null {
   const dir = mkdtempSync(join(tmpdir(), "ss-"));
@@ -69,7 +73,9 @@ async function main() {
   console.log("semáforos:", sig.length);
 
   const run: Stats = {};
-  const prev = new Map<string, { x: number; y: number; t: number; lon: number; lat: number }>();
+  const prev = new Map<string, { x: number; y: number; t: number; lon: number; lat: number; dir: string }>();
+  // hacia dónde va el bus (N, E, S, O) según cómo se movió desde su reporte anterior; quieto, se queda con la última que se le vio
+  const dirOf = (dx: number, dy: number): string => { const deg = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360; return ["N", "E", "S", "O"][Math.round(deg / 90) % 4]!; };
   const trunk = (rid: string) => st.network.routes.get(rid)?.system === "troncal";
   let polls = 0, obs = 0;
   const end = Date.now() + SECONDS * 1000;
@@ -82,10 +88,12 @@ async function main() {
         for (const r of reports) {
           if (trunk(r.routeId)) continue;
           const w = toWorld(r.position), p = prev.get(r.id);
-          prev.set(r.id, { x: w.x, y: w.y, t: r.reportedAt, lon: r.position.lon, lat: r.position.lat });
+          const moved = p ? distanceMeters(p, w) : 0;
+          const dir = p && moved > 8 ? dirOf(w.x - p.x, w.y - p.y) : p?.dir ?? "?";
+          prev.set(r.id, { x: w.x, y: w.y, t: r.reportedAt, lon: r.position.lon, lat: r.position.lat, dir });
           if (!p || r.reportedAt <= p.t) continue;
           const dt = r.reportedAt - p.t; if (dt < 8 || dt > 90) continue;
-          const speed = distanceMeters(p, w) / dt;
+          const speed = moved / dt;
           // semáforos a menos de 35 m de la posición nueva
           const cx = Math.floor(r.position.lon / 0.0005), cy = Math.floor(r.position.lat / 0.0005);
           let best = -1, bd = NEAR_M;
@@ -94,7 +102,7 @@ async function main() {
           }
           if (best < 0 || nearStop(r.position.lon, r.position.lat)) continue;
           const d = new Date((r.reportedAt - 5 * 3600) * 1000);
-          const k = `${sig[best]![0]},${sig[best]![1]}|${dayType(d)}|${bucketOf(d.getUTCHours())}`;
+          const k = `${sig[best]![0]},${sig[best]![1]}|${dayType(d)}|${bucketOf(d.getUTCHours())}|${dir}`;
           const a = (run[k] ??= { n: 0, still: 0, slow: 0, sumV: 0, phase: new Array(12).fill(0) });
           a.n++; a.sumV += speed; obs++;
           if (speed < 4) a.slow++;
@@ -118,7 +126,7 @@ async function main() {
   const out = mkdtempSync(join(tmpdir(), "ss-out-"));
   mkdirSync(out, { recursive: true });
   const compact = Object.fromEntries(Object.entries(total).map(([k, a]) => [k, { ...a, sumV: Math.round(a.sumV * 10) / 10 }]));
-  const meta = { v: 1, buckets: BUCKETS, updated: new Date().toISOString(), keys: Object.keys(total).length, observaciones: Object.values(total).reduce((s, a) => s + a.n, 0) };
+  const meta = { v: 2, direcciones: "N, E, S, O (hacia dónde va el bus), ? = sin saber", buckets: BUCKETS, updated: new Date().toISOString(), keys: Object.keys(total).length, observaciones: Object.values(total).reduce((s, a) => s + a.n, 0) };
   writeFileSync(join(out, "stats.json.gz"), gzipSync(JSON.stringify({ ...meta, stats: compact }), { level: 9 }));
   execFileSync("bash", ["scripts/publish.sh", out], { stdio: "inherit", env: { ...process.env, BRANCH: "signal-stats", GITHUB_REPOSITORY: REPO, GITHUB_TOKEN: TOKEN } });
   console.log("acumulado:", JSON.stringify(meta));
