@@ -52,7 +52,7 @@ async function main() {
     { name: "aprendido, mín 8, mezcla 3", apply: true, minN: 8, priorN: 3 },
     { name: "aprendido, mín 1, mezcla 10", apply: true, minN: 1, priorN: 10 },
   ];
-  const useVariant = (k: number) => { const x = VARIANTS[k]!; state.hopProfile.apply = x.apply; state.hopProfile.minN = x.minN; state.hopProfile.priorN = x.priorN; };
+  const useVariant = (k: number) => { const x = VARIANTS[k]!; state.hopProfile.apply = x.apply; state.hopProfile.minN = x.minN; state.hopProfile.priorN = x.priorN; state.hopProfile.extra = 0; };      // las correcciones (+ s) se suman aparte
   useVariant(2);      // lo que usa la app desde el 2026-11-17 (aprendido, sin mezcla)
   // por bus: por dónde ha ido (metros sobre su trazado, hora del GPS) y qué se le pronosticó
   type Pred = { stopS: number; away: number; madeAt: number; shown: number; raw: number; remaining: number; alt: number[] };
