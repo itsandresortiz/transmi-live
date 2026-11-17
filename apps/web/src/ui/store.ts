@@ -5,6 +5,8 @@ import type { ColorMode, Motion } from "../map/BusRenderer";
 
 export type Tab = "rutas" | "buses" | "paradas" | "avisos" | "viaje";
 export type SheetState = "peek" | "half" | "full";
+/** Modo de pruebas del dueño: se abre la web con `?pruebas` en la dirección. Muestra lo que aún no es para los usuarios (el detalle de cada semáforo). */
+export const OWNER_TESTS = typeof location !== "undefined" && new URLSearchParams(location.search).has("pruebas");
 export interface Layers { streets: boolean; stops: boolean; network: boolean; buses: boolean; signals: boolean; traffic: boolean }
 
 interface UiState {

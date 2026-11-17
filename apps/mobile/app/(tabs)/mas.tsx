@@ -17,6 +17,7 @@ import { useSaved } from "@/favorites";
 import { useDemo } from "@/demo";
 import { usePlanner } from "@/planner/store";
 import { Tap, PAGE, Toggle } from "@/ui/kit";
+import { useTestsMode } from "@/tests";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { lift, radius, space, type, useColors } from "@/ui/theme";
 
@@ -70,7 +71,7 @@ export default function Mas() {
   };
   // «Buses de ejemplo» es una herramienta de pruebas: queda escondida y aparece al tocar 8 veces la fila de buses en la calle
   const [tests, setTests] = useState(testsShown);
-  const secretTap = () => { if (tests) return; if (++secretTaps >= 8) { testsShown = true; setTests(true); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } };
+  const secretTap = () => { if (tests) return; if (++secretTaps >= 8) { testsShown = true; setTests(true); useTestsMode.getState().set(true); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } };
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
   const hasBuses = !liveDown(), late = (st.ageSeconds ?? 0) > 300, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;

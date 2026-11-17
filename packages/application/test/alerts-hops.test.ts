@@ -158,3 +158,16 @@ describe("semáforos", () => {
     expect(signalInfo([-74, 4.7, "AK 7 X CL 1", "", ""]).text).toBe("Cruce con semáforo.");      // archivo viejo
   });
 });
+
+describe("semáforos en su sitio", () => {
+  it("dibuja cada semáforo con posición y, si no hay, el punto del cruce", async () => {
+    const { signalPoints } = await import("../src");
+    const pts = signalPoints([
+      [-74.09367, 4.74459, "KR 102B BIS X AC 145", "SUBA", "", 3, 1, 3, 1, 2, "NORMAL", [[-74.0937, 4.7446, "c"], [-74.0936, 4.7449, "t"]]],
+      [-74.1, 4.7, "AK 7 X CL 1", "", ""],
+    ]);
+    expect(pts).toHaveLength(3);
+    expect(pts[1]).toMatchObject({ lon: -74.0936, label: "TM", tm: true, title: "KR 102B BIS X AC 145" });
+    expect(pts[2]).toMatchObject({ lon: -74.1, label: "AK 7 X CL 1", tm: false });
+  });
+});

@@ -1,7 +1,8 @@
+import { OWNER_TESTS } from "../ui/store";
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
-import { type SignalRow, flowDash, signalInfo, trafficBand } from "@transmi/application";
+import { type SignalRow, flowDash, signalPoints, trafficBand } from "@transmi/application";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
@@ -348,7 +349,7 @@ export class MapController {
       const hit = pick(e.point);
       if (!hit) {
         // un semáforo: qué cruce es y cuántos semáforos tiene (cada punto es un cruce, no cada semáforo de la calle)
-        const sig = m.getLayer("semaforos-icons") ? m.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ["semaforos-icons", "semaforos-dots"] })[0] : undefined;
+        const sig = OWNER_TESTS && m.getLayer("semaforos-icons") ? m.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ["semaforos-icons", "semaforos-dots"] })[0] : undefined;
         if (sig) {
           const el = document.createElement("div"), h = document.createElement("b"), p = document.createElement("div");
           h.textContent = String(sig.properties?.title ?? "Semáforo"); p.textContent = String(sig.properties?.text ?? ""); p.style.marginTop = "4px";
@@ -452,7 +453,8 @@ export class MapController {
     this.signalsLoaded = true;
     (this.map.getSource("semaforos") as GeoJSONSource | undefined)?.setData({
       type: "FeatureCollection",
-      features: rows.map((r) => { const i = signalInfo(r); return { type: "Feature", properties: { dir: r[2], loc: r[3], tipo: r[4], title: i.title, text: i.text }, geometry: { type: "Point", coordinates: [r[0], r[1]] } }; }),
+      // cada semáforo en su sitio (de OpenStreetMap) y, donde no se sabe, el punto del cruce; el de TransMilenio lleva «TM»
+      features: signalPoints(rows).map((p) => ({ type: "Feature", properties: { dir: p.label, tm: p.tm, title: p.title, text: p.text }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } })),
     });
   }
   get hasSignals(): boolean { return this.signalsLoaded; }

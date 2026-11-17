@@ -1,6 +1,20 @@
 /** Una fila de `semaforos.json`: [lon, lat, dirección, localidad, tipo, carros, TransMilenio, peatones, bicis, fases, operación].
  *  Las últimas seis llegan desde el 2026-11-17; los archivos viejos traen solo las cinco primeras. */
-export type SignalRow = readonly [number, number, string, string, string, number?, number?, number?, number?, number?, string?];
+export type SignalRow = readonly [number, number, string, string, string, number?, number?, number?, number?, number?, string?, (readonly SignalHead[])?];
+/** Un semáforo con su posición (de OpenStreetMap): [lon, lat, «c» carros | «t» TransMilenio]. */
+export type SignalHead = readonly [number, number, "c" | "t"];
+
+/** Los puntos a dibujar en el mapa: cada semáforo en su sitio si se sabe; si no, el punto del cruce. `label`: «TM» en los de TransMilenio,
+ *  la dirección del cruce en el punto de un cruce sin posiciones. */
+export function signalPoints(rows: readonly SignalRow[]): { lon: number; lat: number; label: string; tm: boolean; title: string; text: string }[] {
+  const out: { lon: number; lat: number; label: string; tm: boolean; title: string; text: string }[] = [];
+  for (const r of rows) {
+    const i = signalInfo(r), heads = r[11];
+    if (heads?.length) for (const h of heads) out.push({ lon: h[0], lat: h[1], label: h[2] === "t" ? "TM" : "", tm: h[2] === "t", title: i.title, text: i.text });
+    else out.push({ lon: r[0], lat: r[1], label: r[2], tm: false, title: i.title, text: i.text });
+  }
+  return out;
+}
 
 /** Cuántos grupos de señal hay en un campo de la Secretaría de Movilidad («1,2,3» → 3; «N/A» o vacío → 0). */
 export function countSignalGroups(field: unknown): number {
