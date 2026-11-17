@@ -12,6 +12,7 @@ import { Launch, useLaunch } from "@/ui/Launch";
 import { AppHeader } from "@/ui/AppHeader";
 import { useColors } from "@/ui/theme";
 import "@/appearance";      // aplica al abrir la apariencia que la persona eligió
+import Constants from "expo-constants";
 
 /** Si la app se abre directo en una parada o una ruta (por el widget, por ejemplo), debajo siempre queda el inicio: así se puede cerrar y volver. */
 export const unstable_settings = { anchor: "(tabs)", initialRouteName: "(tabs)" };
@@ -31,7 +32,8 @@ export default function RootLayout() {
   }, []);
   // la primera vez se explica qué es la app y qué hace con los datos
   const launched = useLaunch((s) => s.done);
-  useEffect(() => { if (launched) void AsyncStorage.getItem("tm.onboarded.v1").then((v) => { if (!v) setTimeout(() => router.push("/onboarding"), 200); }).catch(() => undefined); }, [launched]);
+  // (en la compilación para capturas automáticas no se muestra la bienvenida: taparía todas las pantallas)
+  useEffect(() => { if (launched && !Constants.expoConfig?.extra?.capturas) void AsyncStorage.getItem("tm.onboarded.v1").then((v) => { if (!v) setTimeout(() => router.push("/onboarding"), 200); }).catch(() => undefined); }, [launched]);
   return (
     <>
       <StatusBar style="auto" />
