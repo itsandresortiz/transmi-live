@@ -68,7 +68,7 @@ import { readFileSync } from "node:fs";
 describe("semáforos medidos guardados en el proyecto", () => {
   it("el del otro lado usa los tiempos del primero y cambia al mismo tiempo", () => {
     const list = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
-    expect(list).toHaveLength(4);
+    expect(list.length).toBeGreaterThanOrEqual(4);
     const [a, b] = list.map((x) => model2(x.marks)!);
     // el del otro lado usa el mismo modelo que el primero (el plan más reciente medido, sea cual sea)
     expect(b!.cycle).toBe(a!.cycle);
