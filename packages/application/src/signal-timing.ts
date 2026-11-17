@@ -123,24 +123,43 @@ export function signalNow(m: SignalModel, t: number): { c: Color; left: number }
 
 
 /** Lee el archivo de medidas guardadas en el proyecto (`tools/data/mediciones-semaforos.json`). */
-export function measuredSignals(data: unknown): { lat: number; lon: number; title: string; marks: SignalMark[] }[] {
-  const list = (data as { mediciones?: { semaforo?: { lat?: number; lon?: number; titulo?: string }; marcas?: [string, string][]; igual_a?: number }[] } | null)?.mediciones ?? [];
+export function measuredSignals(data: unknown): { lat: number; lon: number; title: string; marks: SignalMark[]; inverse: boolean; tm: boolean }[] {
+  const list = (data as { mediciones?: { semaforo?: { lat?: number; lon?: number; titulo?: string; transmilenio?: boolean }; marcas?: [string, string][]; igual_a?: number; opuesto_de?: number }[] } | null)?.mediciones ?? [];
   const C: Record<string, SignalColor> = { verde: "g", amarillo: "y", rojo: "r" };
   const parse = (m: { marcas?: [string, string][] } | undefined) => (m?.marcas ?? []).map(([t, c]) => ({ t: Date.parse(t), c: C[c]! })).filter((x) => Number.isFinite(x.t) && x.c);
   return list.flatMap((m) => {
     const lat = Number(m.semaforo?.lat), lon = Number(m.semaforo?.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
     // `igual_a`: un semáforo que cambia junto con otro (mismo cruce, mismo plan) usa también las marcas de ese otro
-    const shared = typeof m.igual_a === "number" && m.igual_a !== list.indexOf(m) ? parse(list[m.igual_a]) : [];
+    // `opuesto_de`: uno que alterna con otro (p. ej. el de TransMilenio con los de carros): sus marcas, con los colores al revés
+    const ref = typeof m.igual_a === "number" ? m.igual_a : typeof m.opuesto_de === "number" ? m.opuesto_de : -1;
+    const shared = ref >= 0 && ref !== list.indexOf(m) ? parse(list[ref]) : [];
+    const inverse = typeof m.opuesto_de === "number" && shared.length > 0;
     // (el ciclo sale de las del otro: las propias suelen ser pocas y de otra hora, y la medición más reciente mandaría)
     const marks = (shared.length ? shared : parse(m)).sort((a, b) => a.t - b.t);
-    return marks.length ? [{ lat, lon, title: String(m.semaforo?.titulo ?? ""), marks }] : [];
+    return marks.length ? [{ lat, lon, title: String(m.semaforo?.titulo ?? ""), marks, inverse, tm: m.semaforo?.transmilenio === true }] : [];
   });
 }
 
 /** Los semáforos medidos con el color que deberían tener en `t` (para pintarlos en el mapa). */
-export function liveSignalColors(measured: readonly { lat: number; lon: number; marks: readonly SignalMark[] }[], t: number): { lon: number; lat: number; c: SignalColor }[] {
+export function liveSignalColors(measured: readonly { lat: number; lon: number; marks: readonly SignalMark[]; inverse?: boolean }[], t: number): { lon: number; lat: number; c: SignalColor }[] {
   const out: { lon: number; lat: number; c: SignalColor }[] = [];
-  for (const m of measured) { const model = signalModel(m.marks); if (model) out.push({ lon: m.lon, lat: m.lat, c: signalNow(model, t).c }); }
+  for (const m of measured) { const model = signalModel(m.marks); if (model) out.push({ lon: m.lon, lat: m.lat, c: m.inverse ? opposite(model, t) : signalNow(model, t).c }); }
   return out;
+}
+
+/** Color de un semáforo que alterna con el medido: verde mientras aquel está en rojo; amarillo en los ~2 s antes de que aquel pase a
+ *  verde (es cuando este debe cerrar); rojo mientras aquel está en verde o en su amarillo (despeje). */
+export function opposite(m: SignalModel, t: number): SignalColor {
+  let into = ((t - m.anchor) % m.cycle + m.cycle) % m.cycle;
+  for (let i = 0; i < m.segs.length; i++) {
+    const seg = m.segs[i]!;
+    if (into < seg.d) {
+      if (seg.c === "r") return "g";
+      const prev = m.segs[(i - 1 + m.segs.length) % m.segs.length]!;
+      return seg.c === "y" && prev.c === "r" ? "y" : "r";
+    }
+    into -= seg.d;
+  }
+  return "r";
 }

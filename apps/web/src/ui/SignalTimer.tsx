@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import { nowMs } from "../clock";
-import { type SignalColor as Color, type SignalMark as Mark, SIGNAL_COLOR_NAMES as NAMES, lastSession, measuredSignals, signalModel, signalNow, summarize } from "@transmi/application";
+import { type SignalColor as Color, type SignalMark as Mark, SIGNAL_COLOR_NAMES as NAMES, lastSession, measuredSignals, opposite, signalModel, signalNow, summarize } from "@transmi/application";
 
 /**
  * Cronómetro de semáforos (solo en el modo de pruebas, `?pruebas`): el dueño mira un semáforo desde la calle o la ventana y toca
@@ -27,10 +27,10 @@ export function liveSignals(t: number): { lon: number; lat: number; color: strin
   const local = loadAll(), ids = new Set([...Object.keys(shared), ...Object.keys(local)]);
   for (const id of ids) {
     // las de este navegador si ya alcanzan para un modelo; si no (p. ej. una sola vuelta), las guardadas en el proyecto
-    const m = (local[id] && signalModel(local[id]!)) || (shared[id] && signalModel(shared[id]!));
+    const own = local[id] && signalModel(local[id]!), m = own || (shared[id] && signalModel(shared[id]!));
     if (!m) continue;
     const [lat, lon] = id.split(",").map(Number);
-    out.push({ lon: lon!, lat: lat!, color: COLORS[signalNow(m, t).c] });
+    out.push({ lon: lon!, lat: lat!, color: COLORS[!own && inverse.has(id) ? opposite(m, t) : signalNow(m, t).c] });
   }
   return out;
 }
@@ -40,10 +40,16 @@ const clock = (t: number) => new Intl.DateTimeFormat("es-CO", { hour: "numeric",
 
 /** Medidas guardadas en el proyecto (`tools/data/mediciones-semaforos.json`), para verlas desde cualquier navegador. */
 let shared: Record<string, Mark[]> = {};
+/** Semáforos guardados que alternan con otro (p. ej. el de TransMilenio): su color es el contrario. */
+let inverse = new Set<string>();
 export async function loadSharedMeasurements(): Promise<void> {
   try {
     const r = await fetch("https://raw.githubusercontent.com/itsandresortiz/transmi-live/main/tools/data/mediciones-semaforos.json", { cache: "no-cache" });
-    if (r.ok) shared = Object.fromEntries(measuredSignals(await r.json()).map((m) => [`${m.lat.toFixed(6)},${m.lon.toFixed(6)}`, m.marks]));
+    if (r.ok) {
+      const list = measuredSignals(await r.json()), key = (m: { lat: number; lon: number }) => `${m.lat.toFixed(6)},${m.lon.toFixed(6)}`;
+      shared = Object.fromEntries(list.map((m) => [key(m), m.marks]));
+      inverse = new Set(list.filter((m) => m.inverse).map(key));
+    }
   } catch { /* sin conexión: solo las de este navegador */ }
 }
 

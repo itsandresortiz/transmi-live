@@ -225,6 +225,18 @@
      "rojo"
     ]
    ]
+  },
+  {
+   "semaforo": {
+    "titulo": "KR 102B BIS X AC 145",
+    "lat": 4.744948,
+    "lon": -74.093647,
+    "transmilenio": true,
+    "nota": "el de TransMilenio (salida del Portal Suba), junto a los de carros"
+   },
+   "opuesto_de": 0,
+   "resumen": "Según el dueño, alterna con los de carros: cuando ellos están en rojo, este en verde (y al revés). Sin marcas propias todavía: se calcula del semáforo 0.",
+   "marcas": []
   }
  ]
 }

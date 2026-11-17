@@ -68,11 +68,26 @@ import { readFileSync } from "node:fs";
 describe("semáforos medidos guardados en el proyecto", () => {
   it("el del otro lado usa los tiempos del primero y cambia al mismo tiempo", () => {
     const list = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
-    expect(list).toHaveLength(2);
+    expect(list).toHaveLength(3);
     const [a, b] = list.map((x) => model2(x.marks)!);
     expect(Math.round(b!.cycle / 1000)).toBe(120);
     // su rojo medido (17:42:23) cae en rojo según el primero
     expect(now2(a!, Date.parse("2026-11-17T17:42:25Z")).c).toBe("r");
     expect(now2(b!, Date.parse("2026-11-17T17:42:25Z")).c).toBe("r");
+  });
+});
+
+import { opposite } from "@transmi/application";
+describe("semáforo de TransMilenio alterno", () => {
+  it("está en verde cuando los de carros están en rojo, y al revés", () => {
+    const list = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
+    const tm = list.find((x) => x.tm)!, cars = model2(list[0]!.marks)!;
+    expect(tm.inverse).toBe(true);
+    const m = model2(tm.marks)!;
+    for (let k = 0; k < 120; k += 3) {
+      const t = Date.parse("2026-11-17T17:42:00Z") + k * 1000, c = now2(cars, t).c, o = opposite(m, t);
+      if (c === "r") expect(o).toBe("g");
+      if (c === "g") expect(o).toBe("r");
+    }
   });
 });
