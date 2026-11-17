@@ -52,6 +52,9 @@ let shared: Record<string, Mark[]> = {};
 let inverse = new Set<string>();
 /** Semáforos que siguen a otro (igual o al revés): usan solo las marcas de ese otro, para no desfasarse entre ellos. */
 let follows = new Map<string, string>();      // semáforo → al que sigue
+/** Lo que dicen los buses de cada semáforo medido (rama `signal-stats`, se recalcula cada 10 min con `tools/signalstats.ts`). */
+let learned: Record<string, { text?: string; ultimas24h?: { text?: string; n?: number } }> = {};
+let learnedAt = "";
 export async function loadSharedMeasurements(): Promise<void> {
   try {
     const r = await fetch("https://raw.githubusercontent.com/itsandresortiz/transmi-live/main/tools/data/mediciones-semaforos.json", { cache: "no-cache" });
@@ -62,6 +65,10 @@ export async function loadSharedMeasurements(): Promise<void> {
       follows = new Map(list.filter((m) => m.follows && m.ref).map((m) => [key(m), key(m.ref!)]));
     }
   } catch { /* sin conexión: solo las de este navegador */ }
+  try {
+    const r = await fetch("https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/aprendizaje.json", { cache: "no-cache" });
+    if (r.ok) { const j = (await r.json()) as { updated?: string; semaforos?: typeof learned }; learned = j.semaforos ?? {}; learnedAt = j.updated ?? ""; }
+  } catch { /* sin conexión */ }
 }
 
 export function SignalTimer() {
@@ -119,6 +126,11 @@ export function SignalTimer() {
           <span aria-hidden style={{ width: 22, height: 22, borderRadius: 11, background: COLORS[live.c], boxShadow: `0 0 12px ${COLORS[live.c]}` }} />
           <span style={{ fontSize: 15, fontWeight: 650 }}>Debería estar en {NAMES[live.c]} · cambia en {Math.ceil(live.left / 1000)} s</span>
         </div>
+      ) : null}
+      {learned[id] ? (
+        <p className="cs" style={{ fontSize: 12.5, margin: "0 0 8px" }}>
+          <b>Lo que dicen los buses</b>{learnedAt ? ` (${clock(Date.parse(learnedAt))})` : ""}: {(learned[id]!.ultimas24h?.n ?? 0) >= 30 ? `(últimas 24 h) ${learned[id]!.ultimas24h!.text}` : `(últimos 7 días) ${learned[id]!.text}`}
+        </p>
       ) : null}
       {live ? <p className="cs" style={{ fontSize: 12, margin: "-4px 0 8px", opacity: 0.75 }}>Es una predicción con tus medidas (tiempo fijo). Si no coincide con la calle, cambió de plan: vuelve a medir.</p> : null}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

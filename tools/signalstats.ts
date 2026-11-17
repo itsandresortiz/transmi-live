@@ -21,8 +21,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { distanceMeters, toWorld } from "@transmi/domain";
-import { TransitState } from "@transmi/application";
+import { TransitState, learnFromBuses, measuredSignals, signalModel, type BusGo, type BusNearSignal, type Heading } from "@transmi/application";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
+import { SignalNearCollector } from "./signal-near";
+
+/** Reportes de buses junto a los semáforos medidos a mano que se conservan (para volver a compararlos cada vez que se mide de nuevo). */
+const KEEP_DAYS = 7;
+type NearStore = { obs: Record<string, [number, 0 | 1, Heading][]>; goes: Record<string, [number, number, Heading][]> };
 
 const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 18_000;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live", TOKEN = process.env.GITHUB_TOKEN ?? "";
@@ -75,6 +80,10 @@ async function main() {
   sig.forEach(([lon, lat], i) => { const k = cell(lon, lat); (grid.get(k) ?? grid.set(k, []).get(k)!).push(i); });
   console.log("semáforos:", sig.length);
 
+  // semáforos medidos a mano (los del archivo del proyecto): los buses que se les acercan se guardan aparte para aprender unos de otros
+  const measured = existsSync("tools/data/mediciones-semaforos.json") ? measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8"))) : [];
+  const near = new SignalNearCollector(measured);
+  const trunkOrDual = (rid: string) => { const sys = st.network.routes.get(rid)?.system; return sys === "troncal" || sys === "dual"; };
   const run: Stats = {};
   const prev = new Map<string, { x: number; y: number; t: number; lon: number; lat: number; dir: string }>();
   // hacia dónde va el bus (N, E, S, O) según cómo se movió desde su reporte anterior; quieto, se queda con la última que se le vio
@@ -89,6 +98,7 @@ async function main() {
       if (res.ok) {
         const reports = decodePositions(new Uint8Array(await res.arrayBuffer())); polls++;
         for (const r of reports) {
+          near.add({ id: r.id, lon: r.position.lon, lat: r.position.lat, t: r.reportedAt, trunk: trunkOrDual(r.routeId) });
           if (trunk(r.routeId)) continue;
           const w = toWorld(r.position), p = prev.get(r.id);
           const moved = p ? distanceMeters(p, w) : 0;
@@ -136,6 +146,24 @@ async function main() {
   mkdirSync(out, { recursive: true });
   const compact = Object.fromEntries(Object.entries(total).map(([k, a]) => [k, { ...a, sumV: Math.round(a.sumV * 10) / 10 }]));
   const meta = { v: 2, direcciones: "N, E, S, O (hacia dónde va el bus), ? = sin saber", buckets: BUCKETS, updated: new Date().toISOString(), keys: Object.keys(total).length, observaciones: Object.values(total).reduce((s, a) => s + a.n, 0) };
+  // buses junto a los semáforos medidos: se suman a los de días anteriores y se vuelve a calcular lo que dicen con la medida de hoy
+  const store: NearStore = { obs: {}, goes: {} };
+  if (prevDir && existsSync(join(prevDir, "cerca-medidos.json.gz"))) Object.assign(store, JSON.parse(gunzipSync(readFileSync(join(prevDir, "cerca-medidos.json.gz"))).toString()));
+  const since = Date.now() / 1000 - KEEP_DAYS * 86_400, learned: Record<string, unknown> = {};
+  measured.forEach((m, k) => {
+    const key = `${m.lat.toFixed(6)},${m.lon.toFixed(6)}`;
+    const obsAll = [...(store.obs[key] ?? []), ...near.obs[k]!.map((o) => [o.t, o.still ? 1 : 0, o.h] as [number, 0 | 1, Heading])].filter((o) => o[0] >= since);
+    const goesAll = [...(store.goes[key] ?? []), ...near.goes[k]!.map((g) => [g.a, g.b, g.h] as [number, number, Heading])].filter((g) => g[0] >= since);
+    store.obs[key] = obsAll; store.goes[key] = goesAll;
+    const model = signalModel(m.marks);
+    if (!model) return;
+    const obs: BusNearSignal[] = obsAll.map(([t, still, h]) => ({ t, still: still === 1, h })), goes: BusGo[] = goesAll.map(([a, b, h]) => ({ a, b, h }));
+    const L = learnFromBuses(model, m.inverse, obs, goes), day = learnFromBuses(model, m.inverse, obs.filter((o) => o.t >= Date.now() / 1000 - 86_400), goes.filter((g) => g.a >= Date.now() / 1000 - 86_400));
+    learned[key] = { titulo: m.title, tm: m.tm, ...L, ultimas24h: { n: day.n, agree: day.agree, shift: day.shift, text: day.text } };
+  });
+  writeFileSync(join(out, "cerca-medidos.json.gz"), gzipSync(JSON.stringify(store), { level: 9 }));
+  writeFileSync(join(out, "aprendizaje.json"), JSON.stringify({ v: 1, updated: new Date().toISOString(), semaforos: learned }));
+  console.log("semáforos medidos:", Object.entries(learned).map(([k, v]) => `${k}: ${(v as { text: string }).text}`).join("\n"));
   writeFileSync(join(out, "stats.json.gz"), gzipSync(JSON.stringify({ ...meta, stats: compact }), { level: 9 }));
   execFileSync("bash", ["scripts/publish.sh", out], { stdio: "inherit", env: { ...process.env, BRANCH: "signal-stats", GITHUB_REPOSITORY: REPO, GITHUB_TOKEN: TOKEN } });
   console.log("acumulado:", JSON.stringify(meta));

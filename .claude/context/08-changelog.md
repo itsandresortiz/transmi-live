@@ -4,6 +4,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-17 · Semáforos y buses aprenden unos de otros: `learnFromBuses` (`packages/application/src/signal-learning.ts`) compara los buses que se acercan a cada semáforo medido (detenido/avanzando, dirección, arranques) con el ciclo medido: cuánto encaja, si el ciclo parece corrido, qué eje va al revés, a qué horas no encaja y si los arranques caen tras el verde. `signal-stats` (cada 10 min) guarda 7 días en `cerca-medidos.json.gz` y publica `aprendizaje.json`; el cronómetro (`?pruebas`) lo muestra. `tools/signalcheck.ts` usa lo mismo a mano.
 - 2026-11-17 · Prueba del cronómetro: ya no fija las duraciones del plan de la 1 p. m. (cambian con cada vuelta guardada).
 
 - 2026-11-17 · núcleo, datos · Medición de 1:10–1:14 p. m.: sigue el ciclo fijo de 120 s con rojos en la misma cuadrícula (1:11:29, 1:13:29) y rojo de 41–49 s. Cronómetro: dos toques del mismo color en <10 s cuentan como uno (un amarillo marcado como rojo) y no se cuentan duraciones que empiezan tras una pausa larga.

@@ -98,3 +98,6 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Descartado**: mostrarlo a todos en el mapa. Alguien podría cruzar o arrancar guiándose por la app; el plan cambia según la hora y Movilidad puede ajustarlo sin aviso.
 - **Por qué**: queda como herramienta del dueño (modo de pruebas) para validar, y lo medido se usa por dentro (p. ej. tiempo de espera del bus en ese rojo para las llegadas).
 
+
+## 2026-11-17 · Los buses validan los semáforos medidos, pero no los corrigen solos
+Contexto: el dueño quiere que semáforos y buses «aprendan unos de otros». Se decidió que los buses **digan** si el ciclo medido encaja, si parece corrido o a qué horas no encaja, pero sin mover el ciclo solos: los reportes llegan cada ~20 s, el corrimiento que sugieren es aproximado y un ajuste automático equivocado se vería como un semáforo mal en las pruebas. Alternativa descartada: corregir el ancla con el mejor corrimiento de los buses. Las llegadas tampoco usan aún el semáforo: primero hay que ver con días de datos que los arranques caen tras el verde.
