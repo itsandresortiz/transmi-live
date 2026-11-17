@@ -9,7 +9,7 @@
     "transmilenio": false,
     "nota": "el de carros más cercano a la ventana del dueño, salida del Portal Suba"
    },
-   "resumen": "Tiempo fijo, ciclo 89,996 s (afinado con 3 mediciones entre 2:34 y 2:57 a. m.): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. La predicción en vivo coincidió con la calle (desfase 0,4–1,7 s, lo que tarda el dedo). Notas: 07:51:31 «rojo» fue al empezar a mirar (no un cambio); 07:52:42 doble toque. Mediodía (12:18–12:27 p. m.): otro plan, ciclo fijo de ~120 s (vueltas bien marcadas 119,8 · 119,9 · 120,2 s): verde 68 s, amarillo 2 s, rojo 48 s, amarillo antes del verde 2 s; 6 de 8 cambios encajan, 2 marcas corridas ~7 s (17:19:19 y 17:24:30, este sin amarillo antes). Hacia la 1 p. m. (12:57–1:00 p. m., 1 vuelta) cambió de plan otra vez: rojo 47 s (igual), verde ~43 s, ciclo ~94 s; los cambios se corrieron >1 min frente al plan de 120 s. Falta confirmar con 2–3 vueltas.",
+   "resumen": "Tiempo fijo, ciclo 89,996 s (afinado con 3 mediciones entre 2:34 y 2:57 a. m.): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. La predicción en vivo coincidió con la calle (desfase 0,4–1,7 s, lo que tarda el dedo). Notas: 07:51:31 «rojo» fue al empezar a mirar (no un cambio); 07:52:42 doble toque. Mediodía (12:18–12:27 p. m.): otro plan, ciclo fijo de ~120 s (vueltas bien marcadas 119,8 · 119,9 · 120,2 s): verde 68 s, amarillo 2 s, rojo 48 s, amarillo antes del verde 2 s; 6 de 8 cambios encajan, 2 marcas corridas ~7 s (17:19:19 y 17:24:30, este sin amarillo antes). Hacia la 1 p. m. (12:57–1:06 p. m.): ciclo fijo de 120 s con el inicio del rojo siempre en el mismo punto (12:59:29, 1:03:29, 1:05:29), pero el rojo dura 40,5–47 s según el tráfico (el cruce ajusta su tiempo dentro del ciclo); el inicio del rojo se corrió ~6 s frente al mediodía.",
    "marcas": [
     [
      "2026-11-17T07:34:38.884Z",
@@ -221,6 +221,42 @@
     ],
     [
      "2026-11-17T18:00:18.518Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T18:03:14.933Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T18:03:27.633Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T18:03:29.475Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T18:04:12.469Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T18:04:14.410Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T18:05:26.955Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T18:05:29.297Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T18:06:09.797Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T18:06:11.214Z",
      "verde"
     ]
    ]

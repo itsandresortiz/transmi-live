@@ -40,7 +40,16 @@ export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Reco
   if (!cycles.length) return { cycles, dur, preGreen, text: "Marca al menos dos veces el mismo color (verde o rojo) para calcular el ciclo: unas 2–3 vueltas." };
   // el ciclo: se prueba cada vuelta medida (afinada con las marcas lejanas) y se queda la que hace encajar más cambios a verde y a
   // rojo (±3 s). Así un toque tarde no corre el ciclo, como pasa con un promedio o una mediana
-  const base0 = med(cycles), cands = cycles.filter((c) => c < base0 * 1.5);
+  // candidatas: cada vuelta medida, la mitad de las que saltaron una vuelta (marcas que faltaron) y su segundo entero más cercano
+  // (solo se parten las vueltas claramente más largas que la más corta, y ningún ciclo puede durar menos que un rojo con sus amarillos)
+  const base0 = med(cycles), shortest = Math.min(...cycles), cands: number[] = [];
+  const floor = (dur.r.length ? Math.max(...dur.r) : 0) + 2 * (dur.y.length ? med(dur.y) : 0) + 10_000;
+  for (const c of cycles) for (const k of [1, 2, 3]) {
+    if (k > 1 && c < shortest * 1.6) continue;
+    const v = c / k;
+    if (v >= Math.max(30_000, floor) && v <= 240_000) cands.push(v, Math.round(v / 1000) * 1000);
+  }
+  if (!cands.length) cands.push(base0);
   const points = (["g", "r"] as const).map((c) => marks.filter((m, i) => m.c === c && i > 0 && m.t - marks[i - 1]!.t <= 100_000).map((m) => m.t));
   // cuántas marcas de un color caen (±3 s) en una cuadrícula del ciclo; cada marca se prueba como referencia y vale la mejor
   const fitOf = (ts: readonly number[], cyc: number) => {
@@ -54,15 +63,24 @@ export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Reco
   };
   const score = (cyc: number) => {
     let fit = 0, total = 0, worst = 0;
-    for (const ts of points) { const r = fitOf(ts, cyc); fit += r.f; total += ts.length; worst = Math.max(worst, r.w); }
-    return { fit, total, worst };
+    const byColor = points.map((ts) => { const r = fitOf(ts, cyc); fit += r.f; total += ts.length; worst = Math.max(worst, r.w); return { fit: r.f, total: ts.length }; });
+    return { fit, total, worst, byColor };
   };
+  void base0;
   let cyc = refineCycle(marks, med(cands)), best = score(cyc);
-  for (const c of cands) { const cc = refineCycle(marks, c), sc = score(cc); if (sc.fit > best.fit || (sc.fit === best.fit && sc.worst < best.worst)) { cyc = cc; best = sc; } }
-  const { fit, total, worst } = best;
-  const parts = [dur.g.length ? `verde ${secs(med(dur.g))}` : "", dur.y.length ? `amarillo ${secs(med(dur.y))}` : "", dur.r.length ? `rojo ${secs(med(dur.r))}` : "", preGreen.length ? `amarillo antes del verde ${secs(med(preGreen))}` : ""].filter(Boolean);
+  // vale más un ciclo en el que todos los cambios de un color (al menos 3) caen exactos: es lo típico de un cruce coordinado, que fija
+  // el inicio de una fase y ajusta la otra según el tráfico (medido: rojos cada 120 s exactos y verdes corridos unos segundos)
+  const value = (sc: ReturnType<typeof score>) => sc.fit + (sc.byColor.some((c) => c.total >= 3 && c.fit === c.total) ? 1.5 : 0);
+  for (const c of cands) { const cc = refineCycle(marks, c), sc = score(cc); if (value(sc) > value(best) || (value(sc) === value(best) && sc.worst < best.worst)) { cyc = cc; best = sc; } }
+  const { fit, total, worst, byColor } = best;
+  const [pg, pr] = byColor;      // verde, rojo
+  const restG = cyc - (dur.r.length ? med(dur.r) : 0) - (dur.y.length ? med(dur.y) : 0) - (preGreen.length ? med(preGreen) : 0);
+  const greenTxt = dur.r.length && dur.y.length && restG > 3000 ? restG : dur.g.length ? med(dur.g) : NaN;      // el verde: lo que queda del ciclo
+  const parts = [Number.isFinite(greenTxt) ? `verde ${secs(greenTxt)}` : "", dur.y.length ? `amarillo ${secs(med(dur.y))}` : "", dur.r.length ? `rojo ${secs(med(dur.r))}` : "", preGreen.length ? `amarillo antes del verde ${secs(med(preGreen))}` : ""].filter(Boolean);
   const steady = total < 3 || rounds < 2 ? ""      // con una sola vuelta no se puede decir si se repite
     : fit === total ? " Se repite igual: parece de tiempo fijo."
+    : pr && pg && pr.total >= 2 && pr.fit === pr.total && pg.fit < pg.total ? ` El rojo empieza siempre en el mismo punto del ciclo; el verde varía unos segundos (el rojo dura entre ${secs(Math.min(...dur.r))} y ${secs(Math.max(...dur.r))}): ciclo fijo que ajusta el tiempo del cruce según el tráfico.`
+    : pr && pg && pg.total >= 2 && pg.fit === pg.total && pr.fit < pr.total ? ` El verde empieza siempre en el mismo punto del ciclo; el rojo varía unos segundos: ciclo fijo que ajusta el tiempo del cruce según el tráfico.`
     : fit / total >= 0.7 ? ` ${fit} de ${total} cambios caen justo en un ciclo fijo; ${total - fit} se corrieron hasta ${secs(worst)} (puede ser el toque o que se adapte al tráfico).`
     : ` Solo ${fit} de ${total} cambios caen en un ciclo fijo: parece adaptarse al tráfico.`;
   return { cycles, dur, preGreen, cycle: cyc, text: `Ciclo de ${secs(cyc)} (${rounds} ${rounds === 1 ? "vuelta" : "vueltas"})${parts.length ? `: ${parts.join(", ")}` : ""}.${steady}` };
@@ -98,8 +116,12 @@ export function signalModel(all: readonly Mark[]): SignalModel | null {
   const reds = marks.filter((m, i) => m.c === "r" && i > 0 && m.t - marks[i - 1]!.t <= 100_000).map((m) => m.t);
   const res = reds.map((t) => { const d = t - last; return d - Math.round(d / cycle) * cycle; }).filter((r) => Math.abs(r) <= 3000);
   const anchor = last + (res.length ? res.reduce((a, b) => a + b, 0) / res.length : 0);
-  const raw = [{ c: "r" as Color, d: med(s.dur.r) }, { c: "y" as Color, d: s.preGreen.length ? med(s.preGreen) : 0 }, { c: "g" as Color, d: med(s.dur.g) }, { c: "y" as Color, d: s.dur.y.length ? med(s.dur.y) : 0 }].filter((x) => x.d > 0);
-  const k = cycle / raw.reduce((a, x) => a + x.d, 0);       // se ajusta para que sume exactamente el ciclo medido
+  // el verde es lo que queda del ciclo: los toques de inicio de verde suelen ser los menos confiables (se empieza a mirar en verde) y,
+  // en un cruce que ajusta su tiempo, el rojo medido + los amarillos + el ciclo fijo dan el verde mejor que su mediana
+  const R = med(s.dur.r), Yg = s.preGreen.length ? med(s.preGreen) : 0, Yb = s.dur.y.length ? med(s.dur.y) : 0;
+  const G = cycle - R - Yg - Yb > 3000 ? cycle - R - Yg - Yb : med(s.dur.g);
+  const raw = [{ c: "r" as Color, d: R }, { c: "y" as Color, d: Yg }, { c: "g" as Color, d: G }, { c: "y" as Color, d: Yb }].filter((x) => x.d > 0);
+  const k = cycle / raw.reduce((a, x) => a + x.d, 0);       // por si acaso, que sume exactamente el ciclo
   return { cycle, anchor, segs: raw.map((x) => ({ c: x.c, d: x.d * k })) };
 }
 /** Afina el ciclo con marcas lejanas del mismo color: si entre el primer y el último verde (o rojo) caben justo N vueltas, el ciclo es
