@@ -404,7 +404,10 @@ function build(state: TransitState, ix: Index, live: Live, run: RunResult, k: nu
   if (!rides.length) return null;
   // cambiar de bus para avanzar una sola parada no tiene sentido… salvo que esa parada quede lejos (un expreso que salta varias estaciones,
   // o el tramo que ahorra una caminata larga hasta el destino): solo se descarta si el salto es corto
-  if (rides.length > 1 && rides.some((r) => r.stops < 2 && hav(r.board.position, r.alight.position) < SHORT_HOP_M)) return null;
+  // un tramo de una parada muy corto no justifica cambiar de bus (se camina)… salvo el último, si te deja en la estación que elegiste:
+  // «7 hasta Polo y el 4 una parada hasta Héroes» es llegar a Héroes sin caminar, que es lo que se pidió
+  const intoStation = (r: RideLeg, i: number) => i === rides.length - 1 && !!dest.stopIds?.includes(r.alight.id);
+  if (rides.length > 1 && rides.some((r, i) => r.stops < 2 && hav(r.board.position, r.alight.position) < SHORT_HOP_M && !intoStation(r, i))) return null;
   const arriveAt = run.best.find((b) => b.k === k && b.stop === stop)!.arrive + shift;
   const walk = all.filter((l): l is WalkLeg => l.kind === "walk");
   return {
