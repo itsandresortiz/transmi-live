@@ -20,9 +20,10 @@ import { TransitState, buildHopProfile, shapeStops } from "@transmi/application"
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 
 const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 10_000;
-/** ¿La app usa ya estos tiempos para las llegadas? Se enciende cuando `tools/etaprecision.ts` muestre, de día, que aciertan más que el
- *  valor fijo. Mientras sea `false` el perfil se publica igual (para medirlo) y la app lo ignora. */
-const PROFILE_USE = false;
+/** ¿La app usa ya estos tiempos para las llegadas? Encendido el 2026-11-17: medido en hora pico con `tools/etaprecision.ts`
+ *  (≈27.000 llegadas), el error típico bajó de 90/122/178 s a 51/63/100 s a 1/2/3 paradas. Ponerlo en `false` lo apaga en web y apps
+ *  (sin sacar versión nueva) en la siguiente publicación del perfil. */
+const PROFILE_USE = true;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live", TOKEN = process.env.GITHUB_TOKEN ?? "";
 const url = (b: string) => `https://${TOKEN ? `x-access-token:${TOKEN}@` : ""}github.com/${REPO}.git`;
 

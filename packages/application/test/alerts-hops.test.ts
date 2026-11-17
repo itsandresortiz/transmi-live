@@ -71,11 +71,12 @@ describe("tiempos reales por tramo", () => {
   it("arma el perfil y descarta tramos que ya no existen", () => {
     const p = buildHopProfile({ "14000|0|1|wk|1": { n: 10, sum: 1200 }, "14000|0|9|wk|1": { n: 5, sum: 100 } }, (k) => (k === "14000|0" ? 5 : undefined), "x");
     expect(p.r["14000|0"]!["wk|1"]).toEqual([0, 0, 120, 10, 0, 0, 0, 0]);
+    expect(p.prior).toBe(0);
     expect(buildHopProfile({ "14000|0|1|wk|1": { n: 2, sum: 240 } }, () => 5, "x").r).toEqual({});      // muy pocas pasadas: no se publica
   });
   it("mezcla lo aprendido con el valor fijo según cuántas pasadas tiene", () => {
     const h = new HopProfile();
-    h.load({ v: 1, updated: "", r: { "R|0": { "wk|1": [0, 0, 120, 3, 200, 30] } } });
+    h.load({ v: 1, updated: "", prior: 3, r: { "R|0": { "wk|1": [0, 0, 120, 3, 200, 30] } } });
     const shape = { routeId: "R", direction: "0", headsign: "", points: [], stopIds: ["a", "b", "c", "d"] };
     expect(h.seconds(shape, 0, NOW, 60)).toBe(60);                          // sin datos: el fijo
     expect(h.seconds(shape, 1, NOW, 60)).toBe(90);                          // 3 pasadas: mitad y mitad

@@ -21,12 +21,13 @@ export function hopTag(nowMs: number): { day: HopDay; bucket: number } {
 }
 
 /** Formato publicado: `r["ruta|sentido"]["wk|1"] = [segundos0, pasadas0, segundos1, pasadas1, …]` (0, 0 = sin datos de ese tramo). */
-export interface HopProfileData { v: 1; updated: string; /** `false` = publicado solo para medir; la app no lo usa todavía. */ use?: boolean; r: Record<string, Record<string, number[]>> }
+export interface HopProfileData { v: 1; updated: string; /** `false` = publicado solo para medir; la app no lo usa todavía. */ use?: boolean; /** Cuánto pesa el valor fijo (sobrescribe `HOP_PRIOR_N` en apps ya publicadas). */ prior?: number; r: Record<string, Record<string, number[]>> }
 
 /** Un tramo tiene que haberse recorrido al menos esto (en tramos completos) para usar su tiempo. */
 export const HOP_MIN_N = 3;
-/** Cuántas «pasadas» vale el valor fijo al mezclarlo: con 3 pasadas pesa la mitad lo aprendido; con 30, casi todo. */
-export const HOP_PRIOR_N = 3;
+/** Cuántas «pasadas» vale el valor fijo al mezclarlo con lo aprendido. Medido el 2026-11-17 en hora pico (≈27.000 llegadas): sin mezcla
+ *  (0) erró menos (mediana 51/63/100 s a 1/2/3 paradas) que mezclando con 3 (54/67/108 s) y que el valor fijo solo (90/122/178 s). */
+export const HOP_PRIOR_N = 0;
 const MIN_S = 8, MAX_S = 900;
 
 export class HopProfile {
@@ -56,6 +57,7 @@ export class HopProfile {
     this.routes = next;
     this.stamp = typeof d.updated === "string" ? d.updated : "";
     this.apply = d.use !== false;          // se enciende o apaga desde los datos, sin sacar una versión nueva de la app
+    if (typeof d.prior === "number" && d.prior >= 0) this.priorN = d.prior;
     return true;
   }
 
@@ -83,7 +85,7 @@ function pick(arr: number[] | undefined, i: number, minN: number): { s: number; 
 
 /** Arma el perfil publicado a partir de las sumas que acumula `tools/hopstats.ts` (`ruta|sentido|tramo|día|franja` → pasadas y segundos).
  *  `stopsOf` dice cuántas paradas tiene cada recorrido hoy: si el GTFS cambió y la ruta ya no tiene ese tramo, se descarta. */
-export function buildHopProfile(stats: Record<string, { n: number; sum: number }>, stopsOf: (routeDir: string) => number | undefined, updated: string, minN = HOP_MIN_N, use = true): HopProfileData {
+export function buildHopProfile(stats: Record<string, { n: number; sum: number }>, stopsOf: (routeDir: string) => number | undefined, updated: string, minN = HOP_MIN_N, use = true, prior = HOP_PRIOR_N): HopProfileData {
   const r: Record<string, Record<string, number[]>> = {};
   for (const [key, a] of Object.entries(stats)) {
     const [route, dir, idx, day, bucket] = key.split("|");
@@ -94,5 +96,5 @@ export function buildHopProfile(stats: Record<string, { n: number; sum: number }
     arr[2 * i] = Math.round(a.sum / a.n);
     arr[2 * i + 1] = Math.min(999, Math.round(a.n));
   }
-  return { v: 1, updated, use, r };
+  return { v: 1, updated, use, prior, r };
 }
