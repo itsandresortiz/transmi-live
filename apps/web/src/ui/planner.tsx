@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
-import { type Itinerary, type Leg, type PlanPlace, type RideLeg, type WalkLeg, diagnosePlan, searchPlanPlaces, TRAVEL_MODES } from "@transmi/application";
+import { type Itinerary, type Leg, type PlanPlace, type RideLeg, type WalkLeg, diagnosePlan, searchPlanPlaces, transfersOf, TRAVEL_MODES } from "@transmi/application";
 import { SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "../composition-root";
 import { routeBadgeColor, type MapTheme } from "../map/theme";
@@ -333,6 +333,8 @@ function Card({ it, i, on, th, act, select, nowS }: { it: Itinerary; i: number; 
           {onlyWalk ? `Caminando · ${meters(it.walkMeters)}` : <>{transfersText(it.transfers)} · caminas {meters(it.walkMeters)}</>}
           {first && <> · <span className={first.waitKind === "live" ? "live" : ""}>{first.waitKind === "live" ? `${first.shortName} ${liveLine(first, nowS)} (en vivo)` : `${first.shortName} pasa cada ~${mins(first.headwaySeconds)} min`}</span></>}
         </div>
+        {/* dónde se cambia de bus, sin tener que abrir la opción */}
+        {(() => { const tps = transfersOf(transit, it); return tps.length ? <div className="tsub ttp">⇄ Trasbordo en {tps.map((t) => (t.boardStation !== t.station ? `${t.station} (sigue en ${t.boardStation})` : t.station)).join(" y en ")}</div> : null; })()}
       </button>
       {on && <Steps it={it} th={th} act={act} nowS={nowS} />}
     </div>

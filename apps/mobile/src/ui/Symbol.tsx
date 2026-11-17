@@ -11,7 +11,7 @@ type IonName = ComponentProps<typeof Ionicons>["name"];
 const ANDROID: Record<string, IonName> = {
   "arrow.down.circle.fill": "arrow-down-circle", "arrow.right": "arrow-forward", "arrow.triangle.2.circlepath": "refresh",
   "arrow.triangle.turn.up.right.diamond": "arrow-redo", "arrow.triangle.turn.up.right.diamond.fill": "arrow-redo",
-  "arrow.up.arrow.down": "swap-vertical", "arrow.up.left.and.arrow.down.right": "expand", "arrow.up.right": "open-outline",
+  "arrow.up.arrow.down": "swap-vertical", "arrow.triangle.swap": "swap-horizontal", "arrow.up.left.and.arrow.down.right": "expand", "arrow.up.right": "open-outline",
   bell: "notifications-outline", "bell.fill": "notifications", "bell.badge.fill": "notifications", "bell.slash": "notifications-off",
   "briefcase.fill": "briefcase", "building.2.fill": "business", bus: "bus", "bus.fill": "bus",
   "checkmark.circle.fill": "checkmark-circle", "chevron.down": "chevron-down", "chevron.left": "chevron-back", "chevron.right": "chevron-forward", "chevron.up": "chevron-up",

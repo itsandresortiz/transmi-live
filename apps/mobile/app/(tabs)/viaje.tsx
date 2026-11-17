@@ -6,7 +6,7 @@ import { router, useIsFocused } from "expo-router";
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { SymbolView } from "@/ui/Symbol";
 import * as Haptics from "expo-haptics";
-import { TRAVEL_MODES, type Itinerary, type PlanPlace, type PlanSort, searchPlanPlaces } from "@transmi/application";
+import { TRAVEL_MODES, type Itinerary, type PlanPlace, type PlanSort, type TransferPoint, searchPlanPlaces, transfersOf } from "@transmi/application";
 import { SYSTEM_LABEL } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { geocode } from "@/geocode";
@@ -245,12 +245,33 @@ function Results() {
   );
 }
 
+/** El paso del trasbordo: en qué estación, de qué vagón a cuál, cuánto caminas y qué bus tomas. */
+function TransferRow({ t }: { t: TransferPoint }) {
+  const c = useColors();
+  const where = t.boardStation !== t.station ? `${t.station} → ${t.boardStation}` : t.station;
+  const wagons = t.fromWagon && t.toWagon ? (t.fromWagon === t.toWagon ? `Quédate en el ${t.fromWagon}` : `Del ${t.fromWagon} al ${t.toWagon}`) : "";
+  const walk = t.meters > 20 ? `camina ${durText(t.seconds)} (${meters(t.meters)})` : "";
+  const detail = [wagons, walk, `toma el ${t.toRoute}`].filter(Boolean).join(" · ");
+  return (
+    <View style={[styles.tpRow, { backgroundColor: c.cardAlt }]} accessible accessibilityLabel={`Trasbordo en ${where}. ${detail}`}>
+      <SymbolView name="arrow.triangle.swap" tintColor={c.accent} size={18} />
+      <View style={{ flex: 1 }}>
+        <Text style={[type.headline, { color: c.text }]}>Trasbordo en {where}</Text>
+        <Text style={[type.caption, { color: c.muted }]}>{detail.charAt(0).toUpperCase() + detail.slice(1)}</Text>
+      </View>
+    </View>
+  );
+}
+
 function TripCard({ it, open, onPress, now }: { it: Itinerary; open: boolean; onPress(): void; now: number }) {
   const c = useColors();
   const first = it.legs.find(isRide);
+  // dónde se cambia de bus: se dice en la tarjeta (sin abrirla) y como paso propio en el detalle
+  const tps = useMemo(() => transfersOf(transit, it), [it]);
+  const tpAt = new Map(tps.map((t) => [t.legIndex, t] as [number, TransferPoint]));
   return (
     <Tap still onPress={onPress} accessibilityRole="button" accessibilityState={{ expanded: open }}
-      accessibilityLabel={`${durText(it.seconds)}, llegas ${hm(it.arriveAt)}, ${transfersText(it.transfers)}`}>
+      accessibilityLabel={`${durText(it.seconds)}, llegas ${hm(it.arriveAt)}, ${transfersText(it.transfers)}${tps.length ? `, trasbordo en ${tps.map((t) => t.station).join(" y en ")}` : ""}`}>
       <Card style={open ? { borderWidth: 1.5, borderColor: c.accent } : undefined}>
         <View style={styles.tripTop}>
           <View style={{ flex: 1, gap: space[1] }}>
@@ -274,12 +295,22 @@ function TripCard({ it, open, onPress, now }: { it: Itinerary; open: boolean; on
           {first ? `${transfersText(it.transfers)} · caminas ${meters(it.walkMeters)}` : `Caminando · ${meters(it.walkMeters)}`}
           {first && first.waitKind === "live" ? ` · ${first.shortName} llega en ${etaText(first.departAt, now)} (en vivo)` : ""}
         </Text>
+        {tps.length ? (
+          <View style={styles.tpLine}>
+            <SymbolView name="arrow.triangle.swap" tintColor={c.accent} size={14} />
+            <Text style={[type.caption, { color: c.text, flex: 1, fontWeight: "600" }]} numberOfLines={2}>Trasbordo en {tps.map((t) => (t.boardStation !== t.station ? `${t.station} (sigue en ${t.boardStation})` : t.station)).join(" y en ")}</Text>
+          </View>
+        ) : null}
         {open ? (
           <View style={{ marginTop: space[3], gap: space[3] }}>
             {it.legs.map((l, i) => isWalk(l) ? (
+              // la caminata entre dos buses es el trasbordo: se dice dónde y entre qué vagones
+              tpAt.get(i + 1) ? <TransferRow key={i} t={tpAt.get(i + 1)!} /> :
               <View key={i} style={styles.step}><SymbolView name="figure.walk" tintColor={c.muted} size={18} /><View style={{ flex: 1 }}><Text style={[type.headline, { color: c.text }]}>Camina {durText(l.seconds)} ({meters(l.meters)})</Text><Text style={[type.caption, { color: c.muted }]}>hasta {l.toName}</Text></View></View>
             ) : (
-              <Tap key={i} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: l.board.id, route: l.routeId } })} accessibilityRole="button" accessibilityLabel={`Ver el bus ${l.shortName} en vivo y sus paradas`} style={styles.step}>
+              <View key={i} style={{ gap: space[3] }}>
+              {tpAt.get(i) && i > 0 && !isWalk(it.legs[i - 1]!) ? <TransferRow t={tpAt.get(i)!} /> : null}
+              <Tap onPress={() => router.push({ pathname: "/stop/[id]", params: { id: l.board.id, route: l.routeId } })} accessibilityRole="button" accessibilityLabel={`Ver el bus ${l.shortName} en vivo y sus paradas`} style={styles.step}>
                 {transit.routeById(l.routeId) ? <RouteBadge route={transit.routeById(l.routeId)!} /> : null}
                 <View style={{ flex: 1 }}>
                   <Text style={[type.headline, { color: c.text }]}>{l.headsign ? `Hacia ${l.headsign}` : `${SYSTEM_LABEL[l.system]} ${l.shortName}`}</Text>
@@ -291,6 +322,7 @@ function TripCard({ it, open, onPress, now }: { it: Itinerary; open: boolean; on
                   <Text style={[type.caption, { color: c.accent, marginTop: 2 }]}>Ver bus más cercano, seguirlo en vivo y sus paradas ›</Text>
                 </View>
               </Tap>
+              </View>
             ))}
             <View style={styles.step}><SymbolView name="mappin.circle.fill" tintColor={c.accent} size={18} /><Text style={[type.headline, { color: c.text }]}>Llegas a las {hm(it.arriveAt)}</Text></View>
             {first ? <PrimaryButton label="Seguir este viaje" symbol="bell.fill" a11y="Seguir este viaje: te avisamos cuándo subir, cuándo bajar y qué sigue" onPress={() => { void allowAlerts(); useTrip.getState().start(it, usePlanner.getState().dest); router.push("/trip"); }} /> : null}
@@ -322,4 +354,6 @@ const styles = StyleSheet.create({
   chainItem: { flexDirection: "row", alignItems: "center", gap: space[1] },
   walk: { flexDirection: "row", alignItems: "center", gap: 2 },
   step: { flexDirection: "row", alignItems: "flex-start", gap: space[3] },
+  tpLine: { flexDirection: "row", alignItems: "center", gap: space[2], marginTop: space[1] },
+  tpRow: { flexDirection: "row", alignItems: "flex-start", gap: space[3], padding: space[3], borderRadius: radius.md, borderCurve: "continuous" },
 });

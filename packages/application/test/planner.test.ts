@@ -128,3 +128,16 @@ describe("subir en la parada más cercana", () => {
     expect((r[0]!.legs.find((l) => l.kind === "ride") as { board: { id: string } }).board.id).toBe("A1");
   });
 });
+
+import { transfersOf } from "@transmi/application";
+describe("dónde se hace el trasbordo", () => {
+  it("dice la estación del cambio de bus y cuánto se camina", () => {
+    const s = new TransitState();
+    const stop = (id: string, name: string) => ({ id, name, position: { lat: 4.6, lon: -74 } });
+    const ride = (n: string, a: string, b: string) => ({ kind: "ride", shortName: n, board: stop(a, a), alight: stop(b, b) });
+    const it = { legs: [ride("H15", "P", "C72"), { kind: "walk", meters: 200, seconds: 160 }, ride("8", "C72b", "C85")], transfers: 1 } as unknown as Itinerary;
+    const t = transfersOf(s, it);
+    expect(t).toHaveLength(1);
+    expect(t[0]).toMatchObject({ station: "C72", boardStation: "C72b", fromRoute: "H15", toRoute: "8", meters: 200, seconds: 160, legIndex: 2 });
+  });
+});

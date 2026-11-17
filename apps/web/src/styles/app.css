@@ -441,3 +441,5 @@ button.stat:active{transform:scale(.97)}
 .roll .rc{display:inline-block;animation:roll-in .32s cubic-bezier(.2,.8,.2,1)}
 @keyframes roll-in{from{transform:translateY(70%);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.roll .rc{animation:none}}
+
+.tsub.ttp{font-weight:600;color:var(--fg);margin-top:2px}

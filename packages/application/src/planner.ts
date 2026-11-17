@@ -635,6 +635,36 @@ function planTripCore(state: TransitState, origin: PlanPlace, dest: PlanPlace, o
   return list.map((it) => ({ ...it, transfers: Math.max(0, it.transfers) }));
 }
 
+/** Un cambio de bus dentro de un viaje: en qué estación (o paradero), de qué vagón a cuál y cuánto se camina. */
+export interface TransferPoint {
+  /** Nombre de la estación o paradero donde te bajas («Calle 72»). */
+  station: string;
+  /** Si el cambio es a otra estación o paradero, su nombre («NQS - Calle 75» → «Calle 75»); si no, igual a `station`. */
+  boardStation: string;
+  /** «vagón 2», «T5B»… si la parada es parte de una estación o portal. */
+  fromWagon?: string; toWagon?: string;
+  fromRoute: string; toRoute: string;
+  meters: number; seconds: number;
+  /** Índice del tramo del segundo bus en `legs` (para pintar el aviso de trasbordo justo antes). */
+  legIndex: number;
+}
+/** Los trasbordos de un viaje, para decir claro dónde hay que cambiar de bus. */
+export function transfersOf(state: TransitState, it: Itinerary): TransferPoint[] {
+  const out: TransferPoint[] = [];
+  let lastRide: RideLeg | null = null, walkM = 0, walkS = 0;
+  it.legs.forEach((l, i) => {
+    if (l.kind === "walk") { if (lastRide) { walkM += l.meters; walkS += l.seconds; } return; }
+    if (lastRide) {
+      const a = state.stopById(lastRide.alight.id), b = state.stopById(l.board.id);
+      const la = a ? state.labelOf(a) : undefined, lb = b ? state.labelOf(b) : undefined;
+      const station = la?.title ?? lastRide.alight.name, boardStation = lb?.title ?? l.board.name;
+      out.push({ station, boardStation, fromWagon: la?.wagon != null ? `vagón ${la.wagon}` : la?.platform, toWagon: lb?.wagon != null ? `vagón ${lb.wagon}` : lb?.platform, fromRoute: lastRide.shortName, toRoute: l.shortName, meters: walkM, seconds: walkS, legIndex: i });
+    }
+    lastRide = l; walkM = 0; walkS = 0;
+  });
+  return out;
+}
+
 /** Metros que se caminan al final (desde que se baja del último bus hasta el destino). */
 export function finalWalk(it: Itinerary): number {
   const last = it.legs[it.legs.length - 1];
