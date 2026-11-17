@@ -4,8 +4,8 @@ import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-n
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "@/ui/Symbol";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { alertView, arrivalAtIndex, displayNextIndex, routeDetail } from "@transmi/application";
-import { ALERT_EFFECT_LABEL, SYSTEM_LABEL,  routeOfficialName, routeTitle, type Vehicle } from "@transmi/domain";
+import { arrivalAtIndex, displayNextIndex, routeDetail } from "@transmi/application";
+import { SYSTEM_LABEL,  routeOfficialName, routeTitle, type Vehicle } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
@@ -17,6 +17,7 @@ import { useMapFocus } from "@/map/focus";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
+import { RouteAlerts } from "@/ui/RouteAlerts";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 import { Eta } from "@/ui/Eta";
@@ -119,15 +120,7 @@ export default function RouteScreen() {
             <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{status.state === "ended" ? `El último salió a las ${clockOfDay(status.lastStart)} y ya no queda ninguno en la calle.${status.nextFirstStart != null ? ` El próximo sale a las ${clockOfDay(status.nextFirstStart)}.` : ""}` : `El primer bus sale a las ${clockOfDay(status.firstStart)}.`}</Text></Card>
         ) : null}
 
-        {d.alerts.map(({ alert, index }) => (
-          <Tap key={index} onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel={`Aviso: ${alertView(transit, alert).title}`}>
-            <Card style={{ gap: space[1] }}>
-              <Text style={[type.caption, { color: alert.effect === "noService" ? "#dc2626" : "#d97706" }]}>{alertView(transit, alert).tag}</Text>
-              <Text style={[type.headline, { color: c.text }]} numberOfLines={2}>{alertView(transit, alert).title}</Text>
-              <Text style={[type.body, { color: c.muted }]} numberOfLines={3}>{alertView(transit, alert).body}</Text>
-            </Card>
-          </Tap>
-        ))}
+        <RouteAlerts routeId={id} max={5} />
 
         <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>BUSES EN VIVO</Text>
         {buses.length ? <Text style={[type.caption, { color: c.muted, marginTop: -space[1] }]}>Cada bus con su próxima parada y en cuánto llega a ella.</Text> : null}

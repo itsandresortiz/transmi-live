@@ -19,6 +19,7 @@ import { stopText } from "@/stopname";
 import { useMapFocus } from "@/map/focus";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
+import { RouteAlerts } from "@/ui/RouteAlerts";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { RideScene } from "@/ui/RideScene";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
@@ -82,6 +83,8 @@ export default function Ride() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+        {/* si la ruta en la que vas tiene un desvío o un vagón cerrado, se avisa arriba mientras esté vigente */}
+        <RouteAlerts routeId={v.routeId} max={1} />
         {!seq || !next ? (
           <>
             <View style={styles.head}>

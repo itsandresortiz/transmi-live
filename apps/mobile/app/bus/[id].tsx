@@ -11,6 +11,7 @@ import { stopText } from "@/stopname";
 import { reportProblem } from "@/report";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
+import { RouteAlerts } from "@/ui/RouteAlerts";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { radius, space, type, useColors } from "@/ui/theme";
 
@@ -41,6 +42,7 @@ export default function BusSheet() {
           {headsign ? <Text style={[type.body, { color: c.text, marginTop: 2 }]} numberOfLines={1}>Hacia {headsign}</Text> : null}
         </View>
       </View>
+      <RouteAlerts routeId={v.routeId} />
       <Card>
         {/* la puntualidad solo se muestra si TransMilenio la publica al día; si no, lo que sí se sabe: hace cuánto reportó su posición */}
         <Text style={[type.eyebrow, { color: c.muted }]}>{d.kind === "unknown" ? "ÚLTIMO REPORTE" : "ESTADO"}</Text>

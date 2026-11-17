@@ -3,7 +3,7 @@ import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SymbolView } from "@/ui/Symbol";
-import { alertView, alertsFor, frequencyText, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
+import { alertView, alertsFor, frequencyText, routeAlertViews, routeHasAlert, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEM_LABEL,  routeTitle, stopLabelText, type Route } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs, nowSec } from "@/clock";
@@ -17,6 +17,7 @@ import { usePlanner } from "@/planner/store";
 import { reportProblem } from "@/report";
 import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
+import { RouteAlerts } from "@/ui/RouteAlerts";
 import { Eta } from "@/ui/Eta";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
@@ -142,6 +143,8 @@ function ArrivalRow({ r, now, onPress }: { r: UpcomingRoute; now: number; onPres
   const first = r.buses[0]!, next = r.buses[1];
   const soon = first.etaAt - now <= 60, old = !!first.vehicle && now - first.vehicle.reportedAt > 90;
   const mark = first.vehicle ? transit.serviceOf(first.vehicle) : undefined;
+  // si la ruta tiene un aviso vigente (desvío, vagón cerrado), una etiqueta corta; el detalle sale al tocar la ruta
+  const warn = routeHasAlert(transit, r.route.id) ? routeAlertViews(transit, r.route.id)[0]?.view.short ?? null : null;
   const sub = `${first.official || first.stopsAway === 0 ? "" : "aprox. "}${stopsAwayText(first.stopsAway)}${next ? ` · luego ${etaText(next.etaAt, now)}` : ""}`;
   return (
     <Tap onPress={onPress} accessibilityRole="button" accessibilityLabel={`Ruta ${r.route.shortName}${r.headsign ? ` hacia ${r.headsign}` : ""}, ${first.stopsAway === 0 ? "en la plataforma, por salir" : `llega en ${etaText(first.etaAt, now)}`}, ${sub}`}>
@@ -151,6 +154,7 @@ function ArrivalRow({ r, now, onPress }: { r: UpcomingRoute; now: number; onPres
           <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{r.headsign ? `Hacia ${r.headsign}` : routeTitle(r.route)}</Text>
           <Text style={[type.caption, { color: c.muted }]} numberOfLines={1}>{sub}</Text>
           {mark?.isLast ? <ServicePill text="Último servicio" tone="#dc2626" /> : mark?.isFirst ? <ServicePill text="Primer servicio" tone="#16a34a" /> : null}
+          {warn ? <ServicePill text={warn} tone="#d97706" /> : null}
         </View>
         {first.stopsAway === 0 ? <Text style={[type.title, { color: c.text }]}>Por salir</Text>
           : <Eta at={first.etaAt} prefix={old ? "≈ " : ""} style={[type.title, { color: soon ? c.accent : c.text }]} containerStyle={{ opacity: old ? 0.6 : 1 }} />}
@@ -192,6 +196,7 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
           <Text style={[type.caption, { color: c.muted }]}>{route ? SYSTEM_LABEL[route.system] : ""} · llega a {stopText(stop)}</Text>
         </View>
       </View>
+      {route ? <RouteAlerts routeId={route.id} max={1} /> : null}
 
       {!row || !hero ? <RouteEmpty route={route} /> : (
         <>

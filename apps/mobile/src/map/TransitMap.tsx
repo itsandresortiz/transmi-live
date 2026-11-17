@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { CORRIDORS, PORTALS, type TripGeo, buildStationGeometry, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { CORRIDORS, PORTALS, type TripGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import lightStyle from "./style-light.json";
@@ -101,6 +101,20 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     type: "FeatureCollection",
     features: routeId ? (transit.network.shapes.get(routeId) ?? []).filter((sh) => sh.points.length > 1).map((sh) => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sh.points.map((p) => [p.lon, p.lat]) } })) : [],
   }), [routeId, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // el tramo de la ruta que toca cada aviso vigente (desvío, cierre), pintado encima del recorrido en ámbar; se quita solo cuando el aviso vence
+  const alertsKey = transit.alerts;
+  const alertLinesJson = useMemo(() => {
+    const features: Feature<LineString>[] = [];
+    if (routeId) {
+      const shapes = transit.routeFamily(routeId).flatMap((id) => transit.network.shapes.get(id) ?? []);
+      for (const { alert, view } of routeAlertViews(transit, routeId, nowMs() / 1000)) for (const sh of shapes) {
+        const pts = alertStretch(transit, alert, sh);
+        if (pts) features.push({ type: "Feature", properties: { tag: view.tag }, geometry: { type: "LineString", coordinates: pts.map((p) => [p.lon, p.lat]) } });
+      }
+    }
+    return JSON.stringify({ type: "FeatureCollection", features });
+  }, [routeId, transit.network, alertsKey]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Las troncales, cada una con el color de su línea (Suba amarillo, Norte verde, Caracas azul…), como en la web y en el plano oficial.
    *  Se dibuja el eje de cada avenida (una sola línea limpia), no el recorrido de cada ruta. No dependen de los datos en vivo. */
@@ -206,6 +220,12 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
           <Layer id="route-line-fill" type="line" {...sp({ lineColor: "#e11d2e", lineWidth: 5, lineCap: "round", lineJoin: "round" })} />
         </GeoJSONSource>
       )}
+      {/* siempre montada (agregar capas en caliente cierra la app): vacía si la ruta no tiene avisos */}
+      <GeoJSONSource id="alert-lines" data={alertLinesJson}>
+        <Layer id="alert-line-casing" type="line" {...sp({ lineColor: "#ffffff", lineWidth: 10, lineCap: "round", lineJoin: "round" })} />
+        <Layer id="alert-line" type="line" {...sp({ lineColor: "#f59e0b", lineWidth: 6, lineDasharray: [1.4, 1], lineCap: "butt", lineJoin: "round" })} />
+        <Layer id="alert-line-label" type="symbol" minzoom={12} {...sp({ symbolPlacement: "line", textField: ["get", "tag"], textFont: ["Noto Sans Bold"], textSize: 12, textColor: "#92400e", textHaloColor: "#ffffff", textHaloWidth: 2, textOffset: [0, -1.1] })} />
+      </GeoJSONSource>
 
 
       {(
@@ -275,6 +295,8 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
     ring: sp({ circleRadius: 22, circleColor: "#e11d2e", circleOpacity: 0.12, circleStrokeColor: "#e11d2e", circleStrokeWidth: 3 }),
     ringFilter: ["in", ["get", "id"], ["literal", highlightIds.length ? highlightIds : ["__ninguno__"]]] as never,
     hit: sp({ circleRadius: 20, circleColor: "#000000", circleOpacity: 0.01 }),
+    alert: sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 13, 4.5, 17, 7], circleColor: "#f59e0b", circleStrokeColor: "#ffffff", circleStrokeWidth: 1.5, circleTranslate: [9, -9], circleOpacity: ["get", "o"], circleStrokeOpacity: ["get", "o"] }),
+    alertMark: sp({ textField: "!", textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 13, 8, 17, 11], textColor: "#ffffff", textTranslate: [9, -9], textAllowOverlap: true, textIgnorePlacement: true, textOpacity: ["get", "o"] }),
     dot: sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 9, 2.6, 11.8, 4], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 1, circleOpacity: ["get", "o"], circleStrokeOpacity: ["get", "o"] }),
     sprite: sp({
       iconOpacity: ["get", "o"],      // un bus que dejó de reportar hace rato se ve atenuado: sigue ahí, pero su dato es viejo
@@ -294,6 +316,9 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
       <Layer id="bus-dot" type="circle" maxzoom={11.8} {...st.dot} />
       <Layer id="bus-sprite" type="symbol" minzoom={11.8} {...st.sprite} />
       <Layer id="bus-label" type="symbol" minzoom={15} {...st.label} />
+      {/* marca ámbar «!» en los buses de una ruta con aviso vigente (desvío, cierre); siempre montada, filtrada por la propiedad `al` */}
+      <Layer id="bus-alert" type="circle" minzoom={13} filter={["==", ["get", "al"], 1] as never} {...st.alert} />
+      <Layer id="bus-alert-mark" type="symbol" minzoom={13} filter={["==", ["get", "al"], 1] as never} {...st.alertMark} />
     </GeoJSONSource>
   );
 });

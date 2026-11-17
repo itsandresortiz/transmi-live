@@ -94,3 +94,21 @@ describe("tiempos reales por tramo", () => {
     expect(rawArrival(s, v, shape, 0, 2, NOW).eta).toBeGreaterThan(before + 600);
   });
 });
+
+describe("avisos en la ruta", () => {
+  it("lista los avisos de la ruta (sus dos sentidos) y el tramo que tocan", async () => {
+    const { routeAlertViews, routeHasAlert, alertStretch, alertUntil } = await import("../src");
+    const s = world(), a = alert("10194", ["B", "D"]);
+    s.applyAlerts([a]);
+    expect(routeHasAlert(s, "14000")).toBe(true);
+    expect(routeHasAlert(s, "14001")).toBe(false);
+    const l = routeAlertViews(s, "14000");
+    expect(l).toHaveLength(1);
+    expect(l[0]!.view.untilText).toMatch(/^hasta las /);
+    expect(alertUntil(a)).toBe(a.endsAt! + 6 * 3600);
+    const pts = alertStretch(s, a, s.network.shapes.get("14000")![0]!)!;
+    expect(Math.round((pts[0]!.lat - 4.70) * 111_000)).toBe(1000);
+    expect(Math.round((pts[pts.length - 1]!.lat - 4.70) * 111_000)).toBe(3000);
+    expect(alertStretch(s, alert("10194", ["B"]), s.network.shapes.get("14000")![0]!)).toBeNull();
+  });
+});

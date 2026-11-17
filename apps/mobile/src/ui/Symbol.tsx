@@ -16,7 +16,7 @@ const ANDROID: Record<string, IonName> = {
   "briefcase.fill": "briefcase", "building.2.fill": "business", bus: "bus", "bus.fill": "bus",
   "checkmark.circle.fill": "checkmark-circle", "chevron.down": "chevron-down", "chevron.left": "chevron-back", "chevron.right": "chevron-forward", "chevron.up": "chevron-up",
   "circle.fill": "ellipse", "dot.radiowaves.left.and.right": "radio", "ellipsis.circle": "ellipsis-horizontal-circle",
-  "exclamationmark.bubble.fill": "chatbubble-ellipses", "figure.walk": "walk", "hand.raised.fill": "hand-left",
+  "exclamationmark.bubble.fill": "chatbubble-ellipses", "exclamationmark.triangle.fill": "warning", "figure.walk": "walk", "hand.raised.fill": "hand-left",
   house: "home-outline", "house.fill": "home", "info.circle": "information-circle", "info.circle.fill": "information-circle",
   "location.fill": "navigate", "location.slash.fill": "navigate-outline", "location.north.fill": "navigate", "location.north.line.fill": "navigate",
   "lock.fill": "lock-closed", magnifyingglass: "search", map: "map-outline", "map.fill": "map", mappin: "location-outline", "mappin.circle.fill": "location",

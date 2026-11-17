@@ -18,7 +18,7 @@ import { FavoritesSection, NearbySection, QuickTrips, StarButton } from "./mine"
 import { ShareButton } from "./share";
 import { useFavs } from "./favorites";
 import { useLocation } from "./location";
-import { alertView, serviceDay, alertsFor, connectionStatus, nearestStops, routeIdsAtStops } from "@transmi/application";
+import { alertView, routeAlertViews, serviceDay, alertsFor, connectionStatus, nearestStops, routeIdsAtStops } from "@transmi/application";
 import { useState } from "react";
 import { useUi } from "./store";
 import { agoShort, delayClass, delayText, etaText, stopsAwayText, untilText } from "./format";
@@ -344,7 +344,8 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
       )}
       <RouteStatusNote routeId={id} nowMs={nowSec * 1000} />
       {!bus && <RouteSchedule routeId={id} nowMs={nowSec * 1000} />}
-      {d.alerts.map(({ alert, index }) => { const v = alertView(transit, alert); return <div key={index} className="card"><span className="pill warn">{v.tag}</span><div className="ct" style={{ marginTop: 8 }}>{v.title}</div><div className="cs">{v.body}</div>{(v.reason || v.when) && <div className="cs" style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{[v.reason, v.when].filter(Boolean).join(" · ")}</div>}</div>; })}
+      {/* avisos vigentes de la ruta (sus dos sentidos): se quitan solos al vencer */}
+      {routeAlertViews(transit, id).map(({ alert, view: v }) => <div key={`${alert.id}-${alert.startsAt ?? 0}`} className="card"><span className="pill warn">{v.tag}{v.untilText ? ` · ${v.untilText}` : ""}</span><div className="ct" style={{ marginTop: 8 }}>{v.title}</div><div className="cs">{v.body}</div>{(v.reason || v.when) && <div className="cs" style={{ fontSize: 12, marginTop: 4, opacity: .7 }}>{[v.reason, v.when].filter(Boolean).join(" · ")}</div>}</div>)}
       {cur && cur.stopIds.length > 0 && (
         <>
           <div className="sec">{bus ? "Por dónde va este bus" : "Paradas"}</div>

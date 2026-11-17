@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { toGeo, type SystemType, type Vehicle, isStaleReport } from "@transmi/domain";
-import { cadenceMs } from "@transmi/application";
+import { cadenceMs, routeHasAlert } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";
 import { motion } from "./engine";
@@ -50,13 +50,14 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       const limit = Math.round(cap * 1.4);
       if (inView.length > limit) inView = inView.map((v) => ({ v, k: keepSet.has(v.id) ? -1 : PRIORITY[v.system] * 1e10 + (hash(v.id) % 1e9) })).sort((a, b) => a.k - b.k).slice(0, limit).map((x) => x.v);
       const ride = useRide.getState().busId, rideNow = t * 1000;      // mismo reloj con que se guardan las lecturas del GPS
+      const warn = alertRoutes();      // rutas con un aviso vigente: sus buses llevan una marca ámbar
       for (const v of inView) {
         // el bus en el que vas se dibuja donde va tu teléfono (el dato de TransMilenio llega ~1 min tarde y el bus se veía atrás o adelantado)
         const mine = v.id === ride ? snappedPosition(v.id, rideNow) : null;
         const g = mine ?? toGeo(motion.step(v, t));
         if (g.lon < view.west - padX || g.lon > view.east + padX || g.lat < view.south - padY || g.lat > view.north + padY) continue;
         const h = (((mine?.heading ?? motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;
-        features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `top-${v.system}-${v.system === "troncal" ? "l" : "s"}`, rot: h, o: !mine && isStaleReport(v, t) ? 0.38 : 1, route: labels ? transit.routeOf(v)?.shortName ?? "" : "" } });
+        features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `top-${v.system}-${v.system === "troncal" ? "l" : "s"}`, rot: h, o: !mine && isStaleReport(v, t) ? 0.38 : 1, route: labels ? transit.routeOf(v)?.shortName ?? "" : "", al: warn.has(v.routeId) ? 1 : 0 } });
       }
       // el bus en el que vas, si no aparece en los datos de TransMilenio: se dibuja donde va tu teléfono
       if (isVirtualRide(ride) && (!system || transit.routeById(virtualParts(ride)?.routeId ?? "")?.system === system)) {
@@ -78,4 +79,14 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
     return () => { stopped = true; clearTimeout(timer); };
   }, [view, system, routeId, only, keep, enabled, everyMs]);
   return data;
+}
+
+/** Rutas con algún aviso vigente; se recalcula solo cuando cambian los avisos (el mapa pregunta por cada bus varias veces por segundo). */
+let alertCache: { alerts: unknown; set: Set<string> } | null = null;
+function alertRoutes(): Set<string> {
+  if (alertCache?.alerts === transit.alerts) return alertCache.set;
+  const set = new Set<string>();
+  for (const id of transit.alertsByRoute.keys()) for (const f of transit.routeFamily(id)) if (routeHasAlert(transit, f)) set.add(f);
+  alertCache = { alerts: transit.alerts, set };
+  return set;
 }
