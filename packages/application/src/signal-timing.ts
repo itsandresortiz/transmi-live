@@ -26,19 +26,46 @@ export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Reco
     else dur[a.c].push(b.t - a.t);
   }
   const lastOf: Partial<Record<"g" | "r", number>> = {}, per = { g: 0, r: 0 };
-  for (const m of marks.slice(1)) {
+  // una marca tras más de 100 s sin marcar no se sabe si fue un cambio (se dejó de mirar un rato y se volvió con la luz encendida):
+  // no sirve para medir el ciclo
+  for (let i = 1; i < marks.length; i++) {
+    const m = marks[i]!;
     if (m.c === "y") continue;
+    if (m.t - marks[i - 1]!.t > 100_000) { lastOf[m.c] = undefined; continue; }
     const p = lastOf[m.c];
     if (p != null && m.t - p <= 300_000 && m.t - p > 10_000) { cycles.push(m.t - p); per[m.c]++; }
     lastOf[m.c] = m.t;
   }
   const rounds = Math.max(per.g, per.r);
   if (!cycles.length) return { cycles, dur, preGreen, text: "Marca al menos dos veces el mismo color (verde o rojo) para calcular el ciclo: unas 2–3 vueltas." };
-  const mc = med(cycles), ok = cycles.filter((c) => Math.abs(c - mc) <= mc * 0.25);      // una marca fuera de lugar no cuenta como «varía»
-  const spread = Math.max(...ok) - Math.min(...ok);
+  // el ciclo: se prueba cada vuelta medida (afinada con las marcas lejanas) y se queda la que hace encajar más cambios a verde y a
+  // rojo (±3 s). Así un toque tarde no corre el ciclo, como pasa con un promedio o una mediana
+  const base0 = med(cycles), cands = cycles.filter((c) => c < base0 * 1.5);
+  const points = (["g", "r"] as const).map((c) => marks.filter((m, i) => m.c === c && i > 0 && m.t - marks[i - 1]!.t <= 100_000).map((m) => m.t));
+  // cuántas marcas de un color caen (±3 s) en una cuadrícula del ciclo; cada marca se prueba como referencia y vale la mejor
+  const fitOf = (ts: readonly number[], cyc: number) => {
+    let best = { f: 0, w: 0 };
+    for (const a of ts) {
+      let f = 0, w = 0;
+      for (const t of ts) { const off = Math.abs(t - a - Math.round((t - a) / cyc) * cyc); if (off <= 3000) f++; else w = Math.max(w, off); }
+      if (f > best.f) best = { f, w };
+    }
+    return best;
+  };
+  const score = (cyc: number) => {
+    let fit = 0, total = 0, worst = 0;
+    for (const ts of points) { const r = fitOf(ts, cyc); fit += r.f; total += ts.length; worst = Math.max(worst, r.w); }
+    return { fit, total, worst };
+  };
+  let cyc = refineCycle(marks, med(cands)), best = score(cyc);
+  for (const c of cands) { const cc = refineCycle(marks, c), sc = score(cc); if (sc.fit > best.fit || (sc.fit === best.fit && sc.worst < best.worst)) { cyc = cc; best = sc; } }
+  const { fit, total, worst } = best;
   const parts = [dur.g.length ? `verde ${secs(med(dur.g))}` : "", dur.y.length ? `amarillo ${secs(med(dur.y))}` : "", dur.r.length ? `rojo ${secs(med(dur.r))}` : "", preGreen.length ? `amarillo antes del verde ${secs(med(preGreen))}` : ""].filter(Boolean);
-  const steady = cycles.length < 2 ? "" : spread <= 4000 ? " Se repite igual: parece de tiempo fijo." : ` Varía ${secs(spread)} entre vueltas: puede adaptarse al tráfico.`;
-  return { cycles, dur, preGreen, text: `Ciclo de ${secs(med(cycles))} (${rounds} ${rounds === 1 ? "vuelta" : "vueltas"})${parts.length ? `: ${parts.join(", ")}` : ""}.${steady}` };
+  const steady = total < 3 ? ""
+    : fit === total ? " Se repite igual: parece de tiempo fijo."
+    : fit / total >= 0.7 ? ` ${fit} de ${total} cambios caen justo en un ciclo fijo; ${total - fit} se corrieron hasta ${secs(worst)} (puede ser el toque o que se adapte al tráfico).`
+    : ` Solo ${fit} de ${total} cambios caen en un ciclo fijo: parece adaptarse al tráfico.`;
+  return { cycles, dur, preGreen, text: `Ciclo de ${secs(cyc)} (${rounds} ${rounds === 1 ? "vuelta" : "vueltas"})${parts.length ? `: ${parts.join(", ")}` : ""}.${steady}` };
 }
 
 /** Modelo de un semáforo de tiempo fijo a partir de las marcas: el orden de colores desde que se pone rojo, cuánto dura cada uno y

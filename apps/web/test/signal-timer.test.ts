@@ -54,3 +54,11 @@ describe("segunda medición del dueño (07:51–07:56)", () => {
     expect(Math.abs(m.cycle - 90_007)).toBeLessThan(150);
   });
 });
+
+describe("medición del mediodía del dueño (plan de 120 s)", () => {
+  it("encuentra el ciclo de 120 s y dice qué marcas se corrieron", () => {
+    const raw: [string, "g" | "y" | "r"][] = [["2026-11-17T17:18:02.057Z","g"],["2026-11-17T17:18:22.825Z","y"],["2026-11-17T17:18:23.866Z","r"],["2026-11-17T17:19:18.496Z","y"],["2026-11-17T17:19:19.713Z","g"],["2026-11-17T17:20:21.420Z","y"],["2026-11-17T17:20:23.703Z","r"],["2026-11-17T17:21:11.327Z","y"],["2026-11-17T17:21:13.154Z","g"],["2026-11-17T17:23:21.170Z","g"],["2026-11-17T17:24:30.953Z","r"],["2026-11-17T17:25:11.589Z","y"],["2026-11-17T17:25:13.522Z","g"],["2026-11-17T17:26:21.230Z","y"],["2026-11-17T17:26:23.497Z","r"],["2026-11-17T17:27:11.503Z","y"],["2026-11-17T17:27:13.395Z","g"]];
+    const s = summarize(lastSession(raw.map(([t, c]) => ({ t: Date.parse(t), c }))));
+    expect(s.text).toMatch(/^Ciclo de 120 s .*verde 68 s, amarillo 2 s, rojo 48 s, amarillo antes del verde 2 s\. 6 de 8 cambios caen justo en un ciclo fijo; 2 se corrieron hasta 7 s/);
+  });
+});
