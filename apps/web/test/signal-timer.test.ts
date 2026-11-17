@@ -41,3 +41,16 @@ describe("varias mediciones del mismo semáforo", () => {
     expect(lastSession(marks.slice(0, 2))).toHaveLength(2);
   });
 });
+
+describe("segunda medición del dueño (07:51–07:56)", () => {
+  const raw: [string, "g" | "y" | "r"][] = [["2026-11-17T07:34:38.884Z","y"],["2026-11-17T07:34:41.243Z","r"],["2026-11-17T07:35:14.586Z","y"],["2026-11-17T07:35:16.403Z","g"],["2026-11-17T07:36:09.333Z","y"],["2026-11-17T07:36:11.166Z","r"],["2026-11-17T07:36:44.420Z","y"],["2026-11-17T07:36:46.344Z","g"],["2026-11-17T07:37:38.652Z","y"],["2026-11-17T07:37:41.472Z","r"],["2026-11-17T07:51:31.266Z","r"],["2026-11-17T07:51:44.587Z","y"],["2026-11-17T07:51:46.504Z","g"],["2026-11-17T07:52:38.835Z","y"],["2026-11-17T07:52:40.854Z","r"],["2026-11-17T07:52:42.002Z","r"],["2026-11-17T07:53:14.524Z","y"],["2026-11-17T07:53:16.508Z","g"],["2026-11-17T07:54:10.566Z","y"],["2026-11-17T07:54:12.266Z","r"],["2026-11-17T07:54:44.673Z","y"],["2026-11-17T07:54:46.632Z","g"],["2026-11-17T07:55:39.756Z","y"],["2026-11-17T07:55:41.814Z","r"],["2026-11-17T07:56:14.647Z","y"],["2026-11-17T07:56:16.506Z","g"]];
+  const marks = raw.map(([t, c]) => ({ t: Date.parse(t), c }));
+  it("separa las mediciones, ignora el doble toque y dice que se repite igual", () => {
+    const s = summarize(lastSession(marks));
+    expect(s.text).toMatch(/^Ciclo de 90 s .*verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s\. Se repite igual/);
+  });
+  it("afina el ciclo con las dos mediciones: 14 vueltas de 90,0 s", () => {
+    const m = signalModel(marks)!;
+    expect(Math.abs(m.cycle - 90_007)).toBeLessThan(150);
+  });
+});

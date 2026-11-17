@@ -9,7 +9,7 @@
     "transmilenio": false,
     "nota": "el de carros más cercano a la ventana del dueño, salida del Portal Suba"
    },
-   "resumen": "Ciclo de 90 s: verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. Tiempo fijo (madrugada). La predicción en vivo coincidió con la calle.",
+   "resumen": "Tiempo fijo, ciclo 89,996 s (afinado con 3 mediciones entre 2:34 y 2:57 a. m.): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. La predicción en vivo coincidió con la calle (desfase 0,4–1,7 s, lo que tarda el dedo). Notas: 07:51:31 «rojo» fue al empezar a mirar (no un cambio); 07:52:42 doble toque.",
    "marcas": [
     [
      "2026-11-17T07:34:38.884Z",
@@ -50,6 +50,86 @@
     [
      "2026-11-17T07:37:41.472Z",
      "rojo"
+    ],
+    [
+     "2026-11-17T07:51:31.266Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T07:51:44.587Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:51:46.504Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T07:52:38.835Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:52:40.854Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T07:52:42.002Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T07:53:14.524Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:53:16.508Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T07:54:10.566Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:54:12.266Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T07:54:44.673Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:54:46.632Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T07:55:39.756Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:55:41.814Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T07:56:14.647Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:56:16.506Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T07:57:08.606Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:57:11.473Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T07:57:44.323Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T07:57:46.341Z",
+     "verde"
     ]
    ]
   }
