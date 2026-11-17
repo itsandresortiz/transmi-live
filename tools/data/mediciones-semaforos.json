@@ -200,6 +200,31 @@
      "verde"
     ]
    ]
+  },
+  {
+   "semaforo": {
+    "titulo": "KR 102B BIS X AC 145",
+    "lat": 4.744510007161125,
+    "lon": -74.09333495423198,
+    "transmilenio": false,
+    "nota": "el del otro lado del cruce; según el dueño funciona igual que el primero"
+   },
+   "igual_a": 0,
+   "resumen": "Sincronizado con el semáforo 0 (mismo plan y mismos cambios): su rojo de 17:42:23 cae 8 vueltas exactas (±1 s) después del rojo de 17:26:23 del primero, con ciclo de 120 s.",
+   "marcas": [
+    [
+     "2026-11-17T17:42:04.755Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T17:42:21.404Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T17:42:23.070Z",
+     "rojo"
+    ]
+   ]
   }
  ]
 }

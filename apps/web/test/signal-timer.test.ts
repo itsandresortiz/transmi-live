@@ -62,3 +62,17 @@ describe("medición del mediodía del dueño (plan de 120 s)", () => {
     expect(s.text).toMatch(/^Ciclo de 120 s .*verde 68 s, amarillo 2 s, rojo 48 s, amarillo antes del verde 2 s\. 6 de 8 cambios caen justo en un ciclo fijo; 2 se corrieron hasta 7 s/);
   });
 });
+
+import { measuredSignals, signalNow as now2, signalModel as model2 } from "@transmi/application";
+import { readFileSync } from "node:fs";
+describe("semáforos medidos guardados en el proyecto", () => {
+  it("el del otro lado usa los tiempos del primero y cambia al mismo tiempo", () => {
+    const list = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
+    expect(list).toHaveLength(2);
+    const [a, b] = list.map((x) => model2(x.marks)!);
+    expect(Math.round(b!.cycle / 1000)).toBe(120);
+    // su rojo medido (17:42:23) cae en rojo según el primero
+    expect(now2(a!, Date.parse("2026-11-17T17:42:25Z")).c).toBe("r");
+    expect(now2(b!, Date.parse("2026-11-17T17:42:25Z")).c).toBe("r");
+  });
+});

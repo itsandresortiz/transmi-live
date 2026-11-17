@@ -24,9 +24,10 @@ export const useSignalTimer = create<{ s: TimedSignal | null; open(s: TimedSigna
 export function liveSignals(t: number): { lon: number; lat: number; color: string }[] {
   const out: { lon: number; lat: number; color: string }[] = [];
   // las de este navegador y, para los semáforos que no se midieron aquí, las guardadas en el proyecto
-  const all: Record<string, Mark[]> = { ...shared, ...loadAll() };
-  for (const [id, marks] of Object.entries(all)) {
-    const m = signalModel(marks);
+  const local = loadAll(), ids = new Set([...Object.keys(shared), ...Object.keys(local)]);
+  for (const id of ids) {
+    // las de este navegador si ya alcanzan para un modelo; si no (p. ej. una sola vuelta), las guardadas en el proyecto
+    const m = (local[id] && signalModel(local[id]!)) || (shared[id] && signalModel(shared[id]!));
     if (!m) continue;
     const [lat, lon] = id.split(",").map(Number);
     out.push({ lon: lon!, lat: lat!, color: COLORS[signalNow(m, t).c] });
@@ -53,7 +54,7 @@ export function SignalTimer() {
   const [, tick] = useState(0);
   useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(id); }, []);
   // las marcas de este navegador o, si aquí no se ha medido, las guardadas en el proyecto
-  const id = s ? idOf(s) : "", marks = useMemo(() => all[id] ?? shared[id] ?? [], [all, id]);
+  const id = s ? idOf(s) : "", marks = useMemo(() => (all[id] && signalModel(all[id]!) ? all[id]! : shared[id] ?? all[id] ?? []), [all, id]);
   if (!s) return null;
   const add = (c: Color) => { const next = { ...all, [id]: [...marks, { t: nowMs(), c }] }; setAll(next); saveAll(next); if (navigator.vibrate) navigator.vibrate(30); };
   const undo = () => { const next = { ...all, [id]: marks.slice(0, -1) }; setAll(next); saveAll(next); };

@@ -124,12 +124,16 @@ export function signalNow(m: SignalModel, t: number): { c: Color; left: number }
 
 /** Lee el archivo de medidas guardadas en el proyecto (`tools/data/mediciones-semaforos.json`). */
 export function measuredSignals(data: unknown): { lat: number; lon: number; title: string; marks: SignalMark[] }[] {
-  const list = (data as { mediciones?: { semaforo?: { lat?: number; lon?: number; titulo?: string }; marcas?: [string, string][] }[] } | null)?.mediciones ?? [];
+  const list = (data as { mediciones?: { semaforo?: { lat?: number; lon?: number; titulo?: string }; marcas?: [string, string][]; igual_a?: number }[] } | null)?.mediciones ?? [];
   const C: Record<string, SignalColor> = { verde: "g", amarillo: "y", rojo: "r" };
+  const parse = (m: { marcas?: [string, string][] } | undefined) => (m?.marcas ?? []).map(([t, c]) => ({ t: Date.parse(t), c: C[c]! })).filter((x) => Number.isFinite(x.t) && x.c);
   return list.flatMap((m) => {
     const lat = Number(m.semaforo?.lat), lon = Number(m.semaforo?.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
-    const marks = (m.marcas ?? []).map(([t, c]) => ({ t: Date.parse(t), c: C[c]! })).filter((x) => Number.isFinite(x.t) && x.c).sort((a, b) => a.t - b.t);
+    // `igual_a`: un semáforo que cambia junto con otro (mismo cruce, mismo plan) usa también las marcas de ese otro
+    const shared = typeof m.igual_a === "number" && m.igual_a !== list.indexOf(m) ? parse(list[m.igual_a]) : [];
+    // (el ciclo sale de las del otro: las propias suelen ser pocas y de otra hora, y la medición más reciente mandaría)
+    const marks = (shared.length ? shared : parse(m)).sort((a, b) => a.t - b.t);
     return marks.length ? [{ lat, lon, title: String(m.semaforo?.titulo ?? ""), marks }] : [];
   });
 }
