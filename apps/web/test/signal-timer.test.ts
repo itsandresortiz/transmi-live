@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarize } from "../src/ui/SignalTimer";
+import { summarize } from "@transmi/application";
 
 describe("cronómetro de semáforos", () => {
   it("calcula el ciclo y cuánto dura cada color", () => {
@@ -17,7 +17,7 @@ describe("cronómetro de semáforos", () => {
   });
 });
 
-import { signalModel, signalNow } from "../src/ui/SignalTimer";
+import { signalModel, signalNow } from "@transmi/application";
 describe("semáforo en vivo (predicción)", () => {
   it("con las medidas reales predice el color de cada momento", () => {
     const raw: [string, "g" | "y" | "r"][] = [["2026-11-17T07:34:38.884Z", "y"], ["2026-11-17T07:34:41.243Z", "r"], ["2026-11-17T07:35:14.586Z", "y"], ["2026-11-17T07:35:16.403Z", "g"], ["2026-11-17T07:36:09.333Z", "y"], ["2026-11-17T07:36:11.166Z", "r"], ["2026-11-17T07:36:44.420Z", "y"], ["2026-11-17T07:36:46.344Z", "g"], ["2026-11-17T07:37:38.652Z", "y"], ["2026-11-17T07:37:41.472Z", "r"]];
@@ -32,7 +32,7 @@ describe("semáforo en vivo (predicción)", () => {
   });
 });
 
-import { lastSession } from "../src/ui/SignalTimer";
+import { lastSession } from "@transmi/application";
 describe("varias mediciones del mismo semáforo", () => {
   it("usa la última (pueden ser planes distintos)", () => {
     const t = 1_800_000_000_000;

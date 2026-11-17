@@ -13,6 +13,7 @@ import { CORRIDORS, PORTALS, type TripGeo, alertStretch, buildStationGeometry, r
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
+import { useLiveSignals } from "./liveSignals";
 import lightStyle from "./style-light.json";
 import darkStyle from "./style-dark.json";
 import { BUS_SPRITES } from "./sprites";
@@ -154,6 +155,8 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   }, [geo]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const signalsJson = useSemaforos(showSignals);
+  const testsOn = useTestsMode((t) => t.on);
+  const liveSignalsJson = useLiveSignals(testsOn && showSignals && active);
   /** El viaje que se está siguiendo, como líneas y puntos. Las capas están siempre montadas: sin viaje, los datos van vacíos. */
   const tripLines = useMemo(() => JSON.stringify({
     type: "FeatureCollection",
@@ -261,6 +264,10 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
           <Layer id="semaforos-labels" type="symbol" minzoom={17.2} {...sp({ visibility: showSignals ? "visible" : "none", textField: ["get", "dir"], textFont: ["Noto Sans Regular"], textSize: 10.5, textOffset: [0, 1.35], textAnchor: "top", textOptional: true, textColor: c.dark ? "#b4b4bb" : "#6c6c70", textHaloColor: c.dark ? "#0b0b0d" : "#eef0f3", textHaloWidth: 1.2 })} />
         </GeoJSONSource>
       )}
+      {/* solo en modo de pruebas: los semáforos medidos a mano con el color que deberían tener ahora (siempre montada, vacía si no) */}
+      <GeoJSONSource id="signal-live" data={liveSignalsJson}>
+        <Layer id="signal-live-dot" type="circle" minzoom={13} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 13, 5, 18, 11], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 2, circleTranslate: [14, -14] })} />
+      </GeoJSONSource>
       <GeoJSONSource id="focus-stop" data={focusJson}>
         <Layer id="focus-stop-halo" type="circle" {...sp({ circleRadius: 20, circleColor: "#e11d2e", circleOpacity: 0.18 })} />
         <Layer id="focus-stop-dot" type="circle" {...sp({ circleRadius: 8, circleColor: "#e11d2e", circleStrokeColor: "#ffffff", circleStrokeWidth: 3 })} />

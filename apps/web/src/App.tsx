@@ -29,7 +29,7 @@ import { mapPadding } from "./ui/layout";
 import { hadLocationPermission, useLocation } from "./ui/location";
 import { type Target, formatHash, parseHash } from "./deeplink";
 import { useUi } from "./ui/store";
-import { SignalTimer, liveSignals, useSignalTimer } from "./ui/SignalTimer";
+import { SignalTimer, liveSignals, loadSharedMeasurements, useSignalTimer } from "./ui/SignalTimer";
 import { OWNER_TESTS } from "./ui/store";
 import { StationView, StopRouteView, StopView } from "./ui/stopViews";
 import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
@@ -205,6 +205,7 @@ export function App() {
   /* modo de pruebas: los semáforos medidos con el cronómetro se pintan con el color que deberían tener ahora */
   useEffect(() => {
     if (!OWNER_TESTS) return;
+    void loadSharedMeasurements();      // las medidas guardadas en el proyecto: se ven desde cualquier navegador (no solo donde se midió)
     let last = "";
     const id = setInterval(() => {
       const m = mc.current; if (!m) return;
