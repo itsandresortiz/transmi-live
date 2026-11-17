@@ -237,6 +237,31 @@
    "opuesto_de": 0,
    "resumen": "Según el dueño, alterna con los de carros: cuando ellos están en rojo, este en verde (y al revés). Sin marcas propias todavía: se calcula del semáforo 0.",
    "marcas": []
+  },
+  {
+   "semaforo": {
+    "titulo": "KR 102B BIS X AC 145",
+    "lat": 4.744491964287732,
+    "lon": -74.09338792786002,
+    "transmilenio": true,
+    "nota": "el segundo de TransMilenio, en paralelo al otro de TransMilenio (en el mapa salía como de carros)"
+   },
+   "opuesto_de": 0,
+   "resumen": "Según el dueño trabaja igual que el otro de TransMilenio. Su verde de 17:46:22.3 cae <1 s antes del rojo de los de carros según el modelo (17:46:22.8): alterna con ellos.",
+   "marcas": [
+    [
+     "2026-11-17T17:46:16.886Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T17:46:20.411Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T17:46:22.295Z",
+     "verde"
+    ]
+   ]
   }
  ]
 }
