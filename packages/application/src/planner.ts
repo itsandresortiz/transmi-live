@@ -481,7 +481,7 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
 
 function planTripCore(state: TransitState, origin: PlanPlace, dest: PlanPlace, opts: PlanOptions = {}): Itinerary[] {
   const nowMs = opts.nowMs ?? Date.now(), nowSec = nowMs / 1000;
-  const limit = opts.limit ?? 5, maxRounds = (opts.maxTransfers ?? 3) + 1, maxAccess = opts.maxAccessMeters ?? MAX_ACCESS_M;
+  const limit = opts.limit ?? 7, maxRounds = (opts.maxTransfers ?? 3) + 1, maxAccess = opts.maxAccessMeters ?? MAX_ACCESS_M;
   const ix = buildIndex(state);
   if (!ix.patterns.length) return [];
   let live = liveInfo(state, ix, nowMs, opts.scheduled);
@@ -571,7 +571,7 @@ function planTripCore(state: TransitState, origin: PlanPlace, dest: PlanPlace, o
     const longWalk = seeds.filter((it) => it.transfers >= 0 && it.transfers <= 1 && finalWalk(it) > LONG_FINAL_WALK_M)
       .sort((a, b) => a.transfers - b.transfers || a.arriveAt - b.arriveAt)
       .filter((it) => { const f = it.legs.find((l): l is RideLeg => l.kind === "ride")?.shortName ?? ""; if (seenFirst.has(f)) return false; seenFirst.add(f); return true; })
-      .slice(0, 3);
+      .slice(0, 2);
     for (const base of longWalk) {
       const keep = new Set([...base.legs.filter((l): l is RideLeg => l.kind === "ride").map((l) => l.shortName), ...doorRoutes]);
       const onlyThese = new Set([...allNames].filter((n) => !keep.has(n)));
@@ -579,16 +579,25 @@ function planTripCore(state: TransitState, origin: PlanPlace, dest: PlanPlace, o
       const baseFirst = base.legs.find((l): l is RideLeg => l.kind === "ride"), boardIx = baseFirst ? ix.stopIdx.get(baseFirst.board.id) : undefined;
       if (boardIx == null) continue;
       const from = new Map([[boardIx, ends.from.has(boardIx) ? 0 : walkMetersOf(origin.position, baseFirst!.board.position)]]);
-      const run = raptor(ix, live, origin.position, dest.position, nowSec, onlyThese, liveEtas, maxRounds, 0, ends.to.size ? egressM : DOOR_FINISH_M, { from, to: ends.to });
-      for (const b of run.best) {
-        const it = build(state, ix, live, run, b.k, b.stop, origin, dest, nowSec);
-        if (!it || finalWalk(it) > LONG_FINAL_WALK_M) continue;
-        // solo si de verdad sigue en el mismo primer bus del viaje directo (si no, ya lo cubren las búsquedas de arriba)
-        const first = it.legs.find((l): l is RideLeg => l.kind === "ride"), baseFirst = base.legs.find((l): l is RideLeg => l.kind === "ride");
-        if (!first || !baseFirst || first.shortName !== baseFirst.shortName) continue;
-        const k = sig(it);
-        if (!candidates.has(k)) candidates.set(k, it);
-        protect.add(k);
+      // varias formas de rematar: tras cada vuelta se quita la ruta con la que se remató, para ofrecer otras
+      // («7 hasta Polo + 4», «7 hasta Escuela Militar + B11»…). Pedido del dueño: más opciones.
+      const finishBanned = new Set(onlyThese);
+      for (let pass = 0; pass < 3; pass++) {
+        const run = raptor(ix, live, origin.position, dest.position, nowSec, finishBanned, liveEtas, maxRounds, 0, ends.to.size ? egressM : DOOR_FINISH_M, { from, to: ends.to });
+        let lastRoute: string | null = null;
+        for (const b of run.best) {
+          const it = build(state, ix, live, run, b.k, b.stop, origin, dest, nowSec);
+          if (!it || finalWalk(it) > LONG_FINAL_WALK_M) continue;
+          // solo si de verdad sigue en el mismo primer bus del viaje directo (si no, ya lo cubren las búsquedas de arriba)
+          const rides = it.legs.filter((l): l is RideLeg => l.kind === "ride");
+          if (!rides[0] || rides[0].shortName !== baseFirst!.shortName) continue;
+          const k = sig(it);
+          if (!candidates.has(k)) candidates.set(k, it);
+          protect.add(k);
+          if (rides.length > 1) lastRoute = rides[rides.length - 1]!.shortName;
+        }
+        if (!lastRoute) break;
+        finishBanned.add(lastRoute);
       }
     }
   }
@@ -603,9 +612,11 @@ function planTripCore(state: TransitState, origin: PlanPlace, dest: PlanPlace, o
   const score = (x: Itinerary) => x.arriveAt + TRANSFER_PENALTY_S * Math.max(0, x.transfers);
   let list = [...candidates.values()].sort((a, b) => score(a) - score(b));
   if (!list.length) return [];
-  // quita lo que otra opción supera en todo: llega antes o igual (±1 min), con menos o igual trasbordos y caminata
-  list = list.filter((a, i) => protect.has(sig(a)) || !list.some((b, j) => j !== i && b.arriveAt <= a.arriveAt + 60 && b.transfers <= a.transfers && b.walkMeters <= a.walkMeters + 50
-    && (b.arriveAt < a.arriveAt - 60 || b.transfers < a.transfers || b.walkMeters < a.walkMeters - 50 || (j < i && b.arriveAt <= a.arriveAt))));
+  // quita lo que otra opción supera claramente en todo: llega 5 min antes o más, con menos o igual trasbordos y caminata. Una opción con
+  // otros buses que llega un par de minutos después se conserva: es una alternativa real (pedido del dueño: más opciones).
+  const routesOf = (x: Itinerary) => x.legs.filter((l): l is RideLeg => l.kind === "ride").map((l) => l.shortName).join(">");
+  list = list.filter((a, i) => protect.has(sig(a)) || !list.some((b, j) => j !== i && b.transfers <= a.transfers && b.walkMeters <= a.walkMeters + 50
+    && (b.arriveAt <= a.arriveAt - 300 || (routesOf(b) === routesOf(a) && b.arriveAt <= a.arriveAt && (b.arriveAt < a.arriveAt || j < i)))));
   // y las que llegan mucho después de la mejor (más de 35 min o el doble del tiempo)
   const best = [...list].sort((a, b) => a.arriveAt - b.arriveAt)[0]!;
   // (una opción sin trasbordos se conserva aunque sea bastante más lenta: mucha gente prefiere no cambiar de bus)
@@ -643,7 +654,9 @@ export function sortItineraries(list: readonly Itinerary[], by: PlanSort): Itine
     const walkOnly = (x: Itinerary) => !x.legs.some((l) => l.kind === "ride");
     // la caminata final larga pesa algo más que un trasbordo: «7 y B11 hasta la estación» va antes que «7 y caminar 580 m desde Polo»
     const weight = (x: Itinerary) => (walkOnly(x) ? (x.walkMeters <= 800 ? 0 : 2) : x.transfers + (finalWalk(x) > LONG_FINAL_WALK_M ? 1.5 : 0) + (x.walkMeters > 700 ? 1 : 0));
-    r.sort((a, b) => weight(a) - weight(b) || a.arriveAt - b.arriveAt);
+    // cada «peso» (un trasbordo, una caminata final larga) equivale a ~10 min: una opción con un trasbordo más que llega 25 min antes
+    // va primero (antes «Mejor» ponía siempre primero la de menos trasbordos aunque tardara mucho más)
+    r.sort((a, b) => a.arriveAt + 600 * weight(a) - (b.arriveAt + 600 * weight(b)) || a.arriveAt - b.arriveAt);
   }
   return r;
 }
