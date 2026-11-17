@@ -123,7 +123,7 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal"); this.src("trip-lines"); this.src("trip-pts");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("alert-lines"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal"); this.src("trip-lines"); this.src("trip-pts");
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
@@ -265,6 +265,12 @@ export class MapController {
       paint: { "circle-radius": zoomWidth([13.5, 2.2], [17, 4]), "circle-color": t.surface, "circle-stroke-color": t.label, "circle-stroke-width": 1 } });
     this.addSided({ id: "route-stops", source: "route-stops",
       paint: { "circle-radius": zoomWidth([10, 3], [15, 5.5], [18, 8]), "circle-color": t.surface, "circle-stroke-color": ["get", "color"], "circle-stroke-width": 2.5 } });
+    // tramo de la ruta elegida que toca un aviso vigente (desvío, cierre): ámbar punteado encima del recorrido
+    m.addLayer({ id: "alert-lines-casing", type: "line", source: "alert-lines", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": 10 } });
+    m.addLayer({ id: "alert-lines", type: "line", source: "alert-lines", layout: { "line-cap": "butt", "line-join": "round" }, paint: { "line-color": "#f59e0b", "line-width": 6, "line-dasharray": [1.4, 1] } });
+    m.addLayer({ id: "alert-lines-label", type: "symbol", source: "alert-lines", minzoom: 12,
+      layout: { "symbol-placement": "line", "text-field": ["get", "tag"], "text-font": FONT, "text-size": 12, "text-offset": [0, -1.1] },
+      paint: { "text-color": "#92400e", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
     m.addLayer({
       id: "alert-stops", type: "circle", source: "alert-stops",
       paint: { "circle-radius": 9, "circle-color": "#f59e0b", "circle-opacity": 0.4, "circle-stroke-color": "#f59e0b", "circle-stroke-width": 2.5 },
@@ -645,6 +651,14 @@ export class MapController {
     this.map.setPaintProperty("troncales-lines", "line-opacity", 0.3);
     sel.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: { color, on: true }, geometry: { type: "LineString", coordinates: points.map((p) => [p.lon, p.lat]) } }] });
     st.setData({ type: "FeatureCollection", features: stops.map((s) => ({ type: "Feature", properties: this.withSector({ id: s.id, color }, s.id), geometry: { type: "Point", coordinates: [s.p.lon, s.p.lat] } })) });
+  }
+
+  /** Tramos de la ruta elegida con un aviso vigente (vacío para quitarlos). */
+  setAlertLines(lines: readonly { tag: string; points: readonly GeoPoint[] }[] | null) {
+    (this.map.getSource("alert-lines") as GeoJSONSource | undefined)?.setData(!lines?.length ? EMPTY : {
+      type: "FeatureCollection",
+      features: lines.map((l) => ({ type: "Feature", properties: { tag: l.tag }, geometry: { type: "LineString", coordinates: l.points.map((p) => [p.lon, p.lat]) } })),
+    });
   }
 
   setAlertStops(points: readonly GeoPoint[] | null) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
-import { connectionStatus, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
+import { alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, networkSource, transit } from "./composition-root";
 import { nowSec } from "./clock";
@@ -221,6 +221,8 @@ export function App() {
       m.setAlertStops(null);
       const fv = ui.followId ? transit.fleet.get(ui.followId) : undefined;
       const id = ui.routeId ?? fv?.routeId ?? null, shapes = id ? transit.network.shapes.get(id) : undefined;
+      // el tramo que toca cada aviso vigente de la ruta (desvío, cierre), en ámbar sobre el recorrido
+      m.setAlertLines(id ? routeAlertViews(transit, id).flatMap(({ alert, view }) => transit.routeFamily(id).flatMap((rid) => transit.network.shapes.get(rid) ?? []).map((sh) => alertStretch(transit, alert, sh)).filter((p): p is NonNullable<typeof p> => !!p).map((points) => ({ tag: view.tag, points }))) : null);
       if (!id || !shapes) { m.showRoute(null, "0", "", () => undefined); return; }
       const route = transit.routeById(id);
       const own = !ui.routeId && fv ? shapes.find((sh) => fv.lastStopId && sh.stopIds.includes(fv.lastStopId))?.direction : undefined;

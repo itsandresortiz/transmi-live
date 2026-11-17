@@ -5,7 +5,7 @@ import { SymbolView } from "@/ui/Symbol";
 import { router } from "expo-router";
 import { transit } from "@/composition-root";
 import { useNow, useTransitVersion } from "@/hooks";
-import { liveLevel, searchAlerts, upcomingAtStop } from "@transmi/application";
+import { lastBusSoon, liveLevel, searchAlerts, upcomingAtStop } from "@transmi/application";
 import type { Route } from "@transmi/domain";
 import { clockOfDay, downText } from "@/lastService";
 import { stopKind, stopTag } from "@/stopname";
@@ -61,8 +61,10 @@ export default function Inicio() {
         if (first && fr) scheduled = { route: fr, time: first.times[0]!, first: true };
       }
     }
-    return [{ id, stop, name: saved.nicknames[id] || transit.labelOf(stop).title, sub: [stopKind(stop), stopTag(stop)].filter(Boolean).join(" · "), arrivals, scheduled }];
-  }), [saved.stops, saved.nicknames, version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
+    // cerca del final del servicio (última hora), el último bus de tus rutas en esa parada, según el horario
+    const last = lastBusSoon(transit, id, saved.routes, nowSec() * 1000)[0];
+    return [{ id, stop, name: saved.nicknames[id] || transit.labelOf(stop).title, sub: [stopKind(stop), stopTag(stop)].filter(Boolean).join(" · "), arrivals, scheduled, last }];
+  }), [saved.stops, saved.nicknames, saved.routes, version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
   const cardW = favStops.length > 1 ? Math.min(330, Math.round(width * 0.8)) : width - space[5] * 2;
   const askPlace = (slot: "home" | "work") => { usePlanner.getState().setSaveAs(slot); router.navigate("/viaje"); };
   const goTo = (p: typeof saved.home) => { if (p) usePlanner.getState().setDest(p); router.navigate("/viaje"); };
@@ -129,6 +131,7 @@ export default function Inicio() {
                         <Text style={[type.headline, { color: c.text }]}>{clockOfDay(f.scheduled.time)}</Text>
                       </View>
                     ) : <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>{live ? "Ningún bus viene ahora" : downText().title}</Text>}
+                    {f.last ? <Text style={[type.caption, { color: "#d97706", fontSize: 13 }]} numberOfLines={1}>Último {f.last.shortName} a las {clockOfDay(f.last.time - (nowSec() - transit.serviceEnds.dayAt(nowSec() * 1000).secs))} (según el horario)</Text> : null}
                   </View>
                 </Card>
               </Tap>

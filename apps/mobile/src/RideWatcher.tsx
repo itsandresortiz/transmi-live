@@ -5,7 +5,7 @@ import * as Haptics from "expo-haptics";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { type PhoneFix, arrivalAtIndex, checkOnShape, checkRide, rideArrival } from "@transmi/application";
 import { isVirtualRide, rideSequence, rideVehicle, virtualParts } from "./virtualRide";
-import { clearRideSnap, rideCheckOf, rideSnapOf, setRideCheck } from "./rideSnap";
+import { clearRideSnap, rideCheckOf, rideNextStop, rideSnapOf, setRideCheck } from "./rideSnap";
 import { transit } from "./composition-root";
 import { nowMs } from "./clock";
 import { cancelAlerts, onAlertTap, schedule } from "./notify";
@@ -29,8 +29,34 @@ let lastAlight: string | null = null;
 export function RideWatcher() {
   const busId = useRide((s) => s.busId), alightId = useRide((s) => s.alightId);
 
+  // vas en un bus pero aún no marcaste dónde te bajas: igual se muestra en la pantalla de bloqueo y la isla dinámica (iPhone) o como
+  // notificación fija (Android), con la próxima parada y cuánto falta para llegar a ella
   useEffect(() => {
-    if (!busId || !alightId) { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); return; }
+    if (!busId || alightId) return;
+    let shown = "";
+    const tick = () => {
+      if (useTrip.getState().it) return;                // un viaje de «Cómo llegar» ya ocupa ese espacio
+      const now = nowMs(), v = rideVehicle(busId, now);
+      if (!v) return;
+      const next = rideNextStop(v, now) ?? (() => { const n = transit.nextStopOf(v, now); return n?.arrivalAt != null ? { stopId: n.stopId, stop: n.stop, arrivalAt: n.arrivalAt } : undefined; })();
+      if (!next) return;
+      const route = transit.routeOf(v), name = stopText(next.stop, "la próxima parada");
+      const key = `${next.stopId}|${Math.round(next.arrivalAt / 20)}`;
+      if (key === shown) return;
+      shown = key;
+      void showTripActivity(name, {
+        title: `Vas en el ${route?.shortName ?? "bus"}`, detail: `Próxima parada: ${name}. Marca dónde te bajas para que te avisemos.`,
+        badge: route?.shortName ?? "", color: SYSTEM_COLOR[v.system], until: next.arrivalAt, untilLabel: "Próxima parada",
+        step: 0, steps: 0, arrive: next.arrivalAt, link: `transmilive:///ride/${busId}`,
+      }).then((ok) => { if (!ok && shown === key) shown = ""; });
+    };
+    tick();
+    const timer = setInterval(() => { if (AppState.currentState === "active") tick(); }, EVERY_MS);
+    return () => { clearInterval(timer); if (!useTrip.getState().it && !useRide.getState().alightId) void endTripActivity(); };
+  }, [busId, alightId]);
+
+  useEffect(() => {
+    if (!busId || !alightId) { void cancelAlerts(); if (!busId && !useTrip.getState().it) void endTripActivity(); return; }
     let warned = 99, shown = "", seen = false, missingSince = 0, doubt = 0, asked = false;
     // si se cambió la parada de bajada, los avisos de la anterior ya no sirven
     if (lastAlight && lastAlight !== alightId) void cancelAlerts();

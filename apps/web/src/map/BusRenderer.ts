@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { nowMs as clockNow } from "../clock";
-import { MotionEngine, type TransitState } from "@transmi/application";
+import { MotionEngine, routeHasAlert, type TransitState } from "@transmi/application";
 import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo, toWorld, isStaleReport } from "@transmi/domain";
 import { type BusDraw, BusCanvas } from "./BusCanvas";
 import type { MapController } from "./MapController";
@@ -127,7 +127,7 @@ export class BusRenderer {
       if (o.motion === "predict") this.shown.set(v.id, { x: w.x, y: w.y, t: nowMs });
       const g = toGeo(w);
       items.push({ id: v.id, lon: g.lon, lat: g.lat, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th),
-        left: v.bearing != null && v.bearing > 180, angle: o.motion === "predict" ? this.motion.heading(v.id) ?? v.bearing : v.bearing, long: v.system === "troncal", label: this.state.routeOf(v)?.shortName ?? v.routeId, stale: isStaleReport(v, nowSec), last: this.state.serviceOf(v)?.isLast });
+        left: v.bearing != null && v.bearing > 180, angle: o.motion === "predict" ? this.motion.heading(v.id) ?? v.bearing : v.bearing, long: v.system === "troncal", label: this.state.routeOf(v)?.shortName ?? v.routeId, stale: isStaleReport(v, nowSec), last: this.state.serviceOf(v)?.isLast, alert: this.alertRoutes().has(v.routeId) });
     }
     this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
     this.items = items;
@@ -138,6 +138,16 @@ export class BusRenderer {
       this.motion.prune();
       for (const id of this.shown.keys()) if (!this.state.fleet.get(id)) this.shown.delete(id);
     }
+  }
+
+  /** Rutas con algún aviso vigente (se recalcula solo cuando cambian los avisos: se pregunta por cada bus en cada cuadro). */
+  private alertCache: { alerts: unknown; set: Set<string> } | null = null;
+  private alertRoutes(): Set<string> {
+    if (this.alertCache?.alerts === this.state.alerts) return this.alertCache.set;
+    const set = new Set<string>();
+    for (const id of this.state.alertsByRoute.keys()) for (const f of this.state.routeFamily(id)) if (routeHasAlert(this.state, f)) set.add(f);
+    this.alertCache = { alerts: this.state.alerts, set };
+    return set;
   }
 
   private delayColor(v: Parameters<TransitState["delayOf"]>[0], th: MapTheme): string {

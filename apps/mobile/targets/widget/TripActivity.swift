@@ -66,9 +66,12 @@ struct TripLockView: View {
         }
       }
       Text(state.detail).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85)).lineLimit(2)
-      HStack(spacing: 6) {
-        ProgressView(value: Double(min(max(state.step, 0), max(state.steps, 1))), total: Double(max(state.steps, 1))).tint(Color(hex: "#e11d2e"))
-        Text("Paso \(state.step) de \(state.steps)").font(.caption2).foregroundStyle(.white.opacity(0.7))
+      // sin pasos (vas en un bus sin haber marcado dónde te bajas): no se muestra la barra
+      if state.steps > 0 {
+        HStack(spacing: 6) {
+          ProgressView(value: Double(min(max(state.step, 0), max(state.steps, 1))), total: Double(max(state.steps, 1))).tint(Color(hex: "#e11d2e"))
+          Text("Paso \(state.step) de \(state.steps)").font(.caption2).foregroundStyle(.white.opacity(0.7))
+        }
       }
       if !dest.isEmpty && state.arrive > 0 {
         Text("Hacia \(dest) · llegas \(Date(timeIntervalSince1970: state.arrive), style: .time)").font(.caption2).foregroundStyle(.white.opacity(0.7)).lineLimit(1)

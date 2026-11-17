@@ -1,7 +1,7 @@
 import type { Map as MLMap } from "maplibre-gl";
 import { TOP_H, TOP_LONG_H, TOP_W, busTopSprite } from "./busTop";
 
-export interface BusDraw { id: string; /** dejó de reportar hace rato: se dibuja atenuado */ stale?: boolean; lon: number; lat: number; color: string; left: boolean; /** rumbo (grados desde el norte) o null si no se sabe */ angle?: number | null; /** vehículo articulado (troncal) */ long?: boolean; label: string; /** último servicio de su ruta */ last?: boolean }
+export interface BusDraw { id: string; /** dejó de reportar hace rato: se dibuja atenuado */ stale?: boolean; lon: number; lat: number; color: string; left: boolean; /** rumbo (grados desde el norte) o null si no se sabe */ angle?: number | null; /** vehículo articulado (troncal) */ long?: boolean; label: string; /** último servicio de su ruta */ last?: boolean; /** su ruta tiene un aviso vigente (desvío, cierre) */ alert?: boolean }
 
 const W = TOP_W;
 /** Tamaño del ícono según el zoom (igual que el que tenía la capa del mapa). */
@@ -74,6 +74,16 @@ export class BusCanvas {
       if (b.stale) ctx.globalAlpha = 0.38;
       ctx.drawImage(this.sprite(b.color, !!b.long), -w / 2, -h / 2, w, h);
       ctx.restore();
+      if (b.alert) {
+        // marca ámbar «!» arriba a la derecha del bus: su ruta tiene un aviso vigente
+        const r = Math.max(4, 5.5 * k), cx = p.x + w * 0.55, cy = p.y - h * 0.35;
+        ctx.save();
+        if (b.stale) ctx.globalAlpha = 0.38;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = "#f59e0b"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "#ffffff"; ctx.stroke();
+        ctx.fillStyle = "#ffffff"; ctx.font = `700 ${Math.round(r * 1.5)}px system-ui, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("!", cx, cy + 0.5);
+        ctx.restore();
+        if (labels) { ctx.font = this.font; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; }
+      }
       if (labels) {
         const up = (Math.abs(Math.cos(rad)) * h + Math.abs(Math.sin(rad)) * w) / 2;      // cuánto se extiende el bus hacia arriba, según su giro
         ctx.strokeText(b.label, p.x, p.y - up - 3); ctx.fillText(b.label, p.x, p.y - up - 3);

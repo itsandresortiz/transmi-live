@@ -88,3 +88,8 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 - **Descartado**: mostrar el número (nadie lo entiende) o adivinar la ruta más probable cuando varias pasan por ahí.
 - **Por qué**: solo se nombra una ruta si es la única que pasa por esas paradas en ese orden (cruzando los avisos del mismo número); si hay pocas posibles se dicen todas, y si no, «una ruta zonal».
 
+## 2026-11-17 · El último bus se muestra en la app, no como notificación
+- **Contexto**: se hizo un aviso diario 20 min antes del último bus de las paradas guardadas.
+- **Descartado**: la notificación diaria (el dueño: «decirle todos los días se vuelve cansón»).
+- **Por qué**: la tarjeta de la parada en Inicio dice «Último … a las …» solo en la última hora; quien lo necesita lo ve sin que le llegue nada.
+

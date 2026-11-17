@@ -8,7 +8,6 @@ import { startData } from "@/bootstrap";
 import { RideWatcher } from "@/RideWatcher";
 import { TripWatcher } from "@/TripWatcher";
 import { BusWatcher } from "@/BusWatcher";
-import { LastBusWatcher } from "@/LastBusWatcher";
 import { WidgetSync } from "@/widgetSync";
 import { Launch, useLaunch } from "@/ui/Launch";
 import { AppHeader } from "@/ui/AppHeader";
@@ -42,7 +41,6 @@ export default function RootLayout() {
       <RideWatcher />
       <TripWatcher />
       <BusWatcher />
-      <LastBusWatcher />
       <WidgetSync />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
