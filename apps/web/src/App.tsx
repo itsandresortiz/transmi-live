@@ -29,6 +29,7 @@ import { mapPadding } from "./ui/layout";
 import { hadLocationPermission, useLocation } from "./ui/location";
 import { type Target, formatHash, parseHash } from "./deeplink";
 import { useUi } from "./ui/store";
+import { SignalTimer, useSignalTimer } from "./ui/SignalTimer";
 import { StationView, StopRouteView, StopView } from "./ui/stopViews";
 import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
 
@@ -125,6 +126,7 @@ export function App() {
         if (uiRef.current.sheet !== "peek") uiRef.current.setSheet("peek");
         if (uiRef.current.settingsOpen) uiRef.current.setSettingsOpen(false);
       },
+      onSignalClick: (s) => useSignalTimer.getState().open(s),
       onUserDrag: () => { if (uiRef.current.followId) uiRef.current.setFollowPaused(true); if (useLocation.getState().following) useLocation.getState().setFollowing(false); },
     });
     mc.current = m;
@@ -411,6 +413,7 @@ export function App() {
       <TripBar th={th} />
       <FollowBar th={th} onResume={() => { useUi.getState().setFollowPaused(false); }} />
       <Settings th={th} />
+      <SignalTimer />
       <AppPromo />
       <div className={`toast glass${toastOn ? " on" : ""}`} role="status" aria-live="polite">{ui.toast?.text}</div>
     </>

@@ -20,6 +20,8 @@ export interface MapEvents {
   onPointerHold?(hold: boolean): void;
   /** Toque en una parte vacía del mapa (no sobre un bus, parada ni estación). */
   onMapTap?(): void;
+  /** Toque en un semáforo (solo en el modo de pruebas): abre el cronómetro. */
+  onSignalClick?(s: { lon: number; lat: number; title: string; text: string; tm: boolean }): void;
 }
 export interface LayerToggles { streets: boolean; stops: boolean; network: boolean; buses: boolean; signals: boolean; traffic: boolean }
 
@@ -351,11 +353,8 @@ export class MapController {
         // un semáforo: qué cruce es y cuántos semáforos tiene (cada punto es un cruce, no cada semáforo de la calle)
         const sig = OWNER_TESTS && m.getLayer("semaforos-icons") ? m.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ["semaforos-icons", "semaforos-dots"] })[0] : undefined;
         if (sig) {
-          const el = document.createElement("div"), h = document.createElement("b"), p = document.createElement("div");
-          h.textContent = String(sig.properties?.title ?? "Semáforo"); p.textContent = String(sig.properties?.text ?? ""); p.style.marginTop = "4px";
-          el.append(h, p);
-          const g = (sig.geometry as unknown as { coordinates: [number, number] }).coordinates;
-          this.showPopup({ lon: g[0], lat: g[1] }, el);
+          const g = (sig.geometry as unknown as { coordinates: [number, number] }).coordinates, pr = sig.properties ?? {};
+          this.events.onSignalClick?.({ lon: g[0], lat: g[1], title: String(pr.title ?? "Semáforo"), text: String(pr.text ?? ""), tm: pr.tm === true || pr.tm === "true" });
           return;
         }
         this.events.onMapTap?.(); return;
