@@ -206,13 +206,14 @@ export function App() {
   useEffect(() => {
     if (!OWNER_TESTS) return;
     void loadSharedMeasurements();      // las medidas guardadas en el proyecto: se ven desde cualquier navegador (no solo donde se midió)
+    const reload = setInterval(() => void loadSharedMeasurements(), 120_000);      // y se releen cada 2 min (una medición nueva aparece sin recargar)
     let last = "";
     const id = setInterval(() => {
       const m = mc.current; if (!m) return;
       const list = ui.layers.signals ? liveSignals(nowMs()) : [], key = JSON.stringify(list);
       if (key !== last) { last = key; void m.ready.then(() => m.setLiveSignals(list)); }
     }, 250);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); clearInterval(reload); };
   }, [ui.layers.signals]);
 
   /* semáforos: el archivo se baja solo la primera vez que se enciende la capa */
