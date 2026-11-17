@@ -1,6 +1,6 @@
 /* TransMi LIVE: guarda la app en el dispositivo para que abra rápido y funcione sin internet.
    Los datos en vivo NO pasan por aquí (la app guarda su propia última copia). */
-const VERSION = "tm-shell-v2";
+const VERSION = "tm-shell-v3";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
@@ -20,6 +20,16 @@ self.addEventListener("fetch", (e) => {
       const cache = await caches.open(VERSION);
       try { const res = await fetch(req); if (res.ok) cache.put("./", res.clone()); return res; }
       catch { return (await cache.match("./")) || (await cache.match(req)) || Response.error(); }
+    })());
+    return;
+  }
+  // datos que cambian sin cambiar de nombre (semaforos.json…): primero la red; lo guardado solo sin conexión. Antes se mostraba la
+  // copia guardada y se actualizaba por detrás, y la primera vez salía la versión vieja (p. ej. semáforos sin sus posiciones)
+  if (url.pathname.endsWith(".json")) {
+    e.respondWith((async () => {
+      const cache = await caches.open(VERSION);
+      try { const res = await fetch(req, { cache: "no-cache" }); if (res.ok) cache.put(req, res.clone()); return res; }
+      catch { return (await cache.match(req)) || Response.error(); }
     })());
     return;
   }

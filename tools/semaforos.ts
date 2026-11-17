@@ -9,15 +9,17 @@
  * OpenStreetMap (© colaboradores de OpenStreetMap, ODbL): los nodos `highway=traffic_signals` a ≤ 60 m del cruce, hasta el número
  * oficial de semáforos para carros + TransMilenio (primero los que tienen sentido marcado, que suelen estar en la línea de pare). El más
  * pegado al eje de la troncal (≤ 15 m) es el de TransMilenio. Si OpenStreetMap no tiene nada, queda solo el punto del cruce.
- * Uso: npx tsx tools/semaforos.ts <carpeta_dist>
+ * Uso: npx tsx tools/semaforos.ts <carpeta_dist>     (ACTUALIZAR_OSM=1 para volver a pedir las posiciones a OpenStreetMap)
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CORRIDORS, countSignalGroups } from "@transmi/application";
 
 const OUT = process.argv[2] ?? "apps/web/dist";
 const BASE = "https://sig.simur.gov.co/arcgis/rest/services/DatosAbiertos/RedSemaforica/FeatureServer/0/query";
 const PAGE = 1000;
+/** Copia guardada de los semáforos de OpenStreetMap (se actualiza a mano con ACTUALIZAR_OSM=1). */
+const SAVED = join(process.cwd(), "tools/data/osm-semaforos.json");
 
 interface Feat { geometry?: { coordinates?: [number, number] }; properties?: Record<string, unknown> }
 
@@ -42,12 +44,28 @@ async function main() {
     if (fs.length < PAGE) break;
   }
   if (rows.length < 500) throw new Error(`Muy pocos semáforos (${rows.length}); no se publica`);
-  const placed = await placeHeads(rows).catch((e) => { console.warn("Semáforos: sin posiciones de OpenStreetMap:", e instanceof Error ? e.message : e); return 0; });
+  let placed = await placeHeads(rows).catch((e) => { console.warn("Semáforos: sin posiciones de OpenStreetMap:", e instanceof Error ? e.message : e); return 0; });
+  // OpenStreetMap a veces frena las consultas seguidas (cada publicación de la web hace una): si no respondió, se reutilizan las
+  // posiciones de la versión ya publicada, cruce por cruce, para no dejar el mapa con un solo punto por cruce
+  if (!placed) placed = await reuseHeads(rows).catch((e) => { console.warn("Semáforos: tampoco se pudieron reutilizar las posiciones publicadas:", e instanceof Error ? e.message : e); return 0; });
   console.log(`Semáforos con posición: ${placed}`);
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "semaforos.json"), JSON.stringify({ v: 2, at: new Date().toISOString().slice(0, 10), rows }));
   console.log(`Semáforos: ${rows.length}`);
 }
+/** Copia las posiciones de cada semáforo desde el archivo ya publicado (mismo cruce = misma dirección y casi el mismo punto). */
+async function reuseHeads(rows: [number, number, string, string, string, number, number, number, number, number, string, [number, number, "c" | "t"][]?][]): Promise<number> {
+  const r = await fetch(process.env.SEMAFOROS_PUBLICADO ?? "https://transmilive.com/semaforos.json", { headers: { "User-Agent": "transmi-live (datos abiertos)" } });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const old = ((await r.json()) as { rows?: unknown[][] }).rows ?? [];
+  const byKey = new Map<string, [number, number, "c" | "t"][]>();
+  for (const o of old) if (Array.isArray(o[11]) && o[11].length) byKey.set(`${o[2]}|${Number(o[0]).toFixed(4)},${Number(o[1]).toFixed(4)}`, o[11] as [number, number, "c" | "t"][]);
+  let n = 0;
+  for (const row of rows) { const h = byKey.get(`${row[2]}|${row[0].toFixed(4)},${row[1].toFixed(4)}`); if (h) { row[11] = h; n += h.length; } }
+  console.log(`Semáforos: reutilizadas ${n} posiciones de la versión publicada`);
+  return n;
+}
+
 /** Metros entre dos puntos (aproximado, suficiente dentro de Bogotá). */
 const meters = (lon1: number, lat1: number, lon2: number, lat2: number) => Math.hypot((lon1 - lon2) * 111_320 * Math.cos((4.65 * Math.PI) / 180), (lat1 - lat2) * 110_570);
 /** Distancia de un punto al eje de la troncal más cercano. */
@@ -69,8 +87,15 @@ async function placeHeads(rows: [number, number, string, string, string, number,
   const q = '[out:json][timeout:120];node["highway"="traffic_signals"](4.45,-74.25,4.85,-73.98);out body;';
   // el servicio de consultas de OpenStreetMap a veces corta o pide esperar: hasta 4 intentos con espera creciente
   let nodes: { lat: number; lon: number; tags?: Record<string, string> }[] = [], err: unknown = null;
-  // para probar sin red: SEMAFOROS_OSM=<archivo .json de Overpass ya descargado>
+  // de dónde salen las posiciones: (1) SEMAFOROS_OSM=<archivo de Overpass> para probar; (2) la copia guardada en el proyecto
+  // (`tools/data/osm-semaforos.json`), que es lo normal: así cada publicación usa siempre las mismas y no depende de que OpenStreetMap
+  // responda; (3) con ACTUALIZAR_OSM=1 se piden de nuevo a OpenStreetMap (y se guarda la copia nueva para subirla al repositorio)
   if (process.env.SEMAFOROS_OSM) nodes = (JSON.parse(readFileSync(process.env.SEMAFOROS_OSM, "utf8")) as { elements: typeof nodes }).elements.filter((n) => n.tags?.highway === "traffic_signals");
+  else if (process.env.ACTUALIZAR_OSM !== "1" && existsSync(SAVED)) {
+    const saved = JSON.parse(readFileSync(SAVED, "utf8")) as { nodos: [number, number, number][] };
+    nodes = saved.nodos.map(([lon, lat, dir]) => ({ lon, lat, tags: dir ? { "traffic_signals:direction": "si" } : {} }));
+    console.log(`Semáforos: posiciones guardadas de OpenStreetMap (${nodes.length} nodos)`);
+  }
   for (let k = 0; k < 4 && !nodes.length; k++) {
     if (k) await new Promise((res) => setTimeout(res, 15_000 * k));
     try {
@@ -80,6 +105,11 @@ async function placeHeads(rows: [number, number, string, string, string, number,
     } catch (e) { err = e; }
   }
   if (!nodes.length && err) throw err;
+  if (process.env.ACTUALIZAR_OSM === "1" && nodes.length >= 1000) {
+    writeFileSync(SAVED, JSON.stringify({ fuente: "OpenStreetMap (© colaboradores de OpenStreetMap, ODbL), nodos highway=traffic_signals de Bogotá", fecha: new Date().toISOString().slice(0, 10), formato: "[lon, lat, 1 si tiene sentido marcado]",
+      nodos: nodes.map((n) => [Math.round(n.lon * 1e6) / 1e6, Math.round(n.lat * 1e6) / 1e6, n.tags?.["traffic_signals:direction"] || n.tags?.direction ? 1 : 0]) }));
+    console.log(`Semáforos: copia guardada actualizada (${SAVED}); súbela al repositorio`);
+  }
   if (nodes.length < 1000) throw new Error(`muy pocos nodos (${nodes.length})`);
   const grid = new Map<string, number[]>(), key = (lon: number, lat: number) => `${Math.floor(lon / 0.001)},${Math.floor(lat / 0.001)}`;
   nodes.forEach((n, i) => { const k = key(n.lon, n.lat); (grid.get(k) ?? grid.set(k, []).get(k)!).push(i); });
