@@ -22,6 +22,7 @@ import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { RideScene } from "@/ui/RideScene";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
+import { Eta } from "@/ui/Eta";
 
 const MAX_STOPS = 30;
 
@@ -96,7 +97,8 @@ export default function Ride() {
               <Text style={[type.title, { color: c.text, textAlign: "center" }]} numberOfLines={2}>{arrived ? "¡Llegaste!" : `Llegando a ${transit.labelOf(nextStop ?? { id: next.id, code: "", name: next.id, position: v.position }).title}`}</Text>
               <View style={styles.sub}>
                 {r ? <RouteBadge route={r} /> : null}
-                <Text style={[type.body, { color: c.muted }]} numberOfLines={1}>{seq.shape.headsign ? `hacia ${seq.shape.headsign} · ` : ""}<Text style={{ color: c.accent, fontWeight: "700" }}>{etaText(next.at, now)}</Text></Text>
+                {seq.shape.headsign ? <Text style={[type.body, { color: c.muted }]} numberOfLines={1}>hacia {seq.shape.headsign} · </Text> : null}
+                <Eta at={next.at} style={[type.body, { color: c.accent, fontWeight: "700" }]} />
               </View>
             </View>
 
@@ -148,7 +150,7 @@ export default function Ride() {
                       {mine ? <Text style={[type.caption, { color }]}>aquí bajas</Text> : null}
                     </View>
                     <View style={{ alignItems: "flex-end", justifyContent: "center", paddingLeft: space[2] }}>
-                      <Text style={[type.headline, { color: i === 0 ? c.accent : c.text }]}>{etaText(s.at, now)}</Text>
+                      <Eta at={s.at} style={[type.headline, { color: i === 0 ? c.accent : c.text }]} />
                       <Text style={[type.caption, { color: c.muted }]}>{hm(s.at)}</Text>
                     </View>
                   </Tap>

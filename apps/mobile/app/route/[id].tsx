@@ -19,6 +19,7 @@ import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
+import { Eta } from "@/ui/Eta";
 
 const DAY_LABEL = { wk: "Lunes a viernes", sa: "Sábados", su: "Domingos y festivos" } as const;
 const MAX_BUSES = 12;
@@ -143,7 +144,7 @@ export default function RouteScreen() {
                     <Text style={[type.caption, { color: c.muted }]}>Bus {b.v.plate || b.v.label || b.v.id} · próxima parada{dl.kind !== "unknown" ? <Text style={{ color: tone }}> · {delayText(dl)}</Text> : null}</Text>
                     <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{stopText(transit.stopById(b.nextId), b.nextId)}</Text>
                   </View>
-                  <Text style={[type.headline, { color: i === 0 ? c.accent : c.text, fontVariant: ["tabular-nums"] }]}>{etaText(b.at, now) === "llegando" ? "llegando" : `en ${etaText(b.at, now)}`}</Text>
+                  <Eta at={b.at} format={(t) => (t === "llegando" ? "llegando" : `en ${t}`)} style={[type.headline, { color: i === 0 ? c.accent : c.text }]} />
                   <SymbolView name="chevron.right" tintColor={c.muted} size={12} />
                 </Tap>
               );

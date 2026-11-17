@@ -28,6 +28,7 @@ import { GlassSegments } from "@/ui/GlassSegments";
 import { SYSTEM_COLOR, space, type, useColors, useOnMap } from "@/ui/theme";
 import { rideNextStop } from "@/rideSnap";
 import { rideVehicle } from "@/virtualRide";
+import { Eta } from "@/ui/Eta";
 
 /** El mapa se centra en tu ubicación solo la primera vez que se abre en cada sesión (después respeta por dónde lo dejaste). */
 let centeredOnce = false;
@@ -174,7 +175,7 @@ export default function Mapa() {
                   {followNext ? (
                     <View style={styles.followNext}>
                       <Text style={[type.headline, { color: om.ink, flex: 1 }]} numberOfLines={2}>{stopText(followNext.stop, followNext.stopId)}</Text>
-                      {followNext.arrivalAt ? <Text style={[type.title, { color: om.accent }]}>{etaText(followNext.arrivalAt, nowS)}</Text> : null}
+                      {followNext.arrivalAt ? <Eta at={followNext.arrivalAt} style={[type.title, { color: om.accent }]} /> : null}
                     </View>
                   ) : <Text style={[type.body, { color: om.sub }]}>No podemos calcular su próxima parada ahora.</Text>}
                   {alight ? <Text style={[type.caption, { color: om.sub }]} numberOfLines={1}>Te bajas en {stopText(alight, rideStop ?? "")}</Text> : null}
@@ -204,7 +205,8 @@ export default function Mapa() {
                     accessibilityLabel={`Ruta ${r?.shortName ?? ""}${first ? `, llega a ${stopName} ${etaText(first.etaAt, nowS)}` : ""}. Ver esta ruta en la parada`}>
                     {r ? <RouteBadge route={r} /> : null}
                     <View style={{ flex: 1 }}>
-                      <Text style={[type.headline, { color: om.ink, fontSize: 15 }]} numberOfLines={1}>{first ? (etaText(first.etaAt, nowS) === "llegando" ? "Llegando" : `Llega en ${etaText(first.etaAt, nowS)}`) : r ? routeTitle(r) : "Ruta"}</Text>
+                      {first ? <Eta at={first.etaAt} format={(t) => (t === "llegando" ? "Llegando" : `Llega en ${t}`)} style={[type.headline, { color: om.ink, fontSize: 15 }]} />
+                        : <Text style={[type.headline, { color: om.ink, fontSize: 15 }]} numberOfLines={1}>{r ? routeTitle(r) : "Ruta"}</Text>}
                       <Text style={[type.caption, { color: om.sub }]} numberOfLines={1}>a {stopName} · toca para ver más</Text>
                     </View>
                   </Tap>

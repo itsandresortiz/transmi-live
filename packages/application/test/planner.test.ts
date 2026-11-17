@@ -60,6 +60,21 @@ describe("planificador de viajes", () => {
   });
 });
 
+describe("estación elegida como destino", () => {
+  const now = Date.parse("2026-03-04T17:00:00Z");
+  it("llega a esa estación (aunque su punto central quede lejos de los vagones) y no propone bajarse antes y caminar", () => {
+    // la «estación» es la parada A6; su punto central queda a ~350 m (como un vagón lejano en una estación larga)
+    const dest = { name: "Estación A6", position: { lat: lat + 0.003, lon: lon0 + 6 * 0.004 }, kind: "Estación" as const, stopIds: ["A6"] };
+    const r = planTrip(world(), at(0, 0.0003), dest, { nowMs: now });
+    const withRide = r.filter((it) => it.legs.some((l) => l.kind === "ride"));
+    expect(withRide.length).toBeGreaterThan(0);
+    for (const it of withRide) {
+      expect(it.legs[it.legs.length - 1]!.kind).toBe("ride");                          // termina en el bus, sin caminar
+      expect((it.legs[it.legs.length - 1] as { alight: { id: string } }).alight.id).toBe("A6");
+    }
+  });
+});
+
 describe("orden de las opciones", () => {
   const ride = { kind: "ride" } as unknown as Itinerary["legs"][number];
   const mk = (arriveAt: number, transfers: number, walkMeters: number): Itinerary => ({ legs: [ride], departAt: 0, arriveAt, seconds: arriveAt, walkMeters, walkSeconds: 0, waitSeconds: 0, transfers, live: false, tags: [] });

@@ -8,9 +8,10 @@ import { useNow } from "@/hooks";
 /** Tiempo de llegada que corre segundo a segundo por su cuenta. Las listas (inicio, favoritos, cerca) se recalculan cada 5 s porque es
  *  costoso; si el texto usara ese mismo reloj, los segundos saltarían de a cinco y se vería trabado. Aquí solo se repinta este texto,
  *  y solo «ruedan» las cifras que cambian (casi siempre los segundos; los minutos cuando les toca). */
-export const Eta = memo(function Eta({ at, style, prefix = "", containerStyle }: { at: number; style?: StyleProp<TextStyle>; prefix?: string; containerStyle?: StyleProp<ViewStyle> }) {
+export const Eta = memo(function Eta({ at, style, prefix = "", format, containerStyle }: { at: number; style?: StyleProp<TextStyle>; prefix?: string; /** Para armar el texto alrededor del tiempo («Llega en 3 min 05 s» / «Llegando»). */ format?: (t: string) => string; containerStyle?: StyleProp<ViewStyle> }) {
   const now = useNow(1000) / 1000;
-  return <RollingText text={`${prefix}${etaText(at, now)}`} style={style} containerStyle={containerStyle} />;
+  const t = etaText(at, now);
+  return <RollingText text={`${prefix}${format ? format(t) : t}`} style={style} containerStyle={containerStyle} />;
 });
 
 /** Texto que cambia con efecto de rodillo: cada letra que cambia sube y sale, y la nueva entra desde abajo; las que no cambian quedan
@@ -56,7 +57,7 @@ function Roll({ cur, prev, h, style }: { cur: string; prev: string | null; h: Sh
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "baseline" },
+  row: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline" },
   cell: { overflow: "hidden" },
   digits: { fontVariant: ["tabular-nums"] },
   over: { position: "absolute", left: 0, top: 0 },

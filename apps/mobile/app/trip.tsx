@@ -16,6 +16,7 @@ import { Card, PrimaryButton, RoundButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
+import { Eta } from "@/ui/Eta";
 
 /** El viaje que estás siguiendo, paso a paso: qué hacer ahora, qué sigue y a qué hora llegas. Los avisos salen aunque cierres esta ventana. */
 export default function Trip() {
@@ -78,7 +79,7 @@ export default function Trip() {
           <Text style={[type.eyebrow, { color: c.onInk, opacity: 0.7 }]}>AHORA</Text>
           <Text style={[type.title, { color: c.onInk }]}>{nowDo.title}</Text>
           <Text style={[type.body, { color: c.onInk, opacity: 0.85 }]}>{nowDo.body}</Text>
-          {key && key > now ? <Text style={[type.headline, { color: c.onInk, fontVariant: ["tabular-nums"] }]}>{guide.phase === "wait" ? "El bus llega en " : "Te bajas en "}{etaText(key, now)}{busId ? " (en vivo)" : " (aprox.)"}</Text> : null}
+          {key && key > now ? <Eta at={key} format={(t) => `${guide.phase === "wait" ? "El bus llega en " : "Te bajas en "}${t}${busId ? " (en vivo)" : " (aprox.)"}`} style={[type.headline, { color: c.onInk }]} /> : null}
           {busId ? <Tap onPress={() => { useMapFocus.getState().set({ followBusId: busId }); router.back(); router.navigate("/mapa"); }} accessibilityRole="button" accessibilityLabel="Ver este bus en el mapa"><Text style={[type.caption, { color: c.onInk, fontSize: 14, textDecorationLine: "underline" }]}>Ver el bus en el mapa ›</Text></Tap> : null}
         </Card>
 

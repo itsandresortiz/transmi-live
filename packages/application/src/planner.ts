@@ -68,6 +68,8 @@ export interface PlanOptions {
   scheduled?: boolean;
   /** Cuánto se está dispuesto a caminar para llegar a la primera parada y desde la última (m). */
   maxAccessMeters?: number;
+  /** Uso interno: cuánto se puede caminar fuera de una estación elegida como origen o destino (0 = subir y bajar en ella misma). */
+  stationEdgeMeters?: number;
   maxTransfers?: number;
   /** Solo usar rutas de estos sistemas (p. ej. solo troncal y dual, o solo zonal). Sin esto, todos. */
   systems?: readonly SystemType[];
@@ -85,8 +87,9 @@ const DOOR_M = 250;
 const DOOR_FINISH_M = 320;
 /** Una caminata final más larga que esto se siente como un trasbordo más (cruzar avenidas, puentes): en «Mejor» pesa como tal. */
 export const LONG_FINAL_WALK_M = 400;
-/** Si sales de una estación (o vas a una), no se te manda caminar a otra estación lejana: a pie solo hasta esta distancia de la elegida.
- *  Medido en 120 viajes entre estaciones: en 53 la app proponía caminar 300–900 m hasta otra estación (de Castellana a pie hasta Polo). */
+/** Si eliges una estación o un portal como origen o destino, el viaje sale o llega a ESA estación: quien pide «llegar a la Calle 85» quiere
+ *  llegar en TransMilenio a la Calle 85, no a Polo para caminar 580 m (pedido del dueño). Solo si así no hay ninguna forma de hacerlo
+ *  se permite caminar hasta esta distancia fuera de ella, como último recurso. */
 const STATION_EDGE_M = 300;
 /** A pie solo se propone si es de verdad corto: más que esto ya es una caminata larga en Bogotá y la gente busca un bus. */
 const WALK_ONLY_MAX_M = 1500;
@@ -464,6 +467,16 @@ function boardNearer(state: TransitState, ix: Index, legs: Leg[], fr: { pat: Pat
 
 /** Planifica un viaje desde `origin` hasta `dest`, saliendo ahora. Devuelve de 0 a `limit` opciones ordenadas por llegada. */
 export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace, opts: PlanOptions = {}): Itinerary[] {
+  const atStation = !!(origin.stopIds?.length || dest.stopIds?.length);
+  if (atStation && opts.stationEdgeMeters == null) {
+    const strict = planTripCore(state, origin, dest, { ...opts, stationEdgeMeters: 0 });
+    if (strict.some((it) => it.legs.some((l) => l.kind === "ride"))) return strict;
+    return planTripCore(state, origin, dest, { ...opts, stationEdgeMeters: STATION_EDGE_M });      // último recurso: caminar un poco fuera de la estación
+  }
+  return planTripCore(state, origin, dest, opts);
+}
+
+function planTripCore(state: TransitState, origin: PlanPlace, dest: PlanPlace, opts: PlanOptions = {}): Itinerary[] {
   const nowMs = opts.nowMs ?? Date.now(), nowSec = nowMs / 1000;
   const limit = opts.limit ?? 5, maxRounds = (opts.maxTransfers ?? 3) + 1, maxAccess = opts.maxAccessMeters ?? MAX_ACCESS_M;
   const ix = buildIndex(state);
@@ -493,7 +506,8 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
 
   const ends = endsOf(ix, origin, dest);
   // con una estación como origen o destino, poco a pie fuera de ella (lo normal es subir y bajar ahí mismo)
-  const accessM = ends.from.size ? Math.min(maxAccess, STATION_EDGE_M) : maxAccess, egressM = ends.to.size ? Math.min(maxAccess, STATION_EDGE_M) : maxAccess;
+  const edge = opts.stationEdgeMeters ?? STATION_EDGE_M;
+  const accessM = ends.from.size ? Math.min(maxAccess, edge) : maxAccess, egressM = ends.to.size ? Math.min(maxAccess, edge) : maxAccess;
   const candidates = new Map<string, Itinerary>();
   const banned = new Set<string>();
   for (let pass = 0; pass < 6; pass++) {
@@ -518,7 +532,7 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
   if (stopsNear(ix, dest.position, DOOR_M).length || ends.to.size) {
     const doorBanned = new Set<string>();
     for (let pass = 0; pass < 3; pass++) {      // hasta tres alternativas distintas (la segunda y la tercera, sin la ruta principal de la anterior)
-      const run = raptor(ix, live, origin.position, dest.position, nowSec, doorBanned, liveEtas, maxRounds, accessM, DOOR_M, ends);
+      const run = raptor(ix, live, origin.position, dest.position, nowSec, doorBanned, liveEtas, maxRounds, accessM, ends.to.size ? egressM : DOOR_M, ends);
       let fastest: Itinerary | null = null;
       for (const b of run.best) {
         const it = build(state, ix, live, run, b.k, b.stop, origin, dest, nowSec);
@@ -544,7 +558,14 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
     const allNames = new Set(ix.patterns.map((pt) => pt.route.shortName));
     // hasta tres opciones con caminata final larga, una por cada primer bus distinto (las de menos trasbordos y que llegan antes)
     const seenFirst = new Set<string>();
-    const longWalk = [...candidates.values()].filter((it) => it.transfers >= 0 && it.transfers <= 1 && finalWalk(it) > LONG_FINAL_WALK_M)
+    // con una estación como destino las opciones que terminan caminando ya no se ofrecen, pero sirven de punto de partida: «7 hasta Polo y
+    // caminar» lleva a buscar «7 hasta Escuela Militar y B11 hasta la Calle 85». Se buscan aparte (sin mostrarlas).
+    const seeds = [...candidates.values()];
+    if (ends.to.size && egressM < MAX_ACCESS_M) {
+      const loose = raptor(ix, live, origin.position, dest.position, nowSec, new Set<string>(), liveEtas, maxRounds, accessM, MAX_ACCESS_M, ends);
+      for (const b of loose.best) { const it = build(state, ix, live, loose, b.k, b.stop, origin, dest, nowSec); if (it) seeds.push(it); }
+    }
+    const longWalk = seeds.filter((it) => it.transfers >= 0 && it.transfers <= 1 && finalWalk(it) > LONG_FINAL_WALK_M)
       .sort((a, b) => a.transfers - b.transfers || a.arriveAt - b.arriveAt)
       .filter((it) => { const f = it.legs.find((l): l is RideLeg => l.kind === "ride")?.shortName ?? ""; if (seenFirst.has(f)) return false; seenFirst.add(f); return true; })
       .slice(0, 3);
@@ -555,7 +576,7 @@ export function planTrip(state: TransitState, origin: PlanPlace, dest: PlanPlace
       const baseFirst = base.legs.find((l): l is RideLeg => l.kind === "ride"), boardIx = baseFirst ? ix.stopIdx.get(baseFirst.board.id) : undefined;
       if (boardIx == null) continue;
       const from = new Map([[boardIx, ends.from.has(boardIx) ? 0 : walkMetersOf(origin.position, baseFirst!.board.position)]]);
-      const run = raptor(ix, live, origin.position, dest.position, nowSec, onlyThese, liveEtas, maxRounds, 0, DOOR_FINISH_M, { from, to: ends.to });
+      const run = raptor(ix, live, origin.position, dest.position, nowSec, onlyThese, liveEtas, maxRounds, 0, ends.to.size ? egressM : DOOR_FINISH_M, { from, to: ends.to });
       for (const b of run.best) {
         const it = build(state, ix, live, run, b.k, b.stop, origin, dest, nowSec);
         if (!it || finalWalk(it) > LONG_FINAL_WALK_M) continue;
