@@ -243,7 +243,11 @@ struct StopWidgetView: View {
   /// Estado en una palabra, con su punto de color: en vivo (verde), programado (gris), demostración (morado) o dato viejo (ámbar).
   private var statusText: String {
     if isDemo { return "Demostración" }
-    if isScheduled { return "Programado" }
+    if isScheduled {
+      // de noche: el próximo es el primero de la mañana; se dice así en vez de «Programado»
+      let wait = (list.first?.t ?? 0) - entry.date.timeIntervalSince1970
+      return wait > 3600 ? "Primer bus" : "Programado"
+    }
     if list.isEmpty { return "Sin datos ahora" }      // sin buses ni horario que mostrar no se puede decir «En vivo»
     if ageMinutes >= 20 { return "Hace \(ageMinutes) min" }
     return "En vivo"

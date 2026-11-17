@@ -46,6 +46,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - **Cierres de De La Sabana y Zona Industrial** (17–23 nov): «Cómo llegar» con A60/C19 hacia el centro debe proponer bajarse en San Facón, y la E32 en CDS Cra. 32. La red de las apps se rearma a las 4:30 a. m.; el 24 vuelve sola a lo normal (la copia del teléfono puede tardar hasta 12 h).
 - **Tiempos aprendidos en las llegadas**: medir de día (pico y valle) con `NODE_USE_ENV_PROXY=1 npx tsx tools/etaprecision.ts 720 8` (o el workflow «Medir precisión de los tiempos de llegada») y, si «aprendido» erra menos que «valor fijo», poner `PROFILE_USE = true` en `tools/hopstats.ts` (se enciende en web y apps sin versión nueva). Luego, usar el perfil también en «Cómo llegar» (`RIDE_MODEL` en `planner.ts`) y en el avance del bus.
 - **Avisos en la ruta y el bus** (2026-11-17, sin ver en teléfono): ¿se ve bien el tramo ámbar punteado en el mapa de una ruta con desvío (y su texto «Desvío»)? ¿La marca «!» en los buses es clara y no estorba (¿demasiados buses marcados?)? Tarjeta ámbar en claro y oscuro. Falta en la web: tramo en el mapa y marca en los buses.
+- **Widget de madrugada** (2026-11-17, sin ver): con la app abierta de noche y cerrada después, de madrugada el widget debe decir «Primer bus» y la hora (no «Sin datos ahora»), en iPhone y Android.
 - **Semáforos** (`signal-stats`): datos acumulados sin uso en la app; idea: sumar segundos en cruces conocidos o explicar demoras.
 
 ## Bugs conocidos / limitaciones

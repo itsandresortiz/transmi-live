@@ -112,3 +112,19 @@ describe("avisos en la ruta", () => {
     expect(alertStretch(s, alert("10194", ["B"]), s.network.shapes.get("14000")![0]!)).toBeNull();
   });
 });
+
+describe("horario de la ruta: qué día es «hoy»", () => {
+  it("de madrugada tras un festivo, cuando ya terminó el servicio de ayer, «hoy» es el día nuevo", async () => {
+    const { ServiceEnds } = await import("../src");
+    const s = new ServiceEnds();
+    s.load({ v: 1, dates: { "20261116": "su" }, routes: { R: {
+      wk: { first: ["a", 4 * 3600], last: ["b", 23 * 3600] },
+      su: { first: ["c", 4 * 3600], last: ["d", 23.5 * 3600] },
+    } } });
+    const at = (iso: string) => Date.parse(`${iso}-05:00`);
+    expect(s.scheduleOf("R", at("2026-11-16T22:00:00"))!.today).toBe("su");        // lunes festivo, de noche
+    expect(s.scheduleOf("R", at("2026-11-17T00:30:00"))!.today).toBe("su");        // el último bus de ayer aún va en camino
+    expect(s.scheduleOf("R", at("2026-11-17T01:50:00"))!.today).toBe("wk");        // ya terminó: es martes
+    expect(s.scheduleOf("R", at("2026-11-17T08:00:00"))!.today).toBe("wk");
+  });
+});

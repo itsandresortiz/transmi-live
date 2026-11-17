@@ -50,17 +50,18 @@ export function syncWidget(): void {
         const route = transit.routeById(p.routeId);
         if (route) for (const t of p.times) sched.push({ r: route.shortName, h: "", t: Math.round(midnight + t), c: SYSTEM_COLOR[route.system] });
       }
-      // cuando ya quedan pocas pasadas hoy (o ninguna: terminó el servicio), se agregan las primeras del siguiente día de servicio,
-      // para que de noche el widget diga a qué hora pasa el primer bus en vez de quedarse vacío
-      if (sched.length < 6) {
-        for (const p of transit.departures.nextAt(id, transit.serviceEnds.nextDayType(now * 1000), 0, 6)) {
-          const route = transit.routeById(p.routeId);
-          if (route) for (const t of p.times) sched.push({ r: route.shortName, h: "", t: Math.round(midnight + 86_400 + t), c: SYSTEM_COLOR[route.system] });
-        }
-      }
       // repartido en el tiempo y para varias horas: si el teléfono no deja refrescar el widget y la app no se abre, el horario sigue respondiendo
       sched.sort((a, b) => a.t - b.t);
-      const spread = spreadArrivals(sched, 40, 6, 240); sched.length = 0; sched.push(...spread);
+      const spread = spreadArrivals(sched, 34, 6, 240); sched.length = 0; sched.push(...spread);
+      // SIEMPRE se agregan los primeros buses del siguiente día de servicio (el primero de cada ruta): antes solo si quedaban menos de 6
+      // pasadas al guardar, y si la app se abrió temprano en la noche, de madrugada el widget se quedaba en «Sin datos ahora»
+      const firsts: typeof arrivals = [];
+      for (const p of transit.departures.nextAt(id, transit.serviceEnds.nextDayType(now * 1000), 0, 1)) {
+        const route = transit.routeById(p.routeId), t = p.times[0];
+        if (route && t != null) firsts.push({ r: route.shortName, h: "", t: Math.round(midnight + 86_400 + t), c: SYSTEM_COLOR[route.system] });
+      }
+      const lastToday = sched[sched.length - 1]?.t ?? 0;
+      sched.push(...firsts.filter((a) => a.t > lastToday).sort((a, b) => a.t - b.t).slice(0, 6));
     }
     return [{ id, name: saved.nicknames[id] || stopLabelText(transit.labelOf(stop)), arrivals, sched }];
   });

@@ -70,7 +70,17 @@ export class ServiceEnds {
   scheduleOf(routeId: string, nowMs: number): { today: DayType; days: { type: DayType; first: number; last: number }[] } | undefined {
     const r = this.byRoute[routeId]; if (!r) return undefined;
     const days = (["wk", "sa", "su"] as DayType[]).flatMap((type) => { const d = r[type]; return d ? [{ type, first: d.first[1], last: d.last[1] }] : []; });
-    return days.length ? { today: serviceDay(nowMs, this.dates).type, days } : undefined;
+    return days.length ? { today: this.todayFor(routeId, nowMs), days } : undefined;
+  }
+
+  /** El día que se marca «hoy» en el horario de una ruta. Pasada la medianoche el día de servicio sigue siendo el anterior (los horarios
+   *  pasan de las 24:00), pero si el último bus de ayer ya terminó (salió hace más de hora y media) para la gente ya es el día nuevo:
+   *  a la 1:50 a. m. del martes, tras un lunes festivo, se marcaba «Domingos y festivos · hoy». */
+  todayFor(routeId: string, nowMs: number): DayType {
+    const sd = serviceDay(nowMs, this.dates);
+    if (sd.secs < 86_400) return sd.type;
+    const last = this.byRoute[routeId]?.[sd.type]?.last[1];
+    return last != null && sd.secs <= last + 5400 ? sd.type : serviceDay(nowMs + SERVICE_DAY_CUTOFF_H * 3600_000, this.dates).type;
   }
 
   /** Estado de la ruta hoy según el horario programado. `activeBuses` son los buses de esa ruta que ahora mismo circulan. */
