@@ -152,7 +152,7 @@ export function signalNow(m: SignalModel, t: number): { c: Color; left: number }
 
 
 /** Lee el archivo de medidas guardadas en el proyecto (`tools/data/mediciones-semaforos.json`). */
-export function measuredSignals(data: unknown): { lat: number; lon: number; title: string; marks: SignalMark[]; inverse: boolean; tm: boolean }[] {
+export function measuredSignals(data: unknown): { lat: number; lon: number; title: string; marks: SignalMark[]; inverse: boolean; tm: boolean; follows: boolean; /** El semáforo al que sigue (si sigue a otro). */ ref?: { lat: number; lon: number } }[] {
   const list = (data as { mediciones?: { semaforo?: { lat?: number; lon?: number; titulo?: string; transmilenio?: boolean }; marcas?: [string, string][]; igual_a?: number; opuesto_de?: number }[] } | null)?.mediciones ?? [];
   const C: Record<string, SignalColor> = { verde: "g", amarillo: "y", rojo: "r" };
   const parse = (m: { marcas?: [string, string][] } | undefined) => (m?.marcas ?? []).map(([t, c]) => ({ t: Date.parse(t), c: C[c]! })).filter((x) => Number.isFinite(x.t) && x.c);
@@ -166,7 +166,7 @@ export function measuredSignals(data: unknown): { lat: number; lon: number; titl
     const inverse = typeof m.opuesto_de === "number" && shared.length > 0;
     // (el ciclo sale de las del otro: las propias suelen ser pocas y de otra hora, y la medición más reciente mandaría)
     const marks = (shared.length ? shared : parse(m)).sort((a, b) => a.t - b.t);
-    return marks.length ? [{ lat, lon, title: String(m.semaforo?.titulo ?? ""), marks, inverse, tm: m.semaforo?.transmilenio === true }] : [];
+    return marks.length ? [{ lat, lon, title: String(m.semaforo?.titulo ?? ""), marks, inverse, tm: m.semaforo?.transmilenio === true, follows: shared.length > 0, ref: shared.length ? { lat: Number(list[ref]!.semaforo?.lat), lon: Number(list[ref]!.semaforo?.lon) } : undefined }] : [];
   });
 }
 

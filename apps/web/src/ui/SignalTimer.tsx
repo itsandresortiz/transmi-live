@@ -26,13 +26,21 @@ export function liveSignals(t: number): { lon: number; lat: number; color: strin
   // las de este navegador y, para los semáforos que no se midieron aquí, las guardadas en el proyecto
   const local = loadAll(), ids = new Set([...Object.keys(shared), ...Object.keys(local)]);
   for (const id of ids) {
-    // las de este navegador si ya alcanzan para un modelo; si no (p. ej. una sola vuelta), las guardadas en el proyecto
-    const own = local[id] && signalModel(local[id]!), m = own || (shared[id] && signalModel(shared[id]!));
+    // el que sigue a otro usa solo las marcas de ese otro (las propias son pocas, de otra hora o del color contrario); los demás, las
+    // guardadas en el proyecto más las de este navegador, juntas (así el semáforo y los que lo siguen nunca se desfasan entre sí)
+    const src = follows.get(id) ?? id, marks = mergeMarks(shared[src] ?? [], local[src] ?? []);
+    const m = signalModel(marks);
     if (!m) continue;
     const [lat, lon] = id.split(",").map(Number);
-    out.push({ lon: lon!, lat: lat!, color: COLORS[!own && inverse.has(id) ? opposite(m, t) : signalNow(m, t).c] });
+    out.push({ lon: lon!, lat: lat!, color: COLORS[inverse.has(id) ? opposite(m, t) : signalNow(m, t).c] });
   }
   return out;
+}
+/** Junta dos listas de marcas sin repetir, en orden. */
+function mergeMarks(a: readonly Mark[], b: readonly Mark[]): Mark[] {
+  const seen = new Set<string>(), out: Mark[] = [];
+  for (const m of [...a, ...b]) { const k = `${m.t}|${m.c}`; if (!seen.has(k)) { seen.add(k); out.push(m); } }
+  return out.sort((x, y) => x.t - y.t);
 }
 const COLORS: Record<Color, string> = { g: "#16a34a", y: "#f5b301", r: "#dc2626" };
 const secs = (ms: number) => `${Math.round(ms / 1000)} s`;
@@ -42,6 +50,8 @@ const clock = (t: number) => new Intl.DateTimeFormat("es-CO", { hour: "numeric",
 let shared: Record<string, Mark[]> = {};
 /** Semáforos guardados que alternan con otro (p. ej. el de TransMilenio): su color es el contrario. */
 let inverse = new Set<string>();
+/** Semáforos que siguen a otro (igual o al revés): usan solo las marcas de ese otro, para no desfasarse entre ellos. */
+let follows = new Map<string, string>();      // semáforo → al que sigue
 export async function loadSharedMeasurements(): Promise<void> {
   try {
     const r = await fetch("https://raw.githubusercontent.com/itsandresortiz/transmi-live/main/tools/data/mediciones-semaforos.json", { cache: "no-cache" });
@@ -49,6 +59,7 @@ export async function loadSharedMeasurements(): Promise<void> {
       const list = measuredSignals(await r.json()), key = (m: { lat: number; lon: number }) => `${m.lat.toFixed(6)},${m.lon.toFixed(6)}`;
       shared = Object.fromEntries(list.map((m) => [key(m), m.marks]));
       inverse = new Set(list.filter((m) => m.inverse).map(key));
+      follows = new Map(list.filter((m) => m.follows && m.ref).map((m) => [key(m), key(m.ref!)]));
     }
   } catch { /* sin conexión: solo las de este navegador */ }
 }
@@ -64,9 +75,11 @@ export function SignalTimer() {
   const id = s ? idOf(s) : "", own = useMemo(() => all[id] ?? [], [all, id]);
   const marks = useMemo(() => {
     const seen = new Set<string>(), out: Mark[] = [];
+    const src = follows.get(id);
+    if (src) return mergeMarks(shared[src] ?? [], all[src] ?? []);      // sigue a otro semáforo: sus tiempos son los de ese
     for (const m of [...(shared[id] ?? []), ...own]) { const k = `${m.t}|${m.c}`; if (!seen.has(k)) { seen.add(k); out.push(m); } }
     return out.sort((a, b) => a.t - b.t);
-  }, [own, id]);
+  }, [own, id, all]);
   if (!s) return null;
   const add = (c: Color) => { const next = { ...all, [id]: [...own, { t: nowMs(), c }] }; setAll(next); saveAll(next); if (navigator.vibrate) navigator.vibrate(30); };
   const undo = () => { if (!own.length) return; const next = { ...all, [id]: own.slice(0, -1) }; setAll(next); saveAll(next); };
