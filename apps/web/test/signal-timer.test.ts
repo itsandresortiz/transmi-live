@@ -16,3 +16,18 @@ describe("cronómetro de semáforos", () => {
     expect(s.text).toBe("Ciclo de 90 s (2 vueltas): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. Se repite igual: parece de tiempo fijo.");
   });
 });
+
+import { signalModel, signalNow } from "../src/ui/SignalTimer";
+describe("semáforo en vivo (predicción)", () => {
+  it("con las medidas reales predice el color de cada momento", () => {
+    const raw: [string, "g" | "y" | "r"][] = [["2026-11-17T07:34:38.884Z", "y"], ["2026-11-17T07:34:41.243Z", "r"], ["2026-11-17T07:35:14.586Z", "y"], ["2026-11-17T07:35:16.403Z", "g"], ["2026-11-17T07:36:09.333Z", "y"], ["2026-11-17T07:36:11.166Z", "r"], ["2026-11-17T07:36:44.420Z", "y"], ["2026-11-17T07:36:46.344Z", "g"], ["2026-11-17T07:37:38.652Z", "y"], ["2026-11-17T07:37:41.472Z", "r"]];
+    const m = signalModel(raw.map(([t, c]) => ({ t: Date.parse(t), c })))!;
+    expect(Math.round(m.cycle / 1000)).toBe(90);
+    const at = (iso: string) => signalNow(m, Date.parse(iso)).c;
+    expect(at("2026-11-17T07:37:50Z")).toBe("r");      // recién se puso rojo
+    expect(at("2026-11-17T07:38:15.8Z")).toBe("y");    // amarillo antes del verde
+    expect(at("2026-11-17T07:38:40Z")).toBe("g");
+    // diez vueltas después sigue cuadrando: rojo a los ~900 s del último rojo medido
+    expect(at("2026-11-17T07:52:45Z")).toBe("r");
+  });
+});

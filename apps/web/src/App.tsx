@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { type SignalRow, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, networkSource, transit } from "./composition-root";
-import { nowSec } from "./clock";
+import { nowMs, nowSec } from "./clock";
 import { BusRenderer } from "./map/BusRenderer";
 import { loadTroncales } from "./map/geodata";
 import { buildStationGeometry } from "./map/stations";
@@ -29,7 +29,8 @@ import { mapPadding } from "./ui/layout";
 import { hadLocationPermission, useLocation } from "./ui/location";
 import { type Target, formatHash, parseHash } from "./deeplink";
 import { useUi } from "./ui/store";
-import { SignalTimer, useSignalTimer } from "./ui/SignalTimer";
+import { SignalTimer, liveSignals, useSignalTimer } from "./ui/SignalTimer";
+import { OWNER_TESTS } from "./ui/store";
 import { StationView, StopRouteView, StopView } from "./ui/stopViews";
 import { type Actions, AlertsView, BusPopup, BusesView, RouteDetailView, RoutesView, StationPopup, StopsView } from "./ui/views";
 
@@ -201,6 +202,18 @@ export function App() {
     run();
     return () => { off(); if (timer) clearTimeout(timer); void m.ready.then(() => m.setTraffic([])); };
   }, [ui.layers.traffic]);
+  /* modo de pruebas: los semáforos medidos con el cronómetro se pintan con el color que deberían tener ahora */
+  useEffect(() => {
+    if (!OWNER_TESTS) return;
+    let last = "";
+    const id = setInterval(() => {
+      const m = mc.current; if (!m) return;
+      const list = ui.layers.signals ? liveSignals(nowMs()) : [], key = JSON.stringify(list);
+      if (key !== last) { last = key; void m.ready.then(() => m.setLiveSignals(list)); }
+    }, 250);
+    return () => clearInterval(id);
+  }, [ui.layers.signals]);
+
   /* semáforos: el archivo se baja solo la primera vez que se enciende la capa */
   useEffect(() => {
     const m = mc.current; if (!ui.layers.signals || !m || m.hasSignals) return;

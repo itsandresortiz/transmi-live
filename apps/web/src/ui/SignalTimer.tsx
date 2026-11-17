@@ -52,6 +52,38 @@ export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Reco
   return { cycles, dur, preGreen, text: `Ciclo de ${secs(med(cycles))} (${rounds} ${rounds === 1 ? "vuelta" : "vueltas"})${parts.length ? `: ${parts.join(", ")}` : ""}.${steady}` };
 }
 
+/** Modelo de un semáforo de tiempo fijo a partir de las marcas: el orden de colores desde que se pone rojo, cuánto dura cada uno y
+ *  la hora de un inicio de rojo medido. `null` si aún no hay con qué (falta medir al menos una vuelta completa). */
+export interface SignalModel { cycle: number; anchor: number; segs: { c: Color; d: number }[] }
+export function signalModel(marks: readonly Mark[]): SignalModel | null {
+  const s = summarize(marks);
+  const anchor = [...marks].reverse().find((m) => m.c === "r")?.t;
+  if (!s.cycles.length || anchor == null || !s.dur.r.length || !s.dur.g.length) return null;
+  const cycle = med(s.cycles);
+  const raw = [{ c: "r" as Color, d: med(s.dur.r) }, { c: "y" as Color, d: s.preGreen.length ? med(s.preGreen) : 0 }, { c: "g" as Color, d: med(s.dur.g) }, { c: "y" as Color, d: s.dur.y.length ? med(s.dur.y) : 0 }].filter((x) => x.d > 0);
+  const k = cycle / raw.reduce((a, x) => a + x.d, 0);       // se ajusta para que sume exactamente el ciclo medido
+  return { cycle, anchor, segs: raw.map((x) => ({ c: x.c, d: x.d * k })) };
+}
+/** Color que debería tener ahora y cuántos ms faltan para el siguiente cambio. */
+export function signalNow(m: SignalModel, t: number): { c: Color; left: number } {
+  let into = ((t - m.anchor) % m.cycle + m.cycle) % m.cycle;
+  for (const s of m.segs) { if (into < s.d) return { c: s.c, left: s.d - into }; into -= s.d; }
+  return { c: m.segs[0]!.c, left: 0 };
+}
+
+/** Los semáforos medidos con su color de ahora (para pintarlos en el mapa). */
+export function liveSignals(t: number): { lon: number; lat: number; color: string }[] {
+  const out: { lon: number; lat: number; color: string }[] = [];
+  for (const [id, marks] of Object.entries(loadAll())) {
+    const m = signalModel(marks);
+    if (!m) continue;
+    const [lat, lon] = id.split(",").map(Number);
+    out.push({ lon: lon!, lat: lat!, color: COLORS[signalNow(m, t).c] });
+  }
+  return out;
+}
+const COLORS: Record<Color, string> = { g: "#16a34a", y: "#f5b301", r: "#dc2626" };
+
 export function SignalTimer() {
   const s = useSignalTimer((x) => x.s), close = useSignalTimer((x) => x.close);
   const [all, setAll] = useState(loadAll);
@@ -63,7 +95,7 @@ export function SignalTimer() {
   const add = (c: Color) => { const next = { ...all, [id]: [...marks, { t: nowMs(), c }] }; setAll(next); saveAll(next); if (navigator.vibrate) navigator.vibrate(30); };
   const undo = () => { const next = { ...all, [id]: marks.slice(0, -1) }; setAll(next); saveAll(next); };
   const clear = () => { if (!confirm("¿Borrar las marcas de este semáforo?")) return; const next = { ...all }; delete next[id]; setAll(next); saveAll(next); };
-  const sum = summarize(marks), last = marks[marks.length - 1];
+  const sum = summarize(marks), last = marks[marks.length - 1], model = signalModel(marks), live = model ? signalNow(model, nowMs()) : null;
   const copy = async () => {
     const data = { semaforo: { titulo: s.title, lat: s.lat, lon: s.lon, transmilenio: s.tm }, resumen: sum.text, marcas: marks.map((m) => [new Date(m.t).toISOString(), NAMES[m.c]]) };
     const txt = `Medidas del semáforo ${s.title}${s.tm ? " (TM)" : ""}\n${sum.text}\n${JSON.stringify(data)}`;
@@ -84,6 +116,13 @@ export function SignalTimer() {
       <div style={{ display: "flex", gap: 8 }}>{btn("g", "Verde", "#16a34a")}{btn("y", "Amarillo", "#f5b301")}{btn("r", "Rojo", "#dc2626")}</div>
       <p style={{ fontSize: 14, margin: "10px 0 4px" }}>{last ? `Último: ${NAMES[last.c]} a las ${clock(last.t)} · hace ${secs(nowMs() - last.t)}` : "Toca el color en el momento en que cambia la luz."}</p>
       <p className="cs" style={{ fontSize: 13.5, margin: "0 0 8px" }}>{marks.length} marcas · {sum.text}</p>
+      {live ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 10px", padding: "8px 10px", borderRadius: 12, background: "var(--hover)" }}>
+          <span aria-hidden style={{ width: 22, height: 22, borderRadius: 11, background: COLORS[live.c], boxShadow: `0 0 12px ${COLORS[live.c]}` }} />
+          <span style={{ fontSize: 15, fontWeight: 650 }}>Debería estar en {NAMES[live.c]} · cambia en {Math.ceil(live.left / 1000)} s</span>
+        </div>
+      ) : null}
+      {live ? <p className="cs" style={{ fontSize: 12, margin: "-4px 0 8px", opacity: 0.75 }}>Es una predicción con tus medidas (tiempo fijo). Si no coincide con la calle, cambió de plan: vuelve a medir.</p> : null}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="btn primary" onClick={() => void copy()} disabled={!marks.length}>Copiar medidas</button>
         <button className="btn" onClick={undo} disabled={!marks.length}>Deshacer</button>

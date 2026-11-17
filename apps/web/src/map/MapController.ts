@@ -126,7 +126,7 @@ export class MapController {
     const m = this.map, t = this.theme;
     this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
     this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
-    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("alert-lines"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal"); this.src("trip-lines"); this.src("trip-pts");
+    this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("alert-lines"); this.src("signal-live"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal"); this.src("trip-lines"); this.src("trip-pts");
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
 
     m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
@@ -255,6 +255,9 @@ export class MapController {
       layout: { "text-field": ["get", "dir"], "text-font": FONT, "text-size": 10.5, "text-offset": [0, 1.35], "text-anchor": "top", "text-optional": true },
       paint: { "text-color": t.label, "text-halo-color": t.halo, "text-halo-width": 1.2 },
     });
+    // semáforos medidos con el cronómetro (modo de pruebas): su color de ahora, predicho con el ciclo medido
+    m.addLayer({ id: "signal-live", type: "circle", source: "signal-live", minzoom: 13,
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 5, 18, 11], "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 2, "circle-blur": 0.1, "circle-translate": [14, -14] } });
     m.addLayer({
       id: "portal-chips", type: "symbol", source: "estaciones", minzoom: 12.5, filter: ["==", ["get", "portal"], true],
       layout: {
@@ -664,6 +667,13 @@ export class MapController {
     this.map.setPaintProperty("troncales-lines", "line-opacity", 0.3);
     sel.setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: { color, on: true }, geometry: { type: "LineString", coordinates: points.map((p) => [p.lon, p.lat]) } }] });
     st.setData({ type: "FeatureCollection", features: stops.map((s) => ({ type: "Feature", properties: this.withSector({ id: s.id, color }, s.id), geometry: { type: "Point", coordinates: [s.p.lon, s.p.lat] } })) });
+  }
+
+  /** Semáforos medidos con su color de ahora (vacío para quitarlos). */
+  setLiveSignals(list: readonly { lon: number; lat: number; color: string }[]) {
+    (this.map.getSource("signal-live") as GeoJSONSource | undefined)?.setData(!list.length ? EMPTY : {
+      type: "FeatureCollection", features: list.map((p) => ({ type: "Feature", properties: { color: p.color }, geometry: { type: "Point", coordinates: [p.lon, p.lat] } })),
+    });
   }
 
   /** Tramos de la ruta elegida con un aviso vigente (vacío para quitarlos). */
