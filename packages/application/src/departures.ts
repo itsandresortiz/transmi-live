@@ -28,15 +28,31 @@ export class Departures {
   /** Última parada del recorrido (su destino). */
   terminusOf(routeId: string, direction: string): string | undefined { const s = this.data[routeId]?.[direction]?.stops; return s?.[s.length - 1]; }
 
-  /** Próximas `n` horas de paso de cada ruta y sentido por la parada, desde `secs` (segundos del día de servicio). */
-  nextAt(stopId: string, type: DayType, secs: number, n = 3): ScheduledPass[] {
+  private stopIndex(): Map<string, { routeId: string; direction: string; index: number }[]> {
     if (!this.byStop) {
       this.byStop = new Map();
       for (const [routeId, dirs] of Object.entries(this.data))
         for (const [direction, e] of Object.entries(dirs)) e.stops.forEach((s, index) => (this.byStop!.get(s) ?? this.byStop!.set(s, []).get(s)!).push({ routeId, direction, index }));
     }
+    return this.byStop;
+  }
+
+  /** La última hora de paso de cada ruta y sentido por la parada en ese tipo de día (segundos del día de servicio). */
+  lastAt(stopId: string, type: DayType): { routeId: string; direction: string; time: number }[] {
+    const out: { routeId: string; direction: string; time: number }[] = [];
+    for (const { routeId, direction, index } of this.stopIndex().get(stopId) ?? []) {
+      const e = this.data[routeId]![direction]!, off = e.off[index];
+      if (off == null || index === e.stops.length - 1) continue;
+      const starts = this.startsOf(routeId, direction, type);
+      if (starts.length) out.push({ routeId, direction, time: starts[starts.length - 1]! + off });
+    }
+    return out.sort((a, b) => a.time - b.time);
+  }
+
+  /** Próximas `n` horas de paso de cada ruta y sentido por la parada, desde `secs` (segundos del día de servicio). */
+  nextAt(stopId: string, type: DayType, secs: number, n = 3): ScheduledPass[] {
     const out: ScheduledPass[] = [];
-    for (const { routeId, direction, index } of this.byStop.get(stopId) ?? []) {
+    for (const { routeId, direction, index } of this.stopIndex().get(stopId) ?? []) {
       const off = this.data[routeId]![direction]!.off[index];
       if (off == null || index === this.data[routeId]![direction]!.stops.length - 1) continue;       // la última parada de un recorrido solo es de llegada
       const starts = this.startsOf(routeId, direction, type);

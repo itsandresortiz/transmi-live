@@ -128,3 +128,21 @@ describe("horario de la ruta: qué día es «hoy»", () => {
     expect(s.scheduleOf("R", at("2026-11-17T08:00:00"))!.today).toBe("wk");
   });
 });
+
+describe("aviso del último bus", () => {
+  it("avisa 20 min antes del último bus de tus rutas en la parada, hoy y el día siguiente", async () => {
+    const { lastBusAlerts } = await import("../src");
+    const s = world();
+    // 539 pasa por B a +600 s de su salida; última salida entre semana 22:00 → por B a las 22:10. K308 (C, D, E) no pasa por B.
+    s.setDepartures({ v: 1, routes: { "14000": { "0": { stops: ["A", "B", "C", "D", "E"], off: [0, 600, 1200, 1800, 2400], wk: [5 * 3600, 17 * 3600] } } } });
+    s.setServiceEnds({ v: 1, routes: {} });
+    const now = Date.parse("2026-11-17T18:00:00-05:00");
+    const l = lastBusAlerts(s, ["B"], [], now, 20, () => "Br. B");
+    expect(l).toHaveLength(2);
+    expect(new Date(l[0]!.at * 1000).toISOString()).toBe("2026-11-18T02:50:00.000Z");     // 21:50 de Bogotá
+    expect(l[0]!.title).toBe("Se acaba el servicio en Br. B");
+    expect(l[0]!.body).toContain("el último 539 pasa a las 10:10 p. m.");
+    expect(lastBusAlerts(s, ["B"], ["14001"], now)).toHaveLength(2);      // la ruta guardada no para ahí: cuentan todas
+    expect(lastBusAlerts(s, ["B"], [], Date.parse("2026-11-17T21:55:00-05:00"))).toHaveLength(1);   // el de hoy ya pasó
+  });
+});

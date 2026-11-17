@@ -97,3 +97,80 @@ export async function scheduleTrip(alerts: readonly { id: string; at: number; ti
   } catch { /* sin permiso: la pantalla del viaje sigue guiando */ }
 }
 export const cancelTrip = (): Promise<void> => scheduleTrip([]);
+
+/* ---------- «Avísame cuando venga»: un bus que esperas en una parada ---------- */
+const COMING = "coming";
+/** Programa (o corre) el aviso de que el bus está por llegar. Suena una sola vez: si ya sonó no se reprograma. `at` en segundos. */
+export async function scheduleComing(at: number, title: string, body: string, stopId: string, routeId: string): Promise<void> {
+  try {
+    if (alreadyRang(COMING)) return;
+    const when = at * 1000;
+    if (when < Date.now() + 2000) return;
+    programmed.set(COMING, when);
+    await Notifications.scheduleNotificationAsync({
+      identifier: COMING,
+      content: { title, body, data: { coming: true, stopId, routeId }, sound: true, interruptionLevel: "timeSensitive" },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(when), channelId: CHANNEL },
+    });
+  } catch { /* sin permiso: la pantalla de la parada sigue mostrando el tiempo */ }
+}
+/** ¿Ya sonó el aviso de «ya viene»? */
+export const comingRang = (): boolean => alreadyRang(COMING);
+export async function cancelComing(): Promise<void> {
+  programmed.delete(COMING);
+  try { await Notifications.cancelScheduledNotificationAsync(COMING); } catch { /* nada que cancelar */ }
+}
+/** Al tocar el aviso de «ya viene», abre esa parada con esa ruta. */
+export function onComingTap(open: (stopId: string, routeId: string) => void): () => void {
+  let last = "";
+  const handle = (r: Notifications.NotificationResponse | null) => {
+    const req = r?.notification.request, d = req?.content.data as { coming?: boolean; stopId?: string; routeId?: string } | undefined;
+    if (!req || d?.coming !== true || typeof d.stopId !== "string" || typeof d.routeId !== "string") return;
+    const key = req.identifier + r!.notification.date;
+    if (key === last) return;
+    last = key;
+    open(d.stopId, d.routeId);
+  };
+  try {
+    void Notifications.getLastNotificationResponseAsync().then(handle).catch(() => undefined);
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => sub.remove();
+  } catch { return () => undefined; }
+}
+
+/* ---------- «Se acaba el servicio»: último bus en las paradas guardadas ---------- */
+const LAST = "last-";
+/** Deja programados exactamente estos avisos del último bus (los demás se quitan). `at` en segundos. Abren la parada al tocarlos. */
+export async function scheduleLastBus(alerts: readonly { id: string; at: number; title: string; body: string; stopId: string }[]): Promise<void> {
+  try {
+    const keep = new Set<string>();
+    for (const a of alerts) {
+      if (a.at * 1000 < Date.now() + 2000) continue;
+      keep.add(LAST + a.id);
+      await Notifications.scheduleNotificationAsync({
+        identifier: LAST + a.id,
+        content: { title: a.title, body: a.body, data: { lastBus: true, stopId: a.stopId }, sound: true },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(a.at * 1000), channelId: CHANNEL },
+      });
+    }
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(all.filter((n) => n.identifier.startsWith(LAST) && !keep.has(n.identifier)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+  } catch { /* sin permiso: nada que hacer */ }
+}
+/** Al tocar un aviso del último bus, abre esa parada. */
+export function onLastBusTap(open: (stopId: string) => void): () => void {
+  let last = "";
+  const handle = (r: Notifications.NotificationResponse | null) => {
+    const req = r?.notification.request, d = req?.content.data as { lastBus?: boolean; stopId?: string } | undefined;
+    if (!req || d?.lastBus !== true || typeof d.stopId !== "string") return;
+    const key = req.identifier + r!.notification.date;
+    if (key === last) return;
+    last = key;
+    open(d.stopId);
+  };
+  try {
+    void Notifications.getLastNotificationResponseAsync().then(handle).catch(() => undefined);
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => sub.remove();
+  } catch { return () => undefined; }
+}

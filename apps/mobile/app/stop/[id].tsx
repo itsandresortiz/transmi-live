@@ -15,7 +15,10 @@ import { useSaved } from "@/favorites";
 import { useMapFocus } from "@/map/focus";
 import { usePlanner } from "@/planner/store";
 import { reportProblem } from "@/report";
-import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
+import { Card, Chip, PrimaryButton, RoundButton, Tap } from "@/ui/kit";
+import { useBusWatch } from "@/busWatch";
+import { allowAlerts, cancelComing } from "@/notify";
+import * as Haptics from "expo-haptics";
 import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteAlerts } from "@/ui/RouteAlerts";
 import { Eta } from "@/ui/Eta";
@@ -110,6 +113,23 @@ export default function StopSheet() {
             })}
           </ScrollView>
         ) : null}
+        {/* en una estación: en qué vagón para cada ruta, para no quedarse esperando en el vagón equivocado */}
+        {siblings.length > 1 ? (
+          <Card style={{ gap: space[2], paddingVertical: space[3] }}>
+            <Text style={[type.eyebrow, { color: c.muted }]}>¿EN QUÉ VAGÓN PARA CADA RUTA?</Text>
+            {siblings.filter(({ x }) => x.id !== id).map(({ x }) => {
+              const rs = routesAtStop(transit, x.id), t = stopTag(x) || stopCode(x) || "Parada";
+              if (!rs.length) return null;
+              return (
+                <Tap key={x.id} still onPress={() => router.setParams({ id: x.id })} accessibilityRole="button" accessibilityLabel={`${t}: rutas ${rs.map((r) => r.shortName).join(", ")}. Ver este vagón`} style={styles.wagonRow}>
+                  <Text style={[type.headline, { color: c.text, minWidth: 74 }]}>{t}</Text>
+                  <View style={[styles.routeWrap, { flex: 1 }]}>{rs.slice(0, 8).map((r) => <RouteBadge key={r.id} route={r} />)}{rs.length > 8 ? <Text style={[type.caption, { color: c.muted, alignSelf: "center" }]}>+{rs.length - 8}</Text> : null}</View>
+                  <SymbolView name="chevron.right" tintColor={c.muted} size={12} />
+                </Tap>
+              );
+            })}
+          </Card>
+        ) : null}
 
         {alerts.map(({ alert, index }) => (
           <Tap key={index} onPress={() => router.push("/avisos")} accessibilityRole="button" accessibilityLabel={`Aviso: ${alertView(transit, alert).title}`}>
@@ -168,6 +188,46 @@ function ServicePill({ text, tone }: { text: string; tone: string }) {
   return <View style={[styles.pill, { borderColor: tone }]}><Text style={[type.caption, { color: tone, fontSize: 11 }]}>{text}</Text></View>;
 }
 
+const LEADS = [3, 5, 10] as const;
+/** «Avísame cuando venga»: elige cuántos minutos antes y te llega un aviso cuando el bus esté por llegar (se corrige con cada dato nuevo).
+ *  Se elige el primer bus que todavía está más lejos que eso: si el próximo llega en 2 min, el aviso es para el siguiente. */
+function ComingAlert({ stopId, row, now }: { stopId: string; row: UpcomingRoute; now: number }) {
+  const c = useColors();
+  const w = useBusWatch((s) => s.w);
+  const [lead, setLead] = useState<number>(5);
+  const mine = w && w.stopId === stopId && transit.routeFamily(row.route.id).includes(w.routeId) ? w : null;
+  const target = row.buses.find((b) => b.stopsAway > 0 && b.etaAt - now > lead * 60 + 30);
+  const watched = mine ? row.buses.find((b) => b.vehicle.id === mine.busId) : undefined;
+  const start = async () => {
+    if (!target) return;
+    if (!(await allowAlerts())) { Alert.alert("Activa las notificaciones", "Para avisarte cuando venga el bus, permite las notificaciones de TransMi LIVE en los ajustes del teléfono."); return; }
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await cancelComing();
+    useBusWatch.getState().set({ stopId, routeId: row.route.id, busId: target.vehicle.id, minutes: lead, since: now });
+  };
+  const stop = () => { void cancelComing(); useBusWatch.getState().clear(); };
+  if (mine) return (
+    <Card style={{ gap: space[2] }}>
+      <View style={{ flexDirection: "row", gap: space[2], alignItems: "center" }}>
+        <SymbolView name="bell.fill" tintColor={c.accent} size={16} />
+        <Text style={[type.headline, { color: c.text, flex: 1 }]}>Te avisamos {mine.minutes} min antes</Text>
+      </View>
+      <Text style={[type.body, { color: c.muted }]}>{watched ? `Cuando el ${row.route.shortName} que llega en ${etaText(watched.etaAt, now)} esté a ${mine.minutes} min de aquí.` : `El bus que esperabas ya no aparece en los datos; el aviso queda a la última hora calculada.`} Con la app cerrada la hora es aproximada.</Text>
+      <Tap onPress={stop} accessibilityRole="button" accessibilityLabel="Cancelar el aviso"><Text style={[type.headline, { color: c.accent }]}>Cancelar el aviso</Text></Tap>
+    </Card>
+  );
+  return (
+    <Card style={{ gap: space[2] }}>
+      <Text style={[type.headline, { color: c.text }]}>Avísame cuando venga</Text>
+      <View style={{ flexDirection: "row", gap: space[2] }}>
+        {LEADS.map((m) => <Chip key={m} label={`${m} min antes`} selected={lead === m} onPress={() => setLead(m)} />)}
+      </View>
+      {target ? <PrimaryButton symbol="bell.fill" label={`Avisarme ${lead} min antes`} onPress={() => void start()} />
+        : <Text style={[type.caption, { color: c.muted }]}>El próximo bus llega en menos de {lead} min: mejor ve saliendo ya.</Text>}
+    </Card>
+  );
+}
+
 /** Detalle de una ruta en la parada: el próximo bus y los siguientes, y el recorrido que le falta al bus hasta aquí. */
 function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string; sel: { routeId: string; direction: string }; row?: UpcomingRoute; now: number; onBack(): void; onMap(busIds: string[], follow: string | null): void }) {
   const c = useColors();
@@ -219,6 +279,8 @@ function RouteAtStop({ stopId, sel, row, now, onBack, onMap }: { stopId: string;
               <Tap onPress={() => onMap(ids, null)} accessibilityRole="button" accessibilityLabel="Ver en el mapa" style={[styles.heroBtn, { backgroundColor: "rgba(255,255,255,0.22)" }]}><Text style={[type.headline, { color: "#ffffff" }]}>Ver en el mapa</Text></Tap>
             </View>
           </View>
+
+          <ComingAlert stopId={stopId} row={row} now={now} />
 
           {row.buses.length > 1 ? (
             <>
@@ -413,4 +475,5 @@ const styles = StyleSheet.create({
   tlLine: { position: "absolute", width: 3, left: 7.5 },
   tlDot: { position: "absolute", top: "50%", marginTop: -7, width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
   routeWrap: { flexDirection: "row", flexWrap: "wrap", gap: space[2] },
+  wagonRow: { flexDirection: "row", alignItems: "center", gap: space[3], paddingVertical: 2 },
 });

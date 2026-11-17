@@ -17,6 +17,8 @@ import { useSaved } from "@/favorites";
 import { useDemo } from "@/demo";
 import { usePlanner } from "@/planner/store";
 import { Tap, PAGE, Toggle } from "@/ui/kit";
+import { useSettings } from "@/settings";
+import { allowAlerts } from "@/notify";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { lift, radius, space, type, useColors } from "@/ui/theme";
 
@@ -53,6 +55,12 @@ function Group({ title, children, footer, bare = false }: { title: string; child
 let testsShown = false, secretTaps = 0;
 
 export default function Mas() {
+  const lastBus = useSettings((s) => s.lastBus);
+  const toggleLastBus = async (v: boolean) => {
+    if (v && !(await allowAlerts())) { Alert.alert("Activa las notificaciones", "Para avisarte del último bus, permite las notificaciones de TransMi LIVE en los ajustes del teléfono."); return; }
+    if (v && !useSaved.getState().stops.length) Alert.alert("Guarda una parada", "Marca con la estrella las paradas donde tomas el bus: te avisaremos del último bus de cada una.");
+    useSettings.getState().setLastBus(v);
+  };
   const c = useColors();
   const appearance = useAppearance();
   const saved = useSaved();
@@ -115,6 +123,16 @@ export default function Mas() {
           <Row symbol="location.fill" tint="#3b82f6" title="Cerca de mí" onPress={() => router.push("/cerca")} />
           <Row symbol="house.fill" tint="#10b981" title="Casa" value={saved.home?.name ?? "Agregar"} onPress={() => editPlace("home")} />
           <Row last symbol="briefcase.fill" tint="#6366f1" title="Trabajo" value={saved.work?.name ?? "Agregar"} onPress={() => editPlace("work")} />
+        </Group>
+
+        <Group title="AVISOS" footer={lastBus ? "Te avisamos 20 min antes de que pase el último bus de tus rutas en tus paradas guardadas, según el horario programado." : "Te avisa 20 min antes del último bus en tus paradas guardadas (si guardaste rutas, solo de esas)."}>
+          <View style={styles.row}>
+            <View style={[styles.tile, { backgroundColor: "#ef4444" }]}><SymbolView name="moon.zzz.fill" tintColor="#ffffff" size={15} /></View>
+            <View style={styles.rowBody}>
+              <Text style={[type.body, { color: c.text, flex: 1 }]}>Avisarme del último bus</Text>
+              <Toggle value={lastBus} onChange={(v) => void toggleLastBus(v)} label="Avisarme del último bus en mis paradas" />
+            </View>
+          </View>
         </Group>
 
         <Group bare title="APARIENCIA" footer="Automático usa la del teléfono.">

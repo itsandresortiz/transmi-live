@@ -6,6 +6,7 @@ export * from "./travel-times";
 export * from "./hop-profile";
 export * from "./alert-route";
 export * from "./alert-view";
+export * from "./last-bus";
 export * from "./motion";
 export * from "./eta";
 export * from "./service-ends";
