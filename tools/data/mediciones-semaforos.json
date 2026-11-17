@@ -386,6 +386,38 @@
      "verde"
     ]
    ]
+  },
+  {
+   "semaforo": {
+    "titulo": "AK 104 X AC 145",
+    "lat": 4.746905027352966,
+    "lon": -74.09615395590663,
+    "transmilenio": false,
+    "nota": "cruce de la Av. Cra. 104 con Calle 145, junto al Portal Suba"
+   },
+   "resumen": "5:38 p. m. (pico de la tarde), una sola vuelta: verde ~17 s (si la primera marca fue un cambio), amarillo ~1 s, rojo ~80 s, amarillo antes del verde 2 s; de verde a verde ~100 s. Falta medir 2–3 vueltas más para confirmar el ciclo.",
+   "marcas": [
+    [
+     "2026-11-17T22:38:38.642Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T22:38:55.776Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T22:38:56.755Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T22:40:16.249Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T22:40:18.430Z",
+     "verde"
+    ]
+   ]
   }
  ]
 }
