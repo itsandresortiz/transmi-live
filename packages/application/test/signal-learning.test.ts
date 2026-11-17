@@ -40,3 +40,13 @@ describe("los semáforos medidos y los buses aprenden unos de otros", () => {
     expect(learnFromBuses(model, false, buses(0, 5)).text).toMatch(/todavía no dicen nada/);
   });
 });
+
+import { signalInfo, signalPoints, type SignalRow } from "../src";
+describe("semáforos que no están en la lista oficial (OpenStreetMap)", () => {
+  // los dos del retorno en U frente al Portal Suba
+  const row: SignalRow = [-74.09522, 4.74597, "", "", "", 2, 0, 0, 0, 0, "OSM", [[-74.0952, 4.745977, "c"], [-74.095241, 4.745959, "c"]]];
+  it("se dibujan los dos y dicen de dónde salen", () => {
+    expect(signalPoints([row])).toHaveLength(2);
+    expect(signalInfo(row).text).toMatch(/^2 semáforos que no aparecen en la lista oficial/);
+  });
+});

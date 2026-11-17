@@ -4,6 +4,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-17 · Semáforos fuera de la lista oficial: `tools/semaforos.ts` agrega los de OpenStreetMap (con sentido marcado) a >60 m de todo cruce oficial, agrupados a ≤50 m, como filas «OSM» (155 semáforos en 79 puntos; entre ellos los 2 del retorno en U frente al Portal Suba que el dueño vio faltar).
 - 2026-11-17 · `live-data.yml` relanza la grabadora de semáforos (`signal-stats.yml`) de día: GitHub solo la corría unas pocas veces al día.
 - 2026-11-17 · Semáforos y buses aprenden unos de otros: `learnFromBuses` (`packages/application/src/signal-learning.ts`) compara los buses que se acercan a cada semáforo medido (detenido/avanzando, dirección, arranques) con el ciclo medido: cuánto encaja, si el ciclo parece corrido, qué eje va al revés, a qué horas no encaja y si los arranques caen tras el verde. `signal-stats` (cada 10 min) guarda 7 días en `cerca-medidos.json.gz` y publica `aprendizaje.json`; el cronómetro (`?pruebas`) lo muestra. `tools/signalcheck.ts` usa lo mismo a mano.
 - 2026-11-17 · Prueba del cronómetro: ya no fija las duraciones del plan de la 1 p. m. (cambian con cada vuelta guardada).

@@ -135,6 +135,21 @@ async function placeHeads(rows: [number, number, string, string, string, number,
     row[11] = heads;
     placed += heads.length;
   }
+  // semáforos de OpenStreetMap lejos de todo cruce oficial (>60 m): Movilidad no los lista, pero existen (p. ej. los dos del retorno en U
+  // frente al Portal Suba, que el dueño vio en la calle). Se agrupan los que están a ≤50 m entre sí y cada grupo va como un cruce propio,
+  // marcado «OSM» (sin cifras oficiales). Solo los que tienen sentido marcado: los demás suelen ser pasos peatonales o puntos dudosos
+  const far = nodes.map((n, i) => ({ n, i })).filter(({ n, i }) => !taken.has(i) && (n.tags?.["traffic_signals:direction"] || n.tags?.direction) && !rows.some((r) => Math.abs(r[0] - n.lon) < 0.001 && Math.abs(r[1] - n.lat) < 0.001 && meters(r[0], r[1], n.lon, n.lat) <= 60));
+  const used = new Set<number>();
+  let extra = 0;
+  for (const a of far) {
+    if (used.has(a.i)) continue;
+    const group = far.filter((b) => !used.has(b.i) && meters(a.n.lon, a.n.lat, b.n.lon, b.n.lat) <= 50);
+    group.forEach((b) => used.add(b.i));
+    const lon = group.reduce((s, b) => s + b.n.lon, 0) / group.length, lat = group.reduce((s, b) => s + b.n.lat, 0) / group.length;
+    rows.push([Math.round(lon * 1e5) / 1e5, Math.round(lat * 1e5) / 1e5, "", "", "", group.length, 0, 0, 0, 0, "OSM", group.map((b) => [Math.round(b.n.lon * 1e6) / 1e6, Math.round(b.n.lat * 1e6) / 1e6, "c"] as [number, number, "c"])]);
+    extra++; placed += group.length;
+  }
+  console.log(`Semáforos fuera de la lista oficial (OpenStreetMap): ${used.size} en ${extra} puntos`);
   return placed;
 }
 

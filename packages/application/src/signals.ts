@@ -27,6 +27,8 @@ export function countSignalGroups(field: unknown): number {
  *  Cada punto es un CRUCE (un controlador), no cada semáforo de la calle: un cruce suele tener varios. */
 export function signalInfo(r: SignalRow): { title: string; text: string } {
   const [, , dir, loc, , car = 0, brt = 0, ped = 0, bici = 0, fases = 0, op = ""] = r;
+  // semáforos que no están en la lista oficial de Movilidad (solo se sabe dónde están, por OpenStreetMap)
+  if (op === "OSM") return { title: "Semáforo", text: `${car > 1 ? `${car} semáforos` : "Semáforo"} que no aparece${car > 1 ? "n" : ""} en la lista oficial de la Secretaría de Movilidad; la posición viene de OpenStreetMap.` };
   const parts: string[] = [];
   if (car) parts.push(`${car} para carros`);
   if (brt) parts.push(`${brt} para TransMilenio`);
