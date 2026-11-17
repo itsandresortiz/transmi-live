@@ -30,6 +30,11 @@ jobs:
           if [ "${N:-1}" = "0" ]; then echo "widget-data.yml estaba detenido: se relanza"; gh workflow run widget-data.yml --repo "$GITHUB_REPOSITORY" --ref main || true; fi
           H=$( (gh run list --repo "$GITHUB_REPOSITORY" --workflow hop-stats.yml --status in_progress --json databaseId --jq length; gh run list --repo "$GITHUB_REPOSITORY" --workflow hop-stats.yml --status queued --json databaseId --jq length) 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo 1)
           if [ "${H:-1}" = "0" ]; then echo "hop-stats.yml estaba detenido: se relanza"; gh workflow run hop-stats.yml --repo "$GITHUB_REPOSITORY" --ref main || true; fi
+          # la grabadora de semáforos (buses junto a los semáforos medidos a mano) debía correr cada 10 min, pero GitHub la lanzaba pocas
+          # veces al día: con servicio (4:30 a. m.–11:30 p. m.), si no está corriendo se lanza aquí
+          HB=$(TZ=America/Bogota date +%H%M)
+          S=$( (gh run list --repo "$GITHUB_REPOSITORY" --workflow signal-stats.yml --status in_progress --json databaseId --jq length; gh run list --repo "$GITHUB_REPOSITORY" --workflow signal-stats.yml --status queued --json databaseId --jq length) 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo 1)
+          if [ "${S:-1}" = "0" ] && [ "$HB" -ge 0430 ] && [ "$HB" -le 2330 ]; then echo "signal-stats.yml no estaba corriendo: se lanza"; gh workflow run signal-stats.yml --repo "$GITHUB_REPOSITORY" --ref main || true; fi
           # la red del día (GTFS, cierres temporales de vagones) se arma a las 4:30 a. m., pero el horario de GitHub la retrasa hasta 10 h:
           # si pasadas las 4:30 de Bogotá aún no ha corrido hoy, se lanza aquí
           HOY=$(TZ=America/Bogota date +%F); HORA=$(TZ=America/Bogota date +%H%M)
