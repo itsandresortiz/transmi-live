@@ -21,6 +21,7 @@ export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Reco
   // la primera marca de una medición puede no ser un cambio (se empieza a mirar con la luz ya encendida): no se cuenta como inicio
   for (let i = 2; i < marks.length; i++) {
     const a = marks[i - 1]!, b = marks[i]!;
+    if (a.t - marks[i - 2]!.t > 100_000) continue;      // tras una pausa larga, la luz ya llevaba rato encendida: no es una duración completa
     if (a.c === b.c || b.t - a.t >= 300_000) continue;
     if (a.c === "y" && b.c === "g") preGreen.push(b.t - a.t);      // amarillo antes del verde
     else dur[a.c].push(b.t - a.t);
@@ -92,7 +93,7 @@ export interface SignalModel { cycle: number; anchor: number; segs: { c: Color; 
 /** Más de 5 min sin marcar = otra medición (ningún ciclo de semáforo pasa de ~4 min). */
 const SESSION_GAP = 5 * 60_000;
 /** Las marcas de la última sesión de medición: puede ser otro plan del semáforo (de noche, en hora pico…), y mezclarlas daría un ciclo
- *  que no existe. Un toque repetido del mismo color en menos de 5 s es un doble toque: cuenta el primero. */
+ *  que no existe. Un toque repetido del mismo color en menos de 10 s es un doble toque (o un amarillo marcado como rojo): cuenta el primero. */
 export function lastSession(marks: readonly Mark[]): Mark[] {
   let i = marks.length - 1;
   while (i > 0 && marks[i]!.t - marks[i - 1]!.t <= SESSION_GAP) i--;
@@ -100,7 +101,7 @@ export function lastSession(marks: readonly Mark[]): Mark[] {
 }
 function clean(marks: readonly Mark[]): Mark[] {
   const out: Mark[] = [];
-  for (const m of marks) { const p = out[out.length - 1]; if (p && p.c === m.c && m.t - p.t < 5000) continue; out.push(m); }
+  for (const m of marks) { const p = out[out.length - 1]; if (p && p.c === m.c && m.t - p.t < 10_000) continue; out.push(m); }      // un mismo color dos veces en <10 s: un solo cambio
   return out;
 }
 
