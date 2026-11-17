@@ -9,7 +9,7 @@
     "transmilenio": false,
     "nota": "el de carros más cercano a la ventana del dueño, salida del Portal Suba"
    },
-   "resumen": "Tiempo fijo, ciclo 89,996 s (afinado con 3 mediciones entre 2:34 y 2:57 a. m.): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. La predicción en vivo coincidió con la calle (desfase 0,4–1,7 s, lo que tarda el dedo). Notas: 07:51:31 «rojo» fue al empezar a mirar (no un cambio); 07:52:42 doble toque. Mediodía (12:18–12:27 p. m.): otro plan, ciclo fijo de ~120 s (vueltas bien marcadas 119,8 · 119,9 · 120,2 s): verde 68 s, amarillo 2 s, rojo 48 s, amarillo antes del verde 2 s; 6 de 8 cambios encajan, 2 marcas corridas ~7 s (17:19:19 y 17:24:30, este sin amarillo antes). Hacia la 1 p. m. (12:57–1:06 p. m.): ciclo fijo de 120 s con el inicio del rojo siempre en el mismo punto (12:59:29, 1:03:29, 1:05:29), pero el rojo dura 40,5–47 s según el tráfico (el cruce ajusta su tiempo dentro del ciclo); el inicio del rojo se corrió ~6 s frente al mediodía. 1:10–1:14 p. m.: sigue igual (rojos a las 1:11:29 y 1:13:29, en la misma cuadrícula de 120 s; rojo de 43 y 49 s).",
+   "resumen": "Tiempo fijo, ciclo 89,996 s (afinado con 3 mediciones entre 2:34 y 2:57 a. m.): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. La predicción en vivo coincidió con la calle (desfase 0,4–1,7 s, lo que tarda el dedo). Notas: 07:51:31 «rojo» fue al empezar a mirar (no un cambio); 07:52:42 doble toque. Mediodía (12:18–12:27 p. m.): otro plan, ciclo fijo de ~120 s (vueltas bien marcadas 119,8 · 119,9 · 120,2 s): verde 68 s, amarillo 2 s, rojo 48 s, amarillo antes del verde 2 s; 6 de 8 cambios encajan, 2 marcas corridas ~7 s (17:19:19 y 17:24:30, este sin amarillo antes). Hacia la 1 p. m. (12:57–1:06 p. m.): ciclo fijo de 120 s con el inicio del rojo siempre en el mismo punto (12:59:29, 1:03:29, 1:05:29), pero el rojo dura 40,5–47 s según el tráfico (el cruce ajusta su tiempo dentro del ciclo); el inicio del rojo se corrió ~6 s frente al mediodía. 1:10–1:14 p. m.: sigue igual (rojos a las 1:11:29 y 1:13:29, en la misma cuadrícula de 120 s; rojo de 43 y 49 s). Validación 1:15–1:17 p. m.: el modelo predijo rojo a la 1:15:29 y 1:17:29 y se marcó a la 1:15:29,7 y 1:17:29,2 (≤0,7 s); rojo de 44 s.",
    "marcas": [
     [
      "2026-11-17T07:34:38.884Z",
@@ -298,6 +298,30 @@
     [
      "2026-11-17T18:14:20.630Z",
      "verde"
+    ],
+    [
+     "2026-11-17T18:15:27.560Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T18:15:29.709Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T18:16:13.634Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T18:16:15.600Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T18:17:26.614Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T18:17:29.217Z",
+     "rojo"
     ]
    ]
   },
