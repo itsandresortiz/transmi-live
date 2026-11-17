@@ -3,7 +3,7 @@
 import { cachedBytes } from "./offline";
 import { gunzipSync } from "fflate";
 import { LiveDataService, type NetworkSourcePort, TransitState } from "@transmi/application";
-import { GtfsLiteNetworkSource, type NetworkDto, ProxyLiveFeed, buildNetwork } from "@transmi/infrastructure";
+import { type CompactNetworkDto, GtfsLiteNetworkSource, type NetworkDto, ProxyLiveFeed, buildNetwork, expandNetwork } from "@transmi/infrastructure";
 import { CONFIG } from "./config";
 import { nowMs, updateClockOffset } from "./clock";
 
@@ -24,6 +24,14 @@ const zipSource = new GtfsLiteNetworkSource({ url: `${CONFIG.dataBase}gtfs-lite.
  *  Es lo que más pesa al abrir, sobre todo en teléfonos modestos. Si no está o falla, se usa el GTFS reducido como antes. */
 export const networkSource: NetworkSourcePort = {
   async load() {
+    try {
+      // formato compacto (la mitad de peso y más rápido de leer); si aún no está publicado, el de siempre
+      const hit2 = await cachedBytes(`${CONFIG.dataBase}network2.json.gz`, "network2.json.gz", 12 * 3_600_000, 10_000);      // espera corta: sin señal y sin copia de este, se sigue con la copia del de siempre
+      if (hit2) {
+        const dto = JSON.parse(new TextDecoder().decode(gunzipSync(hit2.data))) as CompactNetworkDto;
+        if (dto.v === 2 && dto.shapes?.length && dto.stops?.length) return buildNetwork(expandNetwork(dto));
+      }
+    } catch { /* se intenta con el formato de siempre */ }
     try {
       const hit = await cachedBytes(`${CONFIG.dataBase}network.json.gz`, "network.json.gz", 12 * 3_600_000, 30_000);
       if (hit) {

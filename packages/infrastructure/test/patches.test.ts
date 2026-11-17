@@ -48,3 +48,17 @@ describe("cierres temporales", () => {
     expect(tempNoticeAlerts(day("2026-11-25"), () => ["1"], n)).toHaveLength(0);
   });
 });
+
+import { compactNetwork, expandNetwork } from "../src/gtfs/compact";
+describe("red en formato compacto", () => {
+  it("ida y vuelta sin perder más de ~1 m y sin tocar el original", () => {
+    const d = dto(["A", "B"]);
+    d.shapes[0]!.pts = [4.70123, -74.08456, 4.70201, -74.08399, 4.69999, -74.081];
+    const c = compactNetwork(d);
+    expect(c.v).toBe(2);
+    expect(c.shapes[0]!.pts).toEqual([470123, -7408456, 78, 57, -202, 299]);
+    expect(d.shapes[0]!.pts[0]).toBe(4.70123);
+    const back = expandNetwork(JSON.parse(JSON.stringify(c)));
+    back.shapes[0]!.pts.forEach((x, i) => expect(Math.abs(x - d.shapes[0]!.pts[i]!)).toBeLessThan(1e-6));
+  });
+});

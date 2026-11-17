@@ -3,11 +3,13 @@
  * rutas, paradas y trazados listos, con las coordenadas a 5 decimales (~1 m). Así el teléfono no tiene que descomprimir y leer
  * 50 MB de texto al abrir: baja mucho menos y arranca varias veces más rápido, sobre todo en teléfonos modestos.
  *
+ * Escribe también `network2.json.gz` al lado (formato compacto, ver `compact.ts`): lo leen las apps nuevas; el de siempre queda para las viejas.
+ *
  * Uso: npx tsx tools/network-dto.ts <gtfs-lite.zip> <network.json.gz>     (lo corre el workflow «GTFS diario»)
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
-import { applyStopPatches, applyTempStopChanges, parseGtfsLite } from "@transmi/infrastructure";
+import { applyStopPatches, applyTempStopChanges, compactNetwork, parseGtfsLite } from "@transmi/infrastructure";
 
 const [src, out] = process.argv.slice(2);
 if (!src || !out) { console.error("Uso: npx tsx tools/network-dto.ts <gtfs-lite.zip> <network.json.gz>"); process.exit(1); }
@@ -22,5 +24,7 @@ void (async () => {
   for (const sh of dto.shapes) sh.pts = sh.pts.map(r5);
   const gz = gzipSync(JSON.stringify({ v: 1, ...dto }), { level: 9 });
   writeFileSync(out, gz);
+  const gz2 = gzipSync(JSON.stringify(compactNetwork(dto)), { level: 9 }), out2 = out.replace(/network\.json\.gz$/, "network2.json.gz");
+  if (out2 !== out) { writeFileSync(out2, gz2); console.log(`${out2}: ${(gz2.length / 1e6).toFixed(2)} MB (formato compacto)`); }
   console.log(`${out}: ${dto.routes.length} rutas, ${dto.stops.length} paradas, ${dto.shapes.length} trazados, ${(gz.length / 1e6).toFixed(2)} MB`);
 })();

@@ -75,7 +75,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 
 ## Deuda técnica
 - ✅ (2026-11-14, **sin probar en el Mac**) iOS: el número de compilación ya sale de la fecha para la app y el widget (`TM_BUILD_NUMBER`). Comprobar en la próxima entrega que Transporter muestre un número con la fecha y no «3» o «4».
-- Abrir la app procesa `network.json.gz` (leer ~18 MB de JSON + armar la red) en el hilo principal: en teléfonos lentos puede congelar la app unos segundos. Si se nota, mover a un hilo aparte o guardar un formato más compacto/binario.
+- Abrir la app procesa la red en el hilo principal. ✅ (2026-11-17) Formato compacto `network2.json.gz` (la mitad de peso, ~2× más rápido de leer). Queda armar la red (`buildNetwork`, ~56 ms en Node) y las formas de estaciones (~32 ms); medir en un teléfono lento antes de seguir.
 - La web sigue leyendo `gtfs-lite.zip` (17 MB, en un Web Worker); podría usar `network.json.gz` como la app.
 - Rendimiento: lo que queda más caro por lote es `applyPositions` (~38 ms en Node; en un teléfono lento puede notarse como un tirón cada ~20 s) y «Cómo llegar» (190–350 ms en Node). No se ha medido en un teléfono lento real.
 - `packages/application/src/trunk-data.ts` copia `apps/web/src/data/troncales.json` y los portales de `estaciones.json`: hacer que la web lea del mismo sitio.
