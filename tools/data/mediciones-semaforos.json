@@ -9,7 +9,7 @@
     "transmilenio": false,
     "nota": "el de carros más cercano a la ventana del dueño, salida del Portal Suba"
    },
-   "resumen": "Tiempo fijo, ciclo 89,996 s (afinado con 3 mediciones entre 2:34 y 2:57 a. m.): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. La predicción en vivo coincidió con la calle (desfase 0,4–1,7 s, lo que tarda el dedo). Notas: 07:51:31 «rojo» fue al empezar a mirar (no un cambio); 07:52:42 doble toque. Mediodía (12:18–12:27 p. m.): otro plan, ciclo fijo de ~120 s (vueltas bien marcadas 119,8 · 119,9 · 120,2 s): verde 68 s, amarillo 2 s, rojo 48 s, amarillo antes del verde 2 s; 6 de 8 cambios encajan, 2 marcas corridas ~7 s (17:19:19 y 17:24:30, este sin amarillo antes).",
+   "resumen": "Tiempo fijo, ciclo 89,996 s (afinado con 3 mediciones entre 2:34 y 2:57 a. m.): verde 53 s, amarillo 2 s, rojo 33 s, amarillo antes del verde 2 s. La predicción en vivo coincidió con la calle (desfase 0,4–1,7 s, lo que tarda el dedo). Notas: 07:51:31 «rojo» fue al empezar a mirar (no un cambio); 07:52:42 doble toque. Mediodía (12:18–12:27 p. m.): otro plan, ciclo fijo de ~120 s (vueltas bien marcadas 119,8 · 119,9 · 120,2 s): verde 68 s, amarillo 2 s, rojo 48 s, amarillo antes del verde 2 s; 6 de 8 cambios encajan, 2 marcas corridas ~7 s (17:19:19 y 17:24:30, este sin amarillo antes). Hacia la 1 p. m. (12:57–1:00 p. m., 1 vuelta) cambió de plan otra vez: rojo 47 s (igual), verde ~43 s, ciclo ~94 s; los cambios se corrieron >1 min frente al plan de 120 s. Falta confirmar con 2–3 vueltas.",
    "marcas": [
     [
      "2026-11-17T07:34:38.884Z",
@@ -197,6 +197,30 @@
     ],
     [
      "2026-11-17T17:27:13.395Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T17:57:17.855Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T17:58:44.376Z",
+     "verde"
+    ],
+    [
+     "2026-11-17T17:59:27.545Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T17:59:29.545Z",
+     "rojo"
+    ],
+    [
+     "2026-11-17T18:00:16.560Z",
+     "amarillo"
+    ],
+    [
+     "2026-11-17T18:00:18.518Z",
      "verde"
     ]
    ]

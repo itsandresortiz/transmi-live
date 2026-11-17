@@ -61,7 +61,7 @@ export function summarize(marks: readonly Mark[]): { cycles: number[]; dur: Reco
   for (const c of cands) { const cc = refineCycle(marks, c), sc = score(cc); if (sc.fit > best.fit || (sc.fit === best.fit && sc.worst < best.worst)) { cyc = cc; best = sc; } }
   const { fit, total, worst } = best;
   const parts = [dur.g.length ? `verde ${secs(med(dur.g))}` : "", dur.y.length ? `amarillo ${secs(med(dur.y))}` : "", dur.r.length ? `rojo ${secs(med(dur.r))}` : "", preGreen.length ? `amarillo antes del verde ${secs(med(preGreen))}` : ""].filter(Boolean);
-  const steady = total < 3 ? ""
+  const steady = total < 3 || rounds < 2 ? ""      // con una sola vuelta no se puede decir si se repite
     : fit === total ? " Se repite igual: parece de tiempo fijo."
     : fit / total >= 0.7 ? ` ${fit} de ${total} cambios caen justo en un ciclo fijo; ${total - fit} se corrieron hasta ${secs(worst)} (puede ser el toque o que se adapte al tráfico).`
     : ` Solo ${fit} de ${total} cambios caen en un ciclo fijo: parece adaptarse al tráfico.`;
