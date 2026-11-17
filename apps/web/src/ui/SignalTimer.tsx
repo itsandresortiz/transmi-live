@@ -59,14 +59,20 @@ export function SignalTimer() {
   const [msg, setMsg] = useState("");
   const [, tick] = useState(0);
   useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(id); }, []);
-  // las marcas de este navegador o, si aquí no se ha medido, las guardadas en el proyecto
-  const id = s ? idOf(s) : "", marks = useMemo(() => (all[id] && signalModel(all[id]!) ? all[id]! : shared[id] ?? all[id] ?? []), [all, id]);
+  // todas las marcas de este semáforo: las guardadas en el proyecto más las de este navegador (sin repetir). Las nuevas se guardan aquí y
+  // «Copiar» las entrega juntas, así nunca se pierden ni quedan escondidas detrás de las guardadas
+  const id = s ? idOf(s) : "", own = useMemo(() => all[id] ?? [], [all, id]);
+  const marks = useMemo(() => {
+    const seen = new Set<string>(), out: Mark[] = [];
+    for (const m of [...(shared[id] ?? []), ...own]) { const k = `${m.t}|${m.c}`; if (!seen.has(k)) { seen.add(k); out.push(m); } }
+    return out.sort((a, b) => a.t - b.t);
+  }, [own, id]);
   if (!s) return null;
-  const add = (c: Color) => { const next = { ...all, [id]: [...marks, { t: nowMs(), c }] }; setAll(next); saveAll(next); if (navigator.vibrate) navigator.vibrate(30); };
-  const undo = () => { const next = { ...all, [id]: marks.slice(0, -1) }; setAll(next); saveAll(next); };
-  const clear = () => { if (!confirm("¿Borrar las marcas de este semáforo?")) return; const next = { ...all }; delete next[id]; setAll(next); saveAll(next); };
+  const add = (c: Color) => { const next = { ...all, [id]: [...own, { t: nowMs(), c }] }; setAll(next); saveAll(next); if (navigator.vibrate) navigator.vibrate(30); };
+  const undo = () => { if (!own.length) return; const next = { ...all, [id]: own.slice(0, -1) }; setAll(next); saveAll(next); };
+  const clear = () => { if (!confirm("¿Borrar las marcas de este semáforo hechas en este navegador?")) return; const next = { ...all }; delete next[id]; setAll(next); saveAll(next); };
   const session = lastSession(marks), sum = summarize(session), last = marks[marks.length - 1], model = signalModel(marks), live = model ? signalNow(model, nowMs()) : null;
-  const sessions = marks.length ? marks.reduce((n, m, i) => n + (i > 0 && m.t - marks[i - 1]!.t > 15 * 60_000 ? 1 : 0), 1) : 0;
+  const sessions = marks.length ? marks.reduce((n, m, i) => n + (i > 0 && m.t - marks[i - 1]!.t > 5 * 60_000 ? 1 : 0), 1) : 0;
   const copy = async () => {
     const data = { semaforo: { titulo: s.title, lat: s.lat, lon: s.lon, transmilenio: s.tm }, resumen: sum.text, marcas: marks.map((m) => [new Date(m.t).toISOString(), NAMES[m.c]]) };
     const txt = `Medidas del semáforo ${s.title}${s.tm ? " (TM)" : ""}\n${sum.text}\n${JSON.stringify(data)}`;
@@ -74,7 +80,9 @@ export function SignalTimer() {
     catch { try { await navigator.share?.({ text: txt }); } catch { setMsg("No se pudo copiar."); } }
   };
   const copyAll = async () => {
-    const data = Object.entries(loadAll()).filter(([, m]) => m.length).map(([key, m]) => ({ semaforo: key, resumen: summarize(lastSession(m)).text, marcas: m.map((x) => [new Date(x.t).toISOString(), NAMES[x.c]]) }));
+    const local = loadAll(), keys = new Set([...Object.keys(local), ...Object.keys(shared)]);
+    const merged = [...keys].map((key) => { const seen = new Set<string>(); return [key, [...(shared[key] ?? []), ...(local[key] ?? [])].filter((m) => { const k = `${m.t}|${m.c}`; if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => a.t - b.t)] as [string, Mark[]]; });
+    const data = merged.filter(([, m]) => m.length).map(([key, m]) => ({ semaforo: key, resumen: summarize(lastSession(m)).text, marcas: m.map((x) => [new Date(x.t).toISOString(), NAMES[x.c]]) }));
     const txt = `Medidas de ${data.length} semáforo${data.length === 1 ? "" : "s"} (TransMi LIVE)\n${JSON.stringify(data)}`;
     try { await navigator.clipboard.writeText(txt); setMsg(`Copiadas las medidas de ${data.length} semáforo${data.length === 1 ? "" : "s"}: pégalas en el chat.`); }
     catch { try { await navigator.share?.({ text: txt }); } catch { setMsg("No se pudo copiar."); } }
@@ -103,8 +111,8 @@ export function SignalTimer() {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="btn primary" onClick={() => void copy()} disabled={!marks.length}>Copiar medidas</button>
         <button className="btn" onClick={() => void copyAll()}>Copiar todos</button>
-        <button className="btn" onClick={undo} disabled={!marks.length}>Deshacer</button>
-        <button className="btn" onClick={clear} disabled={!marks.length}>Borrar</button>
+        <button className="btn" onClick={undo} disabled={!own.length}>Deshacer</button>
+        <button className="btn" onClick={clear} disabled={!own.length}>Borrar</button>
       </div>
       {msg ? <p className="cs" style={{ marginTop: 6 }}>{msg}</p> : null}
     </div>
