@@ -59,3 +59,13 @@ describe("sin falsas alarmas", () => {
     expect(L.text).not.toMatch(/corrido/);
   });
 });
+
+describe("solo cuentan los buses que van en el sentido del semáforo", () => {
+  it("con rumbo 120° cuenta los que van al sur-oriente y descarta los que van al revés", () => {
+    const obs: BusNearSignal[] = [];
+    for (let i = 0; i < 80; i++) { const t = 1_800_000_000 + i * 37; obs.push({ t, still: red(t), h: "E", b: 125 }); obs.push({ t, still: !red(t), h: "O", b: 305 }); }
+    const L = learnFromBuses(model, false, obs, [], 120);
+    expect(L.n).toBe(80);
+    expect(L.stopped.red).toBe(L.stopped.n);
+  });
+});

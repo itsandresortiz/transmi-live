@@ -15,6 +15,7 @@ const sigs = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-sema
 const g = await fetch("https://raw.githubusercontent.com/itsandresortiz/transmi-live/live-data/gtfs-lite.zip");
 const net = buildNetwork(await parseGtfsLite(new Uint8Array(await g.arrayBuffer())));
 const isTrunk = (routeId: string) => { const sys = net.routes.get(routeId)?.system; return sys === "troncal" || sys === "dual"; };
+const calles = ((await (await fetch("https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/osm-calles.json")).json()) as { s: Record<string, [number]> }).s;
 const col = new SignalNearCollector(sigs);
 const end = Date.now() + SECONDS * 1000;
 let polls = 0;
@@ -30,7 +31,7 @@ while (Date.now() < end) {
 }
 console.log(`consultas: ${polls}`);
 sigs.forEach((s, k) => {
-  const L = learnFromBuses(s.model!, s.inverse, col.obs[k]!, col.goes[k]!);
+  const L = learnFromBuses(s.model, s.inverse, col.obs[k]!, col.goes[k]!, calles[`${s.lon.toFixed(6)},${s.lat.toFixed(6)}`]?.[0]);
   console.log(`\n${s.title}${s.tm ? " (TransMilenio)" : ""}${s.inverse ? " · opuesto" : ""} · ${L.n} reportes · ${L.goes.n} arranques`);
   console.log(`  ${L.text}`);
   console.log(`  ejes: ${L.axes.map((a) => `${a.axis} n=${a.n} igual=${a.same.toFixed(2)} contrario=${a.flipped.toFixed(2)}`).join(" | ")}`);

@@ -27,7 +27,7 @@ import { SignalNearCollector } from "./signal-near";
 
 /** Reportes de buses junto a los semáforos medidos a mano que se conservan (para volver a compararlos cada vez que se mide de nuevo). */
 const KEEP_DAYS = 7;
-type NearStore = { obs: Record<string, [number, 0 | 1, Heading][]>; goes: Record<string, [number, number, Heading][]> };
+type NearStore = { obs: Record<string, [number, 0 | 1, Heading, number?][]>; goes: Record<string, [number, number, Heading][]> };
 
 const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 18_000;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live", TOKEN = process.env.GITHUB_TOKEN ?? "";
@@ -150,14 +150,17 @@ async function main() {
   const store: NearStore = { obs: {}, goes: {} };
   if (prevDir && existsSync(join(prevDir, "cerca-medidos.json.gz"))) Object.assign(store, JSON.parse(gunzipSync(readFileSync(join(prevDir, "cerca-medidos.json.gz"))).toString()));
   const since = Date.now() / 1000 - KEEP_DAYS * 86_400, learned: Record<string, unknown> = {};
+  const calles: Record<string, [number, number, string, number]> = prevDir && existsSync(join(prevDir, "osm-calles.json")) ? (JSON.parse(readFileSync(join(prevDir, "osm-calles.json"), "utf8")) as { s: Record<string, [number, number, string, number]> }).s : {};
   measured.forEach((m, k) => {
     const key = `${m.lat.toFixed(6)},${m.lon.toFixed(6)}`;
-    const obsAll = [...(store.obs[key] ?? []), ...near.obs[k]!.map((o) => [o.t, o.still ? 1 : 0, o.h] as [number, 0 | 1, Heading])].filter((o) => o[0] >= since);
+    const obsAll = [...(store.obs[key] ?? []), ...near.obs[k]!.map((o) => (o.b == null ? [o.t, o.still ? 1 : 0, o.h] : [o.t, o.still ? 1 : 0, o.h, o.b]) as [number, 0 | 1, Heading, number?])].filter((o) => o[0] >= since);
     const goesAll = [...(store.goes[key] ?? []), ...near.goes[k]!.map((g) => [g.a, g.b, g.h] as [number, number, Heading])].filter((g) => g[0] >= since);
     store.obs[key] = obsAll; store.goes[key] = goesAll;
     const model = signalPlans(m.marks);      // el plan de cada hora del día (de madrugada no es el mismo que al mediodía)
-    const obs: BusNearSignal[] = obsAll.map(([t, still, h]) => ({ t, still: still === 1, h })), goes: BusGo[] = goesAll.map(([a, b, h]) => ({ a, b, h }));
-    const L = learnFromBuses(model, m.inverse, obs, goes), day = learnFromBuses(model, m.inverse, obs.filter((o) => o.t >= Date.now() / 1000 - 86_400), goes.filter((g) => g.a >= Date.now() / 1000 - 86_400));
+    const obs: BusNearSignal[] = obsAll.map(([t, still, h, b]) => ({ t, still: still === 1, h, b })), goes: BusGo[] = goesAll.map(([a, b, h]) => ({ a, b, h }));
+    // hacia dónde mira el semáforo (calle de OpenStreetMap, `tools/osm-calles.ts`): solo cuentan los buses que van en ese sentido
+    const rumbo = calles[`${m.lon.toFixed(6)},${m.lat.toFixed(6)}`]?.[0];
+    const L = learnFromBuses(model, m.inverse, obs, goes, rumbo), day = learnFromBuses(model, m.inverse, obs.filter((o) => o.t >= Date.now() / 1000 - 86_400), goes.filter((g) => g.a >= Date.now() / 1000 - 86_400), rumbo);
     learned[key] = { titulo: m.title, tm: m.tm, ...L, ultimas24h: { n: day.n, agree: day.agree, shift: day.shift, text: day.text } };
   });
   writeFileSync(join(out, "cerca-medidos.json.gz"), gzipSync(JSON.stringify(store), { level: 9 }));

@@ -17,7 +17,7 @@ import { opposite, signalNow, type SignalColor, type SignalModel } from "./signa
  */
 export type Heading = "N" | "E" | "S" | "O" | "?";
 /** Un reporte de un bus que se acerca a un semáforo medido: `t` en segundos (hora del reporte), detenido o no, y hacia dónde iba. */
-export interface BusNearSignal { t: number; still: boolean; h: Heading }
+export interface BusNearSignal { t: number; still: boolean; h: Heading; /** Rumbo del bus en grados (0 = norte), si se sabe. */ b?: number }
 /** Un bus que estaba detenido cerca del semáforo en `a` y ya avanzaba en `b` (segundos): arrancó entre los dos reportes. */
 export interface BusGo { a: number; b: number; h: Heading }
 
@@ -57,10 +57,22 @@ const MIN_AXIS = 12, MIN_N = 30;
 const bogotaHour = (tSec: number) => Math.floor((((tSec - 5 * 3600) % 86_400) + 86_400) % 86_400 / 3600);
 
 /** Lo que dicen los buses de un semáforo medido. `inverse` = el semáforo sigue al contrario de `model` (como el de TransMilenio). */
-export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, allObs: readonly BusNearSignal[], allGoes: readonly BusGo[] = []): SignalLearning {
+/** Rumbo aproximado de cada dirección (para reportes viejos que no guardaban el rumbo en grados). */
+const SECTOR: Record<Heading, number | null> = { N: 0, E: 90, S: 180, O: 270, "?": null };
+const angle = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
+/** ¿El bus va en el sentido que controla el semáforo (±45°)? */
+export function headsWith(rumbo: number, o: { h: Heading; b?: number }): boolean {
+  const b = o.b ?? SECTOR[o.h];
+  return b != null && angle(b, rumbo) <= 45;
+}
+
+/** `rumbo`: hacia dónde va el tráfico que controla el semáforo (de OpenStreetMap o de los recorridos). Si se sabe, solo cuentan los buses
+ *  que van en ese sentido (los demás miran otro semáforo del cruce) y para ellos el color vale tal cual. */
+export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, allObs: readonly BusNearSignal[], allGoes: readonly BusGo[] = [], rumbo?: number): SignalLearning {
   planAt = typeof plan === "function" ? plan : () => plan;
-  // solo los reportes de horas en que se sabe qué plan tiene el semáforo
-  const obs = allObs.filter((o) => planAt(o.t * 1000)), goes = allGoes.filter((g) => planAt(g.a * 1000));
+  // solo los reportes de horas en que se sabe qué plan tiene el semáforo (y, si se sabe hacia dónde mira, de buses en ese sentido)
+  const dirOk = (o: { h: Heading; b?: number }) => rumbo == null || headsWith(rumbo, o);
+  const obs = allObs.filter((o) => planAt(o.t * 1000) && dirOk(o)), goes = allGoes.filter((g) => planAt(g.a * 1000) && dirOk(g));
   const model = { cycle: 120_000 };      // para el rango de corrimientos que se prueban (±60 s)
   const byAxis = new Map<Axis, BusNearSignal[]>();
   for (const o of obs) { const a = axisOf(o.h); if (a) (byAxis.get(a) ?? byAxis.set(a, []).get(a)!).push(o); }
@@ -73,7 +85,7 @@ export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, all
   }
   axes.sort((a, b) => b.n - a.n);
   // un eje sin conclusión se toma como el semáforo tal cual (el que se midió es el de ese eje casi siempre)
-  const flipOf = new Map(axes.map((a) => [a.axis, a.inverse === true]));
+  const flipOf = new Map(axes.map((a) => [a.axis, rumbo == null && a.inverse === true]));
   const used = obs.filter((o) => axisOf(o.h));
   const score = (shiftMs: number, list = used) => mean(list.map((o) => fits(o.still, colorAt(model, inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000, shiftMs))));
   const agree = used.length ? score(0) : null;
@@ -113,7 +125,7 @@ export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, all
     }
     chance += Math.min(1, (g.b - g.a + 10) / (planAt(g.a * 1000)!.cycle / 1000));
   }
-  return { n: used.length, axes, agree, shift, hours, stopped, goes: { n: gn, ok, chance: gn ? chance / gn : 0 }, text: describe(used.length, agree, shift, hours, axes, { n: gn, ok, chance: gn ? chance / gn : 0 }, stopped) };
+  return { n: used.length, axes, agree, shift, hours, stopped, goes: { n: gn, ok, chance: gn ? chance / gn : 0 }, text: describe(used.length, agree, shift, hours, rumbo == null ? axes : [], { n: gn, ok, chance: gn ? chance / gn : 0 }, stopped) };
 }
 
 function describe(n: number, agree: number | null, shift: SignalLearning["shift"], hours: SignalLearning["hours"], axes: AxisLearning[], goes: SignalLearning["goes"], stopped: SignalLearning["stopped"]): string {
