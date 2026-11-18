@@ -70,6 +70,17 @@ export async function loadRoads(): Promise<FeatureCollection<LineString>> {
       features.push({ type: "Feature", properties: { c }, geometry: { type: "LineString", coordinates: smooth(coords, c >= 2 ? 2 : 1) } });
     }
   });
+  // enlaces (retornos en U, orejas, giros) de OpenStreetMap, con ~1 m de precisión (`tools/osm-enlaces.ts`): con la de roads.json un
+  // retorno de 30 m salía escalonado
+  const links = (await import("../data/links.json")).default as unknown as Record<string, number[][]>;
+  ROAD_ORDER.forEach((k, c) => {
+    for (const e of links[k] ?? []) {
+      let a = e[0]!, b = e[1]!;
+      const coords: [number, number][] = [[b / 1e5, a / 1e5]];
+      for (let i = 2; i < e.length; i += 2) { a += e[i]!; b += e[i + 1]!; coords.push([b / 1e5, a / 1e5]); }
+      features.push({ type: "Feature", properties: { c }, geometry: { type: "LineString", coordinates: coords } });
+    }
+  });
   return fc<LineString>(features);
 }
 
