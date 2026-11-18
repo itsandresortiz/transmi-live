@@ -1,5 +1,6 @@
 name: Calle y sentido de cada semáforo (OpenStreetMap)
-# A mano: pide a OpenStreetMap en qué calle está cada semáforo y hacia dónde mira, y lo publica en la rama signal-stats (osm-calles.json).
+# A mano: pide a OpenStreetMap en qué calle está cada semáforo y hacia dónde mira (osm-calles.json) y los enlaces viales —retornos en U,
+# orejas, giros— que le faltan al mapa de la web (enlaces.json), y lo publica en la rama signal-stats.
 on:
   workflow_dispatch:
 permissions:
@@ -14,6 +15,7 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx --yes tsx tools/osm-calles.ts dist-osm
+      - run: npx --yes tsx tools/osm-enlaces.ts dist-osm
       - name: Publicar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
