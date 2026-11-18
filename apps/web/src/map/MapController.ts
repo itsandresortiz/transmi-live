@@ -1,4 +1,6 @@
 import { OWNER_TESTS } from "../ui/store";
+import baseLight from "./base-light.json";
+import baseDark from "./base-dark.json";
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
@@ -27,22 +29,11 @@ export interface LayerToggles { streets: boolean; stops: boolean; network: boole
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const FONT = ["Noto Sans Regular"];
-const STREET_LAYERS = ["street-0", "street-2", "street-3", "street-4"];
-const BUS_LAYERS = ["bus-dots", "bus-dots-minor"];
-const BOGOTA: [number, number] = [-74.075, 4.65];
+/** Las capas de un estilo base con otro nombre (para tener el claro y el oscuro a la vez) y visibles o no. */
+function baseLayers(style: unknown, prefix: string, visible: boolean): object[] {
+  return ((style as { layers: { id: string; layout?: object }[] }).layers).map((l) => ({ ...l, id: prefix + l.id, layout: { ...(l.layout ?? {}), visibility: visible ? "visible" : "none" } }));
+}
 
-/** Las líneas de todas las rutas van tenues para que se lea la jerarquía de las calles; al elegir una ruta se resalta sola. */
-const NETWORK_OPACITY = 0.2;
-const TRONCAL_OPACITY = 0.85;
-type RoadKey = "minor" | "tertiary" | "secondary" | "primary" | "trunk";
-/** Ancho (px) de cada tipo de vía según el zoom. Las autopistas y avenidas se ven anchas, como en Google Maps. */
-const ROAD_CLASSES: { id: string; key: RoadKey; filter: unknown[]; minzoom: number; casing: boolean; major: boolean; widths: [number, number][] }[] = [
-  { id: "road-0", key: "minor", filter: ["<=", ["get", "c"], 1], minzoom: 12.5, casing: true, major: false, widths: [[12.5, 0.6], [14, 1.1], [15.5, 3], [17, 8], [19, 18]] },
-  { id: "road-2", key: "tertiary", filter: ["==", ["get", "c"], 2], minzoom: 11.5, casing: true, major: false, widths: [[11.5, 0.5], [13, 1.4], [15, 4.5], [17, 10], [19, 22]] },
-  { id: "road-3", key: "secondary", filter: ["==", ["get", "c"], 3], minzoom: 10.5, casing: true, major: false, widths: [[10.5, 0.6], [13, 2.2], [15, 6], [17, 13], [19, 28]] },
-  { id: "road-4", key: "primary", filter: ["==", ["get", "c"], 4], minzoom: 9, casing: true, major: true, widths: [[9, 0.6], [12, 2.2], [14, 6], [16, 11], [18, 22], [19.5, 38]] },
-  { id: "road-5", key: "trunk", filter: ["==", ["get", "c"], 5], minzoom: 8, casing: true, major: true, widths: [[8, 0.6], [12, 3], [14, 7.5], [16, 14], [18, 28], [19.5, 48]] },
-];
 /** Las paradas se dibujan a la derecha de la vía (donde para el bus), no en el eje. Ocho direcciones y un desplazamiento en píxeles según el zoom. */
 const SECTORS = 8;
 const SIDE_PX: [number, number][] = [[13.5, 0], [15, 2.5], [16, 4.2], [17, 7], [18, 11], [19, 16]];
@@ -59,7 +50,14 @@ function sideScreen(k: number, z: number, bearing: number): [number, number] {
   return [(ux * Math.cos(a) - uy * Math.sin(a)) * px, (ux * Math.sin(a) + uy * Math.cos(a)) * px];
 }
 const sidedIds = (id: string) => [id, ...Array.from({ length: SECTORS }, (_, k) => `${id}-${k}`)];
-const casingWidth = (z: number) => (z < 12 ? 0.4 : z < 16 ? 0.4 + (z - 12) * 0.2 : 1.2 + Math.min(z - 16, 3) * 0.25);
+/** Nombres de calles del mapa base, según la apariencia (los juegos claro y oscuro llaman distinto a sus capas). */
+const streetLayers = (scheme: Scheme) => (scheme === "dark" ? ["bd-highway_name_other", "bd-highway_name_motorway", "bd-road_oneway", "bd-road_oneway_opposite"] : ["bl-highway-name-path", "bl-highway-name-minor", "bl-highway-name-major", "bl-highway-shield-non-us"]);
+const BUS_LAYERS = ["bus-dots", "bus-dots-minor"];
+const BOGOTA: [number, number] = [-74.075, 4.65];
+
+/** Las líneas de todas las rutas van tenues para que se lea la jerarquía de las calles; al elegir una ruta se resalta sola. */
+const NETWORK_OPACITY = 0.2;
+const TRONCAL_OPACITY = 0.85;
 
 /** Color según la línea de la troncal (propiedad `l` de cada elemento). */
 const lineMatch = (t: MapTheme, fallback: string): ExpressionSpecification =>
@@ -74,6 +72,8 @@ export class MapController {
   readonly ready: Promise<void>;
   private theme: MapTheme;
   private scheme: Scheme;
+  /** «Nombres de calles» encendido (se respeta al cambiar de apariencia). */
+  private streetsOn = true;
   private popup: Popup | null = null;
   private me: maplibregl.Marker | null = null;
   private networkLoaded = false;
@@ -82,15 +82,17 @@ export class MapController {
 
   constructor(container: HTMLElement, scheme: Scheme, private readonly events: MapEvents) {
     this.theme = themeOf(scheme); this.scheme = scheme;
-    const base = new URL(import.meta.env.BASE_URL, location.href).href;
-    const emptyGlyph = `${base}fonts/empty.pbf`;
+    const emptyGlyph = `${new URL(import.meta.env.BASE_URL, location.href).href}fonts/empty.pbf`;
     this.map = new maplibregl.Map({
       container,
+      // el mapa base es el mismo de la app (OpenFreeMap, © OpenStreetMap): trae todas las calles, retornos, giros y nombres. Van los dos
+      // juegos de capas (claro y oscuro) y se muestra uno u otro: así cambiar de apariencia no vuelve a cargar el mapa
       style: {
         version: 8,
-        glyphs: `${base}fonts/{fontstack}/{range}.pbf`,
-        sources: {},
-        layers: [{ id: "bg", type: "background", paint: { "background-color": this.theme.mapbg } }],
+        glyphs: (baseLight as { glyphs: string }).glyphs,
+        sprite: (baseLight as { sprite: string }).sprite,
+        sources: { ...(baseLight as { sources: object }).sources, ...(baseDark as { sources: object }).sources } as never,
+        layers: [...baseLayers(baseLight, "bl-", scheme !== "dark"), ...baseLayers(baseDark, "bd-", scheme === "dark")] as never,
       },
       center: BOGOTA, zoom: 11, minZoom: 9, maxZoom: 19.5,
       attributionControl: false, dragRotate: true, pitchWithRotate: false, maxPitch: 0,
@@ -124,24 +126,12 @@ export class MapController {
   private addLayers() {
     this.registerChip();
     const m = this.map, t = this.theme;
-    this.src("localidades"); this.src("localidad-labels"); this.src("roads"); this.src("troncales");
-    this.src("network"); this.src("street-labels"); this.src("estaciones"); this.src("stops");
+    this.src("localidad-labels"); this.src("troncales");
+    this.src("network"); this.src("estaciones"); this.src("stops");
     this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("alert-lines"); this.src("signal-live"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal"); this.src("trip-lines"); this.src("trip-pts");
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
 
-    m.addLayer({ id: "localidades-fill", type: "fill", source: "localidades", paint: { "fill-color": t.land } });
-    m.addLayer({ id: "localidades-line", type: "line", source: "localidades", paint: { "line-color": t.landLine, "line-width": 1.2 } });
-
     const lineLayout = { "line-cap": "round", "line-join": "round" } as const;
-    // calles como en los mapas modernos: primero todos los bordes (de menor a mayor) y luego los rellenos, para que se unan limpiamente
-    for (const cl of ROAD_CLASSES) if (cl.casing) m.addLayer({
-      id: `${cl.id}-casing`, type: "line", source: "roads", minzoom: cl.minzoom, filter: cl.filter as never, layout: lineLayout,
-      paint: { "line-color": cl.major ? t.roads.casingMajor : t.roads.casing, "line-width": ["interpolate", ["linear"], ["zoom"], ...cl.widths.flatMap(([z, w]) => [z, w + 2 * casingWidth(z)])] as never },
-    });
-    for (const cl of ROAD_CLASSES) m.addLayer({
-      id: `${cl.id}-fill`, type: "line", source: "roads", minzoom: cl.minzoom, filter: cl.filter as never, layout: lineLayout,
-      paint: { "line-color": t.roads[cl.key], "line-width": ["interpolate", ["linear"], ["zoom"], ...cl.widths.flat()] as never },
-    });
     m.addLayer({
       id: "network-lines", type: "line", source: "network", minzoom: 9, layout: lineLayout,
       paint: { "line-color": ["get", "color"], "line-opacity": NETWORK_OPACITY, "line-width": zoomWidth([9, 0.5], [14, 1.3], [18, 2.6]) },
@@ -179,18 +169,8 @@ export class MapController {
     m.addLayer({
       id: "localidad-names", type: "symbol", source: "localidad-labels", maxzoom: 13.5,
       layout: { "text-field": ["get", "name"], "text-font": FONT, "text-size": 11, "text-letter-spacing": 0.14, "text-allow-overlap": false, "symbol-z-order": "source" },
-      paint: { "text-color": t.label, "text-halo-color": t.land, "text-halo-width": 1.6, "text-opacity": 0.8 },
+      paint: { "text-color": t.label, "text-halo-color": t.halo, "text-halo-width": 1.6, "text-opacity": 0.8 },
     });
-    const streetLayout = (size: number[]) => ({
-      "text-field": ["get", "n"], "text-font": FONT, "text-size": zoomWidth([13, size[0]!], [19, size[1]!]),
-      "text-rotate": ["get", "a"], "text-rotation-alignment": "map", "text-pitch-alignment": "map",
-      "text-padding": 8, "text-max-angle": 30, "symbol-sort-key": ["get", "c"], "text-letter-spacing": 0.02,
-    } as const);
-    const streetPaint = { "text-color": t.label, "text-halo-color": t.halo, "text-halo-width": 1.5 };
-    ([["street-0", ["<=", ["get", "c"], 1], 13.5, [10, 14]], ["street-2", ["==", ["get", "c"], 2], 14.5, [9.5, 13]],
-      ["street-3", ["==", ["get", "c"], 3], 15, [9.5, 13]], ["street-4", ["==", ["get", "c"], 4], 16, [9, 12]]] as const).forEach(([id, filter, minzoom, size]) =>
-      m.addLayer({ id, type: "symbol", source: "street-labels", minzoom, filter: filter as never, layout: streetLayout([...size]) as never, paint: streetPaint }));
-
     m.addLayer({
       id: "estaciones-circles", type: "circle", source: "estaciones", minzoom: 11,
       paint: { "circle-radius": zoomWidth([11, 2], [15, 4.2], [18, 6]), "circle-color": t.surface, "circle-stroke-color": lineMatch(t, t.troncal), "circle-stroke-width": 2 },
@@ -299,11 +279,9 @@ export class MapController {
   private async loadStatic() {
     const set = (id: string, data: FeatureCollection) => (this.map.getSource(id) as GeoJSONSource | undefined)?.setData(data);
     const [loc, tron, est] = await Promise.all([geo.loadLocalidades(), geo.loadTroncales(), geo.loadEstaciones()]);
-    set("localidades", geo.localidadPolygons(loc)); set("localidad-labels", geo.localidadLabels(loc));
+    set("localidad-labels", geo.localidadLabels(loc));
     set("troncales", geo.troncalLines(tron));
     this.estacionesAll = geo.estacionPoints(est); this.applyEstaciones(); this.rebuildPortalLines();
-    set("roads", await geo.loadRoads());
-    set("street-labels", await geo.loadStreetLabels());
   }
 
   private bindEvents() {
@@ -374,18 +352,16 @@ export class MapController {
   setScheme(scheme: Scheme) {
     this.theme = themeOf(scheme); this.scheme = scheme;
     const t = this.theme, m = this.map;
-    if (!m.getLayer("bg")) return;
-    m.setPaintProperty("bg", "background-color", t.mapbg);
-    m.setPaintProperty("localidades-fill", "fill-color", t.land);
-    m.setPaintProperty("localidades-line", "line-color", t.landLine);
-    for (const cl of ROAD_CLASSES) {
-      m.setPaintProperty(`${cl.id}-fill`, "line-color", t.roads[cl.key]);
-      if (cl.casing) m.setPaintProperty(`${cl.id}-casing`, "line-color", cl.major ? t.roads.casingMajor : t.roads.casing);
+    if (!m.getLayer("troncales-lines")) return;
+    // mapa base: se muestra el juego de capas de la apariencia elegida
+    for (const l of m.getStyle().layers) {
+      if (l.id.startsWith("bl-")) m.setLayoutProperty(l.id, "visibility", scheme === "dark" ? "none" : "visible");
+      else if (l.id.startsWith("bd-")) m.setLayoutProperty(l.id, "visibility", scheme === "dark" ? "visible" : "none");
     }
+    if (!this.streetsOn) for (const id of streetLayers(scheme)) if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", "none");
     m.setPaintProperty("troncales-lines", "line-color", lineMatch(t, t.troncal));
     m.setPaintProperty("localidad-names", "text-color", t.label);
-    m.setPaintProperty("localidad-names", "text-halo-color", t.land);
-    for (const id of STREET_LAYERS) { m.setPaintProperty(id, "text-color", t.label); m.setPaintProperty(id, "text-halo-color", t.halo); }
+    m.setPaintProperty("localidad-names", "text-halo-color", t.halo);
     m.setPaintProperty("estaciones-circles", "circle-color", t.surface);
     m.setPaintProperty("estaciones-circles", "circle-stroke-color", lineMatch(t, t.troncal));
     m.setPaintProperty("estaciones-labels", "text-color", lineMatch(t, t.troncal));
@@ -411,7 +387,7 @@ export class MapController {
   setToggles(t: LayerToggles) {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-    vis(STREET_LAYERS, t.streets); vis([...sidedIds("stops-circles"), "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["network-portal"], t.stops && !t.network); vis(["trafico-casing", "trafico-lines", "trafico-flow-0", "trafico-flow-1", "trafico-flow-2", "trafico-flow-3"], t.traffic); this.setFlow(t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
+    this.streetsOn = t.streets; vis(streetLayers(this.scheme), t.streets); vis([...sidedIds("stops-circles"), "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["network-portal"], t.stops && !t.network); vis(["trafico-casing", "trafico-lines", "trafico-flow-0", "trafico-flow-1", "trafico-flow-2", "trafico-flow-3"], t.traffic); this.setFlow(t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
   }
 
   /** Velocidad de los buses en las calles (cada tramo con su banda de color). */

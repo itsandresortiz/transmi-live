@@ -104,3 +104,6 @@ Contexto: el dueño quiere que semáforos y buses «aprendan unos de otros». Se
 
 ## 2026-11-18 · Un plan de semáforo por hora del día, sin color si no hay medida cerca
 Contexto: el semáforo de Cra. 102B Bis × Calle 145 tiene 90 s de madrugada y 120 s al mediodía, y cada plan vuelve al día siguiente a la misma hora con el mismo arranque (0,3 s). Antes se usaba solo la última medición, así que de día se mostraba el plan de madrugada. Ahora se usa la medición de la hora del día más parecida (±3 h) y, si no hay ninguna cerca, no se pinta color. Alternativa descartada: usar siempre la más cercana aunque sea de otra franja (mostraría colores equivocados con seguridad aparente).
+
+## 2026-11-18 · La web usa el mapa base de la app (OpenFreeMap)
+Contexto: las calles de la web salían de un archivo propio simplificado sin retornos en U ni giros; la app ya usaba OpenFreeMap (OSM completo) y al dueño le parece perfecto. Se descartó (a) sumar los enlaces de OpenStreetMap al archivo propio (se veían escalonados con su precisión y seguirían faltando otras cosas) y (b) los mapas de CARTO (límites de uso y licencia comercial **(?)**). Costo: la web depende del servidor de OpenFreeMap para el fondo (sin conexión solo se ve lo ya guardado), igual que la app.
