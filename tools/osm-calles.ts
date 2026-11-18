@@ -15,7 +15,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const OUT = process.argv[2] ?? "dist-osm";
-const Q = '[out:json][timeout:240];node["highway"="traffic_signals"](4.45,-74.25,4.85,-73.98)->.s;.s out body;way(bn.s)["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|living_street|busway|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"];out tags geom;';
+const Q = '[out:json][timeout:240];node["highway"="traffic_signals"](4.45,-74.25,4.85,-73.98)->.s;.s out body;way(bn.s)["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|living_street|busway|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"];out body geom;';
 const SERVERS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
 
 interface El { type: string; id: number; lat?: number; lon?: number; tags?: Record<string, string>; nodes?: number[]; geometry?: { lat: number; lon: number }[] }
