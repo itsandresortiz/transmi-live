@@ -151,6 +151,8 @@ async function main() {
   if (prevDir && existsSync(join(prevDir, "cerca-medidos.json.gz"))) Object.assign(store, JSON.parse(gunzipSync(readFileSync(join(prevDir, "cerca-medidos.json.gz"))).toString()));
   const since = Date.now() / 1000 - KEEP_DAYS * 86_400, learned: Record<string, unknown> = {};
   const calles: Record<string, [number, number, string, number]> = prevDir && existsSync(join(prevDir, "osm-calles.json")) ? (JSON.parse(readFileSync(join(prevDir, "osm-calles.json"), "utf8")) as { s: Record<string, [number, number, string, number]> }).s : {};
+  // los puestos a mano traen su rumbo
+  if (existsSync("tools/data/semaforos-manuales.json")) for (const m of (JSON.parse(readFileSync("tools/data/semaforos-manuales.json", "utf8")) as { semaforos: { lat: number; lon: number; rumbo?: number }[] }).semaforos) if (m.rumbo != null) calles[`${m.lon.toFixed(6)},${m.lat.toFixed(6)}`] = [m.rumbo, 1, "", 1];
   measured.forEach((m, k) => {
     const key = `${m.lat.toFixed(6)},${m.lon.toFixed(6)}`;
     const obsAll = [...(store.obs[key] ?? []), ...near.obs[k]!.map((o) => (o.b == null ? [o.t, o.still ? 1 : 0, o.h] : [o.t, o.still ? 1 : 0, o.h, o.b]) as [number, 0 | 1, Heading, number?])].filter((o) => o[0] >= since);

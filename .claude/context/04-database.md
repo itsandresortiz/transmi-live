@@ -49,3 +49,5 @@ Se registraría aquí: tablas, relaciones, RLS, migraciones y funciones. Hoy no 
 - Web, almacenamiento local: `tm.iosapp.v1` = ya se mostró (o se cerró) el anuncio de la app de iPhone.
 
 - `mensajes.json` (raíz, rama `main`): mensajes temporales del dueño. Lo edita el dueño a mano en GitHub; lo leen web y app por `raw.githubusercontent.com` (unos 5 min de caché).
+
+- `tools/data/semaforos-manuales.json` (2026-11-18): semáforos que el dueño vio en la calle y que no tiene ninguna fuente; posición, tipo (carros/TM) y rumbo. Se publican en `semaforos.json` con la web.

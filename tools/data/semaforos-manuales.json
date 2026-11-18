@@ -1,0 +1,6 @@
+{
+ "nota": "Semáforos que el dueño vio en la calle y que no están ni en la lista de Movilidad ni en OpenStreetMap. tipo: c = carros, t = TransMilenio. rumbo: hacia dónde va el tráfico que controla (0 = norte, 90 = oriente…). Se agregan al cruce oficial más cercano (≤120 m) al publicar semaforos.json.",
+ "semaforos": [
+  { "lat": 4.747001, "lon": -74.096256, "tipo": "c", "rumbo": 230, "cruce": "AK 104 X AC 145", "nota": "giro a la derecha de la AK 104 (desde el norte) hacia la Calle 145; ubicado en la captura del dueño", "fecha": "2026-11-18" }
+ ]
+}

@@ -48,10 +48,31 @@ async function main() {
   // OpenStreetMap a veces frena las consultas seguidas (cada publicación de la web hace una): si no respondió, se reutilizan las
   // posiciones de la versión ya publicada, cruce por cruce, para no dejar el mapa con un solo punto por cruce
   if (!placed) placed = await reuseHeads(rows).catch((e) => { console.warn("Semáforos: tampoco se pudieron reutilizar las posiciones publicadas:", e instanceof Error ? e.message : e); return 0; });
+  placed += addManual(rows);
   console.log(`Semáforos con posición: ${placed}`);
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "semaforos.json"), JSON.stringify({ v: 2, at: new Date().toISOString().slice(0, 10), rows }));
   console.log(`Semáforos: ${rows.length}`);
+}
+/** Semáforos que el dueño vio en la calle y que no tiene ninguna fuente (`tools/data/semaforos-manuales.json`): se suman al cruce oficial
+ *  más cercano (≤120 m) o, si no hay, van como un punto propio. Devuelve cuántos agregó. */
+function addManual(rows: [number, number, string, string, string, number, number, number, number, number, string, [number, number, "c" | "t"][]?][]): number {
+  const file = join(process.cwd(), "tools/data/semaforos-manuales.json");
+  if (!existsSync(file)) return 0;
+  const list = (JSON.parse(readFileSync(file, "utf8")) as { semaforos?: { lat: number; lon: number; tipo?: string }[] }).semaforos ?? [];
+  let n = 0;
+  for (const m of list) {
+    if (!Number.isFinite(m.lat) || !Number.isFinite(m.lon)) continue;
+    const head: [number, number, "c" | "t"] = [m.lon, m.lat, m.tipo === "t" ? "t" : "c"];
+    let best: (typeof rows)[number] | null = null, bd = 120;
+    for (const r of rows) { const d = meters(r[0], r[1], m.lon, m.lat); if (d < bd && r[10] !== "OSM") { bd = d; best = r; } }
+    if (best) {
+      const heads = best[11] ?? [];
+      if (!heads.some((h) => meters(h[0], h[1], m.lon, m.lat) < 3)) { heads.push(head); best[11] = heads; n++; }
+    } else { rows.push([Math.round(m.lon * 1e5) / 1e5, Math.round(m.lat * 1e5) / 1e5, "", "", "", head[2] === "c" ? 1 : 0, head[2] === "t" ? 1 : 0, 0, 0, 0, "OSM", [head]]); n++; }
+  }
+  console.log(`Semáforos puestos a mano: ${n}`);
+  return n;
 }
 /** Copia las posiciones de cada semáforo desde el archivo ya publicado (mismo cruce = misma dirección y casi el mismo punto). */
 async function reuseHeads(rows: [number, number, string, string, string, number, number, number, number, number, string, [number, number, "c" | "t"][]?][]): Promise<number> {
