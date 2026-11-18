@@ -1,4 +1,4 @@
-/** Configuración de la app. El widget es opcional: solo se incluye al compilar con WIDGET=1, para que una falla en la extensión nunca bloquee una compilación normal. */
+/** Configuración de la app. El widget se incluye con WIDGET=1 (`scripts/testflight-local.sh` lo pone siempre, salvo WIDGET=0; el simulador y las capturas van sin él). */
 const GROUP = "group.com.transmilive.app";
 
 module.exports = ({ config }) => {

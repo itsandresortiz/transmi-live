@@ -26,6 +26,10 @@ echo "Compilando la versión $(git -C "$ROOT" rev-parse --short HEAD) ($(git -C 
 [ "$(uname)" = "Darwin" ] || { echo "Esto solo corre en un Mac con Xcode."; exit 1; }
 : "${TEAM_ID:?falta TEAM_ID}"
 UPLOAD="${UPLOAD:-transporter}"; BUNDLE_ID="${BUNDLE_ID:-com.transmilive.app}"
+# El widget (y la actividad en vivo de la pantalla de bloqueo) va SIEMPRE en lo que se sube a TestFlight: una compilación sin él deja el
+# widget de los usuarios gris y sin responder (pasó el 2026-11-17). Solo para probar sin él: WIDGET=0
+export WIDGET="${WIDGET:-1}"
+echo "Con el widget: $([ "$WIDGET" = 1 ] && echo sí || echo 'NO (WIDGET=0)')"
 # con el widget (WIDGET=1) el identificador de cada parte ya viene del proyecto: forzar uno solo lo rompería
 BUNDLE_OVERRIDE=(); if [ "${WIDGET:-}" != "1" ]; then BUNDLE_OVERRIDE=(PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID"); fi
 if [ "$UPLOAD" = api ]; then
