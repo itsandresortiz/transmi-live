@@ -42,6 +42,8 @@ export interface SignalLearning {
   shift: { s: number; agree: number } | null;
   /** Por hora de Bogotá (0–23): cuántos reportes y cuánto encajan. Una hora que no encaja tiene otro plan. */
   hours: { h: number; n: number; agree: number }[];
+  /** Buses detenidos junto al semáforo: cuántos, cuántos caían en su rojo o amarillo y qué parte sería por azar (0–1). */
+  stopped: { n: number; red: number; chance: number };
   /** Arranques de buses detenidos: cuántos y en cuántos había un inicio de verde justo antes (y cuántos serían por azar). */
   goes: { n: number; ok: number; chance: number };
   /** Lo que se le dice al dueño (modo de pruebas). */
@@ -68,14 +70,26 @@ export function learnFromBuses(model: SignalModel, inverse: boolean, obs: readon
   const used = obs.filter((o) => axisOf(o.h));
   const score = (shiftMs: number, list = used) => mean(list.map((o) => fits(o.still, colorAt(model, inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000, shiftMs))));
   const agree = used.length ? score(0) : null;
+  // el corrimiento: solo se dice si las dos mitades de los datos (por hora) señalan el mismo (±6 s) y ambas mejoran claramente. Con
+  // cientos de reportes ruidosos, probar 60 corrimientos siempre encuentra uno que «encaja mejor» por azar (medido el 2026-11-17: el mejor
+  // saltaba de −42 a +56 s entre franjas, y era distinto en dos semáforos que cambian juntos)
   let shift: SignalLearning["shift"] = null;
-  if (used.length >= MIN_N) {
-    shift = { s: 0, agree: agree! };
-    for (let s = -Math.floor(model.cycle / 2000); s < model.cycle / 2000; s += 2) {
-      const v = score(s * 1000);
-      if (v > shift.agree + 1e-9) shift = { s, agree: v };
-    }
+  const bestShift = (list: BusNearSignal[]) => {
+    let b = { s: 0, agree: score(0, list), base: score(0, list) };
+    for (let s = -Math.floor(model.cycle / 2000); s < model.cycle / 2000; s += 2) { const v = score(s * 1000, list); if (v > b.agree + 1e-9) b = { ...b, s, agree: v }; }
+    return b;
+  };
+  if (used.length >= 2 * MIN_N) {
+    const sorted = [...used].sort((a, b) => a.t - b.t), half = sorted.length >> 1;
+    const A = bestShift(sorted.slice(0, half)), B = bestShift(sorted.slice(half));
+    const near = (x: number, y: number) => { const c = model.cycle / 1000, d = Math.abs(x - y) % c; return Math.min(d, c - d) <= 6; };
+    if (near(A.s, B.s) && A.agree - A.base >= 0.08 && B.agree - B.base >= 0.08) { const s = Math.round((A.s + B.s) / 4) * 2; shift = { s, agree: score(s * 1000) }; }
+    else shift = { s: 0, agree: agree! };
   }
+  // la prueba más clara: los buses DETENIDOS junto al semáforo deberían caer en su rojo (o amarillo) mucho más que por azar
+  const stillObs = used.filter((o) => o.still);
+  const redShare = (inv: boolean) => { let n = 0; for (let t = 0; t < model.cycle; t += 1000) if (colorAt(model, inv, model.anchor + t) !== "g") n++; return n / (model.cycle / 1000); };
+  const stopped = { n: stillObs.length, red: stillObs.filter((o) => colorAt(model, inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000) !== "g").length, chance: mean(stillObs.map((o) => redShare(inverse !== flipOf.get(axisOf(o.h)!)))) };
   const byHour = new Map<number, BusNearSignal[]>();
   for (const o of used) { const h = bogotaHour(o.t); (byHour.get(h) ?? byHour.set(h, []).get(h)!).push(o); }
   const hours = [...byHour].map(([h, list]) => ({ h, n: list.length, agree: score(0, list) })).sort((a, b) => a.h - b.h);
@@ -92,16 +106,21 @@ export function learnFromBuses(model: SignalModel, inverse: boolean, obs: readon
     }
     chance += Math.min(1, (g.b - g.a + 10) / (model.cycle / 1000));
   }
-  return { n: used.length, axes, agree, shift, hours, goes: { n: gn, ok, chance: gn ? chance / gn : 0 }, text: describe(used.length, agree, shift, hours, axes, { n: gn, ok, chance: gn ? chance / gn : 0 }) };
+  return { n: used.length, axes, agree, shift, hours, stopped, goes: { n: gn, ok, chance: gn ? chance / gn : 0 }, text: describe(used.length, agree, shift, hours, axes, { n: gn, ok, chance: gn ? chance / gn : 0 }, stopped) };
 }
 
-function describe(n: number, agree: number | null, shift: SignalLearning["shift"], hours: SignalLearning["hours"], axes: AxisLearning[], goes: SignalLearning["goes"]): string {
+function describe(n: number, agree: number | null, shift: SignalLearning["shift"], hours: SignalLearning["hours"], axes: AxisLearning[], goes: SignalLearning["goes"], stopped: SignalLearning["stopped"]): string {
   if (agree == null || n < MIN_N) return `Los buses todavía no dicen nada de este semáforo (${n} reportes; hacen falta unos ${MIN_N}).`;
   const pct = (x: number) => `${Math.round(x * 100)} %`;
   const out = [`Según ${n} reportes de buses, encajan ${pct(agree)} con tu medida (al azar sería ~50 %).`];
+  if (stopped.n >= 15) {
+    const got = stopped.red / stopped.n, sd = Math.sqrt(stopped.chance * (1 - stopped.chance) / stopped.n);
+    out.push(`De ${stopped.n} buses detenidos, ${pct(got)} caían en tu rojo (al azar ${pct(stopped.chance)})${got - stopped.chance > 2 * sd ? ": los buses lo confirman." : got - stopped.chance < -2 * sd ? ": no cuadra (otro plan u otro sentido)." : ": todavía no se distingue del azar."}`);
+  }
   if (shift && shift.s !== 0 && Math.abs(shift.s) > 6 && shift.agree - agree >= 0.08) out.push(`Encajarían mejor (${pct(shift.agree)}) con el ciclo corrido ${shift.s > 0 ? "+" : ""}${shift.s} s: puede que el plan se haya corrido; vuelve a medir.`);
   else if (agree >= 0.65) out.push("El ciclo medido se sostiene con los buses.");
-  const bad = hours.filter((h) => h.n >= 15 && h.agree < 0.55).map((h) => `${h.h}:00`);
+  else if (agree < 0.58 && stopped.n < 15) out.push("Por ahora no se distingue del azar: los buses de ahí se detienen también por otras cosas (filas, paradas) y reportan cada ~20 s.");
+  const bad = hours.filter((h) => h.n >= 30 && h.agree < 0.4).map((h) => `${h.h}:00`);
   if (bad.length) out.push(`A estas horas no encaja (otro plan): ${bad.join(", ")}.`);
   const known = axes.filter((a) => a.inverse != null).map((a) => `${a.axis === "NS" ? "norte-sur" : "oriente-occidente"} ${a.inverse ? "al revés" : "igual"}`);
   if (known.length) out.push(`Sentidos: ${known.join("; ")}.`);

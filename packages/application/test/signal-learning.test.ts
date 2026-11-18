@@ -50,3 +50,12 @@ describe("semáforos que no están en la lista oficial (OpenStreetMap)", () => {
     expect(signalInfo(row).text).toMatch(/^2 semáforos que no aparecen en la lista oficial/);
   });
 });
+
+describe("sin falsas alarmas", () => {
+  it("con buses que no siguen al semáforo (al azar) no dice que el ciclo se corrió", () => {
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const noise: BusNearSignal[] = Array.from({ length: 300 }, (_, i) => ({ t: 1_800_000_000 + i * 53, still: rnd() < 0.15, h: "E" as const }));
+    const L = learnFromBuses(model, false, noise);
+    expect(L.text).not.toMatch(/corrido/);
+  });
+});
