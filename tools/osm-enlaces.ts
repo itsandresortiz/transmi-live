@@ -3,7 +3,8 @@
  * web (`apps/web/src/data/roads.json` solo traía vías principales, secundarias, residenciales…). Sin ellos, un retorno en U se veía solo
  * como la línea del recorrido del bus, sin calle debajo (lo notó el dueño en la Calle 145 frente al Portal Suba).
  *
- * Salida (`<carpeta>/enlaces.json`): en el mismo formato de `roads.json` ([lat×1e4, lon×1e4, Δlat, Δlon, …] por vía), por clase:
+ * Salida (`<carpeta>/enlaces.json`): como `roads.json` pero con ~1 m de precisión ([lat×1e5, lon×1e5, Δlat, Δlon, …] por vía; con la de
+ * `roads.json`, ~11 m, un retorno en U de 30 m salía escalonado), por clase:
  * los enlaces de troncales y principales van como «tertiary» y los de secundarias y terciarias como «unclassified» (se ven un poco más
  * angostos que la vía de la que salen). Fuente: © colaboradores de OpenStreetMap (ODbL). Corre en GitHub (desde el contenedor de Claude
  * el servidor de consultas corta la conexión).
@@ -28,12 +29,12 @@ async function main() {
     } catch (e) { err = e; console.warn("intento", k + 1, "falló:", e instanceof Error ? e.message : e); }
   }
   if (!ways.length) throw err ?? new Error("sin enlaces");
-  const out: Record<string, number[][]> = { tertiary: [], unclassified: [] };
+  const out: Record<string, number[][]> = { tertiary: [], unclassified: [] };      // escala 1e5
   for (const w of ways) {
     const g = w.geometry ?? [];
     if (g.length < 2) continue;
     const cls = /^(motorway|trunk|primary)_link$/.test(w.tags?.highway ?? "") ? "tertiary" : "unclassified";
-    const pts = g.map((p) => [Math.round(p.lat * 1e4), Math.round(p.lon * 1e4)] as const).filter((p, i, a) => i === 0 || p[0] !== a[i - 1]![0] || p[1] !== a[i - 1]![1]);
+    const pts = g.map((p) => [Math.round(p.lat * 1e5), Math.round(p.lon * 1e5)] as const).filter((p, i, a) => i === 0 || p[0] !== a[i - 1]![0] || p[1] !== a[i - 1]![1]);
     if (pts.length < 2) continue;
     const e = [pts[0]![0], pts[0]![1]];
     for (let i = 1; i < pts.length; i++) e.push(pts[i]![0] - pts[i - 1]![0], pts[i]![1] - pts[i - 1]![1]);
