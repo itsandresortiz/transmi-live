@@ -101,3 +101,6 @@ Formato: **Decisión** · contexto · alternativa descartada · por qué. (Más 
 
 ## 2026-11-17 · Los buses validan los semáforos medidos, pero no los corrigen solos
 Contexto: el dueño quiere que semáforos y buses «aprendan unos de otros». Se decidió que los buses **digan** si el ciclo medido encaja, si parece corrido o a qué horas no encaja, pero sin mover el ciclo solos: los reportes llegan cada ~20 s, el corrimiento que sugieren es aproximado y un ajuste automático equivocado se vería como un semáforo mal en las pruebas. Alternativa descartada: corregir el ancla con el mejor corrimiento de los buses. Las llegadas tampoco usan aún el semáforo: primero hay que ver con días de datos que los arranques caen tras el verde.
+
+## 2026-11-18 · Un plan de semáforo por hora del día, sin color si no hay medida cerca
+Contexto: el semáforo de Cra. 102B Bis × Calle 145 tiene 90 s de madrugada y 120 s al mediodía, y cada plan vuelve al día siguiente a la misma hora con el mismo arranque (0,3 s). Antes se usaba solo la última medición, así que de día se mostraba el plan de madrugada. Ahora se usa la medición de la hora del día más parecida (±3 h) y, si no hay ninguna cerca, no se pinta color. Alternativa descartada: usar siempre la más cercana aunque sea de otra franja (mostraría colores equivocados con seguridad aparente).

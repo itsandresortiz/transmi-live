@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { distanceMeters, toWorld } from "@transmi/domain";
-import { TransitState, learnFromBuses, measuredSignals, signalModel, type BusGo, type BusNearSignal, type Heading } from "@transmi/application";
+import { TransitState, learnFromBuses, measuredSignals, signalPlans, type BusGo, type BusNearSignal, type Heading } from "@transmi/application";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 import { SignalNearCollector } from "./signal-near";
 
@@ -155,8 +155,7 @@ async function main() {
     const obsAll = [...(store.obs[key] ?? []), ...near.obs[k]!.map((o) => [o.t, o.still ? 1 : 0, o.h] as [number, 0 | 1, Heading])].filter((o) => o[0] >= since);
     const goesAll = [...(store.goes[key] ?? []), ...near.goes[k]!.map((g) => [g.a, g.b, g.h] as [number, number, Heading])].filter((g) => g[0] >= since);
     store.obs[key] = obsAll; store.goes[key] = goesAll;
-    const model = signalModel(m.marks);
-    if (!model) return;
+    const model = signalPlans(m.marks);      // el plan de cada hora del día (de madrugada no es el mismo que al mediodía)
     const obs: BusNearSignal[] = obsAll.map(([t, still, h]) => ({ t, still: still === 1, h })), goes: BusGo[] = goesAll.map(([a, b, h]) => ({ a, b, h }));
     const L = learnFromBuses(model, m.inverse, obs, goes), day = learnFromBuses(model, m.inverse, obs.filter((o) => o.t >= Date.now() / 1000 - 86_400), goes.filter((g) => g.a >= Date.now() / 1000 - 86_400));
     learned[key] = { titulo: m.title, tm: m.tm, ...L, ultimas24h: { n: day.n, agree: day.agree, shift: day.shift, text: day.text } };

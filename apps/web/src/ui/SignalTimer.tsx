@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import { nowMs } from "../clock";
-import { type SignalColor as Color, type SignalMark as Mark, SIGNAL_COLOR_NAMES as NAMES, lastSession, measuredSignals, opposite, signalModel, signalNow, summarize } from "@transmi/application";
+import { type SignalColor as Color, type SignalMark as Mark, SIGNAL_COLOR_NAMES as NAMES, lastSession, measuredSignals, opposite, signalModelAt, signalNow, summarize } from "@transmi/application";
 
 /**
  * Cronómetro de semáforos (solo en el modo de pruebas, `?pruebas`): el dueño mira un semáforo desde la calle o la ventana y toca
@@ -29,7 +29,7 @@ export function liveSignals(t: number): { lon: number; lat: number; color: strin
     // el que sigue a otro usa solo las marcas de ese otro (las propias son pocas, de otra hora o del color contrario); los demás, las
     // guardadas en el proyecto más las de este navegador, juntas (así el semáforo y los que lo siguen nunca se desfasan entre sí)
     const src = follows.get(id) ?? id, marks = mergeMarks(shared[src] ?? [], local[src] ?? []);
-    const m = signalModel(marks);
+    const m = signalModelAt(marks, t);      // el plan de esta hora del día
     if (!m) continue;
     const [lat, lon] = id.split(",").map(Number);
     out.push({ lon: lon!, lat: lat!, color: COLORS[inverse.has(id) ? opposite(m, t) : signalNow(m, t).c] });
@@ -91,7 +91,7 @@ export function SignalTimer() {
   const add = (c: Color) => { const next = { ...all, [id]: [...own, { t: nowMs(), c }] }; setAll(next); saveAll(next); if (navigator.vibrate) navigator.vibrate(30); };
   const undo = () => { if (!own.length) return; const next = { ...all, [id]: own.slice(0, -1) }; setAll(next); saveAll(next); };
   const clear = () => { if (!confirm("¿Borrar las marcas de este semáforo hechas en este navegador?")) return; const next = { ...all }; delete next[id]; setAll(next); saveAll(next); };
-  const session = lastSession(marks), sum = summarize(session), last = marks[marks.length - 1], model = signalModel(marks), live = model ? signalNow(model, nowMs()) : null;
+  const session = lastSession(marks), sum = summarize(session), last = marks[marks.length - 1], model = signalModelAt(marks, nowMs()), live = model ? signalNow(model, nowMs()) : null;
   const sessions = marks.length ? marks.reduce((n, m, i) => n + (i > 0 && m.t - marks[i - 1]!.t > 5 * 60_000 ? 1 : 0), 1) : 0;
   const copy = async () => {
     const data = { semaforo: { titulo: s.title, lat: s.lat, lon: s.lon, transmilenio: s.tm }, resumen: sum.text, marcas: marks.map((m) => [new Date(m.t).toISOString(), NAMES[m.c]]) };
@@ -132,7 +132,7 @@ export function SignalTimer() {
           <b>Lo que dicen los buses</b>{learnedAt ? ` (${clock(Date.parse(learnedAt))})` : ""}: {(learned[id]!.ultimas24h?.n ?? 0) >= 30 ? `(últimas 24 h) ${learned[id]!.ultimas24h!.text}` : `(últimos 7 días) ${learned[id]!.text}`}
         </p>
       ) : null}
-      {live ? <p className="cs" style={{ fontSize: 12, margin: "-4px 0 8px", opacity: 0.75 }}>Es una predicción con tus medidas (tiempo fijo). Si no coincide con la calle, cambió de plan: vuelve a medir.</p> : null}
+      {live ? <p className="cs" style={{ fontSize: 12, margin: "-4px 0 8px", opacity: 0.75 }}>Es una predicción con tus medidas de esta hora del día (cada hora puede tener otro plan). Si no coincide con la calle, vuelve a medir.</p> : marks.length ? <p className="cs" style={{ fontSize: 12, margin: "0 0 8px", opacity: 0.75 }}>No hay medidas cerca de esta hora del día (±3 h): mide 2–3 vueltas para ver el color en vivo a esta hora.</p> : null}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="btn primary" onClick={() => void copy()} disabled={!marks.length}>Copiar medidas</button>
         <button className="btn" onClick={() => void copyAll()}>Copiar todos</button>

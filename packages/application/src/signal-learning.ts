@@ -24,9 +24,12 @@ export interface BusGo { a: number; b: number; h: Heading }
 export type Axis = "NS" | "EO";
 const axisOf = (h: Heading): Axis | null => (h === "N" || h === "S" ? "NS" : h === "E" || h === "O" ? "EO" : null);
 
-/** Color del semáforo medido (o del contrario, si `inverse`) en `tMs`, con el ciclo corrido `shiftMs`. */
-function colorAt(m: SignalModel, inverse: boolean, tMs: number, shiftMs = 0): SignalColor {
-  const t = tMs - shiftMs;
+/** El plan del semáforo que vale en cada momento (cada hora del día puede tener otro: ver `signalModelAt`). */
+type PlanAt = (tMs: number) => SignalModel | null;
+let planAt: PlanAt = () => null;
+/** Color del semáforo medido (o del contrario, si `inverse`) en `tMs`, con el ciclo corrido `shiftMs`, según el plan de esa hora. */
+function colorAt(_m: unknown, inverse: boolean, tMs: number, shiftMs = 0): SignalColor {
+  const m = planAt(tMs)!, t = tMs - shiftMs;
   return inverse ? opposite(m, t) : signalNow(m, t).c;
 }
 /** 1 si el reporte encaja con el color (detenido en rojo, avanzando en verde), 0 si lo contradice, ½ en amarillo (puede ser cualquiera). */
@@ -54,7 +57,11 @@ const MIN_AXIS = 12, MIN_N = 30;
 const bogotaHour = (tSec: number) => Math.floor((((tSec - 5 * 3600) % 86_400) + 86_400) % 86_400 / 3600);
 
 /** Lo que dicen los buses de un semáforo medido. `inverse` = el semáforo sigue al contrario de `model` (como el de TransMilenio). */
-export function learnFromBuses(model: SignalModel, inverse: boolean, obs: readonly BusNearSignal[], goes: readonly BusGo[] = []): SignalLearning {
+export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, allObs: readonly BusNearSignal[], allGoes: readonly BusGo[] = []): SignalLearning {
+  planAt = typeof plan === "function" ? plan : () => plan;
+  // solo los reportes de horas en que se sabe qué plan tiene el semáforo
+  const obs = allObs.filter((o) => planAt(o.t * 1000)), goes = allGoes.filter((g) => planAt(g.a * 1000));
+  const model = { cycle: 120_000 };      // para el rango de corrimientos que se prueban (±60 s)
   const byAxis = new Map<Axis, BusNearSignal[]>();
   for (const o of obs) { const a = axisOf(o.h); if (a) (byAxis.get(a) ?? byAxis.set(a, []).get(a)!).push(o); }
   // qué eje obedece al semáforo y cuál al contrario: el que encaja mejor (con suficientes reportes y una diferencia clara)
@@ -88,8 +95,8 @@ export function learnFromBuses(model: SignalModel, inverse: boolean, obs: readon
   }
   // la prueba más clara: los buses DETENIDOS junto al semáforo deberían caer en su rojo (o amarillo) mucho más que por azar
   const stillObs = used.filter((o) => o.still);
-  const redShare = (inv: boolean) => { let n = 0; for (let t = 0; t < model.cycle; t += 1000) if (colorAt(model, inv, model.anchor + t) !== "g") n++; return n / (model.cycle / 1000); };
-  const stopped = { n: stillObs.length, red: stillObs.filter((o) => colorAt(model, inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000) !== "g").length, chance: mean(stillObs.map((o) => redShare(inverse !== flipOf.get(axisOf(o.h)!)))) };
+  const redShare = (inv: boolean, at: number) => { const m = planAt(at)!; let n = 0; for (let t = 0; t < m.cycle; t += 1000) if ((inv ? opposite(m, m.anchor + t) : signalNow(m, m.anchor + t).c) !== "g") n++; return n / (m.cycle / 1000); };
+  const stopped = { n: stillObs.length, red: stillObs.filter((o) => colorAt(model, inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000) !== "g").length, chance: mean(stillObs.map((o) => redShare(inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000))) };
   const byHour = new Map<number, BusNearSignal[]>();
   for (const o of used) { const h = bogotaHour(o.t); (byHour.get(h) ?? byHour.set(h, []).get(h)!).push(o); }
   const hours = [...byHour].map(([h, list]) => ({ h, n: list.length, agree: score(0, list) })).sort((a, b) => a.h - b.h);
@@ -104,7 +111,7 @@ export function learnFromBuses(model: SignalModel, inverse: boolean, obs: readon
     for (let t = g.a - 10; t <= g.b; t++) {
       if (colorAt(model, inv, t * 1000) !== "g" && colorAt(model, inv, (t + 1) * 1000) === "g") { ok++; break; }
     }
-    chance += Math.min(1, (g.b - g.a + 10) / (model.cycle / 1000));
+    chance += Math.min(1, (g.b - g.a + 10) / (planAt(g.a * 1000)!.cycle / 1000));
   }
   return { n: used.length, axes, agree, shift, hours, stopped, goes: { n: gn, ok, chance: gn ? chance / gn : 0 }, text: describe(used.length, agree, shift, hours, axes, { n: gn, ok, chance: gn ? chance / gn : 0 }, stopped) };
 }

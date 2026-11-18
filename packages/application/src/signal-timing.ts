@@ -125,6 +125,40 @@ export function signalModel(all: readonly Mark[]): SignalModel | null {
   const k = cycle / raw.reduce((a, x) => a + x.d, 0);       // por si acaso, que sume exactamente el ciclo
   return { cycle, anchor, segs: raw.map((x) => ({ c: x.c, d: x.d * k })) };
 }
+/** Segundo del día en Bogotá (UTC−5). */
+const daySec = (t: number) => ((((t / 1000 - 5 * 3600) % 86_400) + 86_400) % 86_400);
+/** Las mediciones por separado (más de 5 min sin marcar = otra medición), cada una con su hora del día. */
+export function signalSessions(all: readonly Mark[]): { marks: Mark[]; mid: number; end: number }[] {
+  const out: { marks: Mark[]; mid: number; end: number }[] = [];
+  let cur: Mark[] = [];
+  const push = () => { if (cur.length) { const a = cur[0]!.t, b = cur[cur.length - 1]!.t; out.push({ marks: clean(cur), mid: daySec((a + b) / 2), end: b }); } };
+  for (const m of all) { if (cur.length && m.t - cur[cur.length - 1]!.t > SESSION_GAP) { push(); cur = []; } cur.push(m); }
+  push();
+  return out;
+}
+/** El plan del semáforo que vale a la hora `t`: el de la medición hecha a la hora del día más parecida (a ±`maxHours`), de cualquier día.
+ *  Los semáforos de Bogotá cambian de plan según la hora (medido el 2026-11-17/18 en Cra. 102B Bis × Calle 145: de madrugada 90 s, al
+ *  mediodía 120 s) y cada plan vuelve al día siguiente a la misma hora con el mismo arranque (el rojo de las 2:30 a. m. del 18 cayó a 0,3 s
+ *  de lo que predecía el del 17). Sin una medición cercana a esa hora devuelve `null`: mejor no decir nada que mostrar el plan de otra hora. */
+export function signalModelAt(all: readonly Mark[], t: number, maxHours = 3): SignalModel | null {
+  return signalPlans(all, maxHours)(t);
+}
+/** Lo mismo que `signalModelAt`, pero arma los planes una sola vez (para preguntar por miles de momentos, p. ej. los reportes de buses). */
+export function signalPlans(all: readonly Mark[], maxHours = 3): (t: number) => SignalModel | null {
+  const plans = signalSessions(all).flatMap((s) => { const m = signalModel(s.marks); return m ? [{ m, mid: s.mid, end: s.end }] : []; });
+  return (t) => {
+    let best: (typeof plans)[number] | null = null, bd = Infinity;
+    const now = daySec(t);
+    for (const p of plans) {
+      const raw = Math.abs(p.mid - now), d = Math.min(raw, 86_400 - raw);
+      if (d > maxHours * 3600) continue;
+      // a igual hora (±30 min) gana la medición más reciente
+      if (best && (d > bd + 1800 || (Math.abs(d - bd) <= 1800 && p.end < best.end))) continue;
+      best = p; bd = d;
+    }
+    return best?.m ?? null;
+  };
+}
 /** Afina el ciclo con marcas lejanas del mismo color: si entre el primer y el último verde (o rojo) caben justo N vueltas, el ciclo es
  *  ese tiempo / N (con 14 vueltas el error de un toque se divide entre 14). Si no encajan (otro plan), queda el ciclo medido. */
 function refineCycle(all: readonly Mark[], base: number): number {
@@ -174,7 +208,7 @@ export function measuredSignals(data: unknown): { lat: number; lon: number; titl
 /** Los semáforos medidos con el color que deberían tener en `t` (para pintarlos en el mapa). */
 export function liveSignalColors(measured: readonly { lat: number; lon: number; marks: readonly SignalMark[]; inverse?: boolean }[], t: number): { lon: number; lat: number; c: SignalColor }[] {
   const out: { lon: number; lat: number; c: SignalColor }[] = [];
-  for (const m of measured) { const model = signalModel(m.marks); if (model) out.push({ lon: m.lon, lat: m.lat, c: m.inverse ? opposite(model, t) : signalNow(model, t).c }); }
+  for (const m of measured) { const model = signalModelAt(m.marks, t); if (model) out.push({ lon: m.lon, lat: m.lat, c: m.inverse ? opposite(model, t) : signalNow(model, t).c }); }
   return out;
 }
 

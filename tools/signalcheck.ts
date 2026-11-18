@@ -6,12 +6,12 @@
  * Uso: NODE_USE_ENV_PROXY=1 npx tsx tools/signalcheck.ts [segundos]      (de día, con buses en la calle)
  */
 import { readFileSync } from "node:fs";
-import { learnFromBuses, measuredSignals, signalModel } from "@transmi/application";
+import { learnFromBuses, measuredSignals, signalPlans } from "@transmi/application";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 import { SignalNearCollector } from "./signal-near";
 
 const SECONDS = Number(process.argv[2] ?? 600);
-const sigs = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8"))).map((s) => ({ ...s, model: signalModel(s.marks) })).filter((s) => s.model);
+const sigs = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8"))).map((s) => ({ ...s, model: signalPlans(s.marks) }));
 const g = await fetch("https://raw.githubusercontent.com/itsandresortiz/transmi-live/live-data/gtfs-lite.zip");
 const net = buildNetwork(await parseGtfsLite(new Uint8Array(await g.arrayBuffer())));
 const isTrunk = (routeId: string) => { const sys = net.routes.get(routeId)?.system; return sys === "troncal" || sys === "dual"; };

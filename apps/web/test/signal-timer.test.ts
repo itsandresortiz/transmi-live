@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { summarize } from "@transmi/application";
+import { signalModelAt, signalSessions } from "@transmi/application";
 
 describe("cronómetro de semáforos", () => {
   it("calcula el ciclo y cuánto dura cada color", () => {
@@ -96,8 +97,25 @@ describe("semáforo de TransMilenio alterno", () => {
 describe("cruce coordinado (1 p. m.): rojos fijos cada 120 s, verde variable", () => {
   it("da 120 s y dice que el rojo cae siempre igual", () => {
     const l = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
-    const t = summarize(lastSession(l[0]!.marks)).text;
-    expect(t).toMatch(/^Ciclo de 120 s .*El rojo empieza siempre en el mismo punto del ciclo/);      // las duraciones cambian con cada vuelta nueva que se guarda
-    expect(model2(l[0]!.marks)!.cycle).toBe(120_000);
+    // la medición de la 1 p. m. del 17 (17:57–18:17 UTC)
+    const s = signalSessions(l[0]!.marks).find((x) => x.marks[0]!.t >= Date.parse("2026-11-17T17:50:00Z") && x.marks[0]!.t < Date.parse("2026-11-17T18:30:00Z"))!;
+    expect(summarize(s.marks).text).toMatch(/^Ciclo de 120 s .*El rojo empieza siempre en el mismo punto del ciclo/);      // las duraciones cambian con cada vuelta nueva que se guarda
+    expect(model2(s.marks)!.cycle).toBe(120_000);
+  });
+});
+
+describe("un plan por hora del día", () => {
+  const l = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
+  it("de madrugada 90 s, a la 1 p. m. 120 s, y a las 7 a. m. (sin medidas cerca) nada", () => {
+    expect(signalModelAt(l[0]!.marks, Date.parse("2026-11-20T07:31:00Z"))!.cycle).toBe(90_000);
+    expect(signalModelAt(l[0]!.marks, Date.parse("2026-11-20T18:15:00Z"))!.cycle).toBe(120_000);
+    expect(signalModelAt(l[0]!.marks, Date.parse("2026-11-20T12:00:00Z"))).toBeNull();
+  });
+  it("el plan de madrugada del 17 predice el rojo del 18 a la misma hora (±1 s)", () => {
+    const only17 = l[0]!.marks.filter((m) => m.t < Date.parse("2026-11-17T12:00:00Z"));
+    const red = Date.parse("2026-11-18T07:30:11.531Z");
+    const m = signalModelAt(only17, red)!;
+    expect(signalNow(m, red - 1500).c).not.toBe("r");
+    expect(signalNow(m, red + 1500).c).toBe("r");
   });
 });
