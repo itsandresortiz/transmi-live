@@ -1,0 +1,21 @@
+name: Calle y sentido de cada semáforo (OpenStreetMap)
+# A mano: pide a OpenStreetMap en qué calle está cada semáforo y hacia dónde mira, y lo publica en la rama signal-stats (osm-calles.json).
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  calles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx --yes tsx tools/osm-calles.ts dist-osm
+      - name: Publicar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: signal-stats
+        run: bash scripts/publish.sh dist-osm
