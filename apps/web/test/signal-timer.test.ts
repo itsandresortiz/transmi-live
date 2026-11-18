@@ -119,3 +119,16 @@ describe("un plan por hora del día", () => {
     expect(signalNow(m, red + 1500).c).toBe("r");
   });
 });
+
+describe("el semáforo aprende juntando las mediciones del mismo plan", () => {
+  const l = measuredSignals(JSON.parse(readFileSync("tools/data/mediciones-semaforos.json", "utf8")));
+  it("las dos madrugadas (17 y 18) forman un solo plan de 90 s que acierta los rojos de ambas", () => {
+    const m = signalModelAt(l[0]!.marks, Date.parse("2026-11-20T07:31:00Z"))!;
+    expect(m.cycle).toBe(90_000);
+    for (const red of ["2026-11-17T07:36:11.166Z", "2026-11-17T07:54:12.266Z", "2026-11-18T07:30:11.531Z", "2026-11-18T07:33:11.688Z"]) {
+      const t = Date.parse(red);
+      expect(now2(m, t + 1200).c).toBe("r");
+      expect(now2(m, t - 2500).c).not.toBe("r");
+    }
+  });
+});

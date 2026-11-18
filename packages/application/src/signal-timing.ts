@@ -136,7 +136,8 @@ export function signalSessions(all: readonly Mark[]): { marks: Mark[]; mid: numb
   push();
   return out;
 }
-/** El plan del semáforo que vale a la hora `t`: el de la medición hecha a la hora del día más parecida (a ±`maxHours`), de cualquier día.
+/** El plan del semáforo que vale a la hora `t`: el de la medición hecha a la hora del día más parecida (a ±`maxHours`), de cualquier día,
+ *  afinado con todas las demás mediciones del mismo plan (ver `signalPlans`).
  *  Los semáforos de Bogotá cambian de plan según la hora (medido el 2026-11-17/18 en Cra. 102B Bis × Calle 145: de madrugada 90 s, al
  *  mediodía 120 s) y cada plan vuelve al día siguiente a la misma hora con el mismo arranque (el rojo de las 2:30 a. m. del 18 cayó a 0,3 s
  *  de lo que predecía el del 17). Sin una medición cercana a esa hora devuelve `null`: mejor no decir nada que mostrar el plan de otra hora. */
@@ -145,7 +146,19 @@ export function signalModelAt(all: readonly Mark[], t: number, maxHours = 3): Si
 }
 /** Lo mismo que `signalModelAt`, pero arma los planes una sola vez (para preguntar por miles de momentos, p. ej. los reportes de buses). */
 export function signalPlans(all: readonly Mark[], maxHours = 3): (t: number) => SignalModel | null {
-  const plans = signalSessions(all).flatMap((s) => { const m = signalModel(s.marks); return m ? [{ m, mid: s.mid, end: s.end }] : []; });
+  const sessions = signalSessions(all).flatMap((s) => { const m = signalModel(s.marks); return m ? [{ m, mid: s.mid, end: s.end, marks: s.marks }] : []; });
+  // el semáforo va aprendiendo: cada medición se junta con las demás del MISMO plan (hora del día parecida, mismo ciclo y mismo
+  // arranque, de cualquier día), y el plan sale de todas juntas (duraciones y arranque promediados). Una medición que no encaja (el
+  // semáforo cambió de plan a esa hora) queda aparte y, por ser la más reciente, manda a esa hora
+  const plans = sessions.map((ref) => {
+    const cyc = ref.m.cycle, members = sessions.filter((q) => {
+      const raw = Math.abs(q.mid - ref.mid), d = Math.min(raw, 86_400 - raw);
+      if (d > maxHours * 3600 || Math.abs(q.m.cycle - cyc) >= 1000) return false;
+      const off = q.m.anchor - ref.m.anchor, res = off - Math.round(off / cyc) * cyc;
+      return Math.abs(res) <= 3000;
+    });
+    return { ...ref, m: members.length > 1 ? mergePlan(ref.m, members.map((q) => q.marks)) : ref.m, n: members.length };
+  });
   return (t) => {
     let best: (typeof plans)[number] | null = null, bd = Infinity;
     const now = daySec(t);
@@ -158,6 +171,27 @@ export function signalPlans(all: readonly Mark[], maxHours = 3): (t: number) => 
     }
     return best?.m ?? null;
   };
+}
+/** Un plan armado con varias mediciones del mismo plan: el ciclo de `ref`, las duraciones con las medianas de todas y el arranque con el
+ *  promedio de todos los inicios de rojo que caen en el mismo ritmo (±3 s). */
+function mergePlan(ref: SignalModel, sessions: readonly (readonly Mark[])[]): SignalModel {
+  const cycle = ref.cycle, dur: Record<Color, number[]> = { g: [], y: [], r: [] }, preGreen: number[] = [], res: number[] = [];
+  for (const marks of sessions) {
+    const s = summarize(marks);
+    (["g", "y", "r"] as const).forEach((c) => dur[c].push(...s.dur[c])); preGreen.push(...s.preGreen);
+    marks.forEach((m, i) => {
+      if (m.c !== "r" || i === 0 || m.t - marks[i - 1]!.t > 100_000) return;
+      const d = m.t - ref.anchor, r = d - Math.round(d / cycle) * cycle;
+      if (Math.abs(r) <= 3000) res.push(r);
+    });
+  }
+  if (!dur.r.length) return ref;
+  const anchor = ref.anchor + (res.length ? res.reduce((a, b) => a + b, 0) / res.length : 0);
+  const R = med(dur.r), Yg = preGreen.length ? med(preGreen) : 0, Yb = dur.y.length ? med(dur.y) : 0;
+  const G = cycle - R - Yg - Yb > 3000 ? cycle - R - Yg - Yb : dur.g.length ? med(dur.g) : cycle - R - Yg - Yb;
+  const raw = [{ c: "r" as Color, d: R }, { c: "y" as Color, d: Yg }, { c: "g" as Color, d: G }, { c: "y" as Color, d: Yb }].filter((x) => x.d > 0);
+  const k = cycle / raw.reduce((a, x) => a + x.d, 0);
+  return { cycle, anchor, segs: raw.map((x) => ({ c: x.c, d: x.d * k })) };
 }
 /** Afina el ciclo con marcas lejanas del mismo color: si entre el primer y el último verde (o rojo) caben justo N vueltas, el ciclo es
  *  ese tiempo / N (con 14 vueltas el error de un toque se divide entre 14). Si no encajan (otro plan), queda el ciclo medido. */
