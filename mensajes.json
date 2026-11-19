@@ -1,11 +1,25 @@
 {
   "mensajes": [
-    {"texto": "Del 17 al 23 de noviembre el vagón 1 de De La Sabana está cerrado en sentido occidente-oriente por obras en la vía. Las rutas A60 y C19 paran en el vagón 2 de San Facón - Cra. 22. La J23 no para en De La Sabana.", "desde": "2026-11-17 00:00", "hasta": "2026-11-23 23:59", "tipo": "aviso"},
-    {"texto": "Del 17 al 23 de noviembre el vagón 2 de Zona Industrial está cerrado en sentido occidente-oriente por obras en la vía. La ruta E32 para en el vagón 2 de CDS - Carrera 32. La B28 no para en Zona Industrial.", "desde": "2026-11-17 00:00", "hasta": "2026-11-23 23:59", "tipo": "aviso"}
+    {
+      "texto": "Buses retrasados por manifestaciones.",
+      "desde": "2026-11-19 00:00",
+      "hasta": "2026-11-19 23:59",
+      "tipo": "importante"
+    },
+    {
+      "texto": "Del 17 al 23 de noviembre el vagón 1 de De La Sabana está cerrado en sentido occidente-oriente por obras en la vía. Las rutas A60 y C19 paran en el vagón 2 de San Facón - Cra. 22. La J23 no para en De La Sabana.",
+      "desde": "2026-11-17 00:00",
+      "hasta": "2026-11-23 23:59",
+      "tipo": "aviso"
+    },
+    {
+      "texto": "Del 17 al 23 de noviembre el vagón 2 de Zona Industrial está cerrado en sentido occidente-oriente por obras en la vía. La ruta E32 para en el vagón 2 de CDS - Carrera 32. La B28 no para en Zona Industrial.",
+      "desde": "2026-11-17 00:00",
+      "hasta": "2026-11-23 23:59",
+      "tipo": "aviso"
+    }
   ],
-
   "como_usarlo": "Para mostrar un mensaje en la app y en la web, copia el bloque de 'ejemplo' dentro de los corchetes de 'mensajes', cambia el texto y las fechas, y guarda. Tarda unos 5 minutos en aparecer. Para quitarlo antes de tiempo, deja 'mensajes' vacio: []. Las fechas van en hora de Bogota, asi: 2026-11-12 14:30. 'desde' y 'hasta' son opcionales (sin 'hasta' se muestra hasta que lo borres). 'tipo' puede ser 'aviso' (ambar) o 'importante' (rojo). Maximo 5 mensajes y 280 letras cada uno. Si pones varios, van separados por coma.",
-
   "ejemplo": {
     "texto": "Manifestacion en la Av. Caracas con Calle 26: las troncales tienen desvios.",
     "desde": "2026-11-12 06:00",
