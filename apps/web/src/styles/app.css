@@ -433,7 +433,9 @@ button.stat:active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){.promo,.promo-scrim{transition:none}.promo-ring{animation:none}}
 @media (max-height:720px){.promo-list span{display:none}.promo-hero{height:88px;margin-bottom:6px}.promo-sub{font-size:14px}}
 /* mensaje del dueño en la línea de estado: una sola línea que se desliza si no cabe */
-.st.msg{color:var(--fg);font-weight:600;max-width:min(62vw,340px)}
+.st.msg{color:var(--fg);font-weight:600;max-width:min(78vw,480px)}
+.st.msg .stx{flex:none;color:var(--muted);font-weight:400}
+.st.msg .sep{flex:none;width:1px;height:11px;background:currentColor;opacity:.25}
 .st.msg .mq{flex:1;min-width:0}
 
 /* tiempos con segundos: la cifra que cambia entra desde abajo (ver ui/Rolling.tsx) */

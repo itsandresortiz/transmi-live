@@ -25,23 +25,24 @@ export function FeedStatus({ tint, light = false }: { tint?: string; light?: boo
   const down = liveDownText(nowMs(), isOffline(transit, nowMs())), closed = !live && down.closed, offline = down.offline;
   const title = demo ? "Demostración" : offline ? down.short : closed ? down.title : level === "none" ? "Sin datos en vivo" : level === "late" ? "Datos con retraso" : "En vivo";
   const detail = demo ? "buses de ejemplo" : offline ? "se ve lo guardado" : closed ? "vuelve 4:30 a. m." : level === "few" ? `${n} ${n === 1 ? "bus" : "buses"} a esta hora` : st.ageSeconds != null ? (live ? `hace ${agoShort(st.ageSeconds)}` : `último dato hace ${agoShort(st.ageSeconds)}`) : "";
-  // un mensaje del dueño (accidente, manifestación…) ocupa por un rato el lugar de «En vivo · hace N s», en una sola línea que se desliza si es larga
-  const msg = useActiveMessages()[0];
+  // un mensaje del dueño (accidente, manifestación…) va al lado de «En vivo · hace N s», en la misma línea, deslizándose si es largo: así
+  // nunca se deja de ver si los datos están en vivo
+  const messages = useActiveMessages(), msg = demo ? undefined : messages[0];
   const { width } = useWindowDimensions();
-  if (msg && !demo) return (
-    <Glass tint={tint} scheme={light ? "light" : undefined} style={styles.glass}>
-      <View accessible accessibilityRole="alert" accessibilityLabel={`Aviso de TransMi LIVE: ${msg.text}`} style={styles.pill}>
-        <View style={[styles.dot, { backgroundColor: msg.important ? "#dc2626" : "#f59e0b" }]} />
-        <Marquee text={msg.text} style={[type.caption, { color: c.text }]} maxWidth={Math.min(width - 150, 330)} />
-      </View>
-    </Glass>
-  );
+  const dotColor = demo ? "#8b5cf6" : offline ? "#dc2626" : live ? "#22c55e" : closed ? "#94a3b8" : "#f59e0b";
   return (
     <Glass tint={tint} scheme={light ? "light" : undefined} style={styles.glass}>
-      <View accessible accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}`} style={styles.pill}>
-        <View style={[styles.dot, { backgroundColor: demo ? "#8b5cf6" : offline ? "#dc2626" : live ? "#22c55e" : closed ? "#94a3b8" : "#f59e0b" }]} />
+      <View accessible accessibilityRole={msg ? "alert" : undefined} accessibilityLabel={`${title}${detail ? `, ${detail}` : ""}${msg ? `. Aviso de TransMi LIVE: ${msg.text}` : ""}`} style={styles.pill}>
+        <View style={[styles.dot, { backgroundColor: dotColor }]} />
         <Text style={[type.caption, { color: c.text }]}>{title}</Text>
         {detail ? <Text style={[type.caption, { color: c.text, opacity: 0.7 }]} numberOfLines={1}>{detail}</Text> : null}
+        {msg ? (
+          <>
+            <View style={[styles.sep, { backgroundColor: c.text }]} />
+            <View style={[styles.dot, { backgroundColor: msg.important ? "#dc2626" : "#f59e0b" }]} />
+            <Marquee text={msg.text} style={[type.caption, { color: c.text, fontWeight: "600" }]} maxWidth={Math.max(90, Math.min(width - 270, 220))} />
+          </>
+        ) : null}
       </View>
     </Glass>
   );
@@ -50,4 +51,5 @@ const styles = StyleSheet.create({
   glass: { borderRadius: 20, overflow: "hidden", alignSelf: "flex-start" },
   pill: { flexDirection: "row", alignItems: "center", gap: space[2], paddingVertical: space[2], paddingHorizontal: space[3] },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  sep: { width: StyleSheet.hairlineWidth * 2, height: 12, opacity: 0.25 },
 });

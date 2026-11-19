@@ -450,7 +450,7 @@ function Status() {
   const now = useNow();
   const online = useOnline();
   useMessagesPolling();
-  // un mensaje del dueño (accidente, manifestación…) ocupa por un rato el lugar de «En vivo · hace N s», en una sola línea que se desliza si es larga
+  // un mensaje del dueño (accidente, manifestación…) va al lado de «En vivo · hace N s», en una sola línea que se desliza si es larga
   const msg = useActiveMessages()[0];
   const st: ConnectionStatus = connectionStatus(transit, now);
   const cls = st.connection === "live" ? "live" : st.connection === "waiting" || st.connection === "idle" ? "warn" : st.connection === "stale" ? "bad" : "";
@@ -462,7 +462,13 @@ function Status() {
     : st.connection === "live" ? `En vivo · hace ${ago(st.ageSeconds!)}`
     : st.connection === "waiting" ? `Actualizando · ${agoShort(st.ageSeconds!)}`
     : `Sin señal · ${agoShort(st.ageSeconds!)}`;
-  if (msg && online) return <div className="st msg" role="status" title={msg.text}><span className={`dot ${msg.important ? "bad" : "warn"}`} /><Marquee>{msg.text}</Marquee></div>;
+  // el mensaje va al lado del estado, en la misma línea: nunca se deja de ver si los datos están en vivo
+  if (msg && online) return (
+    <div className="st msg" role="status" title={msg.text}>
+      <span className={`dot ${cls}`} /><span className="stx">{text}</span><span className="sep" aria-hidden />
+      <span className={`dot ${msg.important ? "bad" : "warn"}`} /><Marquee>{msg.text}</Marquee>
+    </div>
+  );
   return <div className="st" title={st.ageSeconds != null ? `Último dato hace ${ago(st.ageSeconds)}` : undefined}><span className={`dot ${cls}`} /><span>{text}</span></div>;
 }
 void CONFIG; void SYSTEM_LABEL;
