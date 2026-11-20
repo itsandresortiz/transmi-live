@@ -26,8 +26,8 @@ import { FeedStatus } from "@/ui/FeedStatus";
 import { Glass, RoundButton, Tap, Toggle } from "@/ui/kit";
 import { GlassSegments } from "@/ui/GlassSegments";
 import { SYSTEM_COLOR, space, type, useColors, useOnMap } from "@/ui/theme";
-import { rideNextStop } from "@/rideSnap";
-import { rideVehicle } from "@/virtualRide";
+import { rideNextStop, snappedPosition } from "@/rideSnap";
+import { isVirtualRide, rideVehicle } from "@/virtualRide";
 import { Eta } from "@/ui/Eta";
 
 /** El mapa se centra en tu ubicación solo la primera vez que se abre en cada sesión (después respeta por dónde lo dejaste). */
@@ -58,7 +58,16 @@ export default function Mapa() {
   }, [focused, focus.stopId, focus.routeId]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!focused || !focus.followBusId) return;
-    const t = setInterval(() => { const v = transit.fleet.get(focus.followBusId!); if (!v) return; const p = motion.peek(v.id); const g = p ? toGeo(p) : v.position; map.current?.flyTo(g.lat, g.lon, 16.5); }, 1500);
+    // la cámara va a donde se DIBUJA el bus: si vas en él, donde va tu teléfono (el dato de TransMilenio llega ~1 min tarde y la cámara se
+    // quedaba atrás de tu bus); si es un viaje con GPS (bus que no sale en los datos), solo existe esa posición
+    const t = setInterval(() => {
+      const id = focus.followBusId!, mine = snappedPosition(id, nowMs());
+      const v = mine ? null : rideVehicle(id);
+      if (!mine && !v) return;
+      const p = v && !isVirtualRide(id) ? motion.peek(v.id) : null;
+      const g = mine ?? (p ? toGeo(p) : v!.position);
+      map.current?.flyTo(g.lat, g.lon, 16.5);
+    }, 1500);
     return () => clearInterval(t);
   }, [focused, focus.followBusId]);
   const [system, setSystem] = useState<SystemType | null>(null);
