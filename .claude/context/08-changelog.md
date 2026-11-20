@@ -4,6 +4,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-20 · App: versión 1.0.7 (seguir en el mapa el bus en el que vas, leer la tarjeta con un toque, mensaje al lado de «En vivo»).
 - 2026-11-20 · App: «Leer mi tarjeta» en Más abre la pantalla de la tarjeta con `?leer=1` y la lectura empieza sola (a los 0,6 s, para que la ventana termine de abrirse); antes había que tocar «Leer mi tarjeta» otra vez.
 - 2026-11-20 · App: «Seguir en el mapa» desde «Voy en este bus» ahora sigue al bus donde se dibuja (tu teléfono, `snappedPosition`) y también a los viajes con GPS (`gps:`); antes la cámara iba a la posición de TransMilenio (~1 min atrasada) o, en un viaje con GPS, no se movía (lo notó el dueño).
 - 2026-11-19 · Mensaje del dueño al lado del estado «En vivo · hace N s» en la misma línea (web y app), en vez de reemplazarlo; se desliza si no cabe. Primer mensaje real: «Buses retrasados por manifestaciones.» (rojo, hasta el 19 a las 11:59 p. m.).
