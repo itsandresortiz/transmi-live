@@ -83,7 +83,7 @@ export default function Mas() {
         <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">Más</Text>
 
         {/* la tarjeta TuLlave: lo más útil de esta pestaña, con su propia tarjeta */}
-        <Tap onPress={() => router.push("/card")} accessibilityRole="button" accessibilityLabel="Mi tarjeta TuLlave. Consultar el saldo acercando la tarjeta al teléfono">
+        <Tap onPress={() => router.push(Tullave ? { pathname: "/card", params: { leer: "1" } } : "/card")} accessibilityRole="button" accessibilityLabel="Mi tarjeta TuLlave. Consultar el saldo acercando la tarjeta al teléfono">
           <View style={styles.hero}>
             <View style={styles.glowA} /><View style={styles.glowB} />
             <View style={styles.heroTop}>

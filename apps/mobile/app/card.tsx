@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
@@ -110,6 +111,17 @@ export default function CardScreen() {
         : "No pudimos leer la tarjeta. Intenta de nuevo.");
     } finally { setBusy(false); }
   };
+
+  // desde «Leer mi tarjeta» en Más se llega con ?leer=1: se empieza a leer sola (antes había que tocar «Leer mi tarjeta» dos veces). Espera a
+  // que termine de abrirse la ventana: en iPhone la hoja del lector no aparece encima de una ventana que todavía se está abriendo
+  const { leer } = useLocalSearchParams<{ leer?: string }>();
+  const autoRead = useRef(false);
+  useEffect(() => {
+    if (leer !== "1" || autoRead.current || !available || nfc === "off") return;
+    autoRead.current = true;
+    const t = setTimeout(() => void read(), 600);
+    return () => clearTimeout(t);
+  }, [leer, available, nfc]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // lo de este mes: cuánto se recargó y cuánto se gastó en viajes
   const thisMonth = useMemo(() => {
