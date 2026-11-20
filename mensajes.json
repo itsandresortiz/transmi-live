@@ -1,12 +1,6 @@
 {
   "mensajes": [
     {
-      "texto": "Buses retrasados por manifestaciones.",
-      "desde": "2026-11-19 00:00",
-      "hasta": "2026-11-19 23:59",
-      "tipo": "importante"
-    },
-    {
       "texto": "Del 17 al 23 de noviembre el vagón 1 de De La Sabana está cerrado en sentido occidente-oriente por obras en la vía. Las rutas A60 y C19 paran en el vagón 2 de San Facón - Cra. 22. La J23 no para en De La Sabana.",
       "desde": "2026-11-17 00:00",
       "hasta": "2026-11-23 23:59",
