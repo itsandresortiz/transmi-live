@@ -15,7 +15,7 @@ export interface Viewport { west: number; south: number; east: number; north: nu
 /** Cuántos buses se dibujan según el zoom: lejos no se distinguen y cada actualización cuesta. */
 const capFor = (zoom: number) => (zoom < 11 ? 500 : zoom < 13 ? 700 : 900);
 /** A quién se conserva primero cuando no caben todos: troncales y duales (son pocos y los que más se buscan), luego alimentadores y zonales. */
-const PRIORITY: Record<SystemType, number> = { troncal: 0, dual: 0, alimentador: 1, zonal: 2, otro: 3 };
+const PRIORITY: Record<SystemType, number> = { troncal: 0, dual: 0, alimentador: 1, zonal: 2, cable: 1, otro: 3 };
 const hash = (id: string) => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0; return Math.abs(h); };
 const EMPTY: FeatureCollection<Point> = { type: "FeatureCollection", features: [] };
 

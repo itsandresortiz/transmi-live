@@ -4,7 +4,7 @@ import { useAccessibility } from "@/accessibility";
 import { DARK, HIGH_DARK, HIGH_LIGHT, LIGHT } from "./palette";
 
 export const SYSTEM_COLOR: Record<SystemType, string> = {
-  troncal: "#e11d2e", dual: "#8b5cf6", alimentador: "#16a34a", zonal: "#2563eb", otro: "#64748b",
+  troncal: "#e11d2e", dual: "#8b5cf6", alimentador: "#16a34a", zonal: "#2563eb", cable: "#1c1c1e", otro: "#64748b",
 };
 
 /** Espacios, esquinas y letras: todo sale de aquí, nada de números sueltos en las pantallas. */

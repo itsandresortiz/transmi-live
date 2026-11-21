@@ -102,13 +102,24 @@ def main(src, dst):
     # primer y último viaje por ruta y tipo de día, según su salida del primer punto del recorrido
     ends = {}
     groups = defaultdict(lambda: defaultdict(list))      # (ruta, primera parada) -> tipo de día -> [(salida, viaje)]
+    # viajes por frecuencia (frequencies.txt: «uno cada N s entre tal y tal hora»; así viene TransMiCable, cada 10–16 s): su hora en
+    # stop_times es solo una plantilla. Se reparten salidas en esas ventanas, como mucho una por minuto (no hace falta más para saber
+    # el primero, el último y cuánto se espera); antes el cable quedaba con una sola salida al día, a las 6:00 a. m.
+    freq = defaultdict(list)
+    try:
+        for r in rows(z, "frequencies.txt"):
+            freq[r["trip_id"]].append((secs(r["start_time"]), secs(r["end_time"]), max(1, int(r["headway_secs"]))))
+    except (KeyError, IndexError):      # GTFS sin frequencies.txt
+        pass
     for t, (q, st, stop) in first.items():
         rid, dtype = trip_info.get(t, (None, None))
         if rid is None: continue
-        e = ends.setdefault((rid, dtype), [(st, t), (st, t)])
-        if st < e[0][0]: e[0] = (st, t)
-        if st > e[1][0]: e[1] = (st, t)
-        groups[(rid, stop)][dtype].append((st, t))
+        starts = [x for a, b, hw in freq[t] for x in range(a, b + 1, max(hw, 60))] if t in freq else [st]
+        for st in starts:
+            e = ends.setdefault((rid, dtype), [(st, t), (st, t)])
+            if st < e[0][0]: e[0] = (st, t)
+            if st > e[1][0]: e[1] = (st, t)
+            groups[(rid, stop)][dtype].append((st, t))
     # variantes de recorrido de cada ruta = viajes que salen de la misma primera parada (sirve aunque direction_id venga vacío)
     by_route = defaultdict(list)
     for (rid, stop), d in groups.items(): by_route[rid].append((sum(len(v) for v in d.values()), stop))
@@ -140,6 +151,12 @@ def main(src, dst):
         for dtype in ("wk", "sa", "su"):
             v = sorted(st for st, _ in groups[(rid, stop)].get(dtype, []))
             if v: entry[dtype] = [v[0]] + [b - a for a, b in zip(v, v[1:])]
+        # ventanas de frecuencia de esta variante (TransMiCable): «cada N s entre tal y tal hora», por tipo de día
+        fq = {}
+        for dtype in ("wk", "sa", "su"):
+            w = sorted({win for _, t in groups[(rid, stop)].get(dtype, []) if t in freq for win in freq[t]})
+            if w: fq[dtype] = [list(x) for x in w]
+        if fq: entry["freq"] = fq
         dep["routes"].setdefault(rid, {})[stop] = entry
     with open(dst.replace("schedule", "departures"), "w") as f:
         json.dump(dep, f, separators=(",", ":"))

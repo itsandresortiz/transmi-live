@@ -3,7 +3,7 @@ import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SymbolView } from "@/ui/Symbol";
-import { alertView, alertsFor, frequencyText, routeAlertViews, routeHasAlert, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
+import { alertView, alertsFor, cableInfo, frequencyText, routeAlertViews, routeHasAlert, routesAtStop, siblingStops, upcomingAtStop, type UpcomingBus, type UpcomingRoute } from "@transmi/application";
 import { ALERT_EFFECT_LABEL, SYSTEM_LABEL,  routeTitle, stopLabelText, type Route } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs, nowSec } from "@/clock";
@@ -55,6 +55,8 @@ export default function StopSheet() {
   const label = transit.labelOf(stop), tag = stopTag(stop);
   const here = routesAtStop(transit, id);
   const hereCount = new Set(here.map((r) => r.shortName)).size;
+  // estación de TransMiCable: sus cabinas no envían ubicación, así que se dice lo del horario oficial (nunca «en vivo»)
+  const cable = here.length && here.every((r) => r.system === "cable") ? cableInfo(transit, here[0]!.id, nowMs()) : null;
   const alerts = alertsFor(transit, new Set(here.map((r) => r.id)), new Set([id])).slice(0, 2);
 
   const showOnMap = (focus: { routeId?: string | null; busIds?: string[]; followBusId?: string | null }) => {
@@ -83,8 +85,15 @@ export default function StopSheet() {
         <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
         <Text style={[type.largeTitle, { color: c.text }]}>{nick || label.title}</Text>
         {nick ? <Text style={[type.caption, { color: c.muted }]}>{label.title}</Text> : null}
+        {cable ? (
+          <Card style={{ gap: space[1] }}>
+            <Text style={[type.caption, { color: c.muted }]}>TRANSMICABLE · SEGÚN HORARIO</Text>
+            <Text style={[type.headline, { color: c.text }]}>{cable.text.replace(" (según horario)", "")}</Text>
+            <Text style={[type.caption, { color: c.muted }]}>Portal Tunal · Juan Pablo II · Manitas · Mirador del Paraíso. Las cabinas no envían su ubicación: esto sale del horario oficial de TransMilenio.</Text>
+          </Card>
+        ) : null}
         <Text style={[type.body, { color: c.muted }]}>
-          {tag ? `${tag} · ` : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta con bus en camino" : "rutas con bus en camino"}${hereCount > rows.length ? ` · ${hereCount} paran aquí` : ""}` : down ? downText().short : "Sin buses acercándose"}
+          {tag ? `${tag} · ` : ""}{cable ? "Estación de TransMiCable" : rows.length ? `${rows.length} ${rows.length === 1 ? "ruta con bus en camino" : "rutas con bus en camino"}${hereCount > rows.length ? ` · ${hereCount} paran aquí` : ""}` : down ? downText().short : "Sin buses acercándose"}
         </Text>
 
         <View style={styles.actions}>

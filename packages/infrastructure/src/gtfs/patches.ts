@@ -22,8 +22,18 @@ export const STOP_PATCHES: readonly StopPatch[] = [
   { why: "H15 para en Calle 57 antes de la nueva estación Calle 53 - Universidad Manuela Beltrán", route: "H15", anchor: "74430", add: "74109", where: "before" },
 ];
 
+/** Nombres de paradas que el GTFS trae mal escritos o confusos (por id). Las estaciones de TransMiCable vienen como «Cable portal tunal» y
+ *  «Mirador del Paraiso»; la del Portal Tunal se llama así para no confundirla con las plataformas de buses del mismo portal. */
+export const STOP_NAMES: Readonly<Record<string, string>> = {
+  cable_tunal: "Portal Tunal · TransMiCable",
+  cable_jpablo: "Juan Pablo II",
+  cable_manitas: "Manitas",
+  cable_paraiso: "Mirador del Paraíso",
+};
+
 /** Aplica las correcciones a los recorridos leídos del GTFS (no toca nada si la parada ya está o no existe). */
 export function applyStopPatches(dto: NetworkDto, patches: readonly StopPatch[] = STOP_PATCHES): void {
+  for (const s of dto.stops) { const n = STOP_NAMES[s.id]; if (n) s.name = n; }
   const known = new Set(dto.stops.map((s) => s.id));
   for (const p of patches) {
     if (!known.has(p.add)) continue;

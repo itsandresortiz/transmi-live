@@ -3,7 +3,7 @@ import { type DayType } from "./service-ends";
 /** Horas de salida programadas por ruta y sentido, y cuánto tarda cada recorrido en llegar a cada parada (sale del horario del GTFS). */
 export interface DeparturesData {
   v: number;
-  routes: Record<string, Record<string, { stops: string[]; off: number[] } & Partial<Record<DayType, number[]>>>>;
+  routes: Record<string, Record<string, { stops: string[]; off: number[]; /** Rutas por frecuencia (TransMiCable): [desde, hasta, cada N s] por tipo de día. */ freq?: Partial<Record<DayType, [number, number, number][]>> } & Partial<Record<DayType, number[]>>>>;
 }
 export interface ScheduledPass { routeId: string; direction: string; /** Segundos desde la medianoche del día de servicio (puede pasar de 86 400). */ times: number[] }
 
@@ -23,6 +23,17 @@ export class Departures {
     let v = this.starts.get(key);
     if (!v) { const enc = this.data[routeId]?.[direction]?.[type]; v = enc ? decode(enc) : []; this.starts.set(key, v); }
     return v;
+  }
+
+  /** Cada cuántos segundos pasa la ruta a esa hora, si va por frecuencia (TransMiCable: 10–16 s), o `null`. También dice cuándo abre
+   *  y cierra ese día (segundos del día de servicio). */
+  frequencyOf(routeId: string, type: DayType, secs: number): { every: number | null; opens: number; closes: number } | null {
+    let opens = Infinity, closes = -Infinity, every: number | null = null;
+    for (const e of Object.values(this.data[routeId] ?? {})) for (const [a, b, hw] of e.freq?.[type] ?? []) {
+      opens = Math.min(opens, a); closes = Math.max(closes, b);
+      if (secs >= a && secs < b) every = every == null ? hw : Math.min(every, hw);
+    }
+    return Number.isFinite(opens) ? { every, opens, closes } : null;
   }
 
   /** Última parada del recorrido (su destino). */

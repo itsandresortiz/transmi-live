@@ -8,7 +8,7 @@ import { type SignalRow, flowDash, signalPoints, trafficBand } from "@transmi/ap
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
-import { stationChipImage, trafficLightImage } from "./sprites";
+import { cableCabinImage, stationChipImage, trafficLightImage } from "./sprites";
 import { type MapTheme, type Scheme, themeOf } from "./theme";
 
 export interface MapEvents {
@@ -130,6 +130,8 @@ export class MapController {
     this.src("network"); this.src("estaciones"); this.src("stops");
     this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("alert-lines"); this.src("signal-live"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal"); this.src("trip-lines"); this.src("trip-pts");
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
+    if (!m.hasImage("cabina")) m.addImage("cabina", cableCabinImage(3), { pixelRatio: 3 });
+    this.src("cable-line"); this.src("cable-stations");
 
     const lineLayout = { "line-cap": "round", "line-join": "round" } as const;
     m.addLayer({
@@ -145,6 +147,9 @@ export class MapController {
       id: "troncales-lines", type: "line", source: "troncales", layout: lineLayout,
       paint: { "line-color": lineMatch(t, t.troncal), "line-opacity": 0.9, "line-width": zoomWidth([9, 1.5], [14, 3.4], [18, 6]) },
     });
+    // TransMiCable: su línea y sus 4 estaciones se ven siempre, como las troncales (no tiene cabinas en vivo: solo horario)
+    m.addLayer({ id: "cable-line", type: "line", source: "cable-line", layout: lineLayout,
+      paint: { "line-color": t.system.cable, "line-opacity": 0.9, "line-width": zoomWidth([9, 1.5], [14, 3], [18, 5]), "line-dasharray": [2, 1.2] } });
     m.addLayer({
       id: "route-sel-line", type: "line", source: "route-sel", layout: lineLayout,
       paint: {
@@ -230,6 +235,11 @@ export class MapController {
       id: "semaforos-icons", type: "symbol", source: "semaforos", minzoom: 15.4,
       layout: { "icon-image": "semaforo", "icon-size": ["interpolate", ["linear"], ["zoom"], 15.4, 0.55, 18, 0.95], "icon-allow-overlap": true, "icon-ignore-placement": true },
     });
+    m.addLayer({ id: "cable-stations", type: "symbol", source: "cable-stations", minzoom: 11,
+      layout: { "icon-image": "cabina", "icon-size": ["interpolate", ["linear"], ["zoom"], 11, 0.6, 15, 1, 18, 1.4], "icon-allow-overlap": true,
+        "icon-rotate": ["get", "rot"], "icon-rotation-alignment": "map",
+        "text-field": ["step", ["zoom"], "", 13, ["get", "name"]], "text-font": FONT, "text-size": 12, "text-offset": [0, 1.6], "text-anchor": "top", "text-optional": true },
+      paint: { "text-color": t.labelStrong, "text-halo-color": t.halo, "text-halo-width": 1.6 } });
     m.addLayer({
       id: "semaforos-labels", type: "symbol", source: "semaforos", minzoom: 17.2,
       layout: { "text-field": ["get", "dir"], "text-font": FONT, "text-size": 10.5, "text-offset": [0, 1.35], "text-anchor": "top", "text-optional": true },
@@ -303,7 +313,7 @@ export class MapController {
     const pick = (pt: { x: number; y: number }): Hit | null => {
       const bus = this.busHit?.(pt);
       if (bus) return { kind: "bus", id: bus };
-      const layers = [...sidedIds("route-stops"), "station-capsule-fill", "station-base-fill", ...sidedIds("stops-circles"), "estaciones-circles", "bus-dots", "bus-dots-minor"].filter((l) => m.getLayer(l));
+      const layers = [...sidedIds("route-stops"), "station-capsule-fill", "station-base-fill", ...sidedIds("stops-circles"), "estaciones-circles", "cable-stations", "bus-dots", "bus-dots-minor"].filter((l) => m.getLayer(l));      // cable-stations: tocar una estación del cable abre su ficha
       const feats = m.queryRenderedFeatures([[pt.x - TOUCH_PAD, pt.y - TOUCH_PAD], [pt.x + TOUCH_PAD, pt.y + TOUCH_PAD]], { layers });
       let best: Hit | null = null, bd = Infinity;
       for (const f of feats) {
@@ -367,6 +377,9 @@ export class MapController {
     m.setPaintProperty("trip-labels", "text-color", t.labelStrong);
     m.setPaintProperty("trip-labels", "text-halo-color", t.halo);
     m.setPaintProperty("semaforos-labels", "text-color", t.label);
+    m.setPaintProperty("cable-line", "line-color", t.system.cable);
+    m.setPaintProperty("cable-stations", "text-color", t.labelStrong);
+    m.setPaintProperty("cable-stations", "text-halo-color", t.halo);
     m.setPaintProperty("semaforos-labels", "text-halo-color", t.halo);
     m.setPaintProperty("estaciones-circles", "circle-color", t.surface);
     m.setPaintProperty("estaciones-circles", "circle-stroke-color", lineMatch(t, t.troncal));
@@ -516,6 +529,19 @@ export class MapController {
           lines.push({ type: "Feature", properties: { rid, color: t.system[sys] }, geometry: { type: "LineString", coordinates: s.points.map((p) => [p.lon, p.lat]) } });
     }
     (this.map.getSource("network") as GeoJSONSource).setData({ type: "FeatureCollection", features: lines });
+    // TransMiCable: un recorrido y sus estaciones (las del GTFS: «cable_…»)
+    const cableLines: Feature<LineString>[] = [], cableStops = new Map<string, Feature<Point>>();
+    for (const [rid, shapes] of net.shapes) {
+      if (net.routes.get(rid)?.system !== "cable") continue;
+      const sh = shapes[0];
+      if (sh && sh.points.length > 1) cableLines.push({ type: "Feature", properties: { rid }, geometry: { type: "LineString", coordinates: sh.points.map((p) => [p.lon, p.lat]) } });
+      // la cabina se gira como va el cable (de la primera a la última estación)
+      const a = sh?.points[0], b = sh?.points[Math.floor((sh?.points.length ?? 1) / 2)];
+      const rot = a && b ? (Math.atan2((b.lon - a.lon) * Math.cos((a.lat * Math.PI) / 180), b.lat - a.lat) * 180) / Math.PI : 0;
+      for (const sh2 of shapes) for (const id of sh2.stopIds) { const st = net.stops.get(id); if (st && !cableStops.has(id)) cableStops.set(id, { type: "Feature", properties: { id, name: st.name, rot }, geometry: { type: "Point", coordinates: [st.position.lon, st.position.lat] } }); }
+    }
+    (this.map.getSource("cable-line") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: cableLines });
+    (this.map.getSource("cable-stations") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: [...cableStops.values()] });
     this.computeSectors(net);
     this.netRef = net; this.rebuildPortalLines();
     const stops: Feature<Point>[] = [];

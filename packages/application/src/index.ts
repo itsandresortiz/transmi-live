@@ -10,6 +10,7 @@ export * from "./last-bus";
 export * from "./signals";
 export * from "./signal-timing";
 export * from "./signal-learning";
+export * from "./cable";
 export * from "./motion";
 export * from "./eta";
 export * from "./service-ends";

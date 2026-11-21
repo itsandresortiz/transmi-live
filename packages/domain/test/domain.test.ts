@@ -53,7 +53,7 @@ describe("sistema de transporte", () => {
     expect(classifyRoute({ shortName: "7", longName: "Consuelo || Palmitas", routeType: "3", routeColor: "0000ff" })).toBe("zonal");
     expect(classifyRoute({ shortName: "M86-K86", longName: "x", routeColor: "00ff00" })).toBe("dual");
     expect(classifyRoute({ shortName: "8-1", longName: "x", routeColor: "00ff00" })).toBe("alimentador");
-    expect(classifyRoute({ shortName: "CABLE", longName: "Tunal", routeType: "6", routeColor: "e30613" })).toBe("otro");
+    expect(classifyRoute({ shortName: "CABLE", longName: "Tunal", routeType: "6", routeColor: "e30613" })).toBe("cable");
     expect(classifyRoute({ shortName: "ML82", longName: "X || Y", routeType: "3" })).toBe("zonal");
   });
   it("deduce el sistema desde el reporte cuando no hay GTFS", () => {

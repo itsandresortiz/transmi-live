@@ -125,6 +125,21 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     features: CORRIDORS.map((k) => ({ type: "Feature", properties: { l: k.l }, geometry: { type: "LineString", coordinates: k.p.map(([la, lo]) => [lo, la]) } })),
   }), []);
 
+  /** TransMiCable: su línea y sus 4 estaciones (cabina roja con negro). Las cabinas no envían su ubicación: no hay nada en vivo que mover. */
+  const cable = useMemo(() => {
+    const lines: Feature<LineString>[] = [], stops = new globalThis.Map<string, Feature<Point>>();
+    for (const [rid, shapes] of transit.network.shapes) {
+      if (transit.network.routes.get(rid)?.system !== "cable") continue;
+      const sh = shapes[0];
+      if (sh && sh.points.length > 1) lines.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: sh.points.map((p) => [p.lon, p.lat]) } });
+      // la cabina se gira como va el cable (como en la web)
+      const a = sh?.points[0], b = sh?.points[Math.floor((sh?.points.length ?? 1) / 2)];
+      const rot = a && b ? (Math.atan2((b.lon - a.lon) * Math.cos((a.lat * Math.PI) / 180), b.lat - a.lat) * 180) / Math.PI : 0;
+      for (const s2 of shapes) for (const id of s2.stopIds) { const st = transit.network.stops.get(id); if (st && !stops.has(id)) stops.set(id, { type: "Feature", properties: { id, name: st.name, rot }, geometry: { type: "Point", coordinates: [st.position.lon, st.position.lat] } }); }
+    }
+    return { lines: { type: "FeatureCollection", features: lines } as FeatureCollection<LineString>, stops: { type: "FeatureCollection", features: [...stops.values()] } as FeatureCollection<Point> };
+  }, [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   /** Las estaciones de la troncal dibujadas como en la web: base, pasillo, vagones con puertas y su número. */
   const geo = useMemo(() => (transit.network.stops.size && transit.network.shapes.size ? buildStationGeometry(transit, trunkStations(transit), CORRIDORS) : null), [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   const stationGeo = useMemo(() => {
@@ -217,6 +232,13 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <Layer id="station-letter" type="symbol" minzoom={12.6} maxzoom={14.5} {...sp({ textField: ["get", "letter"], textFont: ["Noto Sans Bold"], textSize: ["case", ["get", "portal"], 12, 10], textAllowOverlap: true, textIgnorePlacement: true, textColor: letterColor as never })} />
         <Layer id="portal-label" type="symbol" minzoom={10.5} maxzoom={14.5} filter={isPortal as never} {...sp({ textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 10.5, 11.5, 14.5, 15], textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.15, textJustify: "auto", textMaxWidth: 8, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2.2 })} />
         <Layer id="station-label" type="symbol" minzoom={12.6} maxzoom={14.5} filter={["!", isPortal] as never} {...sp({ textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 12.6, 11, 14.5, 13.5], textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.05, textJustify: "auto", textMaxWidth: 8, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2 })} />
+      </GeoJSONSource>
+      {/* TransMiCable: siempre montado (agregar capas en caliente cierra la app) */}
+      <GeoJSONSource id="cable-line" data={cable.lines}>
+        <Layer id="cable-line" type="line" {...sp({ lineColor: c.dark ? "#e8e8ed" : "#1c1c1e", lineOpacity: 0.9, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.5, 14, 3, 17, 5], lineDasharray: [2, 1.2], lineCap: "butt", lineJoin: "round" })} />
+      </GeoJSONSource>
+      <GeoJSONSource id="cable-stations" data={cable.stops} onPress={(e) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onStop?.(id); }}>
+        <Layer id="cable-station" type="symbol" minzoom={11} {...sp({ iconImage: "cabina", iconSize: ["interpolate", ["linear"], ["zoom"], 11, 0.2, 14, 0.25, 16, 0.32, 18, 0.45], iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true, textField: ["step", ["zoom"], "", 13, ["get", "name"]], textFont: ["Noto Sans Regular"], textSize: 12, textOffset: [0, 1.8], textAnchor: "top", textOptional: true, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2 })} />
       </GeoJSONSource>
       {(
         <GeoJSONSource id="route-line" data={lineJson}>

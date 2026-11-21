@@ -1,4 +1,5 @@
 import { routeTitle, SYSTEM_LABEL } from "@transmi/domain";
+import { cableInfo } from "@transmi/application";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { routeBadgeColor } from "../map/theme";
@@ -27,12 +28,14 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
   const stop = transit.stopById(stopId ?? undefined);
   const { rows, nowSec } = useUpcoming(stopId, 3);
   const label = labelOf(stop), tag = stopTag(stop);
+  // estación de TransMiCable (todas sus rutas son del cable)
+  const cable = useMemo(() => { const rs = stopId ? routesAtStop(transit, stopId) : []; return rs.length && rs.every((r) => r.system === "cable") ? rs : []; }, [stopId, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   const siblings = useMemo(() => (stop ? siblingStops(transit, stop).map((x) => ({ x, names: [...new Set(routesAtStop(transit, x.id).map((r) => r.shortName))].slice(0, 2).join(" ") })) : []), [stop, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <button className="back" onClick={() => openStop(null)}><Back /> Atrás</button>
       <div className="dcard"><div style={{ flex: 1, minWidth: 0 }}><small className="kick">{stopKind(stop)}</small><h2>{label?.title ?? "Parada"}</h2>
-        <p>{tag && <b className="vtag">{tag}</b>}{tag ? " · " : ""}{rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : liveDown() ? "Sin datos en vivo por ahora" : "Sin buses acercándose"}</p></div>{stop && <button className="star" aria-label="Cómo llegar a esta parada" onClick={() => openPlannerTo({ name: label?.title ?? "Parada", position: stop.position })}><Directions /></button>}{stopId && <ShareButton target={{ kind: "parada", id: stopId }} title={label?.title ?? "Parada"} />}{stopId && <StarButton kind="stop" id={stopId} />}</div>
+        <p>{tag && <b className="vtag">{tag}</b>}{tag ? " · " : ""}{cable.length ? "Estación de TransMiCable" : rows.length ? `${rows.length} ${rows.length === 1 ? "ruta viene" : "rutas vienen"} hacia aquí · en vivo` : liveDown() ? "Sin datos en vivo por ahora" : "Sin buses acercándose"}</p></div>{stop && <button className="star" aria-label="Cómo llegar a esta parada" onClick={() => openPlannerTo({ name: label?.title ?? "Parada", position: stop.position })}><Directions /></button>}{stopId && <ShareButton target={{ kind: "parada", id: stopId }} title={label?.title ?? "Parada"} />}{stopId && <StarButton kind="stop" id={stopId} />}</div>
       {siblings.length > 1 && (
         <div className="chips" role="group" aria-label="Otros vagones de esta estación">
           {siblings.map(({ x, names }) => {
@@ -42,7 +45,14 @@ export function StopView({ th, act }: { th: MapTheme; act: Actions }) {
           })}
         </div>
       )}
-      {rows.length === 0 ? <NoBuses th={th} stopId={stopId} nowMs={nowSec * 1000} act={act} /> : (
+      {cable.length ? (
+        // TransMiCable: sus cabinas no reportan posición, así que se dice lo del horario oficial (nunca «en vivo»)
+        <div className="card">
+          <span className="rb" style={{ ["--c" as string]: routeBadgeColor(th, cable[0]!) }}>TransMiCable</span>
+          <div className="ct">{cableInfo(transit, cable[0]!.id, nowSec * 1000)?.text ?? "Horario no disponible"}</div>
+          <div className="cs">Recorrido: Portal Tunal · Juan Pablo II · Manitas · Mirador del Paraíso. Las cabinas no envían su ubicación: esto sale del horario oficial de TransMilenio.</div>
+        </div>
+      ) : rows.length === 0 ? <NoBuses th={th} stopId={stopId} nowMs={nowSec * 1000} act={act} /> : (
         <>
           <div className="sec">Toca una ruta para ver de dónde viene</div>
           <div className="list">

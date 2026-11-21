@@ -99,12 +99,12 @@ const SHORT_HOP_M = 450;
 /** Tiempo en bus entre paradas = parada (frenar, subir y bajar) + distancia / velocidad de crucero. Con tramos largos (rutas exprés) la distancia pesa;
  *  con tramos cortos manda la parada. Los valores dan ~24 km/h en la troncal con paradas cada 700 m y ~35 km/h con tramos de 3 km. */
 const RIDE_MODEL: Record<SystemType, { dwell: number; cruise: number }> = {
-  troncal: { dwell: 45, cruise: 12 }, dual: { dwell: 45, cruise: 10 }, alimentador: { dwell: 40, cruise: 6.5 }, zonal: { dwell: 35, cruise: 6.5 }, otro: { dwell: 45, cruise: 8 },
+  troncal: { dwell: 45, cruise: 12 }, dual: { dwell: 45, cruise: 10 }, alimentador: { dwell: 40, cruise: 6.5 }, zonal: { dwell: 35, cruise: 6.5 }, cable: { dwell: 25, cruise: 5 }, otro: { dwell: 45, cruise: 8 },
 };
 /** Cada trasbordo se cuenta como si costara esto de más al ordenar las opciones (la gente prefiere no cambiar de bus). */
 const TRANSFER_PENALTY_S = 150;
 const LAYOVER_S = 240;
-const DEFAULT_HEADWAY: Record<SystemType, number> = { troncal: 270, dual: 420, alimentador: 480, zonal: 660, otro: 900 };
+const DEFAULT_HEADWAY: Record<SystemType, number> = { troncal: 270, dual: 420, alimentador: 480, zonal: 660, cable: 60, otro: 900 };      // cable: las cabinas pasan seguidas (casi no se espera)
 const walkSeconds = (meters: number) => (meters * WALK_DETOUR) / WALK_MPS;
 const walkMetersOf = (a: GeoPoint, b: GeoPoint) => hav(a, b) * WALK_DETOUR;
 
@@ -763,7 +763,7 @@ function searchStopGroupsLite(state: TransitState, q: string, limit: number): Pl
  *  Los duales van aparte desde el 2026-11-13: el dueño esperaba que «TransMilenio» diera solo troncales, como en la app oficial. */
 export type TravelMode = "troncal" | "dual" | "zonal" | "alimentador";
 export const TRAVEL_MODES: readonly { key: TravelMode; label: string; systems: readonly SystemType[] }[] = [
-  { key: "troncal", label: "TransMilenio", systems: ["troncal"] },
+  { key: "troncal", label: "TransMilenio", systems: ["troncal", "cable"] },      // TransMiCable es parte de TransMilenio
   { key: "dual", label: "Dual", systems: ["dual"] },
   { key: "zonal", label: "SITP zonal", systems: ["zonal", "otro"] },
   { key: "alimentador", label: "Alimentador", systems: ["alimentador"] },

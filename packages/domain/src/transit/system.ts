@@ -1,11 +1,13 @@
 /** Sistema de transporte al que pertenece una ruta o un bus. */
-export type SystemType = "troncal" | "dual" | "alimentador" | "zonal" | "otro";
+/** «cable»: TransMiCable (Tunal ↔ Mirador del Paraíso). No reporta posiciones en vivo: solo su horario y frecuencia del GTFS. */
+export type SystemType = "troncal" | "dual" | "alimentador" | "zonal" | "cable" | "otro";
 
 export const SYSTEM_LABEL: Record<SystemType, string> = {
   troncal: "Troncal",
   dual: "Dual",
   alimentador: "Alimentador",
   zonal: "Zonal",
+  cable: "TransMiCable",
   otro: "Otros",
 };
 export const SYSTEMS: SystemType[] = ["troncal", "dual", "alimentador", "zonal"];
@@ -26,7 +28,7 @@ const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerC
 export function classifyRoute(r: RouteDescriptor): SystemType {
   const sn = r.shortName.trim().toUpperCase();
   // 1) lo que dice el propio GTFS: el color y el tipo oficiales de cada ruta (el nombre solo no basta: hay rutas «7» troncales y zonales)
-  if (r.routeType === "6") return "otro";                       // cable aéreo
+  if (r.routeType === "6" || sn === "CABLE" || sn === "TRANSMICABLE") return "cable";      // cable aéreo (TransMiCable)
   const color = (r.routeColor ?? "").toLowerCase().replace("#", "");
   if (color === "ff0000") return "troncal";
   if (color === "0000ff") return "zonal";

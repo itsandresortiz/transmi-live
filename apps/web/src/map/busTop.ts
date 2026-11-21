@@ -65,3 +65,33 @@ export function busTopSprite(color: string, long: boolean, ratio = 2): ImageData
   drawTopBus(c, color, long, ratio);
   return c.getImageData(0, 0, canvas.width, canvas.height);
 }
+
+/** Cabina de TransMiCable vista desde arriba, con el mismo estilo de los buses (sombra suave, filo oscuro fino, sin borde blanco):
+ *  roja con techo negro, ventanas adelante y atrás y el agarre al cable en el centro, mirando hacia ARRIBA (norte; el cable va de arriba a
+ *  abajo). La app usa la misma imagen (assets/cabina.png). */
+export const CABIN_W = 19, CABIN_H = 24;
+export function drawTopCabin(c: CanvasRenderingContext2D, ratio = 1): void {
+  const W = 11, L = 12, x = -W / 2, y = -L / 2;
+  c.save();
+  c.strokeStyle = "#111114"; c.lineWidth = 1.1; c.beginPath(); c.moveTo(0, -CABIN_H / 2 + 0.5); c.lineTo(0, CABIN_H / 2 - 0.5); c.stroke();      // el cable
+  c.shadowColor = "rgba(0,0,0,.38)"; c.shadowBlur = 3.4 * ratio; c.shadowOffsetX = 1.1 * ratio; c.shadowOffsetY = 1.5 * ratio;
+  c.fillStyle = "#e30613"; rounded(c, x, y, W, L, 3); c.fill();
+  c.restore();
+  c.save(); c.lineWidth = 0.55; c.strokeStyle = "rgba(0,0,0,.32)"; rounded(c, x, y, W, L, 3); c.stroke(); c.restore();
+  c.save();
+  c.fillStyle = "#16181d"; rounded(c, x + 1.6, y + 2.6, W - 3.2, L - 5.2, 1.8); c.fill();                       // techo negro
+  c.fillStyle = "rgba(18,24,34,.9)"; rounded(c, x + 1.6, y + 0.8, W - 3.2, 1.5, 0.7); c.fill();                   // ventana adelante
+  rounded(c, x + 1.6, y + L - 2.3, W - 3.2, 1.5, 0.7); c.fill();                                                   // ventana atrás
+  c.fillStyle = "rgba(255,255,255,.22)"; c.fillRect(x + 2.4, y + 1.1, W - 4.8, 0.45);                            // reflejo
+  c.fillStyle = "#3a3d44"; rounded(c, -1.6, -1.6, 3.2, 3.2, 0.8); c.fill();                                       // agarre al cable
+  c.fillStyle = "#e30613"; c.fillRect(-0.5, -0.5, 1, 1);
+  c.restore();
+}
+export function cabinTopSprite(ratio = 2): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(CABIN_W * ratio); canvas.height = Math.round(CABIN_H * ratio);
+  const c = canvas.getContext("2d")!;
+  c.scale(ratio, ratio); c.translate(CABIN_W / 2, CABIN_H / 2);
+  drawTopCabin(c, ratio);
+  return c.getImageData(0, 0, canvas.width, canvas.height);
+}

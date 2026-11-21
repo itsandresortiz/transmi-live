@@ -78,3 +78,6 @@ export function trafficLightImage(): ImageData {
   ["#ff4b3e", "#ffc533", "#3ddc84"].forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.arc(8, 7.5 + i * 7.5, 2.6, 0, 6.3); g.fill(); });
   return g.getImageData(0, 0, W * r, H * r);
 }
+
+/** Cabina de TransMiCable para el mapa: la misma de `busTop.ts` (vista desde arriba, estilo de los buses). */
+export { cabinTopSprite as cableCabinImage } from "./busTop";

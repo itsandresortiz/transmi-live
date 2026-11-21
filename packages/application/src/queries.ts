@@ -30,7 +30,7 @@ const textOf = (r: Route): string => { let t = routeText.get(r); if (t === undef
 const headsignText = new WeakMap<string[], string[]>();
 const headsignsOf = (hs: string[]): string[] => { let t = headsignText.get(hs); if (!t) { t = hs.map(normalize); headsignText.set(hs, t); } return t; };
 
-const SYSTEM_ORDER: Record<SystemType, number> = { troncal: 0, dual: 1, alimentador: 2, zonal: 3, otro: 4 };
+const SYSTEM_ORDER: Record<SystemType, number> = { troncal: 0, dual: 1, alimentador: 2, zonal: 3, cable: 4, otro: 5 };
 
 /** Qué tan bien responde una ruta a lo que se escribió (menos es mejor): el nombre exacto primero («7» → la ruta 7, no las cien que
  *  tienen un 7 en el nombre), luego las que empiezan así, las que lo contienen en el nombre y, al final, las que solo coinciden por

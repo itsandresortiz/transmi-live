@@ -20,7 +20,7 @@ export const LIGHT: MapTheme = {
   roads: { minor: "#d6dce6", tertiary: "#ccd3df", secondary: "#c1cad8", primary: "#b6c0d1", trunk: "#abb6c9", casing: "#9ea9bc", casingMajor: "#8c99ae" },
   label: "#6c6c70", labelStrong: "#1c1c1e", halo: "#eef0f3", troncal: "#e11d2e", surface: "#ffffff",
   stationBase: "#dde2ea", stationEdge: "#a9b2c1", stationLink: "#c4ccd9", capsule: "#ffffff", capsuleEdge: "#6f7a8d",
-  system: { troncal: "#e11d2e", dual: "#8a45d6", alimentador: "#12945f", zonal: "#1f6fd1", otro: "#8e8e93" },
+  system: { troncal: "#e11d2e", dual: "#8a45d6", alimentador: "#12945f", zonal: "#1f6fd1", cable: "#1c1c1e", otro: "#8e8e93" },
   lines: { ...Object.fromEntries(Object.entries(TRUNK_LINES).map(([k, v]) => [k, v.light])), CA: "#e30613" },
   delay: { ok: "#12945f", warn: "#d97706", bad: "#e11d2e", early: "#1f6fd1", none: "#8e8e93" },
 };
@@ -29,7 +29,7 @@ export const DARK: MapTheme = {
   roads: { minor: "#243044", tertiary: "#2c3a52", secondary: "#344460", primary: "#3d4f6e", trunk: "#475a7b", casing: "#4c5d7d", casingMajor: "#60769f" },
   label: "#a1a1a8", labelStrong: "#f5f5f7", halo: "#090c12", troncal: "#ff5a66", surface: "#1c1c1e",
   stationBase: "#242c3b", stationEdge: "#4a566e", stationLink: "#3d4a66", capsule: "#36425c", capsuleEdge: "#a3afc8",
-  system: { troncal: "#ff5a66", dual: "#b88af2", alimentador: "#34d197", zonal: "#5aa2ff", otro: "#9a9aa5" },
+  system: { troncal: "#ff5a66", dual: "#b88af2", alimentador: "#34d197", zonal: "#5aa2ff", cable: "#e8e8ed", otro: "#9a9aa5" },
   lines: { ...Object.fromEntries(Object.entries(TRUNK_LINES).map(([k, v]) => [k, v.dark])), CA: "#ff5a5e" },
   delay: { ok: "#34d197", warn: "#fbbf24", bad: "#ff5a66", early: "#5aa2ff", none: "#9a9aa5" },
 };

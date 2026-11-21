@@ -13,4 +13,5 @@ export const BUS_SPRITES: Record<string, number> = {
   "top-otro-s": require("../../assets/sprites-top/top-otro-s.png"),
   "top-otro-l": require("../../assets/sprites-top/top-otro-l.png"),
   semaforo: require("../../assets/semaforo.png"),
+  cabina: require("../../assets/cabina.png"),      // TransMiCable: cabina roja con negro (sale de cableCabinImage de la web)
 };
