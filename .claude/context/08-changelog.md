@@ -4,6 +4,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-21 · Android: Google Play frenaba el envío de la 1.0.7 («declaraciones de funciones de hardware obligatorias»: `android.hardware.screen.portrait` dejaba por fuera tabletas, computadores y Android XR por `orientation: portrait`). Nuevo `plugins/android-opcional.js`: pantalla vertical y horizontal como `required=false` (comprobado en el manifiesto generado por `expo prebuild`).
 - 2026-11-21 · Web: la app ya está en Google Play (`PLAY_STORE_URL` en `AppPromo.tsx`). El anuncio sale a cada uno con su tienda (Android: Google Play; iPhone: App Store; computador: las dos) y vuelve a salir una vez para Android y computador (clave `tm.apps.v2`; a quien ya lo cerró en iPhone no). En Ajustes: «App para iPhone y Android».
 - 2026-11-20 · App: versión 1.0.7 (seguir en el mapa el bus en el que vas, leer la tarjeta con un toque, mensaje al lado de «En vivo»).
 - 2026-11-20 · App: «Leer mi tarjeta» en Más abre la pantalla de la tarjeta con `?leer=1` y la lectura empieza sola (a los 0,6 s, para que la ventana termine de abrirse); antes había que tocar «Leer mi tarjeta» otra vez.

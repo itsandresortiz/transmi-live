@@ -64,7 +64,8 @@
       ],
       "./plugins/sin-push",
       "./plugins/android-memoria",
-      "./plugins/android-firma"
+      "./plugins/android-firma",
+      "./plugins/android-opcional"
     ],
     "experiments": {
       "typedRoutes": true
