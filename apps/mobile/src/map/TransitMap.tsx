@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { CORRIDORS, PORTALS, type TripGeo, simulatedCabins, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -66,6 +66,9 @@ interface Props {
 }
 
 /** El mapa de buses en vivo: base, trazado de la ruta, paradas (al acercarse), buses y tu ubicación. */
+/** TransMiCable en obra (no cambia mientras corre la app). */
+const UPCOMING = upcomingCablesGeo();
+
 export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], trip = null, onlyRoutes = null, active = true, showSignals = true, showStations = true, showTraffic = false, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
   const c = useColors();
   const camera = useRef<CameraRef>(null);
@@ -259,6 +262,13 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       {/* TransMiCable: siempre montado (agregar capas en caliente cierra la app) */}
       <GeoJSONSource id="cable-line" data={cable.lines}>
         <Layer id="cable-line" type="line" {...sp({ lineColor: c.dark ? "#e8e8ed" : "#1c1c1e", lineOpacity: 0.9, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.5, 14, 3, 17, 5], lineDasharray: [2, 1.2], lineCap: "butt", lineJoin: "round" })} />
+      </GeoJSONSource>
+      {/* TransMiCable en obra (San Cristóbal): tenue, punteado y con «Próximamente»; siempre montado */}
+      <GeoJSONSource id="cable-upcoming-line" data={UPCOMING.lines as never}>
+        <Layer id="cable-upcoming-line" type="line" {...sp({ lineColor: c.dark ? "#e8e8ed" : "#1c1c1e", lineOpacity: 0.35, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 2.6, 17, 4], lineDasharray: [1, 1.6], lineCap: "butt", lineJoin: "round" })} />
+      </GeoJSONSource>
+      <GeoJSONSource id="cable-upcoming-stations" data={UPCOMING.stations as never} onPress={(e) => { const p = e.nativeEvent.features[0]?.properties; if (p?.name) Alert.alert(`${String(p.line)}: ${String(p.name)}`, `${String(p.note)}. Todavía no presta servicio: cuando TransMilenio lo abra, aparecerá aquí con su horario.`); }}>
+        <Layer id="cable-upcoming-station" type="symbol" minzoom={11} {...sp({ iconImage: "cabina", iconSize: ["interpolate", ["linear"], ["zoom"], 11, 0.18, 15, 0.3], iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true, iconOpacity: 0.35, textField: ["step", ["zoom"], "", 12.5, ["concat", ["get", "name"], "\nPróximamente"]], textFont: ["Noto Sans Regular"], textSize: 11.5, textOffset: [0, 1.6], textAnchor: "top", textOptional: true, textColor: c.dark ? "#b4b4bb" : "#6c6c70", textHaloColor: nameHalo, textHaloWidth: 2 })} />
       </GeoJSONSource>
       <GeoJSONSource id="cable-cabins" data={cabins} onPress={(e) => { const f = e.nativeEvent.features[0]?.properties?.from; if (typeof f === "number") onCabin(f); }}>
         <Layer id="cable-cabin" type="symbol" minzoom={12.5} {...sp({ iconImage: "cabina", iconSize: ["interpolate", ["linear"], ["zoom"], 12.5, 0.14, 15, 0.22, 18, 0.34], iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true, iconOpacity: 0.72 })} />

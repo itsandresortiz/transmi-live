@@ -4,7 +4,7 @@ import baseDark from "./base-dark.json";
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
-import { type SignalRow, flowDash, signalPoints, trafficBand } from "@transmi/application";
+import { type SignalRow, upcomingCablesGeo, flowDash, signalPoints, trafficBand } from "@transmi/application";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
@@ -132,6 +132,7 @@ export class MapController {
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
     if (!m.hasImage("cabina")) m.addImage("cabina", cableCabinImage(3), { pixelRatio: 3 });
     this.src("cable-line"); this.src("cable-stations"); this.src("cable-cabins");
+    { const up = upcomingCablesGeo(); this.src("cable-upcoming-line", up.lines as never); this.src("cable-upcoming-stations", up.stations as never); }
 
     const lineLayout = { "line-cap": "round", "line-join": "round" } as const;
     m.addLayer({
@@ -235,6 +236,13 @@ export class MapController {
       id: "semaforos-icons", type: "symbol", source: "semaforos", minzoom: 15.4,
       layout: { "icon-image": "semaforo", "icon-size": ["interpolate", ["linear"], ["zoom"], 15.4, 0.55, 18, 0.95], "icon-allow-overlap": true, "icon-ignore-placement": true },
     });
+    // TransMiCable en obra (San Cristóbal): tenue, punteado y con «Próximamente»; no es servicio
+    m.addLayer({ id: "cable-upcoming-line", type: "line", source: "cable-upcoming-line", layout: lineLayout,
+      paint: { "line-color": t.system.cable, "line-opacity": 0.35, "line-width": zoomWidth([9, 1.2], [14, 2.6], [18, 4]), "line-dasharray": [1, 1.6] } });
+    m.addLayer({ id: "cable-upcoming-stations", type: "symbol", source: "cable-upcoming-stations", minzoom: 11,
+      layout: { "icon-image": "cabina", "icon-size": ["interpolate", ["linear"], ["zoom"], 11, 0.5, 15, 0.85], "icon-rotate": ["get", "rot"], "icon-rotation-alignment": "map", "icon-allow-overlap": true,
+        "text-field": ["step", ["zoom"], "", 12.5, ["concat", ["get", "name"], "\nPróximamente"]], "text-font": FONT, "text-size": 11.5, "text-offset": [0, 1.5], "text-anchor": "top", "text-optional": true },
+      paint: { "icon-opacity": 0.35, "text-color": t.label, "text-halo-color": t.halo, "text-halo-width": 1.6, "text-opacity": 0.85 } });
     // cabinas SIMULADAS según el horario (TransMilenio no envía su ubicación): más suaves que los buses para no pasar por reales
     m.addLayer({ id: "cable-cabins", type: "symbol", source: "cable-cabins", minzoom: 12.5,
       layout: { "icon-image": "cabina", "icon-size": ["interpolate", ["linear"], ["zoom"], 12.5, 0.45, 15, 0.75, 18, 1.1], "icon-rotate": ["get", "rot"], "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true },
@@ -382,6 +390,9 @@ export class MapController {
     m.setPaintProperty("trip-labels", "text-halo-color", t.halo);
     m.setPaintProperty("semaforos-labels", "text-color", t.label);
     m.setPaintProperty("cable-line", "line-color", t.system.cable);
+    m.setPaintProperty("cable-upcoming-line", "line-color", t.system.cable);
+    m.setPaintProperty("cable-upcoming-stations", "text-color", t.label);
+    m.setPaintProperty("cable-upcoming-stations", "text-halo-color", t.halo);
     m.setPaintProperty("cable-stations", "text-color", t.labelStrong);
     m.setPaintProperty("cable-stations", "text-halo-color", t.halo);
     m.setPaintProperty("semaforos-labels", "text-halo-color", t.halo);
