@@ -78,7 +78,11 @@ export function rideArrival(state: TransitState, v: Vehicle, shape: RouteShape, 
   const now = nowMs / 1000;
   if (to < snap.nextIndex) return now;
   const toNextSec = snap.toNext / RIDE_CRUISE_MPS;
-  if (to === snap.nextIndex || lastIndex >= snap.nextIndex) return now + toNextSec;
+  if (to === snap.nextIndex) return now + toNextSec;
+  // el bus ya reportó haber pasado tu siguiente parada (p. ej. detenido en la estación y el GPS del teléfono unos metros antes): las
+  // paradas hasta la del reporte están prácticamente aquí; las de después, a lo que el modelo del bus dice desde donde va él. Antes se
+  // devolvía la hora de la siguiente parada para TODAS (todas «a segundos» y «Faltan 3 paradas» sonaba enseguida)
+  if (lastIndex >= snap.nextIndex) return to <= lastIndex ? now + toNextSec : now + toNextSec + Math.max(0, arrivalAtIndex(state, v, shape, lastIndex, to, nowMs) - now);
   const between = arrivalAtIndex(state, v, shape, lastIndex, to, nowMs) - arrivalAtIndex(state, v, shape, lastIndex, snap.nextIndex, nowMs);
   return now + toNextSec + Math.max(0, between);
 }

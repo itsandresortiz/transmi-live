@@ -283,3 +283,18 @@ describe("mensajes del dueño", () => {
     expect(activeOwnerMessages(list, Date.UTC(2026, 10, 14, 20) / 1000).map((m) => m.text)).toEqual(["Vigente"]);
   });
 });
+
+import { ownerMessageUntil, parseOwnerMessages } from "@transmi/domain";
+describe("auditoría 2026-11-20", () => {
+  it("un reporte más viejo no cambia la ruta ni la última parada del bus", () => {
+    const v = new Vehicle(report({ reportedAt: 1000, lastStopId: "D", routeId: "R1" }), 0);
+    v.apply(report({ reportedAt: 900, lastStopId: "B", routeId: "R2" }), 1);
+    expect(v.lastStopId).toBe("D");
+    expect(v.routeId).toBe("R1");
+  });
+  it("«hasta el 14» se lee como ese día, no como el 15 a las 12:00 a. m.", () => {
+    const [m] = parseOwnerMessages({ mensajes: [{ texto: "x", hasta: "2026-11-14" }] });
+    expect(ownerMessageUntil(m!, Date.parse("2026-11-14T17:00:00Z") / 1000)).toBe("Hasta hoy");
+    expect(ownerMessageUntil(m!, Date.parse("2026-11-12T17:00:00Z") / 1000)).toMatch(/^Hasta el 14 (de )?nov$/);
+  });
+});

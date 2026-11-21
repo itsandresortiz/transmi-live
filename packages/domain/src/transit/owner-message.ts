@@ -57,6 +57,12 @@ export function activeOwnerMessages(all: readonly OwnerMessage[], nowSec: number
 /** «Hasta hoy a las 12:00 p. m.» / «Hasta el 14 nov.» (hora de Bogotá). */
 export function ownerMessageUntil(m: OwnerMessage, nowSec: number): string {
   if (m.endsAt == null) return "";
+  // un «hasta» sin hora («hasta el 14») vale hasta la medianoche que cierra ese día: se dice el día, no «el 15 a las 12:00 a. m.»
+  const wholeDay = ((m.endsAt - 5 * 3600) % 86_400 + 86_400) % 86_400 === 0;
+  if (wholeDay) {
+    const last = m.endsAt - 1, d = (t: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(t * 1000));
+    return d(last) === d(nowSec) ? "Hasta hoy" : `Hasta el ${new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", timeZone: "America/Bogota" }).format(new Date(last * 1000)).replace(/\.$/, "")}`;
+  }
   const day = (t: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(t * 1000));
   const hour = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Bogota" }).format(new Date(m.endsAt * 1000));
   if (day(m.endsAt) === day(nowSec)) return `Hasta hoy a las ${hour}`;

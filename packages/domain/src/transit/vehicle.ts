@@ -72,12 +72,13 @@ export class Vehicle {
     this.lastSeenMs = nowMs;
     this.plate = r.plate ?? this.plate;
     this.label = r.label ?? this.label;
+    // un reporte igual o MÁS VIEJO que el que ya se tiene no mueve el bus: pasa cuando falla el intermediario y se cae en la copia
+    // de respaldo, que va unos minutos atrás; aplicarlo devolvería los buses a donde estaban y se verían como «en vivo». Tampoco cambia
+    // su ruta, viaje ni última parada (antes se cambiaban antes de esta revisión y el bus volvía a «llegar» a paradas ya pasadas)
+    if (r.reportedAt <= this.reportedAt) return false;
     this.routeId = r.routeId || this.routeId;
     this.tripId = r.tripId ?? this.tripId;
     this.lastStopId = r.lastStopId ?? this.lastStopId;
-    // un reporte igual o MÁS VIEJO que el que ya se tiene no mueve el bus: pasa cuando falla el intermediario y se cae en la copia
-    // de respaldo, que va unos minutos atrás; aplicarlo devolvería los buses a donde estaban y se verían como «en vivo»
-    if (r.reportedAt <= this.reportedAt) return false;
 
     const next = toWorld(r.position);
     const moved = distanceMeters(this.world, next);

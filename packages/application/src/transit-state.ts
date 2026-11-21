@@ -36,6 +36,8 @@ export class TransitState {
   readonly travelTimes = new TravelTimes();
   /** Tiempos reales por tramo y hora (rama `hop-stats`); vacío hasta que la app los descarga. */
   readonly hopProfile = new HopProfile();
+  // festivos: los tiempos aprendidos se eligen por el tipo de día de servicio, no solo por el día de la semana
+  private readonly hopDayWired = (this.hopProfile.dayOf = (t: number) => this.serviceEnds.dayAt(t).type);
   /** Primer y último viaje de cada ruta, para marcar «último servicio». */
   readonly serviceEnds = new ServiceEnds();
   readonly departures = new Departures();

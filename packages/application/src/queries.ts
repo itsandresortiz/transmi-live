@@ -83,12 +83,17 @@ export const looksLikeBus = (q: string): boolean => /^[A-Za-z]{1,3}[\s-]?\d[\d\s
 export function findBuses(state: TransitState, query: string, limit = 5): Vehicle[] {
   const q = busCode(query);
   if (q.length < 3 || !/\d/.test(q)) return [];
-  const hits: { v: Vehicle; exact: boolean }[] = [];
+  // primero lo idéntico tal cual se escribió (con sus ceros): al quitar los ceros, GVK003 y GVK030 quedan iguales («GVK3») y salía primero
+  // el que reportó último aunque no fuera el buscado (85 choques así en un lote real)
+  const raw = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, ""), rq = raw(query);
+  const hits: { v: Vehicle; rank: number }[] = [];
   for (const v of state.fleet.values()) {
     const plate = busCode(v.plate ?? ""), label = busCode(v.label ?? "");
-    if (plate.includes(q) || label.includes(q)) hits.push({ v, exact: plate === q || label === q });
+    if (!plate.includes(q) && !label.includes(q)) continue;
+    const rank = raw(v.plate ?? "") === rq || raw(v.label ?? "") === rq ? 0 : plate === q || label === q ? 1 : 2;
+    hits.push({ v, rank });
   }
-  return hits.sort((a, b) => Number(b.exact) - Number(a.exact) || b.v.reportedAt - a.v.reportedAt).slice(0, limit).map((h) => h.v);
+  return hits.sort((a, b) => a.rank - b.rank || b.v.reportedAt - a.v.reportedAt).slice(0, limit).map((h) => h.v);
 }
 
 /** Retraso en segundos para ordenar (los desconocidos al final). */
@@ -337,7 +342,11 @@ export function nearestStops(state: TransitState, p: { lat: number; lon: number 
 
 /** Avisos que tocan alguna de estas rutas o paradas. */
 export function alertsFor(state: TransitState, routeIds: ReadonlySet<string>, stopIds: ReadonlySet<string>): { alert: ServiceAlert; index: number }[] {
-  return searchAlerts(state).filter(({ alert }) => alert.routeIds.some((r) => routeIds.has(r)) || alert.stopIds.some((s) => stopIds.has(s)));
+  // TransMilenio manda los avisos con un número interno de ruta que casi nunca existe en el GTFS: la ruta se deduce al cargarlos y queda
+  // en `alertsByRoute`. Se buscan por ahí, incluido el otro sentido de cada ruta (antes solo por el número del aviso y casi no salía ninguno)
+  const byRoute = new Set<number>();
+  for (const id of routeIds) for (const f of state.routeFamily(id)) for (const i of state.alertsByRoute.get(f) ?? []) byRoute.add(i);
+  return searchAlerts(state).filter(({ alert, index }) => byRoute.has(index) || alert.routeIds.some((r) => routeIds.has(r)) || alert.stopIds.some((s) => stopIds.has(s)));
 }
 
 /** Rutas que pasan por alguna de estas paradas. */

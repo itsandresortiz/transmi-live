@@ -96,7 +96,11 @@ export function rawArrival(state: TransitState, v: Vehicle, shape: RouteShape, l
   } else {
     // respaldo: desde la hora real a la que llegó a su última parada
     const tu = v.tripId ? state.tripUpdates.get(v.tripId) : undefined;
-    const reached = tu?.nextStop && tu.nextStop.stopId === v.lastStopId ? tu.nextStop.arrivalAt : undefined;
+    // solo si el dato del viaje es reciente (≤10 min frente al reporte del bus, como en `delayOf`) y no promete llegar después del
+    // reporte: TransMilenio los manda con horas de atraso (~3,5 h) y con uno viejo el bus «ya había pasado» paradas que no ha pasado
+    const fresh = tu?.reportedAt != null && v.reportedAt - tu.reportedAt <= 600;
+    const at = fresh && tu?.nextStop && tu.nextStop.stopId === v.lastStopId ? tu.nextStop.arrivalAt : undefined;
+    const reached = at != null && at <= v.reportedAt + 60 && v.reportedAt - at <= 3600 ? at : undefined;
     eta = (reached ?? v.reportedAt) + remaining;
   }
   return { eta, remaining };

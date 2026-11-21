@@ -44,6 +44,9 @@ export class HopProfile {
   private routes = new Map<string, Record<string, number[]>>();
   private stamp = "";
   private tag = hopTag(0);
+  /** Tipo de día de servicio (lo pone `TransitState` con el calendario de festivos): un lunes festivo usa los tiempos de domingo, no los de
+   *  un lunes en hora pico. Sin él, solo se mira el día de la semana. */
+  dayOf: ((nowMs: number) => HopDay) | null = null;
   private tagAt = -Infinity;
 
   get size(): number { return this.routes.size; }
@@ -74,7 +77,7 @@ export class HopProfile {
     if (!this.apply) return fallback;
     const r = this.routes.get(`${shape.routeId}|${shape.direction}`);
     if (!r) return fallback;
-    if (Math.abs(nowMs - this.tagAt) > 30_000) { this.tag = hopTag(nowMs); this.tagAt = nowMs; }      // se calcula pocas veces: se pide miles de veces por lote
+    if (Math.abs(nowMs - this.tagAt) > 30_000) { const t = hopTag(nowMs); this.tag = this.dayOf ? { ...t, day: this.dayOf(nowMs) } : t; this.tagAt = nowMs; }      // se calcula pocas veces: se pide miles de veces por lote
     const { day, bucket } = this.tag;
     let hit = pick(r[`${day}|${bucket}`], i, this.minN);
     if (!hit && day !== "wk") hit = pick(r[`wk|${bucket}`], i, this.minN);
