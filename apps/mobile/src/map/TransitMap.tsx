@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { CORRIDORS, PORTALS, type TripGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { CORRIDORS, PORTALS, type TripGeo, simulatedCabins, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -20,6 +20,9 @@ import { BUS_SPRITES } from "./sprites";
 import { sp } from "./styleProps";
 import { useBusFeatures, type Viewport } from "./useBuses";
 import { SYSTEM_COLOR } from "@/ui/theme";
+import { router } from "expo-router";
+import { useRide } from "@/ride";
+import { virtualRideId } from "@/virtualRide";
 
 /** Base de OpenStreetMap servida por OpenFreeMap (gratis, sin llave). */
 /** Mapa base claro u oscuro, según la apariencia de la app. Son los estilos de OpenFreeMap con colores propios (más contraste entre calles, parques y agua);
@@ -140,6 +143,26 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     return { lines: { type: "FeatureCollection", features: lines } as FeatureCollection<LineString>, stops: { type: "FeatureCollection", features: [...stops.values()] } as FeatureCollection<Point> };
   }, [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Cabinas del cable SIMULADAS según el horario oficial (TransMilenio no envía su ubicación): solo con el cable en pantalla, una vez por
+   *  segundo, más suaves que los buses. Al tocar una se puede empezar «Voy en esta cabina». */
+  const cableId = useMemo(() => [...transit.network.routes.values()].find((r) => r.system === "cable")?.id ?? null, [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const [cabins, setCabins] = useState<FeatureCollection<Point>>({ type: "FeatureCollection", features: [] });
+  const cableOnScreen = !!view && view.zoom >= 12.5 && view.west < -74.135 && view.east > -74.165 && view.south < 4.572 && view.north > 4.547;
+  useEffect(() => {
+    if (!cableId || !active || !cableOnScreen) { setCabins((x) => (x.features.length ? { type: "FeatureCollection", features: [] } : x)); return; }
+    const tick = () => setCabins({ type: "FeatureCollection", features: simulatedCabins(transit, cableId, nowMs()).map((cb) => ({ type: "Feature", properties: { from: cb.lastIndex, rot: cb.bearing }, geometry: { type: "Point", coordinates: [cb.lon, cb.lat] } })) });
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [cableId, active, cableOnScreen]);
+  const onCabin = (from: number) => {
+    if (!cableId) return;
+    Alert.alert("Cabina de TransMiCable", "Es una cabina aproximada según el horario oficial: TransMilenio no envía la ubicación de las cabinas.", [
+      { text: "Cerrar", style: "cancel" },
+      { text: "Voy en esta cabina", onPress: () => { const id = virtualRideId(cableId, 0, from); useRide.getState().set(id, null); router.push({ pathname: "/ride/[id]", params: { id } }); } },
+    ]);
+  };
+
   /** Las estaciones de la troncal dibujadas como en la web: base, pasillo, vagones con puertas y su número. */
   const geo = useMemo(() => (transit.network.stops.size && transit.network.shapes.size ? buildStationGeometry(transit, trunkStations(transit), CORRIDORS) : null), [transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
   const stationGeo = useMemo(() => {
@@ -236,6 +259,9 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       {/* TransMiCable: siempre montado (agregar capas en caliente cierra la app) */}
       <GeoJSONSource id="cable-line" data={cable.lines}>
         <Layer id="cable-line" type="line" {...sp({ lineColor: c.dark ? "#e8e8ed" : "#1c1c1e", lineOpacity: 0.9, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.5, 14, 3, 17, 5], lineDasharray: [2, 1.2], lineCap: "butt", lineJoin: "round" })} />
+      </GeoJSONSource>
+      <GeoJSONSource id="cable-cabins" data={cabins} onPress={(e) => { const f = e.nativeEvent.features[0]?.properties?.from; if (typeof f === "number") onCabin(f); }}>
+        <Layer id="cable-cabin" type="symbol" minzoom={12.5} {...sp({ iconImage: "cabina", iconSize: ["interpolate", ["linear"], ["zoom"], 12.5, 0.14, 15, 0.22, 18, 0.34], iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true, iconOpacity: 0.72 })} />
       </GeoJSONSource>
       <GeoJSONSource id="cable-stations" data={cable.stops} onPress={(e) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onStop?.(id); }}>
         <Layer id="cable-station" type="symbol" minzoom={11} {...sp({ iconImage: "cabina", iconSize: ["interpolate", ["linear"], ["zoom"], 11, 0.2, 14, 0.25, 16, 0.32, 18, 0.45], iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true, textField: ["step", ["zoom"], "", 13, ["get", "name"]], textFont: ["Noto Sans Regular"], textSize: 12, textOffset: [0, 1.8], textAnchor: "top", textOptional: true, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2 })} />
