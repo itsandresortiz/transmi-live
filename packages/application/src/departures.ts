@@ -36,6 +36,17 @@ export class Departures {
     return Number.isFinite(opens) ? { every, opens, closes } : null;
   }
 
+  /** Ventanas de frecuencia de la ruta ese tipo de día: [desde, hasta, cada N s] (segundos del día de servicio). */
+  windowsOf(routeId: string, type: DayType): readonly [number, number, number][] {
+    return Object.values(this.data[routeId] ?? {})[0]?.freq?.[type] ?? [];
+  }
+
+  /** El recorrido de una ruta (su primera variante) con lo que tarda en llegar a cada parada desde que sale (s). */
+  scheduleOf(routeId: string): { stops: readonly string[]; off: readonly number[] } | null {
+    const e = Object.values(this.data[routeId] ?? {})[0];
+    return e ? { stops: e.stops, off: e.off } : null;
+  }
+
   /** Última parada del recorrido (su destino). */
   terminusOf(routeId: string, direction: string): string | undefined { const s = this.data[routeId]?.[direction]?.stops; return s?.[s.length - 1]; }
 

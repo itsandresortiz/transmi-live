@@ -15,6 +15,7 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx --yes tsx tools/osm-calles.ts dist-osm
+      - run: npx --yes tsx tools/osm-cable.ts dist-osm
       - name: Publicar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

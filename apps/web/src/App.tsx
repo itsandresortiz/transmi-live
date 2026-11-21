@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
-import { type SignalRow, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
+import { type SignalRow, simulatedCabins, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, networkSource, transit } from "./composition-root";
 import { nowMs, nowSec } from "./clock";
@@ -229,6 +229,22 @@ export function App() {
     });
   }, [ui.layers.signals]);
   useEffect(() => { br.current?.refresh(); }, [ui.colorMode, ui.motion, ui.system, ui.tab, ui.routeId, ui.stopRoute]);
+  // TransMiCable: cabinas simuladas según el horario oficial (no hay datos en vivo del cable); solo si el cable se ve en pantalla
+  useEffect(() => {
+    const cable = [...transit.network.routes.values()].find((r) => r.system === "cable");
+    if (!cable) return;
+    const shape = transit.network.shapes.get(cable.id)?.[0];
+    let shown = false;
+    const tick = () => {
+      const m = mc.current;
+      if (!m || document.hidden) return;
+      if (!m.cabinsVisible()) { if (shown) { m.setCabins({ type: "FeatureCollection", features: [] }); shown = false; } return; }
+      shown = true;
+      m.setCabins({ type: "FeatureCollection", features: simulatedCabins(transit, cable.id, nowMs()).map((c) => ({ type: "Feature", properties: { id: shape?.stopIds[c.lastIndex + 1] ?? "", rot: c.bearing }, geometry: { type: "Point", coordinates: [c.lon, c.lat] } })) });
+    };
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [net]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { br.current?.setFollow(ui.followId); }, [ui.followId]);
   useEffect(() => { br.current?.setFollowPaused(ui.followPaused); }, [ui.followPaused]);
   useEffect(() => {

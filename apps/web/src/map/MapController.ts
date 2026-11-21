@@ -131,7 +131,7 @@ export class MapController {
     this.src("route-sel"); this.src("route-stops"); this.src("alert-stops"); this.src("alert-lines"); this.src("signal-live"); this.src("buses"); this.src("stop-focus"); this.src("station-bases"); this.src("station-links"); this.src("station-capsules"); this.src("station-doors"); this.src("station-labels"); this.src("station-chips"); this.src("semaforos"); this.src("trafico"); this.src("network-portal"); this.src("trip-lines"); this.src("trip-pts");
     if (!m.hasImage("semaforo")) m.addImage("semaforo", trafficLightImage(), { pixelRatio: 2 });
     if (!m.hasImage("cabina")) m.addImage("cabina", cableCabinImage(3), { pixelRatio: 3 });
-    this.src("cable-line"); this.src("cable-stations");
+    this.src("cable-line"); this.src("cable-stations"); this.src("cable-cabins");
 
     const lineLayout = { "line-cap": "round", "line-join": "round" } as const;
     m.addLayer({
@@ -235,6 +235,10 @@ export class MapController {
       id: "semaforos-icons", type: "symbol", source: "semaforos", minzoom: 15.4,
       layout: { "icon-image": "semaforo", "icon-size": ["interpolate", ["linear"], ["zoom"], 15.4, 0.55, 18, 0.95], "icon-allow-overlap": true, "icon-ignore-placement": true },
     });
+    // cabinas SIMULADAS según el horario (TransMilenio no envía su ubicación): más suaves que los buses para no pasar por reales
+    m.addLayer({ id: "cable-cabins", type: "symbol", source: "cable-cabins", minzoom: 12.5,
+      layout: { "icon-image": "cabina", "icon-size": ["interpolate", ["linear"], ["zoom"], 12.5, 0.45, 15, 0.75, 18, 1.1], "icon-rotate": ["get", "rot"], "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true },
+      paint: { "icon-opacity": 0.72 } });
     m.addLayer({ id: "cable-stations", type: "symbol", source: "cable-stations", minzoom: 11,
       layout: { "icon-image": "cabina", "icon-size": ["interpolate", ["linear"], ["zoom"], 11, 0.6, 15, 1, 18, 1.4], "icon-allow-overlap": true,
         "icon-rotate": ["get", "rot"], "icon-rotation-alignment": "map",
@@ -313,7 +317,7 @@ export class MapController {
     const pick = (pt: { x: number; y: number }): Hit | null => {
       const bus = this.busHit?.(pt);
       if (bus) return { kind: "bus", id: bus };
-      const layers = [...sidedIds("route-stops"), "station-capsule-fill", "station-base-fill", ...sidedIds("stops-circles"), "estaciones-circles", "cable-stations", "bus-dots", "bus-dots-minor"].filter((l) => m.getLayer(l));      // cable-stations: tocar una estación del cable abre su ficha
+      const layers = [...sidedIds("route-stops"), "station-capsule-fill", "station-base-fill", ...sidedIds("stops-circles"), "estaciones-circles", "cable-stations", "cable-cabins", "bus-dots", "bus-dots-minor"].filter((l) => m.getLayer(l));      // cable-stations: tocar una estación del cable abre su ficha
       const feats = m.queryRenderedFeatures([[pt.x - TOUCH_PAD, pt.y - TOUCH_PAD], [pt.x + TOUCH_PAD, pt.y + TOUCH_PAD]], { layers });
       let best: Hit | null = null, bd = Infinity;
       for (const f of feats) {
@@ -514,6 +518,14 @@ export class MapController {
     };
     (this.map.getSource("station-capsules") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: g.capsules.features.map(mark) });
     (this.map.getSource("station-labels") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: g.labels.features.map(mark) });
+  }
+
+  /** Cabinas del cable simuladas según el horario (las pone App cada medio segundo). */
+  setCabins(data: FeatureCollection<Point>) { (this.map.getSource("cable-cabins") as GeoJSONSource | undefined)?.setData(data); }
+  /** ¿Se ve el cable en pantalla con zoom suficiente? (para no calcular cabinas que nadie ve) */
+  cabinsVisible(): boolean {
+    const z = this.map.getZoom(); if (z < 12.5) return false;
+    const b = this.map.getBounds(); return b.getWest() < -74.135 && b.getEast() > -74.165 && b.getSouth() < 4.572 && b.getNorth() > 4.547;
   }
 
   setBuses(data: FeatureCollection<Point>) { (this.map.getSource("buses") as GeoJSONSource | undefined)?.setData(data); }
