@@ -35,10 +35,11 @@ fi
 PASS="$(security find-generic-password -a "$USER" -s "$ITEM" -w 2>/dev/null || true)"
 [ -n "$PASS" ] || { echo "No encuentro en el Llavero la clave de la llave de subida («$ITEM»). Avísale a Claude."; exit 1; }
 export TM_UPLOAD_STORE="$STORE" TM_UPLOAD_ALIAS="$ALIAS" TM_UPLOAD_PASS="$PASS"
-# número de compilación: año, mes, día, hora y décima de hora (cambia cada 6 minutos, así dos compilaciones en la misma hora no chocan;
-# Google Play rechaza un número ya usado). Tiene 9 cifras: siempre es mayor que los de 8 cifras usados antes (año-mes-día-hora) y cabe
-# en el máximo de Google (2.100.000.000) hasta el año 2099
-export TM_VERSION_CODE="$(date +%y%m%d%H)$(( 10#$(date +%M) / 6 ))"
+# número de compilación: año, mes, día y un número del 0 al 95 que avanza cada 15 minutos (hora × 4 + cuarto de hora). Así dos
+# compilaciones en la misma hora no chocan (Google Play rechaza un número ya usado) y el número sigue con 8 cifras como los anteriores
+# (año-mes-día-hora): un salto grande (p. ej. a 9 cifras) Google Play lo marca como error por acercarse al máximo permitido
+H=$(( 10#$(date +%H) )); M=$(( 10#$(date +%M) ))
+export TM_VERSION_CODE="$(date +%y%m%d)$(printf %02d $(( H * 4 + M / 15 )))"
 
 npm install
 npx expo prebuild --platform android --clean --no-install
