@@ -19,7 +19,7 @@ export type Heading = "N" | "E" | "S" | "O" | "?";
 /** Un reporte de un bus que se acerca a un semáforo medido: `t` en segundos (hora del reporte), detenido o no, y hacia dónde iba. */
 export interface BusNearSignal { t: number; still: boolean; h: Heading; /** Rumbo del bus en grados (0 = norte), si se sabe. */ b?: number }
 /** Un bus que estaba detenido cerca del semáforo en `a` y ya avanzaba en `b` (segundos): arrancó entre los dos reportes. */
-export interface BusGo { a: number; b: number; h: Heading }
+export interface BusGo { a: number; b: number; h: Heading; /** Rumbo del bus en grados al arrancar, si se sabe. */ bb?: number }
 
 export type Axis = "NS" | "EO";
 const axisOf = (h: Heading): Axis | null => (h === "N" || h === "S" ? "NS" : h === "E" || h === "O" ? "EO" : null);
@@ -72,7 +72,7 @@ export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, all
   planAt = typeof plan === "function" ? plan : () => plan;
   // solo los reportes de horas en que se sabe qué plan tiene el semáforo (y, si se sabe hacia dónde mira, de buses en ese sentido)
   const dirOk = (o: { h: Heading; b?: number }) => rumbo == null || headsWith(rumbo, o);
-  const obs = allObs.filter((o) => planAt(o.t * 1000) && dirOk(o)), goes = allGoes.filter((g) => planAt(g.a * 1000) && dirOk(g));
+  const obs = allObs.filter((o) => planAt(o.t * 1000) && dirOk(o)), goes = allGoes.filter((g) => planAt(g.a * 1000) && dirOk({ h: g.h, b: g.bb }));      // en un arranque `b` es la hora, no el rumbo
   const model = { cycle: 120_000 };      // para el rango de corrimientos que se prueban (±60 s)
   const byAxis = new Map<Axis, BusNearSignal[]>();
   for (const o of obs) { const a = axisOf(o.h); if (a) (byAxis.get(a) ?? byAxis.set(a, []).get(a)!).push(o); }
@@ -86,8 +86,10 @@ export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, all
   axes.sort((a, b) => b.n - a.n);
   // un eje sin conclusión se toma como el semáforo tal cual (el que se midió es el de ese eje casi siempre)
   const flipOf = new Map(axes.map((a) => [a.axis, rumbo == null && a.inverse === true]));
+  // un eje sin datos (p. ej. arranques por una calle sin reportes) va tal cual: antes `inverse !== undefined` lo daba al revés
+  const flip = (a: Axis | null) => !!(a && flipOf.get(a));
   const used = obs.filter((o) => axisOf(o.h));
-  const score = (shiftMs: number, list = used) => mean(list.map((o) => fits(o.still, colorAt(model, inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000, shiftMs))));
+  const score = (shiftMs: number, list = used) => mean(list.map((o) => fits(o.still, colorAt(model, inverse !== flip(axisOf(o.h)), o.t * 1000, shiftMs))));
   const agree = used.length ? score(0) : null;
   // el corrimiento: solo se dice si las dos mitades de los datos (por hora) señalan el mismo (±6 s) y ambas mejoran claramente. Con
   // cientos de reportes ruidosos, probar 60 corrimientos siempre encuentra uno que «encaja mejor» por azar (medido el 2026-11-17: el mejor
@@ -108,7 +110,7 @@ export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, all
   // la prueba más clara: los buses DETENIDOS junto al semáforo deberían caer en su rojo (o amarillo) mucho más que por azar
   const stillObs = used.filter((o) => o.still);
   const redShare = (inv: boolean, at: number) => { const m = planAt(at)!; let n = 0; for (let t = 0; t < m.cycle; t += 1000) if ((inv ? opposite(m, m.anchor + t) : signalNow(m, m.anchor + t).c) !== "g") n++; return n / (m.cycle / 1000); };
-  const stopped = { n: stillObs.length, red: stillObs.filter((o) => colorAt(model, inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000) !== "g").length, chance: mean(stillObs.map((o) => redShare(inverse !== flipOf.get(axisOf(o.h)!), o.t * 1000))) };
+  const stopped = { n: stillObs.length, red: stillObs.filter((o) => colorAt(model, inverse !== flip(axisOf(o.h)), o.t * 1000) !== "g").length, chance: mean(stillObs.map((o) => redShare(inverse !== flip(axisOf(o.h)), o.t * 1000))) };
   const byHour = new Map<number, BusNearSignal[]>();
   for (const o of used) { const h = bogotaHour(o.t); (byHour.get(h) ?? byHour.set(h, []).get(h)!).push(o); }
   const hours = [...byHour].map(([h, list]) => ({ h, n: list.length, agree: score(0, list) })).sort((a, b) => a.h - b.h);
@@ -119,7 +121,7 @@ export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, all
     const ax = axisOf(g.h);
     if (!ax || g.b - g.a > 60) continue;
     gn++;
-    const inv = inverse !== flipOf.get(ax);
+    const inv = inverse !== flip(ax);
     for (let t = g.a - 10; t <= g.b; t++) {
       if (colorAt(model, inv, t * 1000) !== "g" && colorAt(model, inv, (t + 1) * 1000) === "g") { ok++; break; }
     }

@@ -69,3 +69,12 @@ describe("solo cuentan los buses que van en el sentido del semáforo", () => {
     expect(L.stopped.red).toBe(L.stopped.n);
   });
 });
+
+describe("arranques con rumbo", () => {
+  it("el rumbo de un arranque es `bb` (su `b` es la hora): con rumbo del semáforo se cuentan los que van en ese sentido", () => {
+    const goes: BusGo[] = Array.from({ length: 20 }, (_, i) => { const g = 1_800_000_040 + i * 120 + 2; return { a: g - 8, b: g + 12, h: "S" as const, bb: 125 }; });
+    const L = learnFromBuses(model, false, buses(), goes, 120);
+    expect(L.goes.n).toBe(20);
+    expect(L.goes.ok).toBe(20);
+  });
+});

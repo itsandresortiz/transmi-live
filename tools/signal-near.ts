@@ -33,9 +33,11 @@ export class SignalNearCollector {
     this.sigs.forEach((s, k) => {
       if (r.trunk !== s.tm) return;
       const d = meters(s.lon, s.lat, r.lon, r.lat), d0 = meters(s.lon, s.lat, p.lon, p.lat);
+      // arranque: estaba detenido junto al semáforo y ahora avanza. Se anota ANTES de mirar si se aleja: con reportes cada ~20 s, el bus
+      // que arrancó casi siempre ya pasó el semáforo en el reporte siguiente (antes se descartaba y en 4 días quedó 1 solo arranque)
+      if (p.still && speed >= GO_MPS && d0 <= NEAR_SIGNAL_M && d <= NEAR_SIGNAL_M + 150) this.goes[k]!.push({ a: p.t, b: r.t, h, bb: b });
       if (d > NEAR_SIGNAL_M || d > d0 + 3) return;      // lejos o alejándose (ya pasó el semáforo: avanza con cualquier color)
       this.obs[k]!.push({ t: r.t, still, h, b });
-      if (p.still && speed >= GO_MPS && d0 <= NEAR_SIGNAL_M) this.goes[k]!.push({ a: p.t, b: r.t, h });
     });
   }
 }
