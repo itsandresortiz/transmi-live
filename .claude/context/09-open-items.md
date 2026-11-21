@@ -102,6 +102,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 8. Optimizar el mapa de la app con una capa nativa para movimiento fluido.
 
 ## Pasos que dependen del dueño
+- Desplegar la función de Supabase con el arreglo de `Object.hasOwn` (2026-11-20, menor: evita consultas inútiles a TransMilenio con nombres como «constructor»).
 - App Store: aprobada el 2026-11-11; falta que el dueño la libere (liberación manual). Antes de promocionarla, resolver la capacidad del proxy de Supabase (ver deuda).
 - Google Play: enviar la versión de producción a revisión («Resumen de publicación»).
 - Desplegar a mano cualquier cambio en `supabase/functions/tm`.

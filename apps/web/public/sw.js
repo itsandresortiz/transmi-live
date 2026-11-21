@@ -1,6 +1,13 @@
 /* TransMi LIVE: guarda la app en el dispositivo para que abra rápido y funcione sin internet.
    Los datos en vivo NO pasan por aquí (la app guarda su propia última copia). */
-const VERSION = "tm-shell-v3";
+const VERSION = "tm-shell-v4";
+/** Cuántos archivos de la app (con huella en el nombre) se guardan como máximo: cada publicación trae nombres nuevos y antes se
+ *  acumulaban sin límite (~0,75 MB por publicación). La versión de hoy tiene menos de 10. */
+const MAX_ASSETS = 24;
+async function prune(cache) {
+  const keys = (await cache.keys()).filter((r) => new URL(r.url).pathname.includes("/assets/"));
+  for (const r of keys.slice(0, Math.max(0, keys.length - MAX_ASSETS))) await cache.delete(r);      // los más viejos primero
+}
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
@@ -37,7 +44,7 @@ self.addEventListener("fetch", (e) => {
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);
     const hit = await cache.match(req);
-    const net = fetch(req).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
+    const net = fetch(req).then((res) => { if (res.ok) void cache.put(req, res.clone()).then(() => prune(cache)).catch(() => undefined); return res; }).catch(() => null);
     return hit || (await net) || Response.error();
   })());
 });

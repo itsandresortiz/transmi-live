@@ -7,7 +7,11 @@ BRANCH="${BRANCH:-live-data}"
 URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 WORK="$(mktemp -d)"
 # conserva lo que ya hay en la rama (p. ej. gtfs-lite.zip) y reemplaza solo los archivos nuevos
-git clone -q --depth 1 --branch "$BRANCH" "$URL" "$WORK" 2>/dev/null || git init -q -b "$BRANCH" "$WORK"
+if ! git clone -q --depth 1 --branch "$BRANCH" "$URL" "$WORK" 2>/dev/null; then
+  # si la rama existe y no se pudo bajar (red, GitHub), NO se sigue: publicar solo estos archivos borraría los demás de la rama
+  if git ls-remote --exit-code --heads "$URL" "$BRANCH" >/dev/null 2>&1 || [ $? -ne 2 ]; then echo "No se pudo bajar la rama $BRANCH: no se publica (para no borrar sus otros archivos)"; exit 1; fi
+  git init -q -b "$BRANCH" "$WORK"
+fi
 cp -f "$SRC"/* "$WORK"/
 cd "$WORK"
 git config user.name "transmi-live-bot"

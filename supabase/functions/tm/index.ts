@@ -127,7 +127,7 @@ async function handler(req: Request): Promise<Response> {
     return json(out);
   }
 
-  if (last in FILES) {
+  if (Object.hasOwn(FILES, last))      /* `in` aceptaba nombres heredados como «constructor» */ {
     try {
       const e = await load(last);
       const headers: Record<string, string> = {

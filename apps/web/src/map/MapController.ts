@@ -362,6 +362,12 @@ export class MapController {
     m.setPaintProperty("troncales-lines", "line-color", lineMatch(t, t.troncal));
     m.setPaintProperty("localidad-names", "text-color", t.label);
     m.setPaintProperty("localidad-names", "text-halo-color", t.halo);
+    // capas que antes no cambiaban de color al pasar de claro a oscuro con la app abierta (tramo a pie, nombres del viaje, semáforos)
+    m.setPaintProperty("trip-walk", "line-color", t.label);
+    m.setPaintProperty("trip-labels", "text-color", t.labelStrong);
+    m.setPaintProperty("trip-labels", "text-halo-color", t.halo);
+    m.setPaintProperty("semaforos-labels", "text-color", t.label);
+    m.setPaintProperty("semaforos-labels", "text-halo-color", t.halo);
     m.setPaintProperty("estaciones-circles", "circle-color", t.surface);
     m.setPaintProperty("estaciones-circles", "circle-stroke-color", lineMatch(t, t.troncal));
     m.setPaintProperty("estaciones-labels", "text-color", lineMatch(t, t.troncal));

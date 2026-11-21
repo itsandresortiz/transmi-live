@@ -25,7 +25,7 @@ for i in $(seq 1 "$N"); do
     # los archivos que publica el proceso diario (rutas y red) no son de este bucle: se toman siempre de lo que hay publicado,
     # para no pisarlos con la copia vieja que se bajó al empezar
     if git fetch -q --depth 1 "$URL" live-data 2>/dev/null; then
-      for keep in gtfs-lite.zip network.json.gz; do git cat-file -e "FETCH_HEAD:$keep" 2>/dev/null && git show "FETCH_HEAD:$keep" > "$W/$keep"; done
+      for keep in gtfs-lite.zip network.json.gz network2.json.gz hop-profile.json.gz; do git cat-file -e "FETCH_HEAD:$keep" 2>/dev/null && git show "FETCH_HEAD:$keep" > "$W/$keep"; done
     fi
     git checkout -q --orphan "s$i"
     git add -A

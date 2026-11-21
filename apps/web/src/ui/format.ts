@@ -1,6 +1,6 @@
 import { type Delay, delayLabel } from "@transmi/domain";
 
-export const clock = (sec: number) => new Date(sec * 1000).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+export const clock = (sec: number) => new Date(sec * 1000).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "America/Bogota" })      // hora de Bogotá aunque el aparato esté en otra zona;
 export function ago(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;

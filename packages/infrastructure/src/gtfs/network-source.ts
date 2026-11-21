@@ -32,7 +32,8 @@ export class GtfsLiteNetworkSource implements NetworkSourcePort {
         e.data.ok ? resolve(e.data.dto!) : reject(new Error(e.data.error));
       };
       w.onerror = () => { w.terminate(); parseGtfsLite(buf).then(resolve, reject); };
-      w.postMessage(buf, [buf]);
+      // sin transferir el archivo: si el lector aparte falla, `buf` sigue entero para leerlo aquí (transferido quedaba vacío y fallaba)
+      w.postMessage(buf);
     });
   }
 }

@@ -45,7 +45,13 @@ type Stats = Record<string, Acc>;                      // "lon,lat|tipoDía|fran
 
 function clone(branch: string): string | null {
   const dir = mkdtempSync(join(tmpdir(), "ss-"));
-  try { execFileSync("git", ["clone", "-q", "--depth", "1", "--branch", branch, url, dir], { stdio: "pipe" }); return dir; } catch { return null; }
+  try { execFileSync("git", ["clone", "-q", "--depth", "1", "--branch", branch, url, dir], { stdio: "pipe" }); return dir; } catch { /* abajo se mira por qué */ }
+  // si la rama SÍ existe y el clon falló (red, GitHub con problemas), se detiene todo: seguir sería publicar solo lo de esta corrida y
+  // borrar días de datos acumulados (antes pasaba). Solo una rama que no existe todavía se toma como «empezar de cero»
+  let exists = true;
+  try { execFileSync("git", ["ls-remote", "--exit-code", "--heads", url, branch], { stdio: "pipe" }); } catch (e) { exists = (e as { status?: number }).status !== 2; }
+  if (exists) throw new Error(`no se pudo bajar la rama ${branch} (existe): no se publica para no borrar lo acumulado`);
+  return null;
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const grid = new Map<string, number[]>();             // índice espacial de semáforos

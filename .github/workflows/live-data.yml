@@ -38,9 +38,11 @@ jobs:
           # la red del día (GTFS, cierres temporales de vagones) se arma a las 4:30 a. m., pero el horario de GitHub la retrasa hasta 10 h:
           # si pasadas las 4:30 de Bogotá aún no ha corrido hoy, se lanza aquí
           HOY=$(TZ=America/Bogota date +%F); HORA=$(TZ=America/Bogota date +%H%M)
-          ULT=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow gtfs-daily.yml --limit 1 --json createdAt --jq '.[0].createdAt' 2>/dev/null || echo "")
+          # cuenta solo la última corrida que TERMINÓ BIEN (si la de hoy falló, se reintenta) y no se lanza si ya hay una en curso
+          ULT=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow gtfs-daily.yml --status success --limit 1 --json createdAt --jq '.[0].createdAt' 2>/dev/null || echo "")
           ULTD=$( [ -n "$ULT" ] && TZ=America/Bogota date -d "$ULT" +%F || echo "")
-          if [ "$HORA" -ge 0430 ] && [ "$ULTD" != "$HOY" ]; then echo "GTFS diario aún no corre hoy ($ULTD): se lanza"; gh workflow run gtfs-daily.yml --repo "$GITHUB_REPOSITORY" --ref main || true; fi
+          G=$( (gh run list --repo "$GITHUB_REPOSITORY" --workflow gtfs-daily.yml --status in_progress --json databaseId --jq length; gh run list --repo "$GITHUB_REPOSITORY" --workflow gtfs-daily.yml --status queued --json databaseId --jq length) 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo 1)
+          if [ "$HORA" -ge 0430 ] && [ "$ULTD" != "$HOY" ] && [ "${G:-1}" = "0" ]; then echo "GTFS diario aún no corre hoy ($ULTD): se lanza"; gh workflow run gtfs-daily.yml --repo "$GITHUB_REPOSITORY" --ref main || true; fi
       - name: Relanzar para seguir sin pausa
         if: always()
         env:
