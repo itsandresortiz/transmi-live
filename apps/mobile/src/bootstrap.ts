@@ -21,33 +21,36 @@ const POLL_MS = 10_000;
 export function startData(): () => void {
   if (started) return () => undefined;
   started = true;
-  const hour = Math.floor(Date.now() / 3_600_000);
+  const hourNow = () => Math.floor(Date.now() / 3_600_000);
 
   // rutas y horarios: si no cargan (primera apertura sin señal y sin copia guardada), se reintenta con espera creciente y al volver a la app,
   // hasta que lleguen; antes se intentaba una sola vez y la app quedaba en «Cargando rutas…» hasta cerrarla
-  let haveNet = false, haveEnds = false, haveDeps = false, loading = false, wait = 15_000, retry: ReturnType<typeof setTimeout> | undefined;
+  let haveNet = false, haveEnds = false, haveDeps = false, loading = false, wait = 15_000, retry: ReturnType<typeof setTimeout> | undefined, loadedAt = 0;
   const loadStatic = async () => {
     if (loading || (haveNet && haveEnds && haveDeps)) return;
     loading = true; clearTimeout(retry);
     await Promise.all([
       haveNet ? null : networkSource.load().then((n) => { transit.setNetwork(n); haveNet = true; }).catch(() => undefined),
-      haveEnds ? null : gz<Parameters<typeof transit.setServiceEnds>[0]>(`${CONFIG.scheduleBase}service-ends.json.gz?t=${hour}`, "service-ends.json.gz").then((d) => { if (d) { transit.setServiceEnds(d); haveEnds = true; } }),
-      haveDeps ? null : gz<Parameters<typeof transit.setDepartures>[0]>(`${CONFIG.scheduleBase}departures.json.gz?t=${hour}`, "departures.json.gz").then((d) => { if (d) { transit.setDepartures(d); haveDeps = true; } }),
+      haveEnds ? null : gz<Parameters<typeof transit.setServiceEnds>[0]>(`${CONFIG.scheduleBase}service-ends.json.gz?t=${hourNow()}`, "service-ends.json.gz").then((d) => { if (d) { transit.setServiceEnds(d); haveEnds = true; } }),
+      haveDeps ? null : gz<Parameters<typeof transit.setDepartures>[0]>(`${CONFIG.scheduleBase}departures.json.gz?t=${hourNow()}`, "departures.json.gz").then((d) => { if (d) { transit.setDepartures(d); haveDeps = true; } }),
     ]);
     loading = false;
+    if (haveNet && haveEnds && haveDeps) loadedAt = Date.now();
     if (!(haveNet && haveEnds && haveDeps) && started) { retry = setTimeout(() => void loadStatic(), wait); wait = Math.min(wait * 2, 5 * 60_000); }
   };
   void loadStatic();
   // tiempos reales por tramo (~0,5 MB): opcionales y sin apuro; se leen unos segundos después para no frenar la apertura
-  const hops = setTimeout(() => {
-    void gz<unknown>(`${CONFIG.hopBase}profile.json.gz?t=${hour}`, "hop-profile.json.gz").then((d) => { if (d) transit.hopProfile.load(d); });
-  }, 4000);
+  const loadHops = () => void gz<unknown>(`${CONFIG.hopBase}profile.json.gz?t=${hourNow()}`, "hop-profile.json.gz").then((d) => { if (d) transit.hopProfile.load(d); });
+  const hops = setTimeout(loadHops, 4000);
+  // iOS puede tener la app suspendida días: al volver a ella tras más de 12 h se cargan de nuevo la red del día (con sus cierres temporales),
+  // los horarios y los tiempos aprendidos (antes solo se leían al abrirla de cero y, p. ej., un cierre ya vencido seguía en «Cómo llegar»)
+  const refreshIfOld = () => { if (loadedAt && Date.now() - loadedAt > 12 * 3_600_000) { haveNet = haveEnds = haveDeps = false; loadedAt = 0; void loadStatic(); loadHops(); } };
 
   const poll = () => { if (AppState.currentState === "active" && !isDemo()) void liveData.refresh().catch(() => undefined); };      // en demostración no se piden datos reales (se mezclarían)
   poll();
   const timer = setInterval(poll, POLL_MS);
   void refreshMessages();
   const msgTimer = setInterval(() => { if (AppState.currentState === "active") void refreshMessages(); }, 120_000);
-  const sub = AppState.addEventListener("change", (s) => { if (s !== "active") return; void loadStatic(); void refreshMessages(); if (!isDemo()) void liveData.refresh(true).catch(() => undefined); });
+  const sub = AppState.addEventListener("change", (s) => { if (s !== "active") return; refreshIfOld(); void loadStatic(); void refreshMessages(); if (!isDemo()) void liveData.refresh(true).catch(() => undefined); });
   return () => { clearTimeout(hops); clearInterval(timer); clearInterval(msgTimer); clearTimeout(retry); sub.remove(); started = false; };
 }

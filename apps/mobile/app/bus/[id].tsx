@@ -56,7 +56,13 @@ export default function BusSheet() {
         <Text style={[type.title, { color: c.text }]}>{ns?.stop ? stopText(ns.stop) : "—"}</Text>
         {ns?.arrivalAt ? <Text style={[type.body, { color: c.muted }]}>{untilText(ns.arrivalAt, now)}</Text> : null}
       </Card>
-      <PrimaryButton label="Voy en este bus" a11y="Voy en este bus: ver sus próximas paradas y tiempos" onPress={() => router.replace({ pathname: "/ride/[id]", params: { id } })} />
+      <PrimaryButton label="Voy en este bus" a11y="Voy en este bus: ver sus próximas paradas y tiempos" onPress={() => {
+        // queda registrado que vas en este bus (pantalla de bloqueo / aviso fijo con la próxima parada, «Vas en este bus» en el mapa); antes
+        // solo abría la pantalla del viaje. Si ya ibas en otro bus, ese viaje se reemplaza
+        const r = useRide.getState();
+        if (r.busId !== id) r.set(id, null);
+        router.replace({ pathname: "/ride/[id]", params: { id } });
+      }} />
       {r ? <PrimaryButton tone="ink" label="Ver la ruta" onPress={() => router.replace({ pathname: "/route/[id]", params: { id: r.id } })} /> : null}
       <Tap onPress={() => reportProblem({ what: `bus ${v.plate || v.label || v.id} (ruta ${r?.shortName ?? v.routeId})` })} accessibilityRole="button" accessibilityLabel="Reportar un problema con este bus" style={{ alignSelf: "center", marginTop: space[2] }}>
         <Text style={[type.caption, { color: c.muted, fontSize: 14 }]}>Reportar un problema con este bus</Text>

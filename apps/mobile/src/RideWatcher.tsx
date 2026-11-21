@@ -27,7 +27,7 @@ let lastAlight: string | null = null;
 
 /** Vigila el viaje en curso mientras la app esté abierta: mantiene la pantalla encendida, vibra y reprograma los avisos con la hora más reciente de llegada. */
 export function RideWatcher() {
-  const busId = useRide((s) => s.busId), alightId = useRide((s) => s.alightId);
+  const busId = useRide((s) => s.busId), alightId = useRide((s) => s.alightId), hydrated = useRide((s) => s.hydrated);
 
   // vas en un bus pero aún no marcaste dónde te bajas: igual se muestra en la pantalla de bloqueo y la isla dinámica (iPhone) o como
   // notificación fija (Android), con la próxima parada y cuánto falta para llegar a ella
@@ -44,7 +44,8 @@ export function RideWatcher() {
       const key = `${next.stopId}|${Math.round(next.arrivalAt / 20)}`;
       if (key === shown) return;
       shown = key;
-      void showTripActivity(name, {
+      // sin destino («Hacia …»): la próxima parada cambia a cada rato y va en el texto (como destino, iPhone se quedaba con la primera)
+      void showTripActivity("", {
         title: `Vas en el ${route?.shortName ?? "bus"}`, detail: `Próxima parada: ${name}. Marca dónde te bajas para que te avisemos.`,
         badge: route?.shortName ?? "", color: SYSTEM_COLOR[v.system], until: next.arrivalAt, untilLabel: "Próxima parada",
         step: 0, steps: 0, arrive: next.arrivalAt, link: `transmilive:///ride/${busId}`,
@@ -56,34 +57,14 @@ export function RideWatcher() {
   }, [busId, alightId]);
 
   useEffect(() => {
-    if (!busId || !alightId) { void cancelAlerts(); if (!busId && !useTrip.getState().it) void endTripActivity(); return; }
-    let warned = 99, shown = "", seen = false, missingSince = 0, doubt = 0, asked = false;
+    // antes de leer el viaje guardado, «sin viaje» no quiere decir que terminó: no se le cancelan los avisos
+    if (!busId || !alightId) { if (hydrated) { void cancelAlerts(); if (!busId && !useTrip.getState().it) void endTripActivity(); } return; }
+    let warned = 99, shown = "", seen = false, missingSince = 0, doubt = 0, asked = false, notYet = 0;
     // si se cambió la parada de bajada, los avisos de la anterior ya no sirven
     if (lastAlight && lastAlight !== alightId) void cancelAlerts();
     lastAlight = alightId;
     void activateKeepAwakeAsync(TAG).catch(() => undefined);
     const finish = () => { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); clearRideSnap(); useRide.getState().clear(); };
-
-    // tu ubicación (solo con la app abierta y si ya diste el permiso): mientras vas en el bus, el bus se dibuja donde vas tú y las paradas
-    // y avisos se cuentan desde ahí. No sale del teléfono ni se guarda.
-    let sub: Location.LocationSubscription | undefined, gone = false, prevFix: PhoneFix | null = null;
-    void (async () => {
-      const perm = await Location.getForegroundPermissionsAsync().catch(() => null);
-      if (gone || !perm?.granted) return;
-      sub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 5 }, (p) => {
-        const now = nowMs(), fix: PhoneFix = { lat: p.coords.latitude, lon: p.coords.longitude, at: now, accuracy: p.coords.accuracy, speed: p.coords.speed };
-        if (isVirtualRide(busId)) {
-          // sin bus en los datos: solo se mira que vayas sobre el recorrido (desde la parada en que vienes)
-          const vp = virtualParts(busId), seq = vp ? rideSequence(rideVehicle(busId, now)!) : undefined;
-          if (vp && seq) setRideCheck(busId, vp.shape, seq.index, checkOnShape(transit, vp.shape, seq.index, fix, now, prevFix), now);
-        } else {
-          const v = transit.fleet.get(busId), seq = v ? transit.sequenceForDisplay(v) : undefined;
-          if (v && seq) setRideCheck(busId, seq.shape, seq.index, checkRide(transit, v, seq.shape, seq.index, fix, now, prevFix), now);
-        }
-        prevFix = fix;
-      }).catch(() => undefined);
-      if (gone) sub?.remove();
-    })();
 
     /** Si el teléfono va en movimiento y lejos del bus un buen rato, se pregunta una vez: puede haber marcado otro bus, o ya se bajó. */
     const doubtCheck = (route: string, plate: string, routeId: string) => {
@@ -111,12 +92,15 @@ export function RideWatcher() {
       const v = rideVehicle(busId), target = transit.stopById(alightId);
       const seq = v ? rideSequence(v) : undefined;
       // el bus dejó de reportar (y otros sí): tras un rato se da por terminado, para no dejar la pantalla encendida y el aviso fijo para siempre
-      if (!v) { if (transit.fleet.size > 0) { missingSince ||= Date.now(); if (seen && Date.now() - missingSince > GONE_MS) finish(); } return; }
+      // (un viaje recuperado de un aviso viejo o de lo guardado, cuyo bus ya no aparece: se termina al minuto, no a los 10)
+      if (!v) { if (transit.fleet.size > 0) { missingSince ||= Date.now(); if (Date.now() - missingSince > (seen ? GONE_MS : 60_000)) finish(); } return; }
       missingSince = 0;
       if (!seq || !target) return;
       const ti = seq.shape.stopIds.indexOf(alightId, Math.max(0, seq.index));
       // ya pasó tu parada (p. ej. la app estaba cerrada cuando llegó): el viaje terminó
-      if (ti < 0) { if (seen) finish(); return; }
+      // (también si nunca se vio antes de la parada: un viaje recuperado de un aviso viejo, tras 3 vueltas seguidas para no cortar por un dato raro)
+      if (ti < 0) { if (seen || ++notYet >= 3) finish(); return; }
+      notYet = 0;
       seen = true;
       const now = nowMs();
       // si vas en el bus y el GPS lo confirma, lo que falta se cuenta desde donde vas tú (el reporte del bus llega ~1 min tarde)
@@ -155,8 +139,36 @@ export function RideWatcher() {
     };
     tick();
     const timer = setInterval(() => { if (AppState.currentState === "active") tick(); }, EVERY_MS);
-    return () => { gone = true; sub?.remove(); clearRideSnap(); clearInterval(timer); void deactivateKeepAwake(TAG).catch(() => undefined); };
-  }, [busId, alightId]);
+    return () => { clearInterval(timer); void deactivateKeepAwake(TAG).catch(() => undefined); };
+  }, [busId, alightId, hydrated]);
+
+  // tu ubicación mientras vas en un bus, hayas marcado o no dónde te bajas: sin esto, en un viaje con GPS («¿En qué bus vas?») sin parada
+  // de bajada el bus se quedaba quieto en la parada de subida y la cuenta de la próxima parada no llegaba nunca a cero
+  useEffect(() => {
+    if (!busId) return;
+    // tu ubicación (solo con la app abierta y si ya diste el permiso): mientras vas en el bus, el bus se dibuja donde vas tú y las paradas
+    // y avisos se cuentan desde ahí. No sale del teléfono ni se guarda.
+    let sub: Location.LocationSubscription | undefined, gone = false, prevFix: PhoneFix | null = null;
+    void (async () => {
+      const perm = await Location.getForegroundPermissionsAsync().catch(() => null);
+      if (gone || !perm?.granted) return;
+      sub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 5 }, (p) => {
+        const now = nowMs(), fix: PhoneFix = { lat: p.coords.latitude, lon: p.coords.longitude, at: now, accuracy: p.coords.accuracy, speed: p.coords.speed };
+        if (isVirtualRide(busId)) {
+          // sin bus en los datos: solo se mira que vayas sobre el recorrido (desde la parada en que vienes)
+          const vp = virtualParts(busId), seq = vp ? rideSequence(rideVehicle(busId, now)!) : undefined;
+          if (vp && seq) setRideCheck(busId, vp.shape, seq.index, checkOnShape(transit, vp.shape, seq.index, fix, now, prevFix), now);
+        } else {
+          const v = transit.fleet.get(busId), seq = v ? transit.sequenceForDisplay(v) : undefined;
+          if (v && seq) setRideCheck(busId, seq.shape, seq.index, checkRide(transit, v, seq.shape, seq.index, fix, now, prevFix), now);
+        }
+        prevFix = fix;
+      }).catch(() => undefined);
+      if (gone) sub?.remove();
+    })();
+
+    return () => { gone = true; sub?.remove(); clearRideSnap(); };
+  }, [busId]);
 
   // tocar un aviso abre ese viaje (para ver cuánto falta o quitar el aviso); si la app se había cerrado, se recupera dónde te bajas
   const path = usePathname(), pathRef = useRef(path);
@@ -167,7 +179,8 @@ export function RideWatcher() {
     const openTrip = () => { if (pathRef.current !== "/trip") setTimeout(() => router.push("/trip"), 150); };
     return onAlertTap((d) => {
       const ride = useRide.getState();
-      if (!ride.busId) ride.set(d.busId, d.alightId, d.total);
+      // solo se recupera el viaje si el aviso es reciente: tocar horas después un «Bájate aquí» viejo revivía un viaje terminado
+      if (!ride.busId && Date.now() - d.firedAt < 15 * 60_000) ride.set(d.busId, d.alightId, d.total);
       if (pathRef.current !== `/ride/${d.busId}`) setTimeout(() => router.push({ pathname: "/ride/[id]", params: { id: d.busId } }), 150);
     }, openTrip);
   }, [launched]);

@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import { clockOffsetMs } from "./clock";
 
 /** Avisos del viaje («prepárate», «bájate aquí»). Son notificaciones locales del teléfono: no pasan por ningún servidor ni se envía nada. */
 Notifications.setNotificationHandler({
@@ -17,9 +18,16 @@ export type RideAlert = (typeof IDS)[number];
 
 /** Lo que cada aviso lleva consigo para que, al tocarlo, la app abra ese viaje (y lo recupere si la app se había cerrado). */
 export interface RideData { busId: string; alightId: string; total: number }
+/** Hora de un aviso en el reloj del TELÉFONO (ms). Las horas de llegada vienen en hora del servidor de datos (`nowMs` = reloj del
+ *  teléfono + desfase); el teléfono programa con su propio reloj: con el teléfono 90 s atrasado, «Bájate aquí» sonaba 70 s tarde. */
+const deviceMs = (atSec: number) => atSec * 1000 - clockOffsetMs();
+/** Un aviso cuya hora (recalculada) ya pasó hace poco y que aún no sonó: suena ya en vez de perderse (antes se cancelaba). Si pasó hace
+ *  más de esto, ya no sirve. */
+const LATE_OK_MS = 120_000;
+const whenToRing = (atSec: number): number | null => { const w = deviceMs(atSec), now = Date.now(); return w >= now + 2000 ? w : w > now - LATE_OK_MS ? now + 1500 : null; };
 
 /** Llama a `open` cuando la persona toca un aviso del viaje, también si con ese toque se abrió la app. Devuelve cómo dejar de escuchar. */
-export function onAlertTap(open: (d: RideData) => void, openTrip?: () => void): () => void {
+export function onAlertTap(open: (d: RideData & { /** Cuándo sonó el aviso (ms). */ firedAt: number }) => void, openTrip?: () => void): () => void {
   let last = "";
   const handle = (r: Notifications.NotificationResponse | null) => {
     const req = r?.notification.request, d = req?.content.data as (Partial<RideData> & { trip?: boolean }) | undefined;
@@ -29,7 +37,7 @@ export function onAlertTap(open: (d: RideData) => void, openTrip?: () => void): 
     if (d.trip === true) { last = key; openTrip?.(); return; }
     if (typeof d.busId !== "string" || typeof d.alightId !== "string") return;
     last = key;
-    open({ busId: d.busId, alightId: d.alightId, total: typeof d.total === "number" ? d.total : 0 });
+    open({ busId: d.busId, alightId: d.alightId, total: typeof d.total === "number" ? d.total : 0, firedAt: r!.notification.date });
   };
   try {
     void Notifications.getLastNotificationResponseAsync().then(handle).catch(() => undefined);
@@ -53,13 +61,13 @@ export async function allowAlerts(): Promise<boolean> {
  *  Sin esto, «Bájate aquí» sonaba varias veces: cada dato nuevo del bus corre la hora estimada un poco más tarde y el aviso se reprogramaba
  *  después de haber sonado. Se borra al empezar o terminar un viaje. */
 const programmed = new Map<string, number>();
-const alreadyRang = (id: string) => { const t = programmed.get(id); return t != null && t <= Date.now(); };
+const alreadyRang = (id: string) => { const t = programmed.get(id); return t != null && t <= Date.now(); };      // `programmed` va en el reloj del teléfono
 
 export async function schedule(id: RideAlert, at: number, title: string, body: string, data: RideData): Promise<void> {
   try {
-    const when = at * 1000;
     if (alreadyRang(id)) return;
-    if (when < Date.now() + 2000) { await Notifications.cancelScheduledNotificationAsync(id); return; }
+    const when = whenToRing(at);
+    if (when == null) { await Notifications.cancelScheduledNotificationAsync(id); return; }
     programmed.set(id, when);
     await Notifications.scheduleNotificationAsync({
       identifier: id,
@@ -83,13 +91,14 @@ export async function scheduleTrip(alerts: readonly { id: string; at: number; ti
     if (!alerts.length) for (const k of [...programmed.keys()]) if (k.startsWith(TRIP)) programmed.delete(k);      // el viaje terminó
     for (const a of alerts) {
       if (alreadyRang(TRIP + a.id)) continue;            // ya sonó: no se repite aunque la hora estimada se haya corrido
-      if (a.at * 1000 < Date.now() + 2000) continue;
+      const when = whenToRing(a.at);
+      if (when == null) continue;
       keep.add(TRIP + a.id);
-      programmed.set(TRIP + a.id, a.at * 1000);
+      programmed.set(TRIP + a.id, when);
       await Notifications.scheduleNotificationAsync({
         identifier: TRIP + a.id,
         content: { title: a.title, body: a.body, data: { trip: true }, sound: true, interruptionLevel: "timeSensitive" },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(a.at * 1000), channelId: CHANNEL },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(when), channelId: CHANNEL },
       });
     }
     const all = await Notifications.getAllScheduledNotificationsAsync();
@@ -104,8 +113,9 @@ const COMING = "coming";
 export async function scheduleComing(at: number, title: string, body: string, stopId: string, routeId: string): Promise<void> {
   try {
     if (alreadyRang(COMING)) return;
-    const when = at * 1000;
-    if (when < Date.now() + 2000) return;
+    // si la hora nueva ya llegó, suena ya (antes se dejaba el aviso viejo, que sonaba tarde diciendo «en unos 5 min»)
+    const when = whenToRing(at);
+    if (when == null) return;
     programmed.set(COMING, when);
     await Notifications.scheduleNotificationAsync({
       identifier: COMING,

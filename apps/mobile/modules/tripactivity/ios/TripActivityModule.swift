@@ -36,8 +36,14 @@ public class TripActivityModule: Module {
       let stale: Date? = state.arrive > 0 ? Date(timeIntervalSince1970: state.arrive + 1800) : nil
       let content = ActivityContent(state: state, staleDate: stale)
       if let current = Activity<TripActivityAttributes>.activities.first {
-        await current.update(content)
-        return true
+        // el destino («Hacia …») es fijo en una actividad: si cambió (otra parada de bajada, otro viaje) se cierra y se abre una nueva;
+        // antes se quedaba el del primer momento con la hora del destino nuevo
+        let same = current.attributes.dest == dest
+        if same {
+          await current.update(content)
+          return true
+        }
+        await current.end(nil, dismissalPolicy: .immediate)
       }
       do {
         _ = try Activity<TripActivityAttributes>.request(attributes: TripActivityAttributes(dest: dest), content: content, pushType: nil)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,7 +8,7 @@ import { useRide } from "@/ride";
 import { SymbolView } from "@/ui/Symbol";
 import { arrivalAtIndex, rideArrival } from "@transmi/application";
 import { rideSnapOf } from "@/rideSnap";
-import { isVirtualRide, rideSequence, rideVehicle } from "@/virtualRide";
+import { isVirtualRide, rideSequence, rideVehicle, virtualParts } from "@/virtualRide";
 import { SYSTEM_LABEL, routeTitle } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
@@ -44,6 +44,10 @@ export default function Ride() {
   const v = rideVehicle(id);
   const virtual = isVirtualRide(id);
   const r = v ? transit.routeOf(v) : undefined;
+  // la ruta del bus se recuerda: cuando deja de reportar, «Sigo en el bus» abre «¿En qué bus vas?» con esa ruta (antes iba vacía)
+  const lastRoute = useRef<string | null>(null);
+  if (r) lastRoute.current = r.id;
+  const routeForGps = r?.id ?? lastRoute.current ?? (isVirtualRide(id) ? virtualParts(id)?.routeId : undefined) ?? null;
   const seq = v ? rideSequence(v) : undefined;
   const color = v ? SYSTEM_COLOR[v.system] : c.accent;
 
@@ -68,7 +72,7 @@ export default function Ride() {
       <Text style={[type.headline, { color: c.text, marginTop: space[6] }]}>{transit.lastBatchAt == null ? "Cargando el bus…" : "Este bus dejó de reportar"}</Text>
       <Text style={[type.body, { color: c.muted }]}>Puede haber terminado su recorrido. Revisa por la ventana del bus.</Text>
       {/* el aviso de bajada se puede quitar aunque el bus ya no aparezca */}
-      {transit.lastBatchAt != null ? <View style={{ marginTop: space[5] }}><PrimaryButton label="Sigo en el bus: seguirme con mi ubicación" symbol="location.fill" a11y="Sigo en el bus: seguirme con mi ubicación" onPress={() => router.replace({ pathname: "/enbus", params: r ? { route: r.id } : {} })} /></View> : null}
+      {transit.lastBatchAt != null ? <View style={{ marginTop: space[5] }}><PrimaryButton label="Sigo en el bus: seguirme con mi ubicación" symbol="location.fill" a11y="Sigo en el bus: seguirme con mi ubicación" onPress={() => router.replace({ pathname: "/enbus", params: routeForGps ? { route: routeForGps } : {} })} /></View> : null}
       {alightId && transit.lastBatchAt != null ? <View style={{ marginTop: space[3] }}><PrimaryButton tone="ink" label="Quitar el aviso" symbol="bell.slash" a11y="Quitar el aviso de bajada" onPress={() => { setAlightId(null); router.back(); }} /></View> : null}
     </View>
   );
