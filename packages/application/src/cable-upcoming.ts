@@ -1,6 +1,7 @@
 /** Líneas de TransMiCable que todavía NO funcionan (en obra): se dibujan en tono tenue con «Próximamente», nunca como servicio. No están en
  *  el GTFS de TransMilenio; el recorrido y las estaciones salen de OpenStreetMap (© colaboradores de OpenStreetMap, ODbL; `tools/osm-cable.ts`,
- *  2026-11-21, vía 1161227799 «construction=yes»). Cuando TransMilenio la agregue al GTFS, se quita de aquí y sale sola como el otro cable. */
+ *  2026-11-21, vía 1161227799 «construction=yes»). OpenStreetMap también marca en obra Potosí–Portal Sur, pero el dueño confirmó que sus
+ *  obras no han empezado (2026-11-21): no va aquí. Cuando TransMilenio la agregue al GTFS, se quita de aquí y sale sola como el otro cable. */
 export interface UpcomingCable { name: string; note: string; line: readonly [number, number][]; stations: readonly { name: string; lon: number; lat: number }[] }
 
 export const UPCOMING_CABLES: readonly UpcomingCable[] = [
