@@ -22,6 +22,7 @@ import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteAlerts } from "@/ui/RouteAlerts";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { RideScene } from "@/ui/RideScene";
+import { CableScene } from "@/ui/CableScene";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 import { Eta } from "@/ui/Eta";
 
@@ -110,10 +111,11 @@ export default function Ride() {
             </View>
 
             <View style={{ marginHorizontal: -space[5], marginTop: -space[2] }}>
-              <RideScene system={v.system} color={color} moving={!arrived && !silent} width={width} />
+              {v.system === "cable" ? <CableScene moving={!arrived} width={width} /> : <RideScene system={v.system} color={color} moving={!arrived && !silent} width={width} />}
             </View>
 
-            {virtual ? <Card><Text style={[type.headline, { color: c.text }]}>Te seguimos con tu ubicación</Text><Text style={[type.body, { color: c.muted }]}>Este bus no aparece en los datos de TransMilenio en este momento. Mientras tengas la app abierta, el bus va donde vas tú y las paradas se cuentan desde ahí.</Text></Card> : null}
+            {virtual && v.system === "cable" ? <Card><Text style={[type.headline, { color: c.text }]}>Te seguimos con tu ubicación</Text><Text style={[type.body, { color: c.muted }]}>Las cabinas del cable no envían su ubicación: mientras tengas la app abierta, las estaciones y los tiempos se cuentan desde donde vas tú.</Text></Card>
+              : virtual ? <Card><Text style={[type.headline, { color: c.text }]}>Te seguimos con tu ubicación</Text><Text style={[type.body, { color: c.muted }]}>Este bus no aparece en los datos de TransMilenio en este momento. Mientras tengas la app abierta, el bus va donde vas tú y las paradas se cuentan desde ahí.</Text></Card> : null}
             {silent ? <Card><Text style={[type.headline, { color: "#d97706" }]}>Perdimos la señal de este bus</Text><Text style={[type.body, { color: c.muted }]}>Hace {Math.round((now - v.reportedAt) / 60)} min que no reporta. Los tiempos son aproximados.</Text></Card> : null}
 
             <View style={[styles.info, { backgroundColor: c.cardAlt }]}>

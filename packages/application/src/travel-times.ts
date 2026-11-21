@@ -2,7 +2,7 @@ import type { SystemType } from "@transmi/domain";
 import type { TransitState } from "./transit-state";
 
 /** Tiempo típico por parada de cada sistema (medido con lotes reales); es el punto de partida mientras no hay datos propios. */
-export const DEFAULT_SECONDS_PER_STOP: Record<SystemType, number> = { troncal: 58, dual: 58, alimentador: 62, zonal: 50, cable: 240, otro: 55 };
+export const DEFAULT_SECONDS_PER_STOP: Record<SystemType, number> = { troncal: 58, dual: 58, alimentador: 62, zonal: 50, cable: 80, otro: 55 };      // cable: con la distancia da 343/140/186 s entre estaciones, como el horario oficial
 
 type Daypart = "madrugada" | "pico-am" | "valle" | "pico-pm" | "noche";
 /** Franja del día en Bogotá (UTC-5, sin horario de verano). */

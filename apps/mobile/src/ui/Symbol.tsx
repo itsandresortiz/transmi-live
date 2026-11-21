@@ -13,7 +13,7 @@ const ANDROID: Record<string, IonName> = {
   "arrow.triangle.turn.up.right.diamond": "arrow-redo", "arrow.triangle.turn.up.right.diamond.fill": "arrow-redo",
   "arrow.up.arrow.down": "swap-vertical", "arrow.triangle.swap": "swap-horizontal", "arrow.up.left.and.arrow.down.right": "expand", "arrow.up.right": "open-outline",
   bell: "notifications-outline", "bell.fill": "notifications", "bell.badge.fill": "notifications", "bell.slash": "notifications-off",
-  "briefcase.fill": "briefcase", "building.2.fill": "business", bus: "bus", "bus.fill": "bus",
+  "briefcase.fill": "briefcase", "cablecar.fill": "train", "building.2.fill": "business", bus: "bus", "bus.fill": "bus",
   "checkmark.circle.fill": "checkmark-circle", "chevron.down": "chevron-down", "chevron.left": "chevron-back", "chevron.right": "chevron-forward", "chevron.up": "chevron-up",
   "circle.fill": "ellipse", "dot.radiowaves.left.and.right": "radio", "ellipsis.circle": "ellipsis-horizontal-circle",
   "exclamationmark.bubble.fill": "chatbubble-ellipses", "exclamationmark.triangle.fill": "warning", "moon.zzz.fill": "moon", "figure.walk": "walk", "hand.raised.fill": "hand-left",

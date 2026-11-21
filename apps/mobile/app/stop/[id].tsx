@@ -15,6 +15,8 @@ import { useSaved } from "@/favorites";
 import { useMapFocus } from "@/map/focus";
 import { usePlanner } from "@/planner/store";
 import { reportProblem } from "@/report";
+import { virtualRideId } from "@/virtualRide";
+import { useRide } from "@/ride";
 import { Card, Chip, PrimaryButton, RoundButton, Tap } from "@/ui/kit";
 import { useBusWatch } from "@/busWatch";
 import { allowAlerts, cancelComing } from "@/notify";
@@ -57,6 +59,22 @@ export default function StopSheet() {
   const hereCount = new Set(here.map((r) => r.shortName)).size;
   // estación de TransMiCable: sus cabinas no envían ubicación, así que se dice lo del horario oficial (nunca «en vivo»)
   const cable = here.length && here.every((r) => r.system === "cable") ? cableInfo(transit, here[0]!.id, nowMs()) : null;
+  // los dos sentidos del cable desde esta estación: el recorrido sube hasta el Mirador y vuelve; se empieza en su paso de ida o de vuelta
+  const cableTrips = (() => {      // sin `useMemo`: va después de un `return` temprano de esta pantalla (las reglas de React no lo permiten) y es barato
+    if (!cable?.open) return [];
+    const out: { id: string; to: string }[] = [];
+    for (const r of here) (transit.network.shapes.get(r.id) ?? []).forEach((sh, si) => {
+      const last = sh.stopIds.length - 1;
+      // donde se devuelve el cable (arriba, en el Mirador): la parada cuya anterior y siguiente son la misma
+      const apex = sh.stopIds.findIndex((_, k) => k > 0 && k < last && sh.stopIds[k - 1] === sh.stopIds[k + 1]);
+      for (const i of [sh.stopIds.indexOf(id), sh.stopIds.lastIndexOf(id)]) {
+        if (i < 0 || i >= last) continue;
+        const end = apex > 0 && i < apex ? apex : last, to = transit.stopById(sh.stopIds[end])?.name ?? "";
+        if (to && !out.some((o) => o.to === to)) out.push({ id: virtualRideId(r.id, si, i), to });
+      }
+    });
+    return out;
+  })();
   const alerts = alertsFor(transit, new Set(here.map((r) => r.id)), new Set([id])).slice(0, 2);
 
   const showOnMap = (focus: { routeId?: string | null; busIds?: string[]; followBusId?: string | null }) => {
@@ -90,6 +108,8 @@ export default function StopSheet() {
             <Text style={[type.caption, { color: c.muted }]}>TRANSMICABLE · SEGÚN HORARIO</Text>
             <Text style={[type.headline, { color: c.text }]}>{cable.text.replace(" (según horario)", "")}</Text>
             <Text style={[type.caption, { color: c.muted }]}>Portal Tunal · Juan Pablo II · Manitas · Mirador del Paraíso. Las cabinas no envían su ubicación: esto sale del horario oficial de TransMilenio.</Text>
+            {/* «Voy en el cable»: como «Voy en este bus», con tu ubicación (las cabinas no envían la suya). Un botón por sentido */}
+            {cableTrips.map((t) => <PrimaryButton key={t.id} symbol="cablecar.fill" label={`Voy en el cable hacia ${t.to.replace(" · TransMiCable", "")}`} onPress={() => { useRide.getState().set(t.id, null); router.push({ pathname: "/ride/[id]", params: { id: t.id } }); }} />)}
           </Card>
         ) : null}
         <Text style={[type.body, { color: c.muted }]}>
