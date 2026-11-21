@@ -1,4 +1,4 @@
-import { APP_STORE_URL, showsIosApp } from "./AppPromo";
+import { APP_STORE_URL, PLAY_STORE_URL, platform } from "./AppPromo";
 import { CardSection } from "./card";
 import { useEffect, useState } from "react";
 import { SYSTEMS, SYSTEM_LABEL } from "@transmi/domain";
@@ -75,12 +75,11 @@ export function Settings({ th }: { th: MapTheme }) {
               : <p className="hint">En iPhone: toca el botón Compartir y luego «Añadir a pantalla de inicio».</p>}
           </div>
         )}
-        {showsIosApp() && (
-          <div className="grp"><h3>App para iPhone</h3>
-            <a className="btn primary" href={APP_STORE_URL} target="_blank" rel="noopener">Descargar en el App Store</a>
-            <p className="hint">Con saldo de tu TuLlave, avisos de tu viaje y tu parada en la pantalla de inicio. Gratis.</p>
-          </div>
-        )}
+        <div className="grp"><h3>App para iPhone y Android</h3>
+          {platform() !== "android" && <a className="btn primary" href={APP_STORE_URL} target="_blank" rel="noopener">Descargar en el App Store</a>}
+          {platform() !== "ios" && <a className={`btn${platform() === "android" ? " primary" : ""}`} href={PLAY_STORE_URL} target="_blank" rel="noopener">Descargar en Google Play</a>}
+          <p className="hint">Con saldo de tu TuLlave, avisos de tu viaje y tu parada en la pantalla de inicio. Gratis.</p>
+        </div>
         <div className="grp"><h3>Ayuda</h3>
           <a className="btn" href={"mailto:info@transmilive.com?subject=" + encodeURIComponent("TransMi LIVE: problema o idea") + "&body=" + encodeURIComponent("¿Qué pasó o qué idea tienes? (cuéntalo con tus palabras)\n\n\n---\nDesde la web de TransMi LIVE")}>Reportar un problema o dar una idea</a>
           <p className="hint">Se abre un correo a info@transmilive.com. También puedes leer la <a href="privacidad.html">política de privacidad</a>.</p>

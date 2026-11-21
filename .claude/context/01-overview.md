@@ -18,7 +18,7 @@ Usuarios de Bogotá en el celular, sobre todo con prisa en la calle. El dueño d
 | **Función de Supabase** (proxy de feeds) | `supabase/functions/tm/index.ts` | El dueño la despliega a mano; en producción se llama `rapid-responder` (nombre en `config.ts`) |
 | **Workflows de GitHub Actions** (datos en vivo, GTFS diario, vigilancia, estadísticas) | `.github/workflows/*` | Activos |
 
-Android: **en preparación** (2026-11-11): la app corre con los mismos paquetes; iconos, barra, avisos e ícono ya adaptados; sin tarjeta TuLlave, widget ni actividad en vivo (son solo iOS). Se prueba en emulador con `apps/mobile/scripts/android-emulador.sh`; falta cuenta de Google Play.
+Android: **en Google Play** desde 2026-11-21 (play.google.com/store/apps/details?id=com.transmilive.app; antes, en preparación desde 2026-11-11): la app corre con los mismos paquetes; iconos, barra, avisos e ícono ya adaptados; sin tarjeta TuLlave, widget ni actividad en vivo (son solo iOS). Se prueba en emulador con `apps/mobile/scripts/android-emulador.sh`; falta cuenta de Google Play.
 
 ## Stack
 - TypeScript en todo (modo estricto), monorepo con **DDD** en `packages/*`.
