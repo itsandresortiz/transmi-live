@@ -10,3 +10,4 @@ build/
 *.p8
 ios/App/Pods/
 ios/DerivedData/
+.claude/worktrees/
