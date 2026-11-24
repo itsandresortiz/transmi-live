@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="tm_widget_bg">#FF1C1C1E</color>
+    <color name="tm_widget_text">#FFFFFFFF</color>
+    <color name="tm_widget_muted">#FFA1A1A8</color>
+</resources>
