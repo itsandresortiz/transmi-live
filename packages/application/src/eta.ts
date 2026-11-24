@@ -92,7 +92,7 @@ export function rawArrival(state: TransitState, v: Vehicle, shape: RouteShape, l
     const f = Math.min(1, Math.max(0, (bus.s - sa) / (sb - sa)));        // fracción del tramo ya recorrida
     remaining -= hop(lastIndex) * f;
     eta = v.reportedAt + remaining;
-    if (state.hopProfile.apply && state.hopProfile.size) eta += state.hopProfile.extra;      // corrección del sesgo medido (ver HOP_EXTRA_S)
+    if (state.hopProfile.apply && state.hopProfile.size) eta += state.hopProfile.extraAt(nowMs);      // corrección del sesgo medido, por franja si se sabe (ver HOP_EXTRA_S y HOP_EXTRA_BY)
     // semáforos medidos que los buses confirman (ver signal-eta.ts): si llega en rojo, se suma lo que le falta al rojo. Solo a 1–3 paradas,
     // donde la hora a la que llega al semáforo se conoce bien
     const st = info.s[to];

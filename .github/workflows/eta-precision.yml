@@ -1,14 +1,22 @@
 name: Medir precisión de los tiempos de llegada
 # Prueba puntual (se lanza a mano): compara la hora de llegada que muestra la app con la hora en que cada bus cruzó de verdad la parada.
-on: { workflow_dispatch: {} }
+# El sesgo cambia con la hora: lanzarlo en cada franja (pico de la mañana 6–10, valle 10–16, pico de la tarde 16–20, noche 20–24,
+# hora de Bogotá) y comparar la línea «aprendido + N s» de cada una para ajustar `HOP_EXTRA_BY` (packages/application/src/hop-profile.ts).
+on:
+  workflow_dispatch:
+    inputs:
+      segundos:
+        description: "Segundos de captura (720 = 12 min; hasta 1800)"
+        default: "720"
 permissions: { contents: read }
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npx --yes tsx tools/etaprecision.ts 720 8
+      - run: npx --yes tsx tools/etaprecision.ts "$SEGUNDOS" 8
+        env: { SEGUNDOS: "${{ inputs.segundos || '720' }}" }

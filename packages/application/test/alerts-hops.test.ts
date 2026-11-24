@@ -94,6 +94,37 @@ describe("tiempos reales por tramo", () => {
     s.hopProfile.load({ v: 1, updated: "", r: { "14000|0": { "wk|1": [600, 100, 600, 100, 0, 0, 0, 0] } } });
     expect(rawArrival(s, v, shape, 0, 2, NOW).eta).toBeGreaterThan(before + 600);
   });
+  it("corrección del sesgo por franja, y la general para quien no la trae", () => {
+    const h = new HopProfile(), r = { "R|0": { "wk|1": [120, 10] } };
+    h.load({ v: 1, updated: "", extra: 15, r });
+    expect(h.extraAt(NOW)).toBe(15);                                         // perfil viejo: el mismo todo el día
+    h.load({ v: 1, updated: "", extra: 15, extraBy: [5, 40, 15, 35, 0], r });
+    expect(h.extraAt(NOW)).toBe(40);                                         // pico de la mañana
+    expect(h.extraAt(Date.parse("2026-11-17T12:00:00-05:00"))).toBe(15);     // valle
+    expect(h.extraAt(Date.parse("2026-11-17T22:00:00-05:00"))).toBe(0);      // noche
+    h.load({ v: 1, updated: "", extra: 15, extraBy: [5, 40, 999, 35, 0], r });
+    expect(h.extraAt(NOW)).toBe(15);                                         // valores raros: se ignora y queda el general
+    h.load({ v: 1, updated: "", extra: 15, extraBy: [5, 40], r });
+    expect(h.extraAt(NOW)).toBe(15);
+    const shape = { routeId: "R", direction: "0", headsign: "", points: [], stopIds: ["a", "b"] };
+    expect(h.has(shape, 0, NOW)).toBe(true);
+    expect(h.has(shape, 0, Date.parse("2026-11-17T12:00:00-05:00"))).toBe(false);
+    // lo que se publica: `extra` sigue saliendo (lo leen las apps ya instaladas) y `extraBy` solo si se pide
+    const p = buildHopProfile({}, () => 5, "x", 3, true, 0, 15, [5, 40, 15, 35, 0]);
+    expect(p.extra).toBe(15);
+    expect(p.extraBy).toEqual([5, 40, 15, 35, 0]);
+    expect("extraBy" in buildHopProfile({}, () => 5, "x", 3, true, 0, 15, null)).toBe(false);
+  });
+  it("la llegada suma la corrección de su franja", () => {
+    const s = world();
+    s.applyPositions([{ id: "bus", routeId: "14000", reportedAt: NOW / 1000, position: at(0), lastStopId: "A" }], NOW);
+    const v = s.fleet.get("bus")!, shape = s.network.shapes.get("14000")![0]!;
+    const r = { "14000|0": { "wk|1": [100, 50, 100, 50, 100, 50, 100, 50] } };
+    s.hopProfile.load({ v: 1, updated: "", extra: 0, r });
+    const base = rawArrival(s, v, shape, 0, 2, NOW).eta;
+    s.hopProfile.load({ v: 1, updated: "", extra: 0, extraBy: [0, 30, 0, 0, 0], r });
+    expect(rawArrival(s, v, shape, 0, 2, NOW).eta).toBeCloseTo(base + 30);
+  });
 });
 
 describe("avisos en la ruta", () => {

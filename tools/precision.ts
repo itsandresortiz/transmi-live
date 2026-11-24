@@ -6,11 +6,17 @@
  * con la posición que el bus informó. También mide cuánto se aleja de su ruta.
  * Referencia: dejar el bus quieto en su último reporte (sin predicción).
  *
+ * También compara el adelanto con los tiempos reales por tramo (`hopWeight`, perfil publicado en la rama `hop-stats`).
+ *
  * Uso: npx tsx tools/precision.ts [segundos] [espera_entre_descargas]
+ *      LOTES=<carpeta> npx tsx tools/precision.ts   (lotes ya guardados: archivos `<ms>.pb`, la hora de descarga en milisegundos)
  */
 import { DEFAULT_MOTION, MotionEngine, type MotionParams, TransitState } from "@transmi/application";
 import { DEFAULT_PREDICTION, RoadPath, distanceMeters, toWorld, type VehicleReport } from "@transmi/domain";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
+import { gunzipSync } from "node:zlib";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 const SECONDS = Number(process.argv[2] ?? 270), GAP_MS = Number(process.argv[3] ?? 8) * 1000;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live";
@@ -25,7 +31,9 @@ async function main() {
   // 1) captura de lotes reales
   const batches: { reports: VehicleReport[]; at: number }[] = [];
   let lastSig = "";
-  const end = Date.now() + SECONDS * 1000;
+  const DIR = process.env.LOTES;
+  if (DIR) for (const f of readdirSync(DIR).filter((x) => x.endsWith(".pb")).sort()) batches.push({ reports: decodePositions(new Uint8Array(readFileSync(join(DIR, f)))), at: Number(f.slice(0, -3)) / 1000 });
+  const end = DIR ? 0 : Date.now() + SECONDS * 1000;
   while (Date.now() < end) {
     try {
       const r = await fetch("https://gtfs.transmilenio.gov.co/positions.pb", { headers: { "User-Agent": "Mozilla/5.0 (transmi-live)" } });
@@ -40,14 +48,22 @@ async function main() {
 
   // 2) reproducción con el motor de la app, para varias políticas de predicción (misma captura)
   const net = st.network;
+  let profile: unknown = null;
+  try {
+    const h = await fetch(`https://raw.githubusercontent.com/${REPO}/hop-stats/profile.json.gz`);
+    profile = JSON.parse(gunzipSync(new Uint8Array(await h.arrayBuffer())).toString());
+  } catch (e) { console.log("sin perfil de tramos:", e instanceof Error ? e.message : e); }
+  let ms = 0;
   const evaluate = (gain: number, extra: Partial<MotionParams> = {}, maxSeconds = 90) => {
     (DEFAULT_PREDICTION as { gain: number }).gain = gain;
     (DEFAULT_PREDICTION as { maxSeconds: number }).maxSeconds = maxSeconds;
     const state = new TransitState(); state.setNetwork(net);
+    if (profile) state.hopProfile.load(profile);
+    const t0 = performance.now();
     const eng = new MotionEngine(state, { ...DEFAULT_MOTION, ...extra });
     const paths = new Map<string, RoadPath[]>();
     const pathsOf = (rid: string) => paths.get(rid) ?? (paths.set(rid, (net.shapes.get(rid) ?? []).filter((x) => x.points.length > 1).map((x) => new RoadPath(x.points))), paths.get(rid)!);
-    const err = { model: [] as number[], held: [] as number[], along: [] as number[], lat: [] as number[], signed: [] as number[] };
+    const err = { model: [] as number[], held: [] as number[], along: [] as number[], lat: [] as number[], signed: [] as number[], still: [] as number[] };
     const lag: number[] = [];
     // dónde se dibujó cada bus en los últimos ~4 min. Hace falta guardar varios intervalos: TransMilenio entrega hoy cada posición con
     // 30–90 s de atraso, así que el reporte que dice dónde estaba el bus en el instante T llega uno o varios lotes después de T.
@@ -62,7 +78,11 @@ async function main() {
           if (prev && r.reportedAt !== prev.reportedAt) { gap.push(r.reportedAt - prev.reportedAt); lagAll.push(b.at - r.reportedAt); }
           if (!h || !prev || r.reportedAt === prev.reportedAt) continue;
           const rw = toWorld(r.position);
-          if (distanceMeters(prev.world, rw) < 15) continue;       // parado: no mide el movimiento
+          if (distanceMeters(prev.world, rw) < 15) {                // parado: no mide el movimiento, pero sí cuánto se le adelantó de más
+            let b2 = h[0]!; for (const p of h) if (Math.abs(p.t - r.reportedAt) < Math.abs(b2.t - r.reportedAt)) b2 = p;
+            if (Math.abs(b2.t - r.reportedAt) <= 1.2) err.still.push(distanceMeters(b2, rw));
+            continue;
+          }
           let best = h[0]!; for (const p of h) if (Math.abs(p.t - r.reportedAt) < Math.abs(best.t - r.reportedAt)) best = p;
           if (Math.abs(best.t - r.reportedAt) > 1.2) continue;
           err.model.push(distanceMeters(best, rw)); err.held.push(distanceMeters(prev.world, rw)); lag.push(b.at - r.reportedAt);
@@ -82,9 +102,10 @@ async function main() {
         while (l.length && l[0]!.t < t - HIST_S) l.shift();
       }
     }
+    ms = (performance.now() - t0) / Math.max(1, batches.length - 1);
     return { err, lag, gap, lagAll };
   };
-  const base = evaluate(0.5);
+  const base = evaluate(0.5, { hopWeight: 0, hopWeightStill: 0 });
   console.log("\n=== PRECISIÓN (buses que se movieron más de 15 m entre reportes; " + base.err.model.length + " muestras) ===");
   console.log("Sin predicción (quieto en el último reporte):", f(base.err.held));
   console.log("Distancia a la ruta (a lo ancho):", f(base.err.lat));
@@ -92,11 +113,11 @@ async function main() {
   console.log(`Cada cuánto cambia el reporte de un mismo bus (s): mediana ${pct(base.gap, 0.5).toFixed(0)}, p10 ${pct(base.gap, 0.1).toFixed(0)}, p90 ${pct(base.gap, 0.9).toFixed(0)} (n=${base.gap.length})`);
   console.log(`Edad del GPS al llegar el lote, todos los reportes nuevos (s): mediana ${pct(base.lagAll, 0.5).toFixed(0)}, p10 ${pct(base.lagAll, 0.1).toFixed(0)}, p90 ${pct(base.lagAll, 0.9).toFixed(0)}`);
   console.log("--- políticas (ganancia = fracción de la velocidad medida que realmente avanza) ---");
-  const row = (label: string, r: ReturnType<typeof evaluate>) => console.log(`${label.padEnd(34)} error ${f(r.err.model)} | a lo largo: sesgo mediano ${pct(r.err.signed.map((x) => x), 0.5).toFixed(1)} m (neg = se queda corto)`);
-  for (const g of [0.3, 0.5, 0.6, 0.7]) row(`ganancia ${g}`, g === 0.5 ? base : evaluate(g));
-  // el dato llega hoy con ~60 s de edad y cada bus cambia cada ~60 s: con el tope de 90 s el bus se queda quieto buena parte del tiempo
-  for (const [g, mx] of [[0.5, 120], [0.5, 150], [0.5, 200], [0.6, 150], [0.6, 200], [0.4, 150]] as const) row(`ganancia ${g}, tope ${mx} s`, evaluate(g, {}, mx));
-  for (const [c, name] of [[0.1, "corrección suave"], [0.3, "corrección fuerte"]] as const) row(`ganancia 0.7 + ${name}`, evaluate(0.7, { catchUp: c }));
+  const row = (label: string, r: ReturnType<typeof evaluate>) => console.log(`${label.padEnd(48)} error ${f(r.err.model)} | todos: ${f([...r.err.model, ...r.err.still])} | quietos: ${f(r.err.still)} | a lo largo: sesgo mediano ${pct(r.err.signed.map((x) => x), 0.5).toFixed(1)} m (neg = se queda corto) | ${ms.toFixed(0)} ms por lote (motor 4 Hz)`);
+  // la política vigente es ganancia 0,4 con tope de 150 s (DEFAULT_PREDICTION); se compara sin y con los tiempos por tramo
+  row("vigente sin tramos (0,4 / 150 s)", evaluate(0.4, { hopWeight: 0, hopWeightStill: 0 }, 150));
+  for (const [w, g, q] of [[0.75, 1, 0.75], [1, 1, 1], [1, 1, 0.5], [1, 1, 0.25], [1, 1, 0], [0.75, 1, 0.25], [1, 1.1, 0.25]] as const) row(`0,4 / 150 s + tramos peso ${w} (quieto ${q}), ritmo ${g}`, evaluate(0.4, { hopWeight: w, hopGain: g, hopWeightStill: q }, 150));
+  for (const g of [0.3, 0.5, 0.6]) row(`ganancia ${g}, tope 150 s, sin tramos`, evaluate(g, { hopWeight: 0, hopWeightStill: 0 }, 150));
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
