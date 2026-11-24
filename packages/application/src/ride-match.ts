@@ -1,5 +1,5 @@
 import { type GeoPoint, type Route, type RouteShape, type Vehicle, bearingDegrees, toGeo, toWorld } from "@transmi/domain";
-import { arrivalAtIndex, hav, shapeStops } from "./eta";
+import { arrivalAtIndex, estimateTravelSeconds, hav, shapeStops } from "./eta";
 import type { TransitState } from "./transit-state";
 
 /** Una lectura del GPS del teléfono. `at` en ms; `accuracy` y `speed` como las da el sistema (metros, m/s), si las da. */
@@ -16,6 +16,8 @@ export interface RideSnap {
   nextIndex: number;
   /** Metros que faltan para esa parada. */
   toNext: number;
+  /** Desde dónde se mide el ritmo de tu bus en este viaje (si ya se tiene). */
+  pace?: RidePace;
 }
 
 /** Resultado de comparar el teléfono con el bus:
@@ -72,21 +74,60 @@ export function fixSpeed(fix: PhoneFix, prev?: PhoneFix | null): number | null {
   return (R * Math.hypot(dLat, dLon)) / ((fix.at - prev.at) / 1000);
 }
 
-/** Hora de llegada a la parada `to` contada desde donde va la persona (no desde el reporte del bus, que llega ~1 min tarde):
- *  lo que le falta para la siguiente parada, a velocidad de crucero, más lo que el modelo del bus dice entre esa parada y `to`. */
-export function rideArrival(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, snap: RideSnap, to: number, nowMs: number): number {
+/** Desde dónde se mide tu ritmo en el viaje: un punto del recorrido (metros) y cuándo pasaste por ahí (ms). */
+export interface RidePace { s: number; at: number }
+
+/** Tramo entre paradas para un viaje seguido con el GPS: un tiempo fijo por parada (frenar, subir y bajar gente, arrancar) más la
+ *  distancia REAL del tramo sobre el recorrido a la velocidad de marcha. Antes se usaba el modelo de las llegadas (casi solo «N paradas ×
+ *  ~1 min», con la distancia en línea recta a 18 m/s), y entre paradas de 200 m y de 2 km salía casi el mismo tiempo: con tu ubicación
+ *  real al lado, los tiempos se desfasaban. Los promedios dan lo mismo que antes (zonal ~72 s con su tramo medio de 390 m, troncal
+ *  ~117 s con 1.060 m), pero cada tramo pesa según lo largo que es. Si se sabe lo que tardan de verdad los buses en ese tramo a esta
+ *  hora (perfil de tramos), se mezcla con eso. El cable sigue con su modelo (cuadra con el horario oficial). */
+const RIDE_HOP: Partial<Record<Vehicle["system"], { stop: number; mps: number }>> = {
+  troncal: { stop: 29, mps: 12 }, dual: { stop: 29, mps: 12 }, zonal: { stop: 23, mps: 8 }, alimentador: { stop: 29, mps: 8 }, otro: { stop: 23, mps: 8 },
+};
+function rideHopSeconds(state: TransitState, v: Vehicle, shape: RouteShape, s: readonly number[], i: number, nowMs: number): number {
+  const m = RIDE_HOP[v.system], len = Math.max(0, s[i + 1]! - s[i]!);
+  const model = m ? m.stop + len / m.mps : estimateTravelSeconds(state, v, shape.stopIds, i, i + 1, nowMs);
+  return state.hopProfile.seconds(shape, i, nowMs, model);
+}
+/** Segundos que da el modelo para ir del punto `a` al punto `b` del recorrido (metros): cada tramo cuenta en la parte que se recorre. */
+function rideModelSeconds(state: TransitState, v: Vehicle, shape: RouteShape, s: readonly number[], a: number, b: number, nowMs: number): number {
+  let t = 0;
+  for (let i = 0; i + 1 < s.length; i++) {
+    const lo = s[i]!, hi = s[i + 1]!;
+    if (hi <= a) continue;
+    if (lo >= b) break;
+    if (hi - lo < 1) continue;
+    t += ((Math.min(b, hi) - Math.max(a, lo)) / (hi - lo)) * rideHopSeconds(state, v, shape, s, i, nowMs);
+  }
+  return t;
+}
+/** Con cuánta prisa va TU bus frente al modelo (1 = como el modelo, 1,5 = tarda 50 % más), medido con tu ubicación: lo que llevas
+ *  recorrido desde `pace` y cuánto te tomó (contando semáforos y trancones). Pesa más cuanto más tiempo se ha medido (todo a los 10 min);
+ *  con menos de 1 min o 200 m no se usa. Limitado a 0,6–1,8 para que un trancón largo no dispare los tiempos. */
+export function ridePaceFactor(state: TransitState, v: Vehicle, shape: RouteShape, snap: RideSnap, nowMs: number): number {
+  const p = snap.pace, ss = shapeStops(state, shape);
+  if (!p || !ss) return 1;
+  const took = (nowMs - p.at) / 1000, went = snap.s - p.s;
+  if (took < 60 || went < 200) return 1;
+  const model = rideModelSeconds(state, v, shape, ss.s, p.s, snap.s, nowMs);
+  if (model < 20) return 1;
+  const raw = Math.min(1.8, Math.max(0.6, took / model)), w = Math.min(1, took / 600);
+  return 1 + w * (raw - 1);
+}
+
+/** Hora de llegada a la parada `to` contada desde donde va la persona (su GPS), no desde el reporte del bus (que llega ~1 min tarde):
+ *  la distancia que de verdad falta sobre el recorrido, tramo por tramo, ajustada al ritmo que lleva tu bus en este viaje.
+ *  `lastIndex` (la última parada que reportó el bus) ya no cambia la cuenta: tu ubicación manda. */
+export function rideArrival(state: TransitState, v: Vehicle, shape: RouteShape, _lastIndex: number, snap: RideSnap, to: number, nowMs: number): number {
   const now = nowMs / 1000;
   if (to < snap.nextIndex) return now;
-  const toNextSec = snap.toNext / RIDE_CRUISE_MPS;
-  if (to === snap.nextIndex) return now + toNextSec;
-  // el bus ya reportó haber pasado tu siguiente parada (p. ej. detenido en la estación y el GPS del teléfono unos metros antes): las
-  // paradas hasta la del reporte están prácticamente aquí; las de después, a lo que el modelo del bus dice desde donde va él. Antes se
-  // devolvía la hora de la siguiente parada para TODAS (todas «a segundos» y «Faltan 3 paradas» sonaba enseguida)
-  if (lastIndex >= snap.nextIndex) return to <= lastIndex ? now + toNextSec : now + toNextSec + Math.max(0, arrivalAtIndex(state, v, shape, lastIndex, to, nowMs) - now);
-  const between = arrivalAtIndex(state, v, shape, lastIndex, to, nowMs) - arrivalAtIndex(state, v, shape, lastIndex, snap.nextIndex, nowMs);
-  return now + toNextSec + Math.max(0, between);
+  const ss = shapeStops(state, shape), target = ss?.s[to];
+  if (!ss || target == null) return now + snap.toNext / RIDE_CRUISE_MPS + Math.max(0, arrivalAtIndex(state, v, shape, snap.nextIndex, to, nowMs) - arrivalAtIndex(state, v, shape, snap.nextIndex, snap.nextIndex, nowMs));
+  return now + ridePaceFactor(state, v, shape, snap, nowMs) * rideModelSeconds(state, v, shape, ss.s, snap.s, Math.max(snap.s, target), nowMs);
 }
-/** Velocidad típica de un bus en marcha entre paradas (m/s); la misma que usa el cálculo de llegadas. */
+/** Velocidad típica de un bus en marcha entre paradas (m/s), para cuando el recorrido no tiene trazado. */
 const RIDE_CRUISE_MPS = 8;
 
 /** Dónde va el teléfono sobre un recorrido, sin comparar con ningún bus: para seguir un viaje cuando el bus no aparece en los datos
@@ -102,6 +143,30 @@ export function checkOnShape(state: TransitState, shape: RouteShape, fromIndex: 
   if (nextIndex < 0) nextIndex = ss.s.length - 1;
   const here = ss.path.pointAt(me.s), ahead = ss.path.pointAt(me.s + 15);
   return { kind: "on", moving, snap: { s: me.s, pos: toGeo(here), heading: bearingDegrees(here, ahead), nextIndex, toNext: Math.max(0, (ss.s[nextIndex] ?? me.s) - me.s) } };
+}
+
+/** Vas con «¿En qué bus vas?» (tu bus no salía en los datos) y aparece en los datos un bus de tu misma ruta y sentido justo donde vas tú:
+ *  lo más seguro es que sea el tuyo, que volvió a reportar. Devuelve el que mejor cuadra, o `null`. `s` es dónde vas sobre el recorrido
+ *  (metros). Cuadra si su reporte es reciente (≤2,5 min), no queda muy por delante de ti y, contando lo que avanza un bus típico desde ese
+ *  reporte (~7 m/s), quedaría a menos de 300 m de ti. La app solo lo enlaza si cuadra en dos reportes seguidos del bus (ver RideWatcher). */
+export function busForGpsRide(state: TransitState, shape: RouteShape, s: number, nowMs: number): { vehicle: Vehicle; gap: number } | null {
+  const ss = shapeStops(state, shape);
+  if (!ss) return null;
+  const now = nowMs / 1000;
+  let best: { vehicle: Vehicle; gap: number } | null = null;
+  for (const v of state.fleet.values()) {
+    if (v.routeId !== shape.routeId || v.id.startsWith("gps:")) continue;
+    const age = now - v.reportedAt;
+    if (age > 150 || age < -60) continue;
+    if (state.sequenceForDisplay(v)?.shape !== shape) continue;      // mismo sentido
+    const bus = ss.path.projectAfter(toWorld(v.position), Math.max(0, s - 3000), OFF_ROUTE_M);
+    if (!bus) continue;
+    const ahead = bus.s - s;                                           // el reporte (viejo) del bus no puede ir muy por delante de ti
+    if (ahead > 150) continue;
+    const gap = Math.abs(s - (bus.s + Math.max(0, age) * 7));
+    if (gap <= 300 && (!best || gap < best.gap)) best = { vehicle: v, gap: Math.round(gap) };
+  }
+  return best;
 }
 
 /** Un bus que podría ser en el que vas (va por tu misma vía, en tu sentido, y donde puede estar dado lo viejo de su reporte). */

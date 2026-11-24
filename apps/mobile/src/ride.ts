@@ -17,7 +17,8 @@ interface RideState {
 const MAX_RIDE_MS = 3 * 3600_000;
 export const useRide = create<RideState>()(persist((set) => ({
   busId: null, alightId: null, total: 0, since: 0, hydrated: false,
-  set: (busId, alightId, total = 0) => set({ busId, alightId, total, since: Date.now() }),
+  // al pasar un viaje con GPS a su bus real (mismo viaje) no se reinicia la hora en que empezó
+  set: (busId, alightId, total = 0) => set((s) => ({ busId, alightId, total, since: s.busId && s.busId.startsWith("gps:") && !busId.startsWith("gps:") && s.since ? s.since : Date.now() })),
   clear: () => set({ busId: null, alightId: null, total: 0, since: 0 }),
 }), {
   name: "tm.ride.v1", storage: createJSONStorage(() => AsyncStorage),

@@ -8,7 +8,7 @@ import { useRide } from "@/ride";
 import { SymbolView } from "@/ui/Symbol";
 import { arrivalAtIndex, rideArrival } from "@transmi/application";
 import { rideSnapOf } from "@/rideSnap";
-import { isVirtualRide, rideSequence, rideVehicle, virtualParts } from "@/virtualRide";
+import { isVirtualRide, linkedBusOf, rideSequence, rideVehicle, virtualParts, wasLinked } from "@/virtualRide";
 import { SYSTEM_LABEL, routeTitle } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
@@ -42,8 +42,11 @@ export default function Ride() {
   const setAlightId = (stop: string | null, total = 0) => { if (stop) { void allowAlerts(); useRide.getState().set(id, stop, total); } else useRide.getState().clear(); };
   // «Voy en este bus» también es seguirlo: al cerrar esta ventana, el mapa lo acompaña y deja arriba su tarjeta
   useEffect(() => { if (id && useMapFocus.getState().followBusId !== id) useMapFocus.getState().set({ followBusId: id }); }, [id]);
+  // el viaje con GPS encontró su bus en los datos (ver RideWatcher): la pantalla pasa a ese bus
+  useEffect(() => { if (isVirtualRide(id) && rideBus && rideBus !== id && linkedBusOf(id) === rideBus) router.setParams({ id: rideBus }); }, [id, rideBus]);
   const v = rideVehicle(id);
   const virtual = isVirtualRide(id);
+  const found = !virtual && rideBus === id && wasLinked(id);
   const r = v ? transit.routeOf(v) : undefined;
   // la ruta del bus se recuerda: cuando deja de reportar, «Sigo en el bus» abre «¿En qué bus vas?» con esa ruta (antes iba vacía)
   const lastRoute = useRef<string | null>(null);
@@ -115,6 +118,7 @@ export default function Ride() {
             </View>
 
             {virtual && v.system === "cable" ? <Card><Text style={[type.headline, { color: c.text }]}>Te seguimos con tu ubicación</Text><Text style={[type.body, { color: c.muted }]}>Las cabinas del cable no envían su ubicación: mientras tengas la app abierta, las estaciones y los tiempos se cuentan desde donde vas tú.</Text></Card>
+              : found ? <Card><Text style={[type.headline, { color: c.text }]}>Encontramos tu bus</Text><Text style={[type.body, { color: c.muted }]}>{`Tu bus volvió a aparecer en los datos de TransMilenio${v.plate ? ` (placa ${v.plate})` : ""}. Seguimos contando las paradas desde tu ubicación y tu aviso de bajada sigue igual.`}</Text></Card>
               : virtual ? <Card><Text style={[type.headline, { color: c.text }]}>Te seguimos con tu ubicación</Text><Text style={[type.body, { color: c.muted }]}>Este bus no aparece en los datos de TransMilenio en este momento. Mientras tengas la app abierta, el bus va donde vas tú y las paradas se cuentan desde ahí.</Text></Card> : null}
             {silent ? <Card><Text style={[type.headline, { color: "#d97706" }]}>Perdimos la señal de este bus</Text><Text style={[type.body, { color: c.muted }]}>Hace {Math.round((now - v.reportedAt) / 60)} min que no reporta. Los tiempos son aproximados.</Text></Card> : null}
 

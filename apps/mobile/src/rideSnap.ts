@@ -6,7 +6,13 @@ import { rideSequence } from "./virtualRide";
 
 /** Mientras vas en un bus («Voy en este bus»), su posición sale de TU teléfono, no del reporte de TransMilenio (que llega ~1 min tarde):
  *  aquí se guarda dónde vas sobre el recorrido. La ubicación no sale del teléfono ni se guarda: vive solo en memoria mientras dura el viaje. */
-interface Snap { busId: string; shape: RouteShape; lastIndex: number; prev: { s: number; at: number } | null; cur: { s: number; at: number }; info: RideSnap }
+interface Snap { busId: string; shape: RouteShape; lastIndex: number; prev: { s: number; at: number } | null; cur: { s: number; at: number }; info: RideSnap; track: { s: number; at: number }[] }
+/** Ventana con la que se mide el ritmo de tu bus (semáforos y trancones incluidos). */
+const PACE_WINDOW_MS = 10 * 60_000;
+/** Cuánto sigue valiendo la última ubicación sin lecturas nuevas. Quieto en un semáforo el teléfono casi no da lecturas: antes, a los 20 s
+ *  se soltaba y un viaje sin bus en los datos volvía a la parada de subida (los tiempos saltaban). En un viaje con GPS tú eres el bus:
+ *  vale 10 min; con un bus de los datos, 3 min (luego se vuelve a lo que reporta TransMilenio). */
+const keepMs = (busId: string) => (busId.startsWith("gps:") ? 10 * 60_000 : 3 * 60_000);
 let snap: Snap | null = null;
 /** El último resultado de comparar el teléfono con el bus (lo usa el vigilante del viaje para preguntar si vas en otro bus). */
 let lastCheck: { busId: string; check: RideCheck; at: number } | null = null;
@@ -18,20 +24,24 @@ export function setRideCheck(busId: string, shape: RouteShape, lastIndex: number
   const same = snap && snap.busId === busId && snap.shape === shape;
   // el bus no retrocede: un salto del GPS hacia atrás de pocos metros no lo hace ir en reversa
   const s = same && check.snap.s < snap!.cur.s && snap!.cur.s - check.snap.s < 60 ? snap!.cur.s : check.snap.s;
-  snap = { busId, shape, lastIndex, prev: same ? snap!.cur : null, cur: { s, at: atMs }, info: { ...check.snap, s } };
+  const track = (same ? snap!.track : []).filter((p) => atMs - p.at <= PACE_WINDOW_MS);
+  track.push({ s, at: atMs });
+  snap = { busId, shape, lastIndex, prev: same ? snap!.cur : null, cur: { s, at: atMs }, info: { ...check.snap, s }, track };
 }
 export function clearRideSnap(): void { snap = null; lastCheck = null; }
 export function rideCheckOf(busId: string): { check: RideCheck; at: number } | null { return lastCheck && lastCheck.busId === busId ? lastCheck : null; }
 
-/** Lo que se sabe de dónde vas, si es reciente (sin lecturas en 20 s se vuelve al dato de TransMilenio). */
+/** Lo que se sabe de dónde vas, si es reciente (ver `keepMs`). */
 export function rideSnapOf(busId: string, nowMs = clockMs()): (RideSnap & { shape: RouteShape; lastIndex: number }) | null {
-  if (!snap || snap.busId !== busId || nowMs - snap.cur.at > 20_000) return null;
-  return { ...snap.info, shape: snap.shape, lastIndex: snap.lastIndex };
+  if (!snap || snap.busId !== busId || nowMs - snap.cur.at > keepMs(busId)) return null;
+  // el ritmo se mide desde la lectura más vieja de la ventana (la cuenta incluye el rato que llevas quieto sin lecturas nuevas)
+  const first = snap.track.find((p) => nowMs - p.at <= PACE_WINDOW_MS);
+  return { ...snap.info, pace: first, shape: snap.shape, lastIndex: snap.lastIndex };
 }
 
 /** Dónde dibujar el bus en este instante: entre dos lecturas del GPS avanza a la velocidad que llevaba (hasta 3 s), para que se mueva fluido. */
 export function snappedPosition(busId: string, nowMs = clockMs()): { lat: number; lon: number; heading: number } | null {
-  if (!snap || snap.busId !== busId || nowMs - snap.cur.at > 20_000) return null;
+  if (!snap || snap.busId !== busId || nowMs - snap.cur.at > keepMs(busId)) return null;
   const ss = shapeStops(transit, snap.shape);
   if (!ss) return null;
   let s = snap.cur.s;

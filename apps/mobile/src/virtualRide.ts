@@ -16,12 +16,18 @@ export function virtualParts(id: string): { routeId: string; shape: RouteShape; 
   return routeId && shape ? { routeId, shape, fromIndex: Math.max(0, Math.min(shape.stopIds.length - 1, Number(fi) || 0)) } : null;
 }
 
+/** La última parada que se sabe que pasaste en cada viaje con GPS (en memoria, mientras la app esté abierta). */
+const reached = new Map<string, number>();
 /** Dónde va el viaje: la última parada que ya pasaste (por el GPS si lo confirma; si no, la parada desde la que vienes). */
 export function virtualSequence(id: string, at = nowMs()): { shape: RouteShape; index: number } | undefined {
   const p = virtualParts(id);
   if (!p) return undefined;
   const snap = rideSnapOf(id, at);
-  const index = snap && snap.shape === p.shape ? Math.max(p.fromIndex, Math.min(p.shape.stopIds.length - 1, snap.nextIndex - 1)) : p.fromIndex;
+  // sin lectura reciente del GPS se queda en la última parada que pasaste (antes volvía a la de subida y los tiempos saltaban)
+  const before = Math.max(p.fromIndex, reached.get(id) ?? 0);
+  const index = snap && snap.shape === p.shape ? Math.max(before, Math.min(p.shape.stopIds.length - 1, snap.nextIndex - 1)) : before;
+  if (reached.size > 20) reached.clear();
+  reached.set(id, index);
   return { shape: p.shape, index };
 }
 
@@ -47,3 +53,11 @@ export function virtualVehicle(id: string, at = nowMs()): Vehicle | undefined {
 export const rideVehicle = (id: string, at = nowMs()): Vehicle | undefined => (isVirtualRide(id) ? virtualVehicle(id, at) : transit.fleet.get(id));
 /** Dónde va el bus del viaje sobre su recorrido. */
 export const rideSequence = (v: Vehicle): { shape: RouteShape; index: number } | undefined => (isVirtualRide(v.id) ? virtualSequence(v.id) : transit.sequenceForDisplay(v));
+
+/** Viajes con GPS que ya encontraron su bus en los datos: viaje con GPS → bus real (para que la pantalla del viaje pase al bus real). */
+const linked = new Map<string, string>();
+export const linkRide = (virtualId: string, busId: string): void => { linked.set(virtualId, busId); };
+/** El bus real con el que se enlazó este viaje con GPS (si ya se encontró). */
+export const linkedBusOf = (virtualId: string): string | undefined => linked.get(virtualId);
+/** ¿Este bus vino de enlazar un viaje con GPS? */
+export const wasLinked = (busId: string): boolean => [...linked.values()].includes(busId);

@@ -3,8 +3,8 @@ import { Alert, AppState } from "react-native";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { type PhoneFix, arrivalAtIndex, checkOnShape, checkRide, rideArrival } from "@transmi/application";
-import { isVirtualRide, rideSequence, rideVehicle, virtualParts } from "./virtualRide";
+import { type PhoneFix, arrivalAtIndex, busForGpsRide, checkOnShape, checkRide, rideArrival } from "@transmi/application";
+import { isVirtualRide, linkRide, rideSequence, rideVehicle, virtualParts } from "./virtualRide";
 import { clearRideSnap, rideCheckOf, rideNextStop, rideSnapOf, setRideCheck } from "./rideSnap";
 import { transit } from "./composition-root";
 import { nowMs } from "./clock";
@@ -16,6 +16,7 @@ import { endTripActivity, showTripActivity } from "../modules/tripactivity/src";
 import { SYSTEM_COLOR } from "./ui/theme";
 import { router, usePathname } from "expo-router";
 import { useLaunch } from "./ui/Launch";
+import { useMapFocus } from "./map/focus";
 
 const TAG = "ride";
 const EVERY_MS = 5000;
@@ -149,6 +150,8 @@ export function RideWatcher() {
     // tu ubicación (solo con la app abierta y si ya diste el permiso): mientras vas en el bus, el bus se dibuja donde vas tú y las paradas
     // y avisos se cuentan desde ahí. No sale del teléfono ni se guarda.
     let sub: Location.LocationSubscription | undefined, gone = false, prevFix: PhoneFix | null = null;
+    // un bus de los datos que cuadra contigo: con qué reportes suyos ha cuadrado (se enlaza al cuadrar en dos reportes distintos)
+    let cand: { id: string; reports: Set<number> } | null = null;
     void (async () => {
       const perm = await Location.getForegroundPermissionsAsync().catch(() => null);
       if (gone || !perm?.granted) return;
@@ -157,7 +160,29 @@ export function RideWatcher() {
         if (isVirtualRide(busId)) {
           // sin bus en los datos: solo se mira que vayas sobre el recorrido (desde la parada en que vienes)
           const vp = virtualParts(busId), seq = vp ? rideSequence(rideVehicle(busId, now)!) : undefined;
-          if (vp && seq) setRideCheck(busId, vp.shape, seq.index, checkOnShape(transit, vp.shape, seq.index, fix, now, prevFix), now);
+          const check = vp && seq ? checkOnShape(transit, vp.shape, seq.index, fix, now, prevFix) : null;
+          if (vp && seq && check) setRideCheck(busId, vp.shape, seq.index, check, now);
+          // ¿apareció tu bus en los datos? Un bus de tu ruta y sentido que reporta justo donde vas tú, dos veces seguidas: se pasa el viaje
+          // a ese bus (con tu parada de bajada y sus avisos), así lo ven también los demás en el mapa y sus datos se suman a los tuyos
+          if (vp && check?.kind === "on" && check.moving) {
+            const hit = busForGpsRide(transit, vp.shape, check.snap.s, now);
+            if (!hit) cand = null;
+            else {
+              if (cand?.id !== hit.vehicle.id) cand = { id: hit.vehicle.id, reports: new Set() };
+              cand.reports.add(hit.vehicle.reportedAt);
+              if (cand.reports.size >= 2) {
+                const st = useRide.getState(), to = hit.vehicle.id;
+                if (st.busId === busId) {
+                  linkRide(busId, to);
+                  st.set(to, st.alightId, st.total);
+                  const f = useMapFocus.getState();
+                  if (f.followBusId === busId) f.set({ stopId: f.stopId, routeId: f.routeId, locate: false, followBusId: to, busIds: f.busIds.map((b) => (b === busId ? to : b)) });
+                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+                return;
+              }
+            }
+          }
         } else {
           const v = transit.fleet.get(busId), seq = v ? transit.sequenceForDisplay(v) : undefined;
           if (v && seq) setRideCheck(busId, seq.shape, seq.index, checkRide(transit, v, seq.shape, seq.index, fix, now, prevFix), now);
