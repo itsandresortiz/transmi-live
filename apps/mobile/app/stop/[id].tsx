@@ -25,6 +25,8 @@ import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteAlerts } from "@/ui/RouteAlerts";
 import { Eta } from "@/ui/Eta";
 import { RouteBadge } from "@/ui/RouteBadge";
+import { SceneHeader, laneColorOf } from "@/ui/Illustrations";
+import { tipOnce } from "@/tips";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 
 /** Hoja de una parada: lo mismo que la web. Rutas que vienen, hora de cada una, de dónde viene el bus y los horarios si no hay datos en vivo. */
@@ -75,6 +77,15 @@ export default function StopSheet() {
     });
     return out;
   })();
+  // la ilustración de arriba: estación (con el color de su línea más común), paradero del SITP o estación del cable
+  const scene = (() => {
+    const trunk = here.find((r) => r.system === "troncal" || r.system === "dual");
+    const counts = new Map<string, number>();
+    for (const r of here) { const l = laneColorOf(r.shortName, r.system, c.dark); if (l !== SYSTEM_COLOR[r.system]) counts.set(l, (counts.get(l) ?? 0) + 1); }
+    const lane = [...counts].sort((x, y) => y[1] - x[1])[0]?.[0];
+    const sys = trunk?.system ?? here[0]?.system ?? "zonal", kind = cable ? "cable" as const : stopKind(stop) === "Parada" ? "stop" as const : "station" as const;
+    return { kind, bus: SYSTEM_COLOR[sys], lane: lane ?? SYSTEM_COLOR[sys], long: sys === "troncal" };
+  })();
   const alerts = alertsFor(transit, new Set(here.map((r) => r.id)), new Set([id])).slice(0, 2);
 
   const showOnMap = (focus: { routeId?: string | null; busIds?: string[]; followBusId?: string | null }) => {
@@ -100,6 +111,8 @@ export default function StopSheet() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <CloseToolbar />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, { paddingTop: space[4], paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+        {/* cabecera ilustrada: la estación con la franja de su línea, o el paradero del SITP; el bus que viene entra y se detiene */}
+        <SceneHeader kind={scene.kind} busColor={scene.bus} laneColor={scene.lane} long={scene.long} sign={rows[0]?.route.shortName} arrive height={140} />
         <Text style={[type.eyebrow, { color: c.accent }]}>{stopKind(stop).toUpperCase()}</Text>
         <Text style={[type.largeTitle, { color: c.text }]}>{nick || label.title}</Text>
         {nick ? <Text style={[type.caption, { color: c.muted }]}>{label.title}</Text> : null}
@@ -233,6 +246,7 @@ function ComingAlert({ stopId, row, now }: { stopId: string; row: UpcomingRoute;
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await cancelComing();
     useBusWatch.getState().set({ stopId, routeId: row.route.id, busId: target.vehicle.id, minutes: lead, since: now });
+    void tipOnce("coming", 400);      // la primera vez se explica cómo funciona el aviso
   };
   const stop = () => { void cancelComing(); useBusWatch.getState().clear(); };
   if (mine) return (

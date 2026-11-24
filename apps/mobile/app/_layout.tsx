@@ -53,6 +53,7 @@ export default function RootLayout() {
         <Stack.Screen name="stop/[id]" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="trip" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "Tu viaje", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="avisos" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "Avisos del servicio", headerTintColor: "#e11d2e" }} />
+        <Stack.Screen name="tip/[id]" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "", headerShadowVisible: false, headerTintColor: "#e11d2e", contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="personalizar/[id]" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "Personalizar parada", headerShadowVisible: false, contentStyle: { backgroundColor: c.bg } }} />
         <Stack.Screen name="enbus" options={{ presentation: "modal", headerShown: true, ...ANDROID_HEADER, title: "¿En qué bus vas?", headerTintColor: "#e11d2e" }} />

@@ -19,6 +19,7 @@ import { useSaved } from "@/favorites";
 import { Card, Chip, PrimaryButton, Tap, PAGE } from "@/ui/kit";
 import { TripBanner } from "@/ui/TripBanner";
 import { allowAlerts } from "@/notify";
+import { tipOnce } from "@/tips";
 import { useTrip } from "@/trip";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
@@ -35,6 +36,9 @@ export default function Viaje() {
   const [remote, setRemote] = useState<PlanPlace[]>([]);
   const [busy, setBusy] = useState(false);
   const seq = useRef(0);
+  // la primera vez que se abre «Cómo llegar»: hoja de consejo
+  const tabFocused = useIsFocused();
+  useEffect(() => { if (tabFocused) void tipOnce("plan", 600); }, [tabFocused]);
 
   const local = useMemo(() => (text.trim().length >= 2 ? searchPlanPlaces(transit, text.trim(), 6) : []), [text]);   // eslint-disable-line react-hooks/exhaustive-deps
 

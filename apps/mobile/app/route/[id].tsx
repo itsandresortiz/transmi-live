@@ -21,6 +21,7 @@ import { RouteAlerts } from "@/ui/RouteAlerts";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 import { Eta } from "@/ui/Eta";
+import { SceneHeader, laneColorOf } from "@/ui/Illustrations";
 
 const DAY_LABEL = { wk: "Lunes a viernes", sa: "Sábados", su: "Domingos y festivos" } as const;
 const MAX_BUSES = 12;
@@ -92,6 +93,8 @@ export default function RouteScreen() {
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
+        {/* cabecera ilustrada: el bus de la ruta, del color de su sistema, por el carril del color de su línea; anda si hay buses en la calle */}
+        <SceneHeader kind={route.system === "cable" ? "cable" : "city"} busColor={color} laneColor={laneColorOf(route.shortName, route.system, c.dark)} long={route.system === "troncal"} sign={route.shortName} moving={d.vehicles.length > 0} height={130} />
         <View style={styles.head}>
           <RouteBadge route={route} />
           <View style={{ flex: 1 }}>
