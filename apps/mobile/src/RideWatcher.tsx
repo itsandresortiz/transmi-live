@@ -4,7 +4,7 @@ import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { type PhoneFix, arrivalAtIndex, busForGpsRide, checkOnShape, checkRide, rideArrival } from "@transmi/application";
-import { isVirtualRide, linkRide, rideSequence, rideVehicle, virtualParts } from "./virtualRide";
+import { isVirtualRide, linkRide, rideSequence, rideVehicle, virtualParts, virtualRideId } from "./virtualRide";
 import { clearRideSnap, rideCheckOf, rideNextStop, rideSnapOf, setRideCheck } from "./rideSnap";
 import { transit } from "./composition-root";
 import { nowMs } from "./clock";
@@ -192,7 +192,25 @@ export function RideWatcher() {
       if (gone) sub?.remove();
     })();
 
-    return () => { gone = true; sub?.remove(); clearRideSnap(); };
+    // tu bus dejó de reportar (más de 90 s sin dato, o ya no aparece) pero tu ubicación confirmaba que ibas en él: el viaje pasa a seguirte
+    // con tu ubicación, con la misma parada de bajada y sus avisos. Antes se quedaba con el último dato del bus («Perdimos la señal»,
+    // tiempos aproximados) y a los 10 min el viaje terminaba solo. Si el bus vuelve a reportar, `busForGpsRide` lo enlaza de nuevo.
+    const handover = !isVirtualRide(busId) ? setInterval(() => {
+      if (AppState.currentState !== "active") return;
+      const now = nowMs(), mine = rideSnapOf(busId, now), v = transit.fleet.get(busId);
+      if (!mine || (v && now / 1000 - v.reportedAt <= 90)) return;
+      const routeId = v?.routeId ?? mine.shape.routeId, si = transit.network.shapes.get(routeId)?.indexOf(mine.shape) ?? -1;
+      if (si < 0) return;
+      const st = useRide.getState();
+      if (st.busId !== busId) return;
+      const to = virtualRideId(routeId, si, Math.max(mine.lastIndex, mine.nextIndex - 1));
+      linkRide(busId, to);
+      st.set(to, st.alightId, st.total);
+      const f = useMapFocus.getState();
+      if (f.followBusId === busId) f.set({ stopId: f.stopId, routeId: f.routeId, locate: false, followBusId: to, busIds: f.busIds.map((b) => (b === busId ? to : b)) });
+    }, EVERY_MS) : undefined;
+
+    return () => { gone = true; sub?.remove(); clearRideSnap(); if (handover) clearInterval(handover); };
   }, [busId]);
 
   // tocar un aviso abre ese viaje (para ver cuánto falta o quitar el aviso); si la app se había cerrado, se recupera dónde te bajas

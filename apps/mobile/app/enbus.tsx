@@ -9,7 +9,7 @@ import { routeTitle } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useRide } from "@/ride";
-import { virtualRideId } from "@/virtualRide";
+import { rideSequence, rideVehicle, virtualRideId } from "@/virtualRide";
 import { SymbolView } from "@/ui/Symbol";
 import { Card, PrimaryButton, Tap } from "@/ui/kit";
 import { CloseToolbar } from "@/ui/CloseToolbar";
@@ -53,7 +53,14 @@ export default function EnBus() {
     return () => { gone = true; sub?.remove(); clearTimeout(timer); };
   }, [round, onlyRoute]);
 
-  const pickBus = (id: string) => { void Haptics.selectionAsync(); useRide.getState().set(id, null); router.replace({ pathname: "/ride/[id]", params: { id } }); };
+  // «Sigo en el bus»: si tu parada de bajada está más adelante en el recorrido que elegiste, se conserva (y sus avisos); antes se perdía
+  const pickBus = (id: string) => {
+    void Haptics.selectionAsync();
+    const st = useRide.getState(), v = rideVehicle(id), seq = v ? rideSequence(v) : undefined;
+    const keep = st.alightId && seq && seq.shape.stopIds.indexOf(st.alightId, seq.index + 1) > 0 ? st.alightId : null;
+    st.set(id, keep, keep ? st.total : 0);
+    router.replace({ pathname: "/ride/[id]", params: { id } });
+  };
   const pickRoute = (r: RouteGuess) => pickBus(virtualRideId(r.route.id, r.shapeIndex, r.fromIndex));
 
   return (
