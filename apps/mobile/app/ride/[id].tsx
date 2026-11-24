@@ -22,6 +22,7 @@ import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteAlerts } from "@/ui/RouteAlerts";
 import { RouteBadge } from "@/ui/RouteBadge";
 import { RideScene } from "@/ui/RideScene";
+import { tipOnce } from "@/tips";
 import { CableScene } from "@/ui/CableScene";
 import { SYSTEM_COLOR, radius, space, type, useColors } from "@/ui/theme";
 import { Eta } from "@/ui/Eta";
@@ -46,6 +47,9 @@ export default function Ride() {
   // (o al revés: tu bus dejó de reportar y el viaje pasó a seguirte con tu ubicación)
   useEffect(() => { if (rideBus && rideBus !== id && linkedBusOf(id) === rideBus) router.setParams({ id: rideBus }); }, [id, rideBus]);
   const v = rideVehicle(id);
+  // la primera vez: hoja de consejo («marca tu parada y te avisamos»)
+  const hasBus = !!v;
+  useEffect(() => { if (hasBus) void tipOnce("ride", 700); }, [hasBus]);
   const virtual = isVirtualRide(id);
   const found = !virtual && rideBus === id && wasLinked(id);
   const r = v ? transit.routeOf(v) : undefined;
