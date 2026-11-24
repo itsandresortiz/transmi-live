@@ -13,6 +13,7 @@ import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
 import { reportProblem } from "@/report";
 import { useAppearance, type AppearanceMode } from "@/appearance";
+import { useOfflineMap } from "@/map/offlineMap";
 import { useSaved } from "@/favorites";
 import { useDemo } from "@/demo";
 import { usePlanner } from "@/planner/store";
@@ -56,6 +57,7 @@ let testsShown = false, secretTaps = 0;
 export default function Mas() {
   const c = useColors();
   const appearance = useAppearance();
+  const offline = useOfflineMap();
   const saved = useSaved();
   const demo = useDemo();
   // casa y trabajo: si no hay, se busca el lugar; si ya hay, se puede cambiar o quitar
@@ -116,6 +118,16 @@ export default function Mas() {
           <Row symbol="location.fill" tint="#3b82f6" title="Cerca de mí" onPress={() => router.push("/cerca")} />
           <Row symbol="house.fill" tint="#10b981" title="Casa" value={saved.home?.name ?? "Agregar"} onPress={() => editPlace("home")} />
           <Row last symbol="briefcase.fill" tint="#6366f1" title="Trabajo" value={saved.work?.name ?? "Agregar"} onPress={() => editPlace("work")} />
+        </Group>
+
+        <Group title="MAPA" footer={offline.enabled ? (offline.progress != null ? `Guardando el mapa de Bogotá: ${offline.progress} %.` : offline.mb != null ? `Mapa de Bogotá guardado en el teléfono (${offline.mb} MB): sin señal se siguen viendo las calles.` : "El mapa de Bogotá se guarda en el teléfono (unos 20 MB, una sola vez) para verlo sin señal.") : "Sin señal, solo se ven las zonas del mapa que ya habías mirado."}>
+          <View style={styles.row}>
+            <View style={[styles.tile, { backgroundColor: "#0ea5e9" }]}><SymbolView name="map.fill" tintColor="#ffffff" size={15} /></View>
+            <View style={styles.rowBody}>
+              <Text style={[type.body, { color: c.text, flex: 1 }]}>Mapa sin conexión</Text>
+              <Toggle value={offline.enabled} onChange={(v) => offline.setEnabled(v)} label="Guardar el mapa de Bogotá para verlo sin señal" />
+            </View>
+          </View>
         </Group>
 
         <Group bare title="APARIENCIA" footer="Automático usa la del teléfono.">

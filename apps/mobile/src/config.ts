@@ -9,4 +9,7 @@ export const CONFIG = {
   scheduleBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/schedule-data/",
   /** Tiempos reales entre paradas por hora del día (los aprende el workflow «hop-stats»). */
   hopBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/hop-stats/",
+  /** Semáforos medidos a mano y lo que los buses dicen de ellos (para sumar su espera a las llegadas, solo si los buses la confirman). */
+  signalsUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/main/tools/data/mediciones-semaforos.json",
+  signalLearningUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/aprendizaje.json",
 } as const;

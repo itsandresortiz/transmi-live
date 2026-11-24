@@ -3,7 +3,7 @@ import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
 import { type SignalRow, simulatedCabins, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
-import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, networkSource, transit } from "./composition-root";
+import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, loadSignalWaits, networkSource, transit } from "./composition-root";
 import { nowMs, nowSec } from "./clock";
 import { BusRenderer } from "./map/BusRenderer";
 import { loadTroncales } from "./map/geodata";
@@ -154,6 +154,7 @@ export function App() {
     void loadServiceEnds();
     void loadDepartures();
     void loadHopProfile();
+    void loadSignalWaits();
     void networkSource.load().then((n) => {
       if (stopped) return;
       transit.setNetwork(n);

@@ -40,7 +40,12 @@ export function startData(): () => void {
   };
   void loadStatic();
   // tiempos reales por tramo (~0,5 MB): opcionales y sin apuro; se leen unos segundos después para no frenar la apertura
-  const loadHops = () => void gz<unknown>(`${CONFIG.hopBase}profile.json.gz?t=${hourNow()}`, "hop-profile.json.gz").then((d) => { if (d) transit.hopProfile.load(d); });
+  const loadHops = () => {
+    void gz<unknown>(`${CONFIG.hopBase}profile.json.gz?t=${hourNow()}`, "hop-profile.json.gz").then((d) => { if (d) transit.hopProfile.load(d); });
+    // semáforos medidos y lo que dicen los buses de ellos: la espera solo se suma si los buses la confirman (ver signal-eta.ts)
+    const j = (u: string) => fetch(`${u}?t=${hourNow()}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    void Promise.all([j(`${CONFIG.signalsUrl}`), j(`${CONFIG.signalLearningUrl}`)]).then(([m, l]) => { if (m && l) transit.signalWaits.load(m, l); });
+  };
   const hops = setTimeout(loadHops, 4000);
   // iOS puede tener la app suspendida días: al volver a ella tras más de 12 h se cargan de nuevo la red del día (con sus cierres temporales),
   // los horarios y los tiempos aprendidos (antes solo se leían al abrirla de cero y, p. ej., un cierre ya vencido seguía en «Cómo llegar»)

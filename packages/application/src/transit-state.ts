@@ -1,3 +1,4 @@
+import { SignalWaits } from "./signal-eta";
 import {
   Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle, type RouteShape,
   type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, isAlertActive, parseStopName, MAX_REPORT_AGE_S,
@@ -36,6 +37,8 @@ export class TransitState {
   readonly travelTimes = new TravelTimes();
   /** Tiempos reales por tramo y hora (rama `hop-stats`); vacío hasta que la app los descarga. */
   readonly hopProfile = new HopProfile();
+  /** Semáforos medidos que los buses confirman: su espera se suma a las llegadas (ver `signal-eta.ts`). */
+  readonly signalWaits = new SignalWaits();
   // festivos: los tiempos aprendidos se eligen por el tipo de día de servicio, no solo por el día de la semana
   private readonly hopDayWired = (this.hopProfile.dayOf = (t: number) => this.serviceEnds.dayAt(t).type);
   /** Primer y último viaje de cada ruta, para marcar «último servicio». */

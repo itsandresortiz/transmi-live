@@ -1,6 +1,6 @@
 /** Raíz de composición: aquí (y solo aquí) se conectan los puertos con sus adaptadores. */
-import { LiveDataService, TransitState } from "@transmi/application";
-import { GtfsLiteNetworkSource, ProxyLiveFeed, WorkerLiveFeed } from "@transmi/infrastructure";
+import { LiveDataService, type NetworkSourcePort, TransitState } from "@transmi/application";
+import { type CompactNetworkDto, GtfsLiteNetworkSource, type NetworkDto, ProxyLiveFeed, WorkerLiveFeed, buildNetwork, expandNetwork } from "@transmi/infrastructure";
 import { CONFIG } from "./config";
 import { nowMs, updateClockOffset } from "./clock";
 import { makeCachedFetch } from "./offline-cache";
@@ -22,11 +22,35 @@ function makeFeed() {
 const feed = makeFeed();
 export const liveData = new LiveDataService(feed, transit, { now: nowMs });
 
-export const networkSource = new GtfsLiteNetworkSource({
+const zipSource = new GtfsLiteNetworkSource({
   url: `${CONFIG.dataBase}gtfs-lite.zip?t=${Math.floor(Date.now() / 3_600_000)}`,
   fetchFn: cachedFetch,
   createWorker: () => new Worker(new URL("../../../packages/infrastructure/src/gtfs/worker.ts", import.meta.url), { type: "module" }),
 });
+
+/** Lee un archivo .json.gz publicado (o su copia sin conexión). */
+async function gzJson<T>(url: string): Promise<T | null> {
+  if (typeof DecompressionStream === "undefined") return null;
+  const res = await cachedFetch(`${url}?t=${Math.floor(Date.now() / 3_600_000)}`);
+  if (!res.ok || !res.body) return null;
+  return JSON.parse(await new Response(res.body.pipeThrough(new DecompressionStream("gzip"))).text()) as T;
+}
+/** La red de rutas: primero la ya procesada en formato compacto (`network2.json.gz`, ~1 MB, la misma que usa la app), luego la de
+ *  siempre (`network.json.gz`, ~2 MB) y, si ninguna está, el GTFS reducido (`gtfs-lite.zip`, 17 MB que hay que procesar). Antes la web
+ *  descargaba siempre los 17 MB: en un celular con datos tardaba y gastaba mucho más. */
+export const networkSource: NetworkSourcePort = {
+  async load() {
+    try {
+      const d2 = await gzJson<CompactNetworkDto>(`${CONFIG.dataBase}network2.json.gz`);
+      if (d2?.v === 2 && d2.shapes?.length && d2.stops?.length) return buildNetwork(expandNetwork(d2));
+    } catch { /* se intenta con el formato de siempre */ }
+    try {
+      const d1 = await gzJson<NetworkDto & { v?: number }>(`${CONFIG.dataBase}network.json.gz`);
+      if (d1?.v === 1 && d1.shapes?.length && d1.stops?.length) return buildNetwork(d1);
+    } catch { /* se intenta con el GTFS reducido */ }
+    return zipSource.load();
+  },
+};
 
 /** Carga las horas de salida programadas (para mostrar horarios por parada). Si falla o aún no existe, la app sigue sin eso. */
 export async function loadDepartures(): Promise<void> {
@@ -59,4 +83,13 @@ export async function loadServiceEnds(): Promise<void> {
     const text = await new Response(res.body.pipeThrough(new DecompressionStream("gzip"))).text();
     transit.setServiceEnds(JSON.parse(text));
   } catch { /* sin conexión o archivo aún no publicado */ }
+}
+
+/** Semáforos medidos y lo que dicen los buses de ellos: su espera se suma a las llegadas solo si los buses la confirman (ver signal-eta.ts). */
+export async function loadSignalWaits(): Promise<void> {
+  try {
+    const t = Math.floor(Date.now() / 3_600_000);
+    const [m, l] = await Promise.all([CONFIG.signalsUrl, CONFIG.signalLearningUrl].map((u) => fetch(`${u}?t=${t}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
+    if (m && l) transit.signalWaits.load(m, l);
+  } catch { /* sin conexión: no se suma nada */ }
 }

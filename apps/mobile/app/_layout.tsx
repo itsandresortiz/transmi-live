@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { startData } from "@/bootstrap";
+import { ensureOfflineMap } from "@/map/offlineMap";
 import { RideWatcher } from "@/RideWatcher";
 import { TripWatcher } from "@/TripWatcher";
 import { BusWatcher } from "@/BusWatcher";
@@ -29,7 +30,9 @@ export default function RootLayout() {
   useEffect(() => {
     let stop: (() => void) | undefined;
     const id = setTimeout(() => { stop = startData(); }, 650);
-    return () => { clearTimeout(id); stop?.(); };
+    // el mapa de Bogotá para usar sin señal se baja (o se renueva) un rato después de abrir, sin estorbar el arranque
+    const map = setTimeout(() => { void ensureOfflineMap(); }, 20_000);
+    return () => { clearTimeout(id); clearTimeout(map); stop?.(); };
   }, []);
   // la primera vez se explica qué es la app y qué hace con los datos
   const launched = useLaunch((s) => s.done);

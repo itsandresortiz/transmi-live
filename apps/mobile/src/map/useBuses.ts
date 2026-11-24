@@ -73,7 +73,10 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       const count = build();
       if (Date.now() - lastPrune > 30_000) { lastPrune = Date.now(); motion.prune(); }      // el motor olvida los buses que ya no existen (si no, la memoria crece sin parar)
       const spent = Date.now() - t0;
-      if (!stopped) timer = setTimeout(loop, Math.max(everyMs, cadenceMs(view.zoom, count), spent * 3));      // si calcular tarda mucho, se espacia: los toques tienen prioridad sobre el movimiento
+      // a media distancia (zoom 12–14,5, ≤400 buses) los buses avanzaban a saltos cada 0,4–0,7 s: ahora como mucho cada 0,25 s. Si el
+      // teléfono tarda en calcular, `spent * 3` lo vuelve a espaciar solo (no calienta un teléfono lento)
+      const base = cadenceMs(view.zoom, count), cadence = view.zoom >= 12 && count <= 400 ? Math.min(base, 250) : base;
+      if (!stopped) timer = setTimeout(loop, Math.max(everyMs, cadence, spent * 3));      // si calcular tarda mucho, se espacia: los toques tienen prioridad sobre el movimiento
     };
     loop();
     return () => { stopped = true; clearTimeout(timer); };
