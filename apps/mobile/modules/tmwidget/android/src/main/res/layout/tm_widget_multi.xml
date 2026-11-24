@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget alto: hasta tres paradas favoritas, una debajo de otra; cada una abre la suya. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tm_m_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="14dp" android:background="@drawable/tm_widget_bg">
+    <TextView android:id="@+id/tm_m_empty" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/tm_widget_muted" android:textSize="13sp" android:visibility="gone"
+        android:text="Abre TransMi LIVE y guarda tus paradas con la estrella para verlas aquí." />
+    <LinearLayout android:id="@+id/tm_s1" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/tm_s1_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/tm_s1_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="8dp"
+                android:textColor="@color/tm_widget_muted" android:textSize="10sp" android:textStyle="bold" android:maxLines="1" />
+        </LinearLayout>
+        <TextView android:id="@+id/tm_s1_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+            android:textColor="@color/tm_widget_muted" android:textSize="12sp" android:visibility="gone" android:text="Sin buses por ahora." />
+        <LinearLayout android:id="@+id/tm_s1_row1" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="4dp" android:visibility="gone">
+            <TextView android:id="@+id/tm_s1_route1" android:layout_width="wrap_content" android:layout_height="22dp" android:minWidth="42dp"
+                android:paddingLeft="7dp" android:paddingRight="7dp" android:gravity="center" android:background="@drawable/tm_widget_badge"
+                android:textColor="#FFFFFFFF" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <TextView android:id="@+id/tm_s1_head1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginLeft="8dp" android:layout_marginRight="8dp" android:textColor="@color/tm_widget_muted" android:textSize="12sp"
+                android:maxLines="1" android:ellipsize="end" />
+            <Chronometer android:id="@+id/tm_s1_count1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="15sp" android:textStyle="bold" android:visibility="gone" />
+            <TextView android:id="@+id/tm_s1_time1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="15sp" android:textStyle="bold" android:visibility="gone" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/tm_s1_row2" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="4dp" android:visibility="gone">
+            <TextView android:id="@+id/tm_s1_route2" android:layout_width="wrap_content" android:layout_height="22dp" android:minWidth="42dp"
+                android:paddingLeft="7dp" android:paddingRight="7dp" android:gravity="center" android:background="@drawable/tm_widget_badge"
+                android:textColor="#FFFFFFFF" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <TextView android:id="@+id/tm_s1_head2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginLeft="8dp" android:layout_marginRight="8dp" android:textColor="@color/tm_widget_muted" android:textSize="12sp"
+                android:maxLines="1" android:ellipsize="end" />
+            <Chronometer android:id="@+id/tm_s1_count2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:visibility="gone" />
+            <TextView android:id="@+id/tm_s1_time2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/tm_s2" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:layout_marginTop="10dp" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/tm_s2_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/tm_s2_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="8dp"
+                android:textColor="@color/tm_widget_muted" android:textSize="10sp" android:textStyle="bold" android:maxLines="1" />
+        </LinearLayout>
+        <TextView android:id="@+id/tm_s2_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+            android:textColor="@color/tm_widget_muted" android:textSize="12sp" android:visibility="gone" android:text="Sin buses por ahora." />
+        <LinearLayout android:id="@+id/tm_s2_row1" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="4dp" android:visibility="gone">
+            <TextView android:id="@+id/tm_s2_route1" android:layout_width="wrap_content" android:layout_height="22dp" android:minWidth="42dp"
+                android:paddingLeft="7dp" android:paddingRight="7dp" android:gravity="center" android:background="@drawable/tm_widget_badge"
+                android:textColor="#FFFFFFFF" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <TextView android:id="@+id/tm_s2_head1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginLeft="8dp" android:layout_marginRight="8dp" android:textColor="@color/tm_widget_muted" android:textSize="12sp"
+                android:maxLines="1" android:ellipsize="end" />
+            <Chronometer android:id="@+id/tm_s2_count1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="15sp" android:textStyle="bold" android:visibility="gone" />
+            <TextView android:id="@+id/tm_s2_time1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="15sp" android:textStyle="bold" android:visibility="gone" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/tm_s2_row2" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="4dp" android:visibility="gone">
+            <TextView android:id="@+id/tm_s2_route2" android:layout_width="wrap_content" android:layout_height="22dp" android:minWidth="42dp"
+                android:paddingLeft="7dp" android:paddingRight="7dp" android:gravity="center" android:background="@drawable/tm_widget_badge"
+                android:textColor="#FFFFFFFF" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <TextView android:id="@+id/tm_s2_head2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginLeft="8dp" android:layout_marginRight="8dp" android:textColor="@color/tm_widget_muted" android:textSize="12sp"
+                android:maxLines="1" android:ellipsize="end" />
+            <Chronometer android:id="@+id/tm_s2_count2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:visibility="gone" />
+            <TextView android:id="@+id/tm_s2_time2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/tm_s3" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:layout_marginTop="10dp" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/tm_s3_name" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/tm_s3_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="8dp"
+                android:textColor="@color/tm_widget_muted" android:textSize="10sp" android:textStyle="bold" android:maxLines="1" />
+        </LinearLayout>
+        <TextView android:id="@+id/tm_s3_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+            android:textColor="@color/tm_widget_muted" android:textSize="12sp" android:visibility="gone" android:text="Sin buses por ahora." />
+        <LinearLayout android:id="@+id/tm_s3_row1" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="4dp" android:visibility="gone">
+            <TextView android:id="@+id/tm_s3_route1" android:layout_width="wrap_content" android:layout_height="22dp" android:minWidth="42dp"
+                android:paddingLeft="7dp" android:paddingRight="7dp" android:gravity="center" android:background="@drawable/tm_widget_badge"
+                android:textColor="#FFFFFFFF" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <TextView android:id="@+id/tm_s3_head1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginLeft="8dp" android:layout_marginRight="8dp" android:textColor="@color/tm_widget_muted" android:textSize="12sp"
+                android:maxLines="1" android:ellipsize="end" />
+            <Chronometer android:id="@+id/tm_s3_count1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="15sp" android:textStyle="bold" android:visibility="gone" />
+            <TextView android:id="@+id/tm_s3_time1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="15sp" android:textStyle="bold" android:visibility="gone" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/tm_s3_row2" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="4dp" android:visibility="gone">
+            <TextView android:id="@+id/tm_s3_route2" android:layout_width="wrap_content" android:layout_height="22dp" android:minWidth="42dp"
+                android:paddingLeft="7dp" android:paddingRight="7dp" android:gravity="center" android:background="@drawable/tm_widget_badge"
+                android:textColor="#FFFFFFFF" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <TextView android:id="@+id/tm_s3_head2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:layout_marginLeft="8dp" android:layout_marginRight="8dp" android:textColor="@color/tm_widget_muted" android:textSize="12sp"
+                android:maxLines="1" android:ellipsize="end" />
+            <Chronometer android:id="@+id/tm_s3_count2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:visibility="gone" />
+            <TextView android:id="@+id/tm_s3_time2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/tm_widget_text" android:textSize="14sp" android:textStyle="bold" android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

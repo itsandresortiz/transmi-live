@@ -30,13 +30,17 @@ if (Platform.OS === "android" && TmWidget) {
   storage = { set: (_key, value) => w.setSnapshot(value) };
 }
 
+/** Cuántas favoritas recibe el widget. Las tres primeras se ven en los tamaños grandes; el resto son las opciones para elegir la parada
+ *  del widget (iPhone: «Editar widget»; Android: tocar el nombre). Los widgets viejos leen solo la primera, así que siguen igual. */
+const WIDGET_STOPS = 6;
+
 let last = "";
 export function syncWidget(): void {
   if (!storage || !transit.network.stops.size) return;
   const demo = isDemo();      // los buses de ejemplo llegan al widget marcados: el widget lo rotula «Demostración», nunca como dato real
   const saved = useSaved.getState();
   const now = nowSec();
-  const stops = saved.stops.slice(0, 3).flatMap((id) => {
+  const stops = saved.stops.slice(0, WIDGET_STOPS).flatMap((id) => {
     const stop = transit.stopById(id);
     if (!stop) return [];
     const arrivals = spreadArrivals(upcomingAtStop(transit, id, now, 6)

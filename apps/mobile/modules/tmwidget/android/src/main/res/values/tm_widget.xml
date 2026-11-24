@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tm_widget_name">Parada favorita</string>
+    <string name="tm_widget_description">Los próximos buses de tu parada favorita. Toca el nombre para pasar a la siguiente.</string>
+    <string name="tm_widget_multi_name">Paradas favoritas</string>
+    <string name="tm_widget_multi_description">Los próximos buses de tres de tus paradas favoritas a la vez.</string>
+    <color name="tm_widget_bg">#FFFFFFFF</color>
+    <color name="tm_widget_text">#FF0B0B0D</color>
+    <color name="tm_widget_muted">#FF5C5C63</color>
+</resources>

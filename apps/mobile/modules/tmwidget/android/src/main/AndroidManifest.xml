@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application>
+        <!-- Widget «Parada favorita»: los próximos buses de una parada guardada (tocar el nombre pasa a la siguiente). -->
+        <receiver android:name="expo.modules.tmwidget.StopWidgetProvider" android:exported="true" android:label="@string/tm_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/tm_widget_info" />
+        </receiver>
+        <!-- Widget «Paradas favoritas» (alto): hasta tres paradas a la vez. Mismo código, otro tamaño. -->
+        <receiver android:name="expo.modules.tmwidget.StopsWidgetProvider" android:exported="true" android:label="@string/tm_widget_multi_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/tm_widget_multi_info" />
+        </receiver>
+    </application>
+</manifest>
