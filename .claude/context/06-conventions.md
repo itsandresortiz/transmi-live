@@ -34,6 +34,7 @@
 - App: pantallas ocultas no deben repintarse (`useTransitVersion`/`useNow` ya dependen de `useIsFocused`); no calcular cosas pesadas en cada segundo.
 - No tocar el motor de movimiento para «inventar» paradas cuando el bus no trae ninguna.
 - Pruebas deben pasar **sin** `apps/mobile/node_modules` (así corre CI).
+- Código nativo de los módulos (`apps/mobile/modules/*/android`, `*/ios`) **va en git**: el `.gitignore` de la app solo ignora `/android/` y `/ios/` de la raíz (los que genera `expo prebuild`). Antes del 2026-11-24 la regla `android/` tapaba los módulos.
 
 ## Diseño / UI
 - Títulos grandes (`type.hero`, `type.largeTitle`; en la web `.dcard h2`, `.sh h2`) en la **letra ancha** `TMWide-ExtraBold` (Archivo Expanded ExtraBold, OFL). Todo lo demás, letra del sistema; los números grandes usan `type.number`. No ponerle `fontWeight` a un texto con la letra ancha.

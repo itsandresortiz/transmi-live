@@ -48,7 +48,7 @@ Notas:
 
 ## Entornos
 - **Local del dueño**: Mac con Xcode; compila con `apps/mobile/scripts/testflight-local.sh` o corre en simulador con `npx expo run:ios` + `npx expo start --dev-client`.
-- **Contenedor de Claude** (Linux): sin Xcode ni red hacia el sitio de TransMilenio ni hacia transmilive.com; sí GitHub (API y `git`) y npm. Puede lanzar Playwright (Chromium) para generar imágenes.
+- **Contenedor de Claude** (Linux): sin Xcode ni red hacia transmilive.com (el 2026-11-24 sí respondió `gtfs.transmilenio.gov.co` **(?)**); sí GitHub (API y `git`) y npm. Puede lanzar Playwright (Chromium) para generar imágenes.
 - **GitHub Actions**: descarga los feeds y el GTFS, despliega la web, mide la calidad de los datos.
 - **Producción web**: GitHub Pages. **Producción app**: TestFlight (aún no App Store).
 

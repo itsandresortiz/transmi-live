@@ -66,3 +66,9 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 - **Mensajes del dueño** (web y app desde 1.0.1): `mensajes.json` en la raíz del repo → en la línea de «En vivo», AL LADO del estado (desde 2026-11-19: «En vivo · hace N s | ● mensaje», el mensaje se desliza si no cabe; antes lo reemplazaba) y primera tarjeta de Avisos, rotulado «Aviso de TransMi LIVE». Cómo escribirlos: clave `como_usarlo` y `ejemplo` dentro del mismo archivo.
 
 - **TransMiCable** (2026-11-21, web y app): línea y estaciones siempre visibles en el mapa (cabina roja y negra), ficha de estación con el horario oficial (cada 10–16 s, «según horario», nunca «en vivo»: las cabinas no reportan posición), incluido en «Cómo llegar». Solo la línea de Ciudad Bolívar (C_1); la de San Cristóbal no está en el GTFS.
+
+## Añadido 2026-11-24 (1.0.9)
+- **Mapa sin conexión** (app): `src/map/offlineMap.ts`, interruptor en Más → «Mapa sin conexión».
+- **Widget**: iPhone pequeño 1 parada, mediano 2, grande 3, elegir parada con «Editar widget» (AppIntents); Android «Parada favorita» (tocar el nombre pasa a la siguiente favorita, «1 de 3 ›») y «Paradas favoritas» 4×3 (hasta 3). La app pasa hasta 6 favoritas (`src/widgetSync.tsx`).
+- **Ilustraciones** (`src/ui/Illustrations.tsx`): bienvenida (`app/onboarding.tsx`), cabecera de ruta (130 pt) y de parada (140 pt: estación, paradero o cable), hojas de consejo `app/tip/[id].tsx` con textos en `src/tips.ts` (se muestran una sola vez).
+- **Llegadas**: espera de semáforos confirmados por los buses (`signal-eta.ts`); los buses del mapa avanzan con el ritmo aprendido de cada tramo (`motion.ts`).
