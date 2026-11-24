@@ -21,7 +21,7 @@ export function hopTag(nowMs: number): { day: HopDay; bucket: number } {
 }
 
 /** Formato publicado: `r["ruta|sentido"]["wk|1"] = [segundos0, pasadas0, segundos1, pasadas1, …]` (0, 0 = sin datos de ese tramo). */
-export interface HopProfileData { v: 1; updated: string; /** `false` = publicado solo para medir; la app no lo usa todavía. */ use?: boolean; /** Cuánto pesa el valor fijo (sobrescribe `HOP_PRIOR_N` en apps ya publicadas). */ prior?: number; /** Segundos de más en cada llegada (`HOP_EXTRA_S`). */ extra?: number; r: Record<string, Record<string, number[]>> }
+export interface HopProfileData { v: 1; updated: string; /** `false` = publicado solo para medir; la app no lo usa todavía. */ use?: boolean; /** Cuánto pesa el valor fijo (sobrescribe `HOP_PRIOR_N` en apps ya publicadas). */ prior?: number; /** Segundos de más en cada llegada (`HOP_EXTRA_S`). Lo leen las apps viejas; las nuevas prefieren `extraBy`. */ extra?: number; /** Lo mismo por franja (`HOP_BUCKETS`, 5 valores): el sesgo no es igual en hora pico que de noche. */ extraBy?: number[]; r: Record<string, Record<string, number[]>> }
 
 /** Un tramo tiene que haberse recorrido al menos esto (en tramos completos) para usar su tiempo. */
 export const HOP_MIN_N = 3;
@@ -32,6 +32,13 @@ export const HOP_PRIOR_N = 0;
  *  decía que el bus llegaba ~20 s antes de lo real; con +15 s el sesgo baja a ~−5 s y el error típico mejora un poco (33→31 s a una
  *  parada). Va en el archivo publicado (`extra`), así se puede ajustar sin sacar versión nueva. */
 export const HOP_EXTRA_S = 15;
+/** `HOP_EXTRA_S` por franja (`HOP_BUCKETS`: madrugada, pico mañana, valle, pico tarde, noche), p. ej. `[15, 30, 15, 30, 10]`. Si no es
+ *  `null`, el perfil publicado lo lleva en `extraBy` (las apps viejas siguen leyendo `extra`). Se deja apagado hasta medir las otras franjas:
+ *  el 2026-11-24 solo se pudo medir el valle (2 capturas, 47 lotes, ≈5.300 buses, 37.000 llegadas a 1 parada). Ahí el mejor ajuste es
+ *  +10/+15 s (sesgo a 1 parada −15/−21 s sin ajuste, ~0 con +15), igual que el +15 actual, y el sesgo casi no está en las paradas
+ *  siguientes (−3/−5 s a 2–3 paradas): +15 s las empeora un poco (error 36→40 s a 2 paradas). Medir con el workflow «Medir precisión de
+ *  los tiempos de llegada» en pico (6–10 y 16–20) y de noche, y llenar esto solo si alguna franja pide más de ~10 s distinto al valle. */
+export const HOP_EXTRA_BY: readonly number[] | null = null;
 const MIN_S = 8, MAX_S = 900;
 
 export class HopProfile {
@@ -41,6 +48,8 @@ export class HopProfile {
   priorN = HOP_PRIOR_N;
   /** Segundos que se suman a cada llegada mientras se usa lo aprendido (ver `HOP_EXTRA_S`). */
   extra = 0;
+  /** Lo mismo por franja (`HOP_BUCKETS`); `null` = el mismo `extra` todo el día. */
+  extraBy: number[] | null = null;
   private routes = new Map<string, Record<string, number[]>>();
   private stamp = "";
   private tag = hopTag(0);
@@ -67,25 +76,41 @@ export class HopProfile {
     this.stamp = typeof d.updated === "string" ? d.updated : "";
     this.apply = d.use !== false;          // se enciende o apaga desde los datos, sin sacar una versión nueva de la app
     if (typeof d.prior === "number" && d.prior >= 0) this.priorN = d.prior;
-    this.extra = typeof d.extra === "number" && d.extra >= -120 && d.extra <= 120 ? d.extra : 0;
+    this.extra = okExtra(d.extra) ? d.extra : 0;
+    this.extraBy = Array.isArray(d.extraBy) && d.extraBy.length === HOP_BUCKETS.length && d.extraBy.every(okExtra) ? d.extraBy.slice() : null;
     return true;
+  }
+
+  /** Segundos que se suman a una llegada calculada a esta hora: el de su franja si el perfil lo trae, si no el general. */
+  extraAt(nowMs: number): number {
+    return this.extraBy ? this.extraBy[hopTag(nowMs).bucket]! : this.extra;
   }
 
   /** Segundos para el tramo `i` (de la parada i a la i+1) del recorrido a esta hora: lo aprendido mezclado con `fallback` (el valor fijo).
    *  Sin datos suficientes devuelve `fallback` tal cual. Los fines de semana sin datos propios usan los de entre semana de la misma franja. */
   seconds(shape: RouteShape, i: number, nowMs: number, fallback: number): number {
-    if (!this.apply) return fallback;
-    const r = this.routes.get(`${shape.routeId}|${shape.direction}`);
-    if (!r) return fallback;
-    if (Math.abs(nowMs - this.tagAt) > 30_000) { const t = hopTag(nowMs); this.tag = this.dayOf ? { ...t, day: this.dayOf(nowMs) } : t; this.tagAt = nowMs; }      // se calcula pocas veces: se pide miles de veces por lote
-    const { day, bucket } = this.tag;
-    let hit = pick(r[`${day}|${bucket}`], i, this.minN);
-    if (!hit && day !== "wk") hit = pick(r[`wk|${bucket}`], i, this.minN);
+    const hit = this.learned(shape, i, nowMs);
     if (!hit) return fallback;
     const s = Math.min(MAX_S, Math.max(MIN_S, hit.s));
     return (hit.n * s + this.priorN * fallback) / (hit.n + this.priorN);
   }
+
+  /** ¿Hay tiempo aprendido para ese tramo a esta hora? (Para quien quiere usarlo solo si existe, sin valor fijo con qué mezclarlo.) */
+  has(shape: RouteShape, i: number, nowMs: number): boolean { return this.learned(shape, i, nowMs) != null; }
+
+  private learned(shape: RouteShape, i: number, nowMs: number): { s: number; n: number } | null {
+    if (!this.apply) return null;
+    const r = this.routes.get(`${shape.routeId}|${shape.direction}`);
+    if (!r) return null;
+    if (Math.abs(nowMs - this.tagAt) > 30_000) { const t = hopTag(nowMs); this.tag = this.dayOf ? { ...t, day: this.dayOf(nowMs) } : t; this.tagAt = nowMs; }      // se calcula pocas veces: se pide miles de veces por lote
+    const { day, bucket } = this.tag;
+    let hit = pick(r[`${day}|${bucket}`], i, this.minN);
+    if (!hit && day !== "wk") hit = pick(r[`wk|${bucket}`], i, this.minN);
+    return hit;
+  }
 }
+
+function okExtra(x: unknown): x is number { return typeof x === "number" && Number.isFinite(x) && x >= -120 && x <= 120; }
 
 function pick(arr: number[] | undefined, i: number, minN: number): { s: number; n: number } | null {
   if (!arr) return null;
@@ -95,7 +120,7 @@ function pick(arr: number[] | undefined, i: number, minN: number): { s: number; 
 
 /** Arma el perfil publicado a partir de las sumas que acumula `tools/hopstats.ts` (`ruta|sentido|tramo|día|franja` → pasadas y segundos).
  *  `stopsOf` dice cuántas paradas tiene cada recorrido hoy: si el GTFS cambió y la ruta ya no tiene ese tramo, se descarta. */
-export function buildHopProfile(stats: Record<string, { n: number; sum: number }>, stopsOf: (routeDir: string) => number | undefined, updated: string, minN = HOP_MIN_N, use = true, prior = HOP_PRIOR_N, extra = HOP_EXTRA_S): HopProfileData {
+export function buildHopProfile(stats: Record<string, { n: number; sum: number }>, stopsOf: (routeDir: string) => number | undefined, updated: string, minN = HOP_MIN_N, use = true, prior = HOP_PRIOR_N, extra = HOP_EXTRA_S, extraBy: readonly number[] | null = HOP_EXTRA_BY): HopProfileData {
   const r: Record<string, Record<string, number[]>> = {};
   for (const [key, a] of Object.entries(stats)) {
     const [route, dir, idx, day, bucket] = key.split("|");
@@ -106,5 +131,5 @@ export function buildHopProfile(stats: Record<string, { n: number; sum: number }
     arr[2 * i] = Math.round(a.sum / a.n);
     arr[2 * i + 1] = Math.min(999, Math.round(a.n));
   }
-  return { v: 1, updated, use, prior, extra, r };
+  return { v: 1, updated, use, prior, extra, ...(extraBy ? { extraBy: [...extraBy] } : {}), r };
 }

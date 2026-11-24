@@ -1,7 +1,8 @@
 import {
-  DEFAULT_PREDICTION, METERS_PER_WORLD_UNIT, RoadPath, type RouteLock, type Vehicle, type WorldPoint,
+  DEFAULT_PREDICTION, METERS_PER_WORLD_UNIT, RoadPath, type RouteLock, type RouteShape, type Vehicle, type WorldPoint,
   lockToRoute, motionSeconds, toWorld,
 } from "@transmi/domain";
+import { estimateTravelSeconds, shapeStops } from "./eta";
 import type { TransitState } from "./transit-state";
 
 /** Parámetros del movimiento. Se calibraron con lotes reales (ver README, «Cómo se mueven los buses»). */
@@ -27,10 +28,24 @@ export interface MotionParams {
   stopClamp: boolean;
   /** Cuánto se deja pasar la parada (m): el bus se detiene antes y después del punto exacto. */
   stopSlackMeters: number;
+  /** Peso (0–1) de los tiempos reales por tramo (`state.hopProfile`) en el adelanto entre reportes, frente a la velocidad medida del bus.
+   *  0 = solo la velocidad medida (como antes). Solo se usa en buses con parada conocida y con datos del tramo en que van. */
+  hopWeight: number;
+  /** Fracción del avance según los tiempos por tramo que se aplica por cada segundo de antigüedad del reporte. */
+  hopGain: number;
+  /** Peso de lo aprendido cuando la velocidad medida dice que el bus estaba detenido (semáforo, parada, trancón). */
+  hopWeightStill: number;
 }
+/** Ver `MotionParams.hopWeight`, `hopGain` y `hopWeightStill`. Medido el 2026-11-24 en hora valle con `tools/precision.ts`
+ *  (34 lotes, ≈5.400 buses, 130.606 comparaciones): con solo la velocidad medida el bus dibujado quedaba a 182 m (mediana; p90 508 m)
+ *  de donde estaba de verdad y casi siempre atrás (−173 m a lo largo de la calle); con los tiempos por tramo, a 118 m (p90 353 m) y
+ *  sin sesgo (−8 m). Mezclar a medias (0,5) dejaba 137 m; ir 10 % más rápido que lo aprendido (1,1), 121 m. En los buses que estaban
+ *  detenidos lo aprendido los adelanta de más (103 → 145 m): con peso 0,25 para ellos, 134 m, sin empeorar a los demás. */
+export const HOP_WEIGHT = 1, HOP_GAIN = 1, HOP_WEIGHT_STILL = 0.25;
 export const DEFAULT_MOTION: MotionParams = {
   rateGain: 1, catchUp: 0.18, speedSmoothing: 1.5, maxRush: 3, rushMarginMps: 3,
   snapMeters: 800, glideSeconds: 1.8, creep: 0.5, lockMeters: 60, stopClamp: false, stopSlackMeters: 12,
+  hopWeight: HOP_WEIGHT, hopGain: HOP_GAIN, hopWeightStill: HOP_WEIGHT_STILL,
 };
 
 interface Track {
@@ -55,11 +70,24 @@ interface Track {
   lastT: number;
   /** Rumbo mostrado (grados desde el norte, en el sentido del reloj), suavizado. */
   h: number | null;
+  /** Avance esperado desde el reporte según los tiempos reales de cada tramo (ver `hopPlan`), o `null` si no se sabe. */
+  plan: HopPlan | null;
+}
+
+/** Puntos (segundos desde el reporte → metros sobre el trazado) por los que pasaría el bus yendo al ritmo típico de cada tramo a esta hora. */
+interface HopPlan { ts: number[]; ss: number[] }
+function planAt(p: HopPlan, t: number): { s: number; rate: number } {
+  const { ts, ss } = p, n = ts.length;
+  if (t <= 0) return { s: ss[0]!, rate: n > 1 ? (ss[1]! - ss[0]!) / (ts[1]! - ts[0]!) : 0 };
+  for (let i = 1; i < n; i++) if (t <= ts[i]!) { const r = (ss[i]! - ss[i - 1]!) / (ts[i]! - ts[i - 1]!); return { s: ss[i - 1]! + r * (t - ts[i - 1]!), rate: r }; }
+  return { s: ss[n - 1]!, rate: 0 };      // fin del recorrido (o del horizonte): ahí se queda
 }
 
 /** Velocidad típica entre paradas (m/s) cuando no hay nada mejor. */
 const TYPICAL_SPEED_MPS: Record<string, number> = { troncal: 6, dual: 5, alimentador: 4, zonal: 4, otro: 4 };
 const STALE_SECONDS = 5;
+/** Por debajo de esto (m/s, medido en ≥28 s) el bus estaba detenido. */
+const STILL_MPS = 0.5;
 const MAX_STEP = 0.25;
 
 /** Calcula, cuadro a cuadro, dónde dibujar cada bus: sigue el trazado de su ruta, nunca retrocede y
@@ -68,6 +96,8 @@ export class MotionEngine {
   private tracks = new Map<string, Track>();
   private paths = new Map<string, RoadPath[]>();
   private pathsFor: object | null = null;
+  /** El recorrido (con sus paradas) del que sale cada trazado. */
+  private shapeOf = new WeakMap<RoadPath, RouteShape>();
 
   constructor(private readonly state: TransitState, readonly params: MotionParams = DEFAULT_MOTION) {}
 
@@ -76,7 +106,7 @@ export class MotionEngine {
     if (this.pathsFor !== net) { this.paths = new Map(); this.tracks.clear(); this.pathsFor = net; }
     let list = this.paths.get(routeId);
     if (!list) {
-      list = (net.shapes.get(routeId) ?? []).filter((sh) => sh.points.length > 1).map((sh) => new RoadPath(sh.points));
+      list = (net.shapes.get(routeId) ?? []).filter((sh) => sh.points.length > 1).map((sh) => { const p = new RoadPath(sh.points); this.shapeOf.set(p, sh); return p; });
       this.paths.set(routeId, list);
     }
     return list;
@@ -105,9 +135,9 @@ export class MotionEngine {
     if (!t || nowSec - t.lastT > STALE_SECONDS || t.reportedAt !== v.reportedAt) {
       const { lock, speed: sp } = this.resolve(v, nowSec, t?.lock?.path);
       if (!t || nowSec - t.lastT > STALE_SECONDS) {
-        const r0 = sp * p.rateGain;
-        const target = this.target(v, nowSec, lock, sp);
-        t = { reportedAt: v.reportedAt, lock, speed: sp, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: r0, ux: 0, uy: 0, lastT: nowSec, h: null };
+        const plan = this.hopPlan(v, lock, nowSec);
+        const target = this.target(v, nowSec, lock, sp, plan);
+        t = { reportedAt: v.reportedAt, lock, speed: sp, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: target.rate, ux: 0, uy: 0, lastT: nowSec, h: null, plan };
         this.tracks.set(v.id, t);
         t.h = this.targetHeading(t, v);
         return { x: t.x, y: t.y };
@@ -120,14 +150,15 @@ export class MotionEngine {
         t.lock = lock; t.s0 = lock.s; t.s = hit ? hit.s : lock.s; t.sStop = this.stopS(v, lock);
         if (!hit) { const q = lock.path.pointAt(t.s); t.ox += t.bx - q.x; t.oy += t.by - q.y; }   // se desliza, no salta
       } else { t.lock = null; t.sStop = Infinity; }
+      t.plan = this.hopPlan(v, t.lock, nowSec);
       t.reportedAt = v.reportedAt;
     }
-    const rate = t.speed * p.rateGain;
 
     const dt = Math.min(MAX_STEP, Math.max(0, nowSec - t.lastT));
     t.lastT = nowSec;
     if (dt <= 0) return { x: t.x, y: t.y };
-    const tgt = this.target(v, nowSec, t.lock, t.speed);
+    const tgt = this.target(v, nowSec, t.lock, t.speed, t.plan);
+    const rate = tgt.rate;
     if (t.lock && p.stopClamp && t.sStop !== Infinity) tgt.s = Math.min(tgt.s, Math.max(t.s0, t.sStop + p.stopSlackMeters));
 
     if (t.lock) {
@@ -212,15 +243,56 @@ export class MotionEngine {
     return hit && hit.s >= lock.s - 25 ? hit.s : Infinity;
   }
 
-  /** Dónde se espera que esté el bus ahora: su último reporte más lo que habrá avanzado, con la política calibrada. */
-  private target(v: Vehicle, nowSec: number, lock: RouteLock | null, speed: number): { s: number; world: WorldPoint } {
-    const age = nowSec - v.reportedAt;
+  /** Dónde se espera que esté el bus ahora: su último reporte más lo que habrá avanzado, con la política calibrada; y a qué ritmo (m/s)
+   *  avanza ese punto. Con tiempos reales del tramo (`plan`) se mezclan los dos adelantos: la velocidad medida sabe si el bus va
+   *  frenado ahora; lo aprendido sabe cuánto se demora de verdad ese tramo a esta hora (paradas, semáforos, trancón). */
+  private target(v: Vehicle, nowSec: number, lock: RouteLock | null, speed: number, plan: HopPlan | null): { s: number; world: WorldPoint; rate: number } {
+    const age = nowSec - v.reportedAt, p = this.params;
     if (lock) {
-      const s = lock.s + speed * motionSeconds(age, DEFAULT_PREDICTION);
-      return { s, world: lock.path.pointAt(s) };
+      let s = lock.s + speed * motionSeconds(age, DEFAULT_PREDICTION), rate = speed * p.rateGain;
+      if (plan) {
+        const vel = v.velocity;      // sin velocidad medida (primer lote) manda lo aprendido
+        const w = !vel ? 1 : vel.speedMps < STILL_MPS ? p.hopWeightStill : p.hopWeight;
+        const h = planAt(plan, Math.min(DEFAULT_PREDICTION.maxSeconds, Math.max(0, age)) * p.hopGain);
+        s = w * h.s + (1 - w) * s;
+        rate = w * h.rate * p.hopGain + (1 - w) * rate;
+      }
+      return { s, world: lock.path.pointAt(s), rate };
     }
     // sin trazado conocido NO se adelanta: en línea recta el bus se saldría de la calle y flotaría en el vacío mientras llega el siguiente dato
-    return { s: 0, world: v.world };
+    return { s: 0, world: v.world, rate: speed * p.rateGain };
+  }
+
+  /** Por dónde iría el bus desde su reporte al ritmo típico de cada tramo a esta hora (`state.hopProfile`, como en `eta.ts`).
+   *  Solo si el bus tiene parada conocida en ese mismo recorrido (no se le asigna una por su cuenta) y hay datos del tramo en que va;
+   *  los tramos siguientes sin datos usan el valor fijo por parada. Nunca va hacia atrás: los puntos solo avanzan sobre el trazado. */
+  private hopPlan(v: Vehicle, lock: RouteLock | null, nowSec: number): HopPlan | null {
+    const prof = this.state.hopProfile, p = this.params;
+    if (!lock || (p.hopWeight <= 0 && p.hopWeightStill <= 0) || p.hopGain <= 0 || !prof.apply || !prof.size) return null;
+    const shape = this.shapeOf.get(lock.path);
+    const seq = shape && this.state.sequenceOf(v);
+    if (!shape || !seq || seq.shape !== shape) return null;
+    const info = shapeStops(this.state, shape);
+    if (!info) return null;
+    const S = info.s, last = S.length - 1, nowMs = nowSec * 1000;
+    let i = -1;
+    for (let k = 0; k < last; k++) if (S[k]! <= lock.s) i = k; else break;
+    if (i < 0 || lock.s >= S[last]!) return null;                    // antes de la primera parada o después de la última: no hay tramo
+    if (!prof.has(shape, i, nowMs)) return null;                       // sin datos del tramo en que va: como antes
+    const horizon = DEFAULT_PREDICTION.maxSeconds * p.hopGain;
+    const ts = [0], ss = [lock.s];
+    let t = 0, s = lock.s;
+    for (let k = i; k < last && t < horizon; k++) {
+      const len = S[k + 1]! - S[k]!;
+      if (len <= 0) continue;
+      const sec = prof.seconds(shape, k, nowMs, estimateTravelSeconds(this.state, v, shape.stopIds, k, k + 1, nowMs));
+      const rate = len / Math.max(1, sec);
+      const dt = (S[k + 1]! - s) / rate;
+      if (dt <= 0) continue;
+      t += dt; s = S[k + 1]!;
+      ts.push(t); ss.push(s);
+    }
+    return ts.length > 1 ? { ts, ss } : null;
   }
 }
 

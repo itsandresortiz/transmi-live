@@ -92,7 +92,7 @@ export function rawArrival(state: TransitState, v: Vehicle, shape: RouteShape, l
     const f = Math.min(1, Math.max(0, (bus.s - sa) / (sb - sa)));        // fracción del tramo ya recorrida
     remaining -= hop(lastIndex) * f;
     eta = v.reportedAt + remaining;
-    if (state.hopProfile.apply && state.hopProfile.size) eta += state.hopProfile.extra;      // corrección del sesgo medido (ver HOP_EXTRA_S)
+    if (state.hopProfile.apply && state.hopProfile.size) eta += state.hopProfile.extraAt(nowMs);      // corrección del sesgo medido, por franja si se sabe (ver HOP_EXTRA_S y HOP_EXTRA_BY)
   } else {
     // respaldo: desde la hora real a la que llegó a su última parada
     const tu = v.tripId ? state.tripUpdates.get(v.tripId) : undefined;

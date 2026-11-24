@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MotionEngine, TransitState } from "@transmi/application";
+import { DEFAULT_MOTION, MotionEngine, TransitState } from "@transmi/application";
 import { METERS_PER_WORLD_UNIT, TransitNetwork, distanceMeters, toWorld, type VehicleReport } from "@transmi/domain";
 
 const M_PER_DEG_LON = 111_320 * Math.cos((4.65 * Math.PI) / 180);
@@ -100,5 +100,64 @@ describe("movimiento de los buses", () => {
     const b = eng.step(st.fleet.get("b")!, 300);            // 270 s después
     expect(distanceMeters(a, b)).toBeGreaterThan(2500);     // arranca ya cerca de la realidad
     expect(distanceMeters(b, toWorld({ lat: 4.65, lon: lonAt(4000) }))).toBeLessThan(300);
+  });
+});
+
+describe("adelanto con los tiempos reales de cada tramo", () => {
+  const T0 = 1_795_500_000;      // un martes cualquiera; el perfil trae el mismo tiempo en todas las franjas
+  /** Mismo mundo, con un perfil donde el tramo P0 → S (2.500 m) tarda `sec` segundos. */
+  function withProfile(sec: number | null): TransitState {
+    const st = world();
+    if (sec != null) {
+      const tags: Record<string, number[]> = {};
+      for (const d of ["wk", "sa", "su"]) for (let b = 0; b < 5; b++) tags[`${d}|${b}`] = [sec, 50];
+      expect(st.hopProfile.load({ v: 1, updated: "", use: true, r: { "R|0": tags } })).toBe(true);
+    }
+    return st;
+  }
+  /** Dos reportes a 10 m/s (llegan con 60 s de edad, como hoy) y 60 s de reloj a 4 Hz: dónde se dibuja el bus. */
+  function drive(st: TransitState, weight: number, stop: string | null = "P0"): number[] {
+    const eng = new MotionEngine(st, { ...DEFAULT_MOTION, hopWeight: weight, hopWeightStill: weight, hopGain: 1 });
+    st.applyPositions([{ ...rep(T0, 1000), lastStopId: stop ?? undefined }], (T0 + 60) * 1000);
+    st.applyPositions([{ ...rep(T0 + 30, 1300), lastStopId: stop ?? undefined }], (T0 + 90) * 1000);
+    const xs: number[] = [];
+    for (let t = T0 + 90; t <= T0 + 150; t += 0.25) xs.push(xOf(eng.step(st.fleet.get("b")!, t)));
+    return xs;
+  }
+  const last = (xs: number[]) => xs[xs.length - 1]!;
+  const monotonic = (xs: number[]) => { for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeGreaterThanOrEqual(-0.01); };
+
+  it("un tramo rápido a esta hora adelanta más al bus; uno lento, menos; y nunca retrocede", () => {
+    const plain = last(drive(withProfile(null), 1));
+    const fast = drive(withProfile(150), 1), slow = drive(withProfile(1000), 1);      // 16,7 m/s y 2,5 m/s de promedio en el tramo
+    monotonic(fast); monotonic(slow);
+    expect(last(fast)).toBeGreaterThan(plain + 300);
+    expect(last(slow)).toBeLessThan(plain - 50);
+    expect(last(slow)).toBeGreaterThan(1300);                 // pero sigue avanzando desde el reporte
+  });
+
+  it("con lo aprendido no se pasa de la última parada del recorrido", () => {
+    const xs = drive(withProfile(60), 1);                     // 42 m/s: a los 150 s ya habría salido del recorrido
+    monotonic(xs);
+    expect(Math.max(...xs)).toBeLessThan(3000 + 30);
+  });
+
+  it("el peso mezcla los dos adelantos", () => {
+    const only = last(drive(withProfile(150), 0)), full = last(drive(withProfile(150), 1)), half = last(drive(withProfile(150), 0.5));
+    expect(half).toBeGreaterThan(only + 50);
+    expect(half).toBeLessThan(full - 50);
+  });
+
+  it("sin parada informada no se usa lo aprendido (no se le asigna una por su cuenta)", () => {
+    expect(drive(withProfile(150), 1, null)).toEqual(drive(withProfile(null), 1, null));
+  });
+
+  it("sin datos del tramo en que va (o con el perfil apagado), se mueve como antes", () => {
+    const plain = drive(withProfile(null), 1);
+    const off = withProfile(150); off.hopProfile.apply = false;
+    expect(drive(off, 1)).toEqual(plain);
+    const st = world();
+    st.hopProfile.load({ v: 1, updated: "", use: true, r: { "R|0": { "wk|0": [150, 1] } } });      // muy pocas pasadas y de otra franja
+    expect(drive(st, 1)).toEqual(plain);
   });
 });

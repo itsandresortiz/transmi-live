@@ -7,8 +7,12 @@
  * Contra eso se compara lo que la app habría mostrado en cada lote (`arrivalAtIndex`, el mismo cálculo de las pantallas).
  *
  * Uso: npx tsx tools/etaprecision.ts [segundos] [espera_entre_descargas]
+ *      LOTES=<carpeta> npx tsx tools/etaprecision.ts   (lotes ya guardados: archivos `<ms>.pb`, la hora de descarga en milisegundos)
+ * Con lotes guardados se puede medir la misma captura varias veces y por franjas (`DESDE`/`HASTA`, hora de Bogotá, p. ej. 16 y 20).
  */
 import { gunzipSync } from "node:zlib";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { TransitState, arrivalAtIndex, buildHopProfile, rawArrival, shapeStops } from "@transmi/application";
 import type { VehicleReport } from "@transmi/domain";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
@@ -22,7 +26,13 @@ async function main() {
   const net = buildNetwork(await parseGtfsLite(new Uint8Array(await g.arrayBuffer())));
   const batches: { reports: VehicleReport[]; at: number }[] = [];
   let lastSig = "";
-  const end = Date.now() + SECONDS * 1000;
+  const DIR = process.env.LOTES, FROM_H = Number(process.env.DESDE ?? 0), TO_H = Number(process.env.HASTA ?? 24);
+  const hourBog = (ms: number) => new Date(ms - 5 * 3600_000).getUTCHours() + new Date(ms - 5 * 3600_000).getUTCMinutes() / 60;
+  if (DIR) for (const f of readdirSync(DIR).filter((x) => x.endsWith(".pb")).sort()) {
+    const at = Number(f.slice(0, -3)), h = hourBog(at);
+    if (h >= FROM_H && h < TO_H) batches.push({ reports: decodePositions(new Uint8Array(readFileSync(join(DIR, f)))), at: at / 1000 });
+  }
+  const end = DIR ? 0 : Date.now() + SECONDS * 1000;
   while (Date.now() < end) {
     try {
       const r = await fetch("https://gtfs.transmilenio.gov.co/positions.pb", { headers: { "User-Agent": "Mozilla/5.0 (transmi-live)" } });
@@ -32,7 +42,7 @@ async function main() {
     } catch (e) { console.log("descarga falló", e instanceof Error ? e.message : e); }
     await new Promise((r) => setTimeout(r, GAP_MS));
   }
-  console.log(`lotes: ${batches.length} en ${SECONDS} s`);
+  console.log(`lotes: ${batches.length} en ${batches.length ? (batches[batches.length - 1]!.at - batches[0]!.at).toFixed(0) : 0} s (hora de Bogotá ${batches.length ? hourBog(batches[0]!.at * 1000).toFixed(2) : "-"}–${batches.length ? hourBog(batches[batches.length - 1]!.at * 1000).toFixed(2) : "-"}), buses por lote: ${batches.length ? Math.round(batches.reduce((a, b) => a + b.reports.length, 0) / batches.length) : 0}`);
   if (batches.length < 6) { console.log("Muy pocos lotes. No se mide."); return; }
 
   const state = new TransitState(); state.setNetwork(net);
@@ -52,7 +62,7 @@ async function main() {
     { name: "aprendido, mín 8, mezcla 3", apply: true, minN: 8, priorN: 3 },
     { name: "aprendido, mín 1, mezcla 10", apply: true, minN: 1, priorN: 10 },
   ];
-  const useVariant = (k: number) => { const x = VARIANTS[k]!; state.hopProfile.apply = x.apply; state.hopProfile.minN = x.minN; state.hopProfile.priorN = x.priorN; state.hopProfile.extra = 0; };      // las correcciones (+ s) se suman aparte
+  const useVariant = (k: number) => { const x = VARIANTS[k]!; state.hopProfile.apply = x.apply; state.hopProfile.minN = x.minN; state.hopProfile.priorN = x.priorN; state.hopProfile.extra = 0; state.hopProfile.extraBy = null; };      // las correcciones (+ s) se suman aparte
   useVariant(2);      // lo que usa la app desde el 2026-11-17 (aprendido, sin mezcla)
   // por bus: por dónde ha ido (metros sobre su trazado, hora del GPS) y qué se le pronosticó
   type Pred = { stopS: number; away: number; madeAt: number; shown: number; raw: number; remaining: number; alt: number[] };
@@ -85,7 +95,7 @@ async function main() {
     return null;
   };
   const endAt = batches[batches.length - 1]!.at;
-  const FACTORS = [1, 1.1, 1.2, 1.3, 1.4], OFFSETS = [15, 30, 45], BUCKETS = ["no vencida", "vencida 0–30 s", "30–60 s", "60–120 s", "más de 120 s"];
+  const FACTORS = [1, 1.1, 1.2, 1.3, 1.4], OFFSETS = [0, 10, 15, 20, 30, 45, 60], BUCKETS = ["no vencida", "vencida 0–30 s", "30–60 s", "60–120 s", "más de 120 s"];
   const bucket = (d: number) => (d < 0 ? 0 : d < 30 ? 1 : d < 60 ? 2 : d < 120 ? 3 : 4);
   interface G { n: number; gone: number; lleg: number; llegGone: number; exp: { n: number; gone: number }[]; err: number[][]; off: number[][]; shown: number[]; alt: number[][] }
   const by = new Map<number, G>();
@@ -94,7 +104,8 @@ async function main() {
     for (const p of tr.preds) {
       // solo cuentan los pronósticos del primer tercio de la captura: así quedan al menos dos tercios para ver llegar el bus.
       // (La corrida del 2026-11-11 contó también los del final, que no podían verse llegar: sus cifras de sesgo para 2+ paradas no valen.)
-      if (p.madeAt > batches[0]!.at + (endAt - batches[0]!.at) / 3) continue;
+      // En capturas largas (lotes guardados) basta con dejar 15 min después de cada pronóstico.
+      if (p.madeAt > endAt - Math.min((endAt - batches[0]!.at) * 2 / 3, 900)) continue;
       let truth = cross(tr.pts, p.stopS);
       // si el bus siguió reportando hasta el final y aún no llegaba a la parada, se sabe que llegó DESPUÉS de su último reporte:
       // se cuenta como «muy tarde» (no se descarta: descartarlo haría ver los tiempos mejores de lo que son)
