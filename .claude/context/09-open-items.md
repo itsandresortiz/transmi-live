@@ -65,8 +65,6 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - **Precisión de llegadas por franja** (2026-11-24): lanzar «Medir precisión de los tiempos de llegada» (`segundos` = 1200) en pico mañana, pico tarde y noche; si una franja pide ≥10 s distinto del valle, poner `HOP_EXTRA_BY` (p. ej. `[15, 30, 15, 30, 10]`). Idea: corrección solo para la próxima parada (ahí está el sesgo). Medir el avance de los buses en pico con «Medir precisión de los buses».
 - **Semáforos en las llegadas** (2026-11-24): se encienden solos cuando `aprendizaje.json` confirme un semáforo; revisar si los buses llegan a confirmarlo con más medidas.
 
-- **Mensaje en vivo** (2026-11-25): Concejo de Bogotá y Centro Memoria fuera de servicio, sin fecha de fin: cuando el dueño avise que volvieron a operar, quitarlo de `mensajes.json`.
-
 ## Bugs conocidos / limitaciones
 - Rutas con un código por sentido (261 de 668 nombres): el mapa ya junta los dos sentidos (`routeFamily`), y el buscador de la app muestra una sola fila por nombre (2026-11-13). Falta: una sola ficha con selector de sentido (hoy es un enlace «Ver el sentido contrario») y lo mismo en la web y en favoritos.
 - ✅ (2026-11-24, sin probar) Sin conexión: la app guarda el mapa base de Bogotá (zoom 9–14). La web sigue dependiendo de internet para el mapa base.

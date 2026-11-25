@@ -3,7 +3,8 @@
     {
       "texto": "Calle 26: por una manifestación en la Calle 26 con Carrera 33, los buses troncales no tienen paso y van en contraflujo. Las estaciones Concejo de Bogotá y Centro Memoria dejan de operar temporalmente.",
       "desde": "2026-11-25 00:00",
-      "tipo": "importante"
+      "tipo": "importante",
+      "hasta": "2026-11-25 23:59"
     }
   ],
   "como_usarlo": "Para mostrar un mensaje en la app y en la web, copia el bloque de 'ejemplo' dentro de los corchetes de 'mensajes', cambia el texto y las fechas, y guarda. Tarda unos 5 minutos en aparecer. Para quitarlo antes de tiempo, deja 'mensajes' vacio: []. Las fechas van en hora de Bogota, asi: 2026-11-12 14:30. 'desde' y 'hasta' son opcionales (sin 'hasta' se muestra hasta que lo borres). 'tipo' puede ser 'aviso' (ambar) o 'importante' (rojo). Maximo 5 mensajes y 280 letras cada uno. Si pones varios, van separados por coma.",
