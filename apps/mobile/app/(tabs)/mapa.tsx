@@ -70,8 +70,9 @@ export default function Mapa() {
       // de cerca: en 3D lo bastante para ver el bus con volumen (salen desde el 16,5; antes se seguía justo en 16,5 y quedaba en el
       // borde: se veía plano). Si acercaste más con los dedos, se respeta (antes la cámara te devolvía al 16,5 cada 1,5 s)
       const near = useMapLayers.getState().view3d ? 17.4 : 16.5;
-      map.current?.flyTo(g.lat, g.lon, Math.min(19, Math.max(near, zoomNow.current)));
-    }, 1500);
+      // deslizar (no «volar»: flyTo aleja y acerca la cámara en cada salto y el bus parecía parpadear), justo lo que dura cada paso
+      map.current?.glideTo(g.lat, g.lon, Math.min(19, Math.max(near, zoomNow.current)), 1000);
+    }, 1000);
     return () => clearInterval(t);
   }, [focused, focus.followBusId]);
   const [system, setSystem] = useState<SystemType | null>(null);

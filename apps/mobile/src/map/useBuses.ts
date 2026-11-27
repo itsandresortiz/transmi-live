@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Feature, FeatureCollection, Point } from "geojson";
-import { toGeo, type SystemType, type Vehicle, isStaleReport } from "@transmi/domain";
+import { toGeo, toWorld, type SystemType, type Vehicle, isStaleReport } from "@transmi/domain";
 import { cadenceMs, routeHasAlert, separateBuses, shiftBus } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";
@@ -56,7 +56,9 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
         // el bus en el que vas se dibuja donde va tu teléfono (el dato de TransMilenio llega ~1 min tarde y el bus se veía atrás o adelantado)
         // y si alguien que va en él comparte su posición (opcional y anónimo), donde va según esa persona
         const mine = v.id === ride ? snappedPosition(v.id, rideNow) : shared ? transit.sharedRides.positionOf(transit, v.id, t) : null;
-        const g = mine ?? toGeo(motion.step(v, t));
+        const stepped = toGeo(motion.step(v, t));      // siempre: el motor sigue al bus también mientras lo mueve tu GPS
+        if (mine && v.id === ride) motion.advanceTo(v.id, toWorld(mine));      // si el GPS se corta, sigue desde ahí (no vuelve atrás)
+        const g = mine ?? stepped;
         if (!Number.isFinite(g.lon) || !Number.isFinite(g.lat)) continue;      // una posición rota no llega al mapa nativo
         if (g.lon < view.west - padX || g.lon > view.east + padX || g.lat < view.south - padY || g.lat > view.north + padY) continue;
         const h = (((mine?.heading ?? motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;

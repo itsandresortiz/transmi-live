@@ -40,6 +40,8 @@ export function rideSnapOf(busId: string, nowMs = clockMs()): (RideSnap & { shap
 }
 
 /** Dónde dibujar el bus en este instante: entre dos lecturas del GPS avanza a la velocidad que llevaba (hasta 3 s), para que se mueva fluido. */
+/** Dónde se dibujó por última vez el bus en el que vas (metros sobre su recorrido), para que avance suave y sin volver atrás. */
+let drawn: { busId: string; shape: unknown; s: number; at: number } | null = null;
 export function snappedPosition(busId: string, nowMs = clockMs()): { lat: number; lon: number; heading: number } | null {
   if (!snap || snap.busId !== busId || nowMs - snap.cur.at > keepMs(busId)) return null;
   const ss = shapeStops(transit, snap.shape);
@@ -49,6 +51,13 @@ export function snappedPosition(busId: string, nowMs = clockMs()): { lat: number
     const speed = Math.min(20, Math.max(0, (snap.cur.s - snap.prev.s) / ((snap.cur.at - snap.prev.at) / 1000)));
     s += speed * Math.min(3, Math.max(0, (nowMs - snap.cur.at) / 1000));
   }
+  // el bus dibujado se acerca a esa posición poco a poco y NUNCA retrocede (regla de todos los buses del mapa): si la lectura llega atrás,
+  // espera ahí. Solo se reinicia con un salto de más de 300 m (otro recorrido). Antes iba directo: entre lecturas se adelantaba con la
+  // velocidad y, si la lectura nueva llegaba unos metros atrás, brincaba hacia atrás varias veces por segundo y se veía parpadear
+  const d = drawn && drawn.busId === busId && drawn.shape === snap.shape && Math.abs(s - drawn.s) < 300 ? drawn : null;
+  if (d && s <= d.s) s = d.s;
+  else if (d) s = d.s + (s - d.s) * (1 - Math.exp(-Math.max(0, nowMs - d.at) / 600));
+  drawn = { busId, shape: snap.shape, s, at: nowMs };
   const here = ss.path.pointAt(s), ahead = ss.path.pointAt(s + 15), g = toGeo(here);
   return { lat: g.lat, lon: g.lon, heading: bearingDegrees(here, ahead) };
 }

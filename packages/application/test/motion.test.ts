@@ -182,3 +182,21 @@ describe("un bus dibujado adelantado espera al real (nunca retrocede)", () => {
     expect(after).toBeGreaterThanOrEqual(before - 0.5);
   });
 });
+
+describe("el bus en el que vas (movido por tu GPS)", () => {
+  it("si el GPS lo llevó adelante y luego se corta, el bus no vuelve atrás a los datos de TransMilenio", () => {
+    const st = world(), eng = new MotionEngine(st);
+    run(st, eng, { 0: rep(0, 700), 10: rep(10, 800), 20: rep(20, 900), 30: rep(30, 1000) }, 30);      // con varios reportes el motor sabe por dónde va
+    let p = eng.step(st.fleet.get("b")!, 30);
+    expect(xOf(p)).toBeLessThan(1100);      // todavía detrás de lo que dirá tu GPS
+    // tu GPS dice que vas 300 m más adelante (el dato oficial llega tarde)
+    eng.advanceTo("b", toWorld({ lat: 4.65, lon: lonAt(1300) }));
+    expect(Math.abs(xOf(eng.peek("b")!) - 1300)).toBeLessThan(1);
+    // el GPS se corta: el motor sigue desde ahí, nunca más atrás
+    let prev = 1300;
+    for (let f = 1; f <= 300; f++) { p = eng.step(st.fleet.get("b")!, 30 + f / 30); expect(xOf(p)).toBeGreaterThanOrEqual(prev - 0.01); prev = xOf(p); }
+    // y no lo lleva hacia atrás si el GPS dice algo detrás
+    eng.advanceTo("b", toWorld({ lat: 4.65, lon: lonAt(900) }));
+    expect(xOf(eng.peek("b")!)).toBeGreaterThanOrEqual(prev - 0.01);
+  });
+});

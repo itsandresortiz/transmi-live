@@ -39,7 +39,7 @@ const PITCH_3D = 58, BUILD_MIN_Z = 15;
 /** Sin sombra de los cerros en la app: en MapLibre iPhone 6.31 los colores del sombreado pasaron a ser una lista y la librería de
  *  React Native aún manda un solo color: la app se cerraba al abrir el mapa (1.1.0, 2026-11-27). En Android pasa lo mismo al revés. */
 
-export interface TransitMapHandle { flyTo(lat: number, lon: number, zoom?: number): void; resetNorth(): void; fit(points: { lat: number; lon: number }[], padding?: number, bottomExtra?: number): void }
+export interface TransitMapHandle { flyTo(lat: number, lon: number, zoom?: number): void; /** Desliza la cámara sin el «salto» de flyTo (seguir un bus). */ glideTo(lat: number, lon: number, zoom: number, ms: number): void; resetNorth(): void; fit(points: { lat: number; lon: number }[], padding?: number, bottomExtra?: number): void }
 interface Props {
   system?: SystemType | null;
   /** Si se da, solo se ven los buses de esa ruta y se dibuja su trazado. */
@@ -88,6 +88,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   useImperativeHandle(ref, () => ({
     resetNorth: () => camera.current?.easeTo({ center: lastCenter.current, bearing: 0, duration: 350 }),
     flyTo: (lat, lon, zoom = 15.5) => { if (Number.isFinite(lat) && Number.isFinite(lon)) camera.current?.flyTo({ center: [lon, lat], zoom, duration: 900 }); },
+    glideTo: (lat, lon, zoom, ms) => { if (Number.isFinite(lat) && Number.isFinite(lon)) camera.current?.easeTo({ center: [lon, lat], zoom, duration: ms }); },
     fit: (pts, padding = 60, bottomExtra = 220) => {
       const ok = pts.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
       if (!ok.length) return;

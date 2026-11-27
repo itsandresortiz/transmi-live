@@ -4,6 +4,11 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-27 · App: **el bus en el que vas parpadeaba al seguirlo en el mapa** (dueño), con tres causas probables, todas corregidas:
+  - (1) `snappedPosition` adelantaba el bus con la velocidad entre lecturas del GPS y, si la lectura nueva llegaba unos metros atrás, lo devolvía varias veces por segundo. Ahora se acerca suave (~0,6 s) y **nunca retrocede**; solo se reinicia con un salto de más de 300 m.
+  - (2) La cámara seguía con `flyTo` cada 1,5 s, que aleja y acerca en cada paso. Ahora se desliza (`glideTo`, `easeTo` de 1 s, cada 1 s).
+  - (3) Si el GPS se cortaba, el bus volvía a la posición de TransMilenio (~1 min atrás). Ahora el motor se queda con la posición del GPS (`MotionEngine.advanceTo`) y sigue desde ahí, sin volver atrás.
+  - Prueba nueva en `motion.test.ts`. Sin ver en teléfono.
 - 2026-11-27 · Mapa 3D y portales (pedidos del dueño):
   - (1) **La estación plana ya no se pinta encima de edificios y árboles**, en web y app. En 3D, desde el zoom 15 (`STATION_3D_MIN_ZOOM` bajó de 15,6 a 15, como los edificios), la base, los pasillos, los vagones y las puertas planas quedan invisibles; se pueden seguir tocando porque solo cambia la opacidad. Queda la estación con volumen.
   - (2) **No salen árboles encima de las estaciones** (`treesOutside`, a 3 m del borde), en web y app.

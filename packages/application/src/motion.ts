@@ -124,6 +124,17 @@ export class MotionEngine {
     return v.bearing;
   }
   forget(id: string): void { this.tracks.delete(id); }
+  /** Lleva el bus dibujado hasta `p` si queda más adelante sobre su trazado (nunca lo devuelve). Para el bus en el que vas: mientras lo
+   *  mueve tu GPS, el motor se queda con esa posición; si el GPS deja de llegar y se vuelve a los datos de TransMilenio (~1 min tarde),
+   *  el bus espera ahí en vez de saltar hacia atrás. */
+  advanceTo(id: string, p: WorldPoint): void {
+    const t = this.tracks.get(id);
+    if (!t?.lock) return;
+    const hit = t.lock.path.project(p, 0, 0, 60);
+    if (!hit || hit.s <= t.s || hit.s - t.s > HOLD_MAX_M) return;
+    const w = t.lock.path.pointAt(hit.s);
+    t.s = hit.s; t.bx = w.x; t.by = w.y; t.ox = 0; t.oy = 0; t.x = w.x; t.y = w.y;
+  }
   prune(): void { for (const id of this.tracks.keys()) if (!this.state.fleet.get(id)) this.tracks.delete(id); }
   get size(): number { return this.tracks.size; }
 
