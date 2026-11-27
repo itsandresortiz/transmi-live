@@ -185,9 +185,20 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   }, [geo]);
 
   /** Vista 3D: las mismas estaciones levantadas (plataforma, vagones de vidrio con el techo del color de su línea). Se arman una vez al encender el 3D. */
-  const stations3dJson = useMemo(() => JSON.stringify(view3d && geo
-    ? stationVolumes(geo, (l) => (TRUNK_LINES as Record<string, { light: string; dark: string } | undefined>)[l]?.[c.dark ? "dark" : "light"] ?? "#e11d2e", { dark: c.dark })
-    : { type: "FeatureCollection", features: [] }), [view3d, geo, c.dark]);
+  // Se arman DESPUÉS de la animación de inclinar (son ~1.500 piezas y ~2 MB de texto: armarlas en el mismo toque trababa el botón) y se
+  // conservan al apagar el 3D (la capa solo se oculta), así volver a encenderlo es inmediato.
+  const [stations3dJson, setStations3d] = useState(EMPTY_FC);
+  const stations3dFor = useRef<unknown>(null), stations3dKey = useRef("");
+  useEffect(() => {
+    if (!view3d || !geo) return;
+    const key = `${c.dark}`;
+    if (stations3dFor.current === geo && stations3dKey.current === key) return;
+    const id = setTimeout(() => {
+      stations3dFor.current = geo; stations3dKey.current = key;
+      setStations3d(JSON.stringify(stationVolumes(geo, (l) => (TRUNK_LINES as Record<string, { light: string; dark: string } | undefined>)[l]?.[c.dark ? "dark" : "light"] ?? "#e11d2e", { dark: c.dark })));
+    }, reduceMotion ? 80 : 760);
+    return () => clearTimeout(id);
+  }, [view3d, geo, c.dark]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Estaciones y portales de la troncal: un punto en el centro de sus vagones, su nombre y la letra de su línea (A, B, C…), que le da el color. */
   const stations = useMemo<FeatureCollection<Point>>(() => {

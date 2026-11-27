@@ -456,8 +456,13 @@ export class MapController {
     if (on) {
       this.addRelief();
       m.setMaxPitch(MAX_PITCH);
-      m.setTerrain({ source: "relieve", exaggeration: RELIEF_EXAGGERATION });
+      // levantar el relieve obliga a redibujar todo el mapa sobre el terreno en cada cuadro: en un celular se traba. Ahí los cerros solo
+      // se sombrean (como en la app); en un computador sí se levantan
+      if (this.raiseTerrain) m.setTerrain({ source: "relieve", exaggeration: RELIEF_EXAGGERATION });
       this.paint3D();
+      // los volúmenes de estaciones y semáforos se arman DESPUÉS de la animación de inclinar y por partes: antes se armaban aquí mismo
+      // (todas las estaciones y los 5.300 semáforos de la ciudad, ~4 MB de una vez) y el mapa se trababa justo al tocar el botón
+      setTimeout(() => this.load3D(), quick ? 50 : 760);
       // `freezeElevation`: la altura de la cámara se recalcula al final (el relieve puede no haber llegado aún al empezar)
       m.easeTo({ pitch: PITCH_3D, duration: quick ? 0 : 700, freezeElevation: true });
       if (!this.unfreezeBound) {
@@ -468,6 +473,7 @@ export class MapController {
         m.on("moveend", () => {
           const mm = m as unknown as { _elevationFreeze?: boolean; _finalizeElevation?: () => void; terrain?: unknown };
           if (this.on3D && mm.terrain && mm._elevationFreeze && !m.isMoving()) mm._finalizeElevation?.();
+          if (this.on3D) this.loadSignals3D();          // los semáforos con volumen son solo los de la pantalla
         });
       }
     } else {
@@ -488,18 +494,40 @@ export class MapController {
     vis("relieve-sombra-claro", this.on3D && !dark); vis("relieve-sombra-oscuro", this.on3D && dark);
     vis("buses-3d", this.on3D && this.busesOn);
     // semáforos: en 3D, desde el zoom 16 el poste con su caja reemplaza al ícono plano
-    if (this.on3D && this.signalsOn && this.signalRows && !this.signals3dLoaded) {
-      this.signals3dLoaded = true;
-      (m.getSource("semaforos-3d") as GeoJSONSource | undefined)?.setData(signalVolumes(signalPoints(this.signalRows)) as FeatureCollection);
-    }
     vis("semaforos-3d", this.on3D && this.signalsOn);
-    if (this.on3D && this.stationBase && this.stations3dFor !== this.scheme + "|" + this.stationsVersion) {
-      this.stations3dFor = this.scheme + "|" + this.stationsVersion;
-      const t = this.theme;
-      (m.getSource("estaciones-3d") as GeoJSONSource | undefined)?.setData(stationVolumes(this.stationBase, (l) => t.lines[l] ?? t.troncal, { dark }) as FeatureCollection);
-    }
     vis("estaciones-3d", this.on3D && this.stopsOn); vis("estaciones-3d-vidrio", this.on3D && this.stopsOn);
+    if (this.on3D && this.loaded3D) this.load3D();        // cambió la apariencia, las estaciones o las capas con el 3D ya encendido
     if (m.getLayer("semaforos-icons")) m.setLayerZoomRange("semaforos-icons", 15.4, this.on3D ? SIGNAL_3D_MIN_ZOOM : 24);
+  }
+  /** ¿Se levanta el relieve? Solo donde hay con qué (un computador): en pantallas táctiles se sombrea y ya. */
+  private readonly raiseTerrain = typeof matchMedia === "undefined" || !matchMedia("(pointer: coarse)").matches;
+  private loaded3D = false;
+  /** Arma (una vez por apariencia) las estaciones con volumen y los semáforos de la pantalla, en dos tandas para no trabar el mapa. */
+  private load3D() {
+    if (!this.on3D) return;
+    this.loaded3D = true;
+    const m = this.map, dark = this.scheme === "dark";
+    if (this.stationBase && this.stopsOn && this.stations3dFor !== this.scheme + "|" + this.stationsVersion) {
+      this.stations3dFor = this.scheme + "|" + this.stationsVersion;
+      const t = this.theme, base = this.stationBase;
+      (m.getSource("estaciones-3d") as GeoJSONSource | undefined)?.setData(stationVolumes(base, (l) => t.lines[l] ?? t.troncal, { dark }) as FeatureCollection);
+    }
+    setTimeout(() => this.loadSignals3D(), 120);
+  }
+  private signalPts: { lon: number; lat: number }[] | null = null;
+  private signals3dKey = "";
+  /** Los semáforos con volumen de la pantalla (de cerca, hasta 400): toda la ciudad de una vez eran 10.600 piezas y 2,4 MB. */
+  private loadSignals3D() {
+    const m = this.map, src = m.getSource("semaforos-3d") as GeoJSONSource | undefined;
+    if (!src || !this.on3D || !this.signalsOn || !this.signalRows) return;
+    if (m.getZoom() < SIGNAL_3D_MIN_ZOOM - 0.4) return;
+    const all = (this.signalPts ??= signalPoints(this.signalRows).map((p) => ({ lon: p.lon, lat: p.lat })));
+    const b = m.getBounds(), padX = (b.getEast() - b.getWest()) * 0.3, padY = (b.getNorth() - b.getSouth()) * 0.3;
+    const near = all.filter((p) => p.lon > b.getWest() - padX && p.lon < b.getEast() + padX && p.lat > b.getSouth() - padY && p.lat < b.getNorth() + padY).slice(0, 400);
+    const key = near.length + "|" + (near[0] ? `${near[0].lon},${near[0].lat}` : "") + "|" + (near[near.length - 1] ? `${near[near.length - 1]!.lon},${near[near.length - 1]!.lat}` : "");
+    if (key === this.signals3dKey) return;
+    this.signals3dKey = key;
+    src.setData(signalVolumes(near) as FeatureCollection);
   }
   private signalsOn = true;
   private busesOn = true;
@@ -507,7 +535,6 @@ export class MapController {
   private stations3dFor = "";
   private stationsVersion = 0;
   private signalRows: readonly SignalRow[] | null = null;
-  private signals3dLoaded = false;
 
   /* ---------- operaciones ---------- */
   setScheme(scheme: Scheme) {
@@ -604,7 +631,7 @@ export class MapController {
   /** Pone los semáforos en el mapa (se llama la primera vez que el usuario enciende la capa). */
   setSignals(rows: readonly SignalRow[]) {
     this.signalsLoaded = true;
-    this.signalRows = rows; this.signals3dLoaded = false; this.paint3D();
+    this.signalRows = rows; this.signalPts = null; this.signals3dKey = ""; this.paint3D();
     (this.map.getSource("semaforos") as GeoJSONSource | undefined)?.setData({
       type: "FeatureCollection",
       // cada semáforo en su sitio (de OpenStreetMap) y, donde no se sabe, el punto del cruce; el de TransMilenio lleva «TM»

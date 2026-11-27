@@ -14,7 +14,7 @@ describe("busVolumes", () => {
     const parts = busVolumes([{ id: "a", lon: -74.07, lat: 4.6, heading: 0, color: "#e11d2e" }]).features;
     expect(parts.every((f) => f.properties.id === "a")).toBe(true);
     const body = parts.find((f) => f.properties.c === "#e11d2e")!;
-    expect(body.properties.b).toBeCloseTo(0.35); expect(body.properties.h).toBeCloseTo(1.3);
+    expect(body.properties.b).toBeCloseTo(0.5); expect(body.properties.h).toBeCloseTo(1.4);
     const e = extent([body.geometry.coordinates[0]!]);
     expect(e.ns).toBeCloseTo(BUS_DIMENSIONS.std, 1); expect(e.ew).toBeCloseTo(BUS_DIMENSIONS.width, 1);
     // hacia el este: el largo queda de este a oeste
@@ -22,7 +22,7 @@ describe("busVolumes", () => {
     const e2 = extent([east.geometry.coordinates[0]!]);
     expect(e2.ew).toBeCloseTo(BUS_DIMENSIONS.std, 1); expect(e2.ns).toBeCloseTo(BUS_DIMENSIONS.width, 1);
     // el parabrisas va adelante (al norte del centro)
-    const glass = parts.filter((f) => f.properties.b > 0.9 && f.properties.b < 1).map((f) => f.geometry.coordinates[0]!.map((p) => p[1]!));
+    const glass = parts.filter((f) => f.properties.b > 1 && f.properties.b < 1.1).map((f) => f.geometry.coordinates[0]!.map((p) => p[1]!));
     expect(glass).toHaveLength(1);
     expect(Math.min(...glass[0]!)).toBeGreaterThan(4.6);
     expect(Math.max(...parts.map((f) => f.properties.h))).toBeLessThanOrEqual(3.4);

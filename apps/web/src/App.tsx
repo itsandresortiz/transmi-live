@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
-import { type SignalRow, prepareNetworkInSlices, simulatedCabins, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
+import { type SignalRow, VIEW_3D_MIN_ZOOM, prepareNetworkInSlices, simulatedCabins, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, loadSignalWaits, networkSource, transit } from "./composition-root";
 import { nowMs, nowSec } from "./clock";
@@ -47,6 +47,7 @@ export function App() {
   const [scheme, setScheme] = useState<Scheme>(currentScheme);
   const [net, setNet] = useState(0);
   const [bearing, setBearing] = useState(0);
+  const [near3d, setNear3d] = useState(false);
   const th = useMemo(() => themeOf(scheme), [scheme]);
   const ui = useUi();
   const thRef = useRef(th); thRef.current = th;
@@ -139,6 +140,9 @@ export function App() {
     br.current = r;
     const onRotate = () => setBearing(m.bearing);
     m.map.on("rotate", onRotate);
+    // el botón «3D» solo se ofrece de cerca (más lejos no se ve volumen); con un margen para que no parpadee justo en el borde
+    const onZoom = () => setNear3d((was) => (was ? m.zoom >= VIEW_3D_MIN_ZOOM - 0.3 : m.zoom >= VIEW_3D_MIN_ZOOM));
+    m.map.on("zoom", onZoom); void m.ready.then(onZoom);
     (window as unknown as { __tm: unknown }).__tm = { transit, map: m, renderer: r, liveData, act, ui: useUi, planner: usePlanner };
     let stopped = false;
     void m.ready.then(() => { if (!stopped) { r.start(); m.setToggles(uiRef.current.layers); } });
@@ -432,7 +436,8 @@ export function App() {
             <Bell />{alertCount > 0 && <span className="badge">{alertCount > 99 ? "99+" : alertCount}</span>}
           </button>
           <button className="fab glass" aria-label={headingUp ? "Dejar el mapa fijo" : following ? "Girar el mapa según hacia dónde miro" : "Mi ubicación"} aria-pressed={following} onClick={() => void locate()}><Locate /></button>
-          <button className="fab glass t3d" aria-label={ui.view3d ? "Volver al mapa plano" : "Ver el mapa en 3D"} title={ui.view3d ? "Mapa plano" : "Mapa en 3D"} aria-pressed={ui.view3d} onClick={() => ui.setView3d(!ui.view3d)}>3D</button>
+          {/* solo de cerca, o si ya está encendido (para poder apagarlo) */}
+          {(near3d || ui.view3d) && <button className="fab glass t3d" aria-label={ui.view3d ? "Volver al mapa plano" : "Ver el mapa en 3D"} title={ui.view3d ? "Mapa plano" : "Mapa en 3D"} aria-pressed={ui.view3d} onClick={() => ui.setView3d(!ui.view3d)}>3D</button>}
           <button className="fab glass" aria-label="Ajustes del mapa" aria-pressed={ui.settingsOpen} onClick={() => ui.setSettingsOpen(true)}><Sliders /></button>
         </div>
       </header>

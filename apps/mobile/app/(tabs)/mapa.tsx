@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
 import { SymbolView } from "@/ui/Symbol";
 import { router, useIsFocused, usePathname } from "expo-router";
-import { hav, upcomingAtStop } from "@transmi/application";
+import { VIEW_3D_MIN_ZOOM, hav, upcomingAtStop } from "@transmi/application";
 import { SYSTEMS, SYSTEM_LABEL, routeTitle, type SystemType } from "@transmi/domain";
 import { toGeo } from "@transmi/domain";
 import { transit } from "@/composition-root";
@@ -250,12 +250,15 @@ export default function Mapa() {
         <View pointerEvents="none"><FeedStatus light /></View>
         <View pointerEvents="box-none" style={styles.rightCol}>
           {/* vista 3D (como en Mapas de Apple): inclina el mapa y levanta los edificios; se recuerda en el teléfono */}
+          {/* solo de cerca (más lejos no se ve volumen), o si ya está encendido, para poder apagarlo */}
+          {layers.view3d || (center?.zoom ?? 0) >= VIEW_3D_MIN_ZOOM ? <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(160)}>
           <Tap onPress={() => { void Haptics.selectionAsync(); layers.set3d(!layers.view3d); }} accessibilityRole="button" accessibilityState={{ selected: layers.view3d }}
             accessibilityLabel={layers.view3d ? "Volver al mapa plano" : "Ver el mapa en 3D"} style={styles.round3d}>
             <Glass interactive scheme="light" style={styles.round3dGlass}>
               <Text style={[type.headline, { color: layers.view3d ? om.accent : om.ink, fontWeight: "800" }]} maxFontSizeMultiplier={1.3}>3D</Text>
             </Glass>
           </Tap>
+          </Animated.View> : null}
           <RoundButton symbol="square.3.layers.3d" label="Capas del mapa" onPress={() => setPanel((p) => !p)} size={46} light />
           {away ? <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)}><RoundButton symbol={denied ? "location.slash.fill" : "location.fill"} label={denied ? "Activar mi ubicación" : "Volver a mi ubicación"} onPress={() => void locate()} size={52} light /></Animated.View> : null}
         </View>

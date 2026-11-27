@@ -27,7 +27,13 @@ export interface BusVolumeProps { id: string; /** color */ c: string; /** base (
 
 /** Medidas en metros. Padrón (alimentador, zonal, dual): ~12 × 2,55 m. Articulado de la troncal: ~18,3 m (11,2 + fuelle 0,9 + 6,2). */
 export const BUS_DIMENSIONS = { width: 2.55, std: 12, front: 11.2, gap: 0.9, rear: 6.2 } as const;
-const Z = { wheelTop: 0.75, bodyBase: 0.35, belt: 1.3, windshieldBase: 0.95, roofBase: 2.45, roofTop: 3.05, acTop: 3.35 } as const;
+/** La carrocería va 50 cm sobre el suelo y las ruedas (1 m de alto) asoman 12 cm a cada lado y suben por encima del borde de la
+ *  carrocería: así se ven desde el aire como ruedas. Antes quedaban metidas del todo bajo el bus (solo asomaban por una rendija de 35 cm). */
+const Z = { wheelTop: 1.0, bodyBase: 0.5, belt: 1.4, windshieldBase: 1.05, roofBase: 2.5, roofTop: 3.1, acTop: 3.4 } as const;
+const WHEEL_OUT = 0.12, WHEEL_W = 0.42, WHEEL_LEN = 1.1;
+/** Desde este zoom tiene sentido la vista 3D (medio nivel antes de que salgan los edificios): más lejos no se ve volumen y el botón «3D»
+ *  no se ofrece. */
+export const VIEW_3D_MIN_ZOOM = 14.5;
 const WHEEL = "#1b1f27", BELLOWS = "#1b1f27";
 
 /** Mezcla dos colores #rrggbb (t = 0 da `a`, t = 1 da `b`). */
@@ -60,8 +66,8 @@ export function busVolumes(buses: readonly BusVolumeInput[], opts: { dark?: bool
     const W = BUS_DIMENSIONS.width;
     /** Un cuerpo: ruedas, carrocería, franja de vidrios (un poco hundida), techo y, si es el de adelante, parabrisas y aire acondicionado. */
     const body = (center: number, len: number, front: boolean, axles: number[]) => {
-      // ruedas: debajo de la carrocería, asomadas a cada lado (el bus «flota» 35 cm sobre ellas)
-      for (const a of axles) for (const side of [-1, 1]) box(center + a, side * (W / 2 - 0.2), 1.0, 0.34, 0, WHEEL, 0, Z.wheelTop);
+      // ruedas: asoman a cada lado y por encima del borde bajo de la carrocería (se dibujan antes: la carrocería tapa su parte de adentro)
+      for (const a of axles) for (const side of [-1, 1]) box(center + a, side * (W / 2 + WHEEL_OUT - WHEEL_W / 2), WHEEL_LEN, WHEEL_W, 0.18, WHEEL, 0, Z.wheelTop);
       box(center, 0, len, W, 0.45, color, Z.bodyBase, Z.belt);
       box(center, 0, len - 0.1, W - 0.1, 0.4, glass, Z.belt, Z.roofBase);      // franja de vidrios, un poco hundida
       box(center, 0, len, W, 0.45, roof, Z.roofBase, Z.roofTop);
