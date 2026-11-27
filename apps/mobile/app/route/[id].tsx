@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-n
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "@/ui/Symbol";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { arrivalAtIndex, displayNextIndex, routeDetail } from "@transmi/application";
+import { displayNextIndex, routeDetail, shownArrival } from "@transmi/application";
 import { SYSTEM_LABEL,  routeOfficialName, routeTitle, type Vehicle } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
@@ -60,7 +60,7 @@ export default function RouteScreen() {
       if (!seq || seq.shape !== cur) continue;
       const j = displayNextIndex(transit, v, cur, seq.index, nowMs()), nextId = cur.stopIds[j];
       if (!nextId) continue;
-      out.push({ v, k: j - 1, nextId, at: arrivalAtIndex(transit, v, cur, seq.index, j, nowMs()) });
+      out.push({ v, k: j - 1, nextId, at: shownArrival(transit, v, cur, seq.index, j, nowMs()) });      // la cuenta se detiene en vez de subir
     }
     return out.sort((a, b) => b.k - a.k);
   }, [d, cur, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps

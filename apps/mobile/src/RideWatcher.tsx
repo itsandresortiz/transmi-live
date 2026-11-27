@@ -3,7 +3,7 @@ import { Alert, AppState } from "react-native";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { type PhoneFix, arrivalAtIndex, busForGpsRide, checkOnShape, checkRide, rideArrival } from "@transmi/application";
+import { type PhoneFix, arrivalAtIndex, busForGpsRide, checkOnShape, checkRide, rideArrival, rideShownArrival } from "@transmi/application";
 import { isVirtualRide, linkRide, rideSequence, rideVehicle, virtualParts, virtualRideId } from "./virtualRide";
 import { clearRideSnap, rideCheckOf, rideNextStop, rideSnapOf, setRideCheck } from "./rideSnap";
 import { transit } from "./composition-root";
@@ -126,7 +126,8 @@ export function RideWatcher() {
       if (left >= 1) void schedule("ride-0", at(ti) - 20, "Bájate aquí", `Estás llegando a ${name}.`, data);
       // lo mismo en la pantalla de bloqueo y la isla dinámica (si no hay ya un viaje de «Cómo llegar» ocupándola)
       if (!useTrip.getState().it && left > 0) {
-        const eta = at(ti), key = `${left}|${Math.round(eta / 20)}`, total = Math.max(useRide.getState().total, left, 1);
+        // en pantalla (bloqueo / isla / aviso fijo) la misma cuenta que en «Voy en este bus»: se detiene en vez de subir
+        const eta = rideShownArrival(transit, v, seq.shape, seq.index, snap, ti, now), key = `${left}|${Math.round(eta / 20)}`, total = Math.max(useRide.getState().total, left, 1);
         if (key !== shown) {
           shown = key;
           void showTripActivity(name, {

@@ -4,7 +4,7 @@ import {
   Fleet, type Delay, type Route, type ServiceAlert, type Stop, type SystemType, type TripUpdate, type Vehicle, type RouteShape,
   type VehicleReport, type StopLabel, TransitNetwork, delayFromSeconds, inferSystemFromReport, isAlertActive, parseStopName, MAX_REPORT_AGE_S,
 } from "@transmi/domain";
-import { arrivalAtIndex, displayNextIndex, shapeStops } from "./eta";
+import { arrivalAtIndex, displayNextIndex, shapeStops, shownArrival } from "./eta";
 import { type RouteDayStatus, ServiceEnds, type ServiceMark } from "./service-ends";
 import { Departures } from "./departures";
 import { TravelTimes } from "./travel-times";
@@ -201,7 +201,8 @@ export class TransitState {
     const j = byPosition ? displayNextIndex(this, v, seq.shape, seq.index, nowMs) : seq.index + 1;
     const stopId = seq.shape.stopIds[j];
     if (!stopId) return undefined;
-    return { stopId, stop: this.stopById(stopId), arrivalAt: arrivalAtIndex(this, v, seq.shape, seq.index, j, nowMs) };
+    // para mostrar, la cuenta no sube de golpe (se detiene; ver eta-hold.ts); el motor de movimiento quiere la hora tal cual
+    return { stopId, stop: this.stopById(stopId), arrivalAt: byPosition ? shownArrival(this, v, seq.shape, seq.index, j, nowMs) : arrivalAtIndex(this, v, seq.shape, seq.index, j, nowMs) };
   }
 
   /** Saca de la flota los buses que llevan mucho sin reportar. Hay que llamarlo aunque no lleguen datos nuevos. */

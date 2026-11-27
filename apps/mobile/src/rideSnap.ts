@@ -1,4 +1,4 @@
-import { type RideCheck, type RideSnap, rideArrival, shapeStops } from "@transmi/application";
+import { type RideCheck, type RideSnap, rideShownArrival, shapeStops } from "@transmi/application";
 import { type RouteShape, type Stop, type Vehicle, bearingDegrees, toGeo } from "@transmi/domain";
 import { transit } from "./composition-root";
 import { nowMs as clockMs } from "./clock";
@@ -60,5 +60,5 @@ export function rideNextStop(v: Vehicle, nowMs = clockMs()): { stopId: string; s
   if (!mine || !seq || seq.shape !== mine.shape) return undefined;
   const stopId = seq.shape.stopIds[mine.nextIndex];
   if (!stopId) return undefined;
-  return { stopId, stop: transit.stopById(stopId), arrivalAt: rideArrival(transit, v, seq.shape, seq.index, mine, mine.nextIndex, nowMs) };
+  return { stopId, stop: transit.stopById(stopId), arrivalAt: rideShownArrival(transit, v, seq.shape, seq.index, mine, mine.nextIndex, nowMs) };      // para mostrar: la cuenta no sube de golpe
 }

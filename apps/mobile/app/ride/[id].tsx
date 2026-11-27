@@ -6,7 +6,7 @@ import * as Haptics from "expo-haptics";
 import { allowAlerts } from "@/notify";
 import { useRide } from "@/ride";
 import { SymbolView } from "@/ui/Symbol";
-import { arrivalAtIndex, rideArrival } from "@transmi/application";
+import { rideShownArrival } from "@transmi/application";
 import { rideSnapOf } from "@/rideSnap";
 import { isVirtualRide, linkedBusOf, rideSequence, rideVehicle, virtualParts, wasLinked } from "@/virtualRide";
 import { SYSTEM_LABEL, routeTitle } from "@transmi/domain";
@@ -68,7 +68,7 @@ export default function Ride() {
     if (!v || !seq) return [];
     const out: { id: string; index: number; at: number }[] = [];
     const last = Math.min(seq.shape.stopIds.length - 1, reached + MAX_STOPS);
-    for (let j = reached + 1; j <= last; j++) out.push({ id: seq.shape.stopIds[j]!, index: j, at: snap ? rideArrival(transit, v, seq.shape, seq.index, snap, j, nowMs()) : arrivalAtIndex(transit, v, seq.shape, seq.index, j, nowMs()) });
+    for (let j = reached + 1; j <= last; j++) out.push({ id: seq.shape.stopIds[j]!, index: j, at: rideShownArrival(transit, v, seq.shape, seq.index, snap, j, nowMs()) });
     return out;
   }, [v, seq?.shape, seq?.index, reached, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -132,7 +132,7 @@ export default function Ride() {
               <SymbolView name="info.circle.fill" tintColor={c.muted} size={22} />
               <Text style={[type.body, { color: c.text, flex: 1 }]}>
                 {alightId && left != null
-                  ? left <= 0 ? "Es tu parada. Prepárate para bajar." : left === 1 ? `La siguiente es la tuya: ${stopText(transit.stopById(alightId), alightId)}.` : `Bajas en ${stopText(transit.stopById(alightId), alightId)}: faltan ${left} paradas, ${etaText(snap ? rideArrival(transit, v, seq.shape, seq.index, snap, reached + left, nowMs()) : arrivalAtIndex(transit, v, seq.shape, seq.index, reached + left, nowMs()), now)}.`
+                  ? left <= 0 ? "Es tu parada. Prepárate para bajar." : left === 1 ? `La siguiente es la tuya: ${stopText(transit.stopById(alightId), alightId)}.` : `Bajas en ${stopText(transit.stopById(alightId), alightId)}: faltan ${left} paradas, ${etaText(rideShownArrival(transit, v, seq.shape, seq.index, snap, reached + left, nowMs()), now)}.`
                   : `${stopText(nextStop, next.id)} es la próxima parada. Toca en la lista la parada donde bajas y te avisamos antes de llegar.`}
               </Text>
             </View>

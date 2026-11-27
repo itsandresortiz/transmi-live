@@ -30,3 +30,7 @@ export class EtaHold {
 
   private prune(nowSec: number): void { for (const [k, v] of this.shown) if (nowSec - v.t > FORGET_S) this.shown.delete(k); }
 }
+
+/** Clave aparte para «Voy en este bus»: ahí la hora sale de tu GPS (`rideArrival`), no del reporte del bus; si compartiera la clave con
+ *  las listas de las paradas, una cuenta frenaría a la otra con un cálculo distinto. */
+export const rideHoldKey = (busId: string): string => `ride:${busId}`;
