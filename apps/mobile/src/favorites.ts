@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { PlanPlace } from "@transmi/application";
+import { toggleSavedRoute, type PlanPlace } from "@transmi/application";
+import { transit } from "./composition-root";
 
 interface Saved {
   stops: string[]; routes: string[];
@@ -21,7 +22,9 @@ export const useSaved = create<Saved>()(persist((set) => ({
   stops: [], routes: [], nicknames: {}, home: null, work: null,
   setNickname: (id, name) => set((s) => { const n = { ...s.nicknames }; if (name.trim()) n[id] = name.trim().slice(0, 40); else delete n[id]; return { nicknames: n }; }),
   toggleStop: (id) => set((s) => ({ stops: flip(s.stops, id) })),
-  toggleRoute: (id) => set((s) => ({ routes: flip(s.routes, id) })),
+  // una ruta guardada es la ruta en sus dos sentidos (TransMilenio les da un código a cada uno): quitarla borra todos sus códigos,
+  // también los que quedaron guardados de antes, cuando cada sentido se guardaba aparte (por eso no hace falta migrar nada)
+  toggleRoute: (id) => set((s) => ({ routes: toggleSavedRoute(transit, s.routes, id) })),
   moveStop: (id, by) => set((s) => {
     const i = s.stops.indexOf(id), j = i + by;
     if (i < 0 || j < 0 || j >= s.stops.length) return s;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { downText } from "./liveStatus";
-import { type Itinerary, nearestStops, planTrip, upcomingAtStop } from "@transmi/application";
+import { type Itinerary, isRouteSaved, nearestStops, planTrip, savedRouteFamilies, upcomingAtStop } from "@transmi/application";
 import { transit } from "../composition-root";
 import type { MapTheme } from "../map/theme";
 import { routeBadgeColor } from "../map/theme";
@@ -30,7 +30,7 @@ export function useUpcoming(stopId: string | null, perRoute: number) {
 }
 
 export function StarButton({ kind, id }: { kind: "stop" | "route"; id: string }) {
-  const on = useFavs((f) => (kind === "stop" ? f.stops : f.routes).includes(id));
+  const on = useFavs((f) => (kind === "stop" ? f.stops.includes(id) : isRouteSaved(transit, f.routes, id)));
   const toggle = useFavs((f) => (kind === "stop" ? f.toggleStop : f.toggleRoute));
   return (
     <button className={`star${on ? " on" : ""}`} aria-pressed={on} aria-label={on ? "Quitar de favoritos" : "Guardar en favoritos"} onClick={() => toggle(id)}>
@@ -84,7 +84,8 @@ export function StopCard({ stopId, th, act, meters }: { stopId: string; th: MapT
 
 export function FavoritesSection({ th, act }: { th: MapTheme; act: Actions }) {
   useTransitVersion();
-  const stops = useFavs((f) => f.stops), routes = useFavs((f) => f.routes);
+  const stops = useFavs((f) => f.stops), saved = useFavs((f) => f.routes);
+  const routes = savedRouteFamilies(transit, saved);      // una por ruta aunque estén guardados sus dos sentidos
   if (!stops.length && !routes.length) return null;
   return (
     <div className="favs">

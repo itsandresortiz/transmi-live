@@ -50,6 +50,8 @@ interface UiState {
   openGroup(ids: string[] | null): void;
   setStopRoute(r: { routeId: string; direction: string } | null): void;
   setDirection(d: string): void;
+  /** Cambia de sentido en la ficha de una ruta: el otro sentido puede tener otro código de ruta (TransMilenio publica cada uno aparte). */
+  setRouteDirection(routeId: string, direction: string): void;
   setOpenAlert(i: number | null): void;
   setFollow(id: string | null): void;
   setFollowPaused(v: boolean): void;
@@ -88,6 +90,7 @@ export const useUi = create<UiState>((set) => ({
   openStop: (stopId) => set({ stopId, stopRoute: null, targetStopId: stopId, routeId: null, routeBusId: null }),
   setStopRoute: (stopRoute) => set({ stopRoute }),
   setDirection: (direction) => set({ direction }),
+  setRouteDirection: (routeId, direction) => set({ routeId, direction }),
   setOpenAlert: (openAlert) => set({ openAlert }),
   setFollow: (followId) => set({ followId, followPaused: false }),
   setFollowPaused: (followPaused) => set({ followPaused }),

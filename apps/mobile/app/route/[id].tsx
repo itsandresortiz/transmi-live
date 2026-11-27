@@ -4,8 +4,8 @@ import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-n
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "@/ui/Symbol";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { arrivalAtIndex, displayNextIndex, routeDetail } from "@transmi/application";
-import { SYSTEM_LABEL,  routeOfficialName, routeTitle, type Vehicle } from "@transmi/domain";
+import { directionBuses, isRouteSaved, pickDirection, routeDetail, routeDirections } from "@transmi/application";
+import { SYSTEM_LABEL,  routeOfficialName, routeTitle } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
@@ -16,6 +16,7 @@ import { useSaved } from "@/favorites";
 import { useMapFocus } from "@/map/focus";
 import { TransitMap, type TransitMapHandle } from "@/map/TransitMap";
 import { Card, Chip, RoundButton, Tap } from "@/ui/kit";
+import { GlassSegments } from "@/ui/GlassSegments";
 import { CloseToolbar } from "@/ui/CloseToolbar";
 import { RouteAlerts } from "@/ui/RouteAlerts";
 import { RouteBadge } from "@/ui/RouteBadge";
@@ -26,22 +27,28 @@ import { SceneHeader, laneColorOf } from "@/ui/Illustrations";
 const DAY_LABEL = { wk: "Lunes a viernes", sa: "Sábados", su: "Domingos y festivos" } as const;
 const MAX_BUSES = 12;
 
-/** Una ruta como en la web: su recorrido y los buses en vivo en un mapa, y debajo los buses con su próxima parada, las paradas con los buses que van hacia ellas y el horario. */
+/** Una ruta como en la web: su recorrido y los buses en vivo en un mapa, y debajo los buses con su próxima parada, las paradas con los buses que van hacia ellas y el horario.
+ *  Es una sola ficha para los dos sentidos: TransMilenio publica muchos con un código de ruta distinto, pero para la gente «el 7» es uno;
+ *  arriba se elige el sentido («Hacia Portal Suba» / «Hacia Polo») y cambian las paradas, los buses y el mapa sin abrir otra ventana. */
 export default function RouteScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, d: wantDir } = useLocalSearchParams<{ id: string; d?: string }>();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const map = useRef<TransitMapHandle>(null);
   useTransitVersion();
   const now = useNow() / 1000;
-  const [dir, setDir] = useState<string | null>(null);
-  const fav = useSaved((f) => f.routes.includes(id)), toggle = useSaved((f) => f.toggleRoute);
-  const d = routeDetail(transit, id);
-  // TransMilenio publica cada sentido como una ruta aparte: si existe el contrario, se ofrece el salto
-  const otherId = transit.routeFamily(id).find((x) => x !== id), other = otherId ? transit.routeById(otherId) : undefined;
-  const shapes = transit.network.shapes.get(id) ?? [];
-  const cur = shapes.find((s) => s.direction === dir) ?? shapes[0];
+  const [dirKey, setDirKey] = useState<string | null>(null);
+  // los sentidos de la ruta con todos sus códigos; el elegido manda en el mapa, las paradas, los buses y el horario
+  const dirs = useMemo(() => routeDirections(transit, id), [id, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const sel = pickDirection(dirs, { key: dirKey, routeId: id, direction: wantDir ?? null });
+  const rid = sel?.routeId ?? id, cur = sel?.shape;
+  const fav = useSaved((f) => isRouteSaved(transit, f.routes, id)), toggle = useSaved((f) => f.toggleRoute);
+  const d = routeDetail(transit, rid);
+  // buses en la calle contando los dos sentidos (son la misma ruta para quien la usa)
+  const family = transit.routeFamily(rid);
+  let onStreet = 0;
+  for (const v of transit.fleet.values()) if (family.includes(v.routeId)) onStreet++;
 
   // el mapa se encuadra en el recorrido que se está viendo
   useEffect(() => {
@@ -49,72 +56,64 @@ export default function RouteScreen() {
     const step = Math.max(1, Math.floor(cur.points.length / 80));
     const t = setTimeout(() => map.current?.fit(cur.points.filter((_, i) => i % step === 0), 36, 20), 350);
     return () => clearTimeout(t);
-  }, [id, cur?.direction]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, sel?.key]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // los buses de esta ruta que van en el sentido que se ve, con su próxima parada y la hora a la que llegan a ella
-  const buses = useMemo(() => {
-    if (!d || !cur) return [];
-    const out: { v: Vehicle; k: number; nextId: string; at: number }[] = [];
-    for (const v of d.vehicles) {
-      const seq = transit.sequenceForDisplay(v);
-      if (!seq || seq.shape !== cur) continue;
-      const j = displayNextIndex(transit, v, cur, seq.index, nowMs()), nextId = cur.stopIds[j];
-      if (!nextId) continue;
-      out.push({ v, k: j - 1, nextId, at: arrivalAtIndex(transit, v, cur, seq.index, j, nowMs()) });
-    }
-    return out.sort((a, b) => b.k - a.k);
-  }, [d, cur, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const buses = useMemo(() => (sel ? directionBuses(transit, sel, nowMs()) : []), [sel, transit.version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps
   // próximas salidas programadas de este sentido desde su primera parada (para cuando aún no hay ningún bus en la calle)
   const nextStarts = useMemo(() => {
     if (!cur?.stopIds[0] || !transit.departures.size) return [];
     const dd = transit.serviceEnds.dayAt(nowMs());
-    return transit.departures.nextAt(cur.stopIds[0], dd.type, dd.secs, 2).find((p) => p.routeId === id && p.direction === cur.direction)?.times ?? [];
-  }, [id, cur, Math.floor(now / 30)]);   // eslint-disable-line react-hooks/exhaustive-deps
+    return transit.departures.nextAt(cur.stopIds[0], dd.type, dd.secs, 2).find((p) => p.routeId === rid && p.direction === cur.direction)?.times ?? [];
+  }, [rid, cur, Math.floor(now / 30)]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!d) return <View style={[styles.empty, { backgroundColor: c.bg }]}><CloseToolbar />{transit.network.routes.size ? <><Text style={[type.headline, { color: c.text }]}>Ruta no encontrada</Text><Text style={[type.body, { color: c.muted }]}>Ya no aparece en el servicio.</Text></> : <Text style={[type.headline, { color: c.text }]}>Cargando la ruta…</Text>}</View>;
   const route = d.route, color = SYSTEM_COLOR[route.system];
-  const status = transit.routeStatus(id, nowMs());
-  const sched = transit.serviceEnds.scheduleOf(id, nowMs());
+  const status = transit.routeStatus(rid, nowMs());
+  const sched = transit.serviceEnds.scheduleOf(rid, nowMs());
   const day = transit.serviceEnds.dayAt(nowMs());
-  const gap = transit.departures.size ? transit.departures.headwayAt(id, day.type, day.secs) : null;
+  const gap = transit.departures.size ? transit.departures.headwayAt(rid, day.type, day.secs) : null;
   const avg = d.averageDelaySeconds;
   const mapH = Math.min(320, Math.round(height * 0.36));
   const heading = (i: number) => buses.filter((b) => cur?.stopIds[b.k + 1] === cur?.stopIds[i]);
-  const showAll = () => { useMapFocus.getState().set({ stopId: null, routeId: id, busIds: [], followBusId: null }); router.dismissAll(); router.navigate("/mapa"); };
+  const showAll = () => { useMapFocus.getState().set({ stopId: null, routeId: rid, busIds: [], followBusId: null }); router.dismissAll(); router.navigate("/mapa"); };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Stack.Screen options={{ title: route.shortName }} />
       <CloseToolbar />
       <View style={{ height: mapH, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, overflow: "hidden" }}>
-        <TransitMap ref={map} routeId={id} compact attributionPosition={{ bottom: 6, left: 8 }}
-          onBus={(bid) => router.push({ pathname: "/bus/[id]", params: { id: bid } })} onStop={(sid) => router.push({ pathname: "/stop/[id]", params: { id: sid, route: id } })} />
+        <TransitMap ref={map} routeId={rid} compact attributionPosition={{ bottom: 6, left: 8 }}
+          onBus={(bid) => router.push({ pathname: "/bus/[id]", params: { id: bid } })} onStop={(sid) => router.push({ pathname: "/stop/[id]", params: { id: sid, route: rid } })} />
         <View style={styles.mapBtn}><RoundButton symbol="arrow.up.left.and.arrow.down.right" label="Ver la ruta en el mapa grande" onPress={showAll} size={40} light /></View>
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + space[10] * 2 }]} showsVerticalScrollIndicator={false}>
         {/* cabecera ilustrada: el bus de la ruta, del color de su sistema, por el carril del color de su línea; anda si hay buses en la calle */}
-        <SceneHeader kind={route.system === "cable" ? "cable" : "city"} busColor={color} laneColor={laneColorOf(route.shortName, route.system, c.dark)} long={route.system === "troncal"} sign={route.shortName} moving={d.vehicles.length > 0} height={130} />
+        <SceneHeader kind={route.system === "cable" ? "cable" : "city"} busColor={color} laneColor={laneColorOf(route.shortName, route.system, c.dark)} long={route.system === "troncal"} sign={route.shortName} moving={onStreet > 0} height={130} />
         <View style={styles.head}>
           <RouteBadge route={route} />
           <View style={{ flex: 1 }}>
-            <Text style={[type.title, { color: c.text }]} numberOfLines={2}>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName ? routeTitle(route) : SYSTEM_LABEL[route.system]}</Text>
+            <Text style={[type.title, { color: c.text }]} numberOfLines={2}>{sel?.toward ? sel.label : route.longName ? routeTitle(route) : SYSTEM_LABEL[route.system]}</Text>
             {route.longName ? <Text style={[type.caption, { color: c.muted }]}>Nombre oficial: {routeOfficialName(route)}</Text> : null}
-            {other ? <Tap haptic={false} onPress={() => router.replace({ pathname: "/route/[id]", params: { id: other.id } })} accessibilityRole="button" accessibilityLabel={`Ver el ${route.shortName} en el sentido contrario${other.longName ? `, ${other.longName}` : ""}`} style={{ marginTop: 4, alignSelf: "flex-start" }}>
-              <Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>Ver el sentido contrario{other.longName ? ` (${other.longName})` : ""} ›</Text></Tap> : null}
             {/* si vas en un bus de esta ruta que no sale en el mapa (su GPS no reporta), te seguimos con tu ubicación */}
-            <Tap haptic={false} onPress={() => router.push({ pathname: "/enbus", params: { route: id } })} accessibilityRole="button" accessibilityLabel={`Voy en un ${route.shortName}: encontrarlo con mi ubicación`} style={{ marginTop: 4, alignSelf: "flex-start" }}>
+            <Tap haptic={false} onPress={() => router.push({ pathname: "/enbus", params: { route: rid } })} accessibilityRole="button" accessibilityLabel={`Voy en un ${route.shortName}: encontrarlo con mi ubicación`} style={{ marginTop: 4, alignSelf: "flex-start" }}>
               <Text style={[type.caption, { color: c.accent, fontSize: 14 }]}>Voy en un {route.shortName} ›</Text></Tap>
           </View>
           <RoundButton symbol={fav ? "star.fill" : "star"} label={fav ? "Quitar de favoritos" : "Guardar en favoritos"} onPress={() => toggle(id)} />
         </View>
         <Text style={[type.body, { color: c.muted }]}>
-          {SYSTEM_LABEL[route.system]} · {d.vehicles.length} {d.vehicles.length === 1 ? "bus" : "buses"} en la calle{avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}
+          {SYSTEM_LABEL[route.system]} · {onStreet} {onStreet === 1 ? "bus" : "buses"} en la calle{dirs.length > 1 ? " en los dos sentidos" : ""}{avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}
         </Text>
 
-        {shapes.length > 1 ? (
+        {/* sentido: con dos, un selector de igual ancho (como Rutas / Paradas en el buscador); con más (variantes con otro destino), fichas que se deslizan */}
+        {sel && dirs.length === 2 ? (
+          <View>
+            <GlassSegments<string> variant="plain" value={sel.key} onChange={setDirKey} items={dirs.map((x) => ({ key: x.key, label: x.label }))} />
+          </View>
+        ) : sel && dirs.length > 2 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[5] }} contentContainerStyle={{ gap: space[2], paddingHorizontal: space[5] }}>
-            {shapes.map((s) => <Chip key={s.direction} label={s.headsign ? `Hacia ${s.headsign}` : `Sentido ${Number(s.direction) + 1}`} selected={cur?.direction === s.direction} onPress={() => setDir(s.direction)} />)}
+            {dirs.map((x) => <Chip key={x.key} label={x.label} selected={sel.key === x.key} onPress={() => setDirKey(x.key)} />)}
           </ScrollView>
         ) : null}
 
@@ -123,22 +122,22 @@ export default function RouteScreen() {
             <Text style={[type.body, { color: c.muted, marginTop: space[1] }]}>{status.state === "ended" ? `El último salió a las ${clockOfDay(status.lastStart)} y ya no queda ninguno en la calle.${status.nextFirstStart != null ? ` El próximo sale a las ${clockOfDay(status.nextFirstStart)}.` : ""}` : `El primer bus sale a las ${clockOfDay(status.firstStart)}.`}</Text></Card>
         ) : null}
 
-        <RouteAlerts routeId={id} max={5} />
+        <RouteAlerts routeId={rid} max={5} />
 
         <Text style={[type.eyebrow, { color: c.muted, marginTop: space[3] }]}>BUSES EN VIVO</Text>
         {buses.length ? <Text style={[type.caption, { color: c.muted, marginTop: -space[1] }]}>Cada bus con su próxima parada y en cuánto llega a ella.</Text> : null}
         {buses.length ? (
           <Card style={{ gap: 0, paddingVertical: space[1] }}>
             {buses.slice(0, MAX_BUSES).map((b, i) => {
-              const dl = transit.delayOf(b.v), tone = delayClass(dl) === "bad" ? "#dc2626" : delayClass(dl) === "warn" ? "#d97706" : delayClass(dl) === "ok" ? "#16a34a" : c.muted;
+              const dl = transit.delayOf(b.vehicle), tone = delayClass(dl) === "bad" ? "#dc2626" : delayClass(dl) === "warn" ? "#d97706" : delayClass(dl) === "ok" ? "#16a34a" : c.muted;
               return (
-                <Tap key={b.v.id} onPress={() => router.push({ pathname: "/bus/[id]", params: { id: b.v.id } })} accessibilityRole="button" accessibilityLabel={`Bus ${b.v.plate || b.v.id}, próxima parada ${stopText(transit.stopById(b.nextId), b.nextId)}, ${etaText(b.at, now)}`}
+                <Tap key={b.vehicle.id} onPress={() => router.push({ pathname: "/bus/[id]", params: { id: b.vehicle.id } })} accessibilityRole="button" accessibilityLabel={`Bus ${b.vehicle.plate || b.vehicle.id}, próxima parada ${stopText(transit.stopById(b.nextStopId), b.nextStopId)}, ${etaText(b.at, now)}`}
                   style={[styles.busRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.line }]}>
                   <SymbolView name="bus.fill" tintColor={color} size={20} />
                   <View style={{ flex: 1 }}>
                     {/* se dice a dónde es ese tiempo: sin el rótulo, «37 s» junto a un nombre no se sabe si es la parada donde está, a la que va o el destino */}
-                    <Text style={[type.caption, { color: c.muted }]}>Bus {b.v.plate || b.v.label || b.v.id} · próxima parada{dl.kind !== "unknown" ? <Text style={{ color: tone }}> · {delayText(dl)}</Text> : null}</Text>
-                    <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{stopText(transit.stopById(b.nextId), b.nextId)}</Text>
+                    <Text style={[type.caption, { color: c.muted }]}>Bus {b.vehicle.plate || b.vehicle.label || b.vehicle.id} · próxima parada{dl.kind !== "unknown" ? <Text style={{ color: tone }}> · {delayText(dl)}</Text> : null}</Text>
+                    <Text style={[type.headline, { color: c.text }]} numberOfLines={1}>{stopText(transit.stopById(b.nextStopId), b.nextStopId)}</Text>
                   </View>
                   <Eta at={b.at} format={(t) => (t === "llegando" ? "llegando" : `en ${t}`)} style={[type.headline, { color: i === 0 ? c.accent : c.text }]} />
                   <SymbolView name="chevron.right" tintColor={c.muted} size={12} />
@@ -160,7 +159,7 @@ export default function RouteScreen() {
                 const here = heading(i), first = i === 0, last = i === cur.stopIds.length - 1;
                 const soon = here[0]?.at;
                 return (
-                  <Tap key={sid + i} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: sid, route: id } })} accessibilityRole="button" accessibilityLabel={`${stopText(transit.stopById(sid), sid)}${here.length ? `, ${here.length} ${here.length === 1 ? "bus va" : "buses van"} hacia aquí` : ""}`} style={styles.tl}>
+                  <Tap key={sid + i} onPress={() => router.push({ pathname: "/stop/[id]", params: { id: sid, route: rid } })} accessibilityRole="button" accessibilityLabel={`${stopText(transit.stopById(sid), sid)}${here.length ? `, ${here.length} ${here.length === 1 ? "bus va" : "buses van"} hacia aquí` : ""}`} style={styles.tl}>
                     <View style={styles.tlRail}>
                       <View style={[styles.tlLine, { backgroundColor: color, top: first ? "50%" : 0, bottom: last ? "50%" : 0 }]} />
                       <View style={[styles.tlDot, { backgroundColor: here.length ? color : c.card, borderColor: color }]} />

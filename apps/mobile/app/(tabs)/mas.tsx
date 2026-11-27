@@ -7,7 +7,7 @@ import { router } from "expo-router";
 import { liveDown, downText } from "@/lastService";
 import Constants from "expo-constants";
 import { SymbolView, type SFSymbol } from "@/ui/Symbol";
-import { connectionStatus, searchAlerts } from "@transmi/application";
+import { connectionStatus, savedRouteFamilies, searchAlerts } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowMs } from "@/clock";
 import { useNow, useTransitVersion } from "@/hooks";
@@ -77,7 +77,7 @@ export default function Mas() {
   useTransitVersion(); useNow(15_000);
   const st = connectionStatus(transit, nowMs());
   const hasBuses = !liveDown(), late = (st.ageSeconds ?? 0) > 300, ageMin = st.ageSeconds != null ? Math.round(st.ageSeconds / 60) : null;
-  const alerts = searchAlerts(transit).length, favs = saved.stops.length + saved.routes.length;
+  const alerts = searchAlerts(transit).length, favs = saved.stops.length + savedRouteFamilies(transit, saved.routes).length;
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: c.bg }]} edges={["top"]}>
