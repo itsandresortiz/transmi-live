@@ -49,6 +49,26 @@ function meanAxis(axes: Axis[]): Axis {
   return { ux: Math.cos(t), uy: Math.sin(t) };
 }
 
+/** Cuando las paradas de una estación forman una fila larga y recta (≥ `STOPS_AXIS_MIN_M` de punta a punta, ≤ `STOPS_AXIS_MAX_SPREAD_M` de
+ *  ancho), esa fila manda sobre el sentido de los recorridos si se apartan más de `STOPS_AXIS_MAX_DEG`. En las cabeceras (Universidades)
+ *  los recorridos dan la vuelta junto a la estación y su sentido salía casi atravesado a la avenida: la base cruzaba las calzadas. */
+export const STOPS_AXIS_MIN_M = 40, STOPS_AXIS_MAX_SPREAD_M = 12, STOPS_AXIS_MAX_DEG = 20;
+export function stopsAxis(ws: readonly { x: number; y: number }[], fromShapes: Axis): Axis {
+  if (ws.length < 2) return fromShapes;
+  const mx = ws.reduce((a, w) => a + w.x, 0) / ws.length, my = ws.reduce((a, w) => a + w.y, 0) / ws.length;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const w of ws) { const dx = w.x - mx, dy = w.y - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+  const t = Math.atan2(2 * sxy, sxx - syy) / 2, ax = { ux: Math.cos(t), uy: Math.sin(t) };
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (const w of ws) {
+    const u = ((w.x - mx) * ax.ux + (w.y - my) * ax.uy) * METERS_PER_WORLD_UNIT, v = ((w.x - mx) * -ax.uy + (w.y - my) * ax.ux) * METERS_PER_WORLD_UNIT;
+    u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v);
+  }
+  if (u1 - u0 < STOPS_AXIS_MIN_M || v1 - v0 > STOPS_AXIS_MAX_SPREAD_M) return fromShapes;
+  const deg = (Math.acos(Math.min(1, Math.abs(ax.ux * fromShapes.ux + ax.uy * fromShapes.uy))) * 180) / Math.PI;
+  return deg > STOPS_AXIS_MAX_DEG ? ax : fromShapes;
+}
+
 /** Dibuja las estaciones de la troncal: la estación completa como una base, y sus vagones como cápsulas adentro. */
 /** Puntos de las líneas dibujadas de la troncal (lat, lon) con su letra: la línea por la que realmente pasa una estación manda sobre cuántas rutas la usan. */
 export interface CorridorLine { l: string; p: readonly [number, number][] }
@@ -150,7 +170,7 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
   for (const st of stations) {
     const items = st.stops.map((stop) => ({ stop, w: toWorld(stop.position), n: state.labelOf(stop).wagon!, axis: tangentOf(state, stop.id, cache, index) }));
     const known = items.map((i) => i.axis).filter((a): a is Axis => !!a);
-    const axis = known.length ? meanAxis(known) : { ux: 0, uy: -1 };
+    const axis = stopsAxis(items.map((i) => i.w), known.length ? meanAxis(known) : { ux: 0, uy: -1 });
     const nx = -axis.uy, ny = axis.ux;
     const all = st.stops.map((s) => s.id).join(",");
     const line = lineOf(st.stops.map((s) => s.id));
