@@ -24,6 +24,10 @@ import { STOP_ORDER_STRONG, StopOrderObserver, emptyStopOrderStats, learnStopFix
 import type { TransitNetwork } from "@transmi/domain";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 
+/** Si el «GTFS diario» aplica las correcciones propuestas. Apagado: por ahora solo se recolecta y el dueño revisa lo propuesto
+ *  (`stop-fixes.json` en la rama `stop-order`) antes de encenderlo. */
+const FIXES_USE = false;
+
 const SECONDS = Number(process.argv[2] ?? 420), EVERY_MS = 10_000;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live", TOKEN = process.env.GITHUB_TOKEN ?? "";
 const url = () => `https://${TOKEN ? `x-access-token:${TOKEN}@` : ""}github.com/${REPO}.git`;
@@ -105,7 +109,7 @@ async function main() {
   const fixes = learnStopFixes(total, net, STOP_ORDER_STRONG);
   const out = mkdtempSync(join(tmpdir(), "so-out-"));
   writeFileSync(join(out, "stats.json.gz"), gzipSync(JSON.stringify(total), { level: 9 }));
-  writeFileSync(join(out, "stop-fixes.json"), JSON.stringify({ v: 1, updated: new Date().toISOString(), thresholds: STOP_ORDER_STRONG, fixes }, null, 1));
+  writeFileSync(join(out, "stop-fixes.json"), JSON.stringify({ v: 1, updated: new Date().toISOString(), use: FIXES_USE, thresholds: STOP_ORDER_STRONG, fixes }, null, 1));
   execFileSync("bash", ["scripts/publish.sh", out], { stdio: "inherit", env: { ...process.env, BRANCH, GITHUB_REPOSITORY: REPO, GITHUB_TOKEN: TOKEN } });
   console.log(`publicado: ${fixes.length} correcciones con evidencia fuerte`);
 }

@@ -6,6 +6,7 @@ import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, loadSignalWaits, networkSource, transit } from "./composition-root";
 import { nowMs, nowSec } from "./clock";
 import { BusRenderer } from "./map/BusRenderer";
+import { startSharedRides } from "./sharedRides";
 import { loadTroncales } from "./map/geodata";
 import { buildStationGeometry } from "./map/stations";
 import { MapController } from "./map/MapController";
@@ -148,6 +149,7 @@ export function App() {
     };
     void poll();
     const t = setInterval(poll, POLL_MS);
+    const stopShared = startSharedRides();      // buses que comparte quien va en ellos (apagado si no hay servidor)
     const vis = () => { if (!document.hidden) void liveData.refresh(true).catch(() => {}); };
     document.addEventListener("visibilitychange", vis);
 
@@ -164,7 +166,7 @@ export function App() {
     const mq = matchMedia("(prefers-color-scheme: dark)");
     const onScheme = () => setScheme(mq.matches ? "dark" : "light");
     mq.addEventListener("change", onScheme);
-    return () => { stopped = true; clearInterval(t); document.removeEventListener("visibilitychange", vis); mq.removeEventListener("change", onScheme); r.stop(); m.destroy(); };
+    return () => { stopped = true; clearInterval(t); stopShared(); document.removeEventListener("visibilitychange", vis); mq.removeEventListener("change", onScheme); r.stop(); m.destroy(); };
   }, [act]);
 
   /* ---------- estado de la interfaz → mapa ---------- */

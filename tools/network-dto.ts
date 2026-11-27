@@ -25,7 +25,10 @@ void (async () => {
   const fx = process.env.CORRECCIONES;
   if (fx && existsSync(fx)) {
     try {
-      const fixes = (JSON.parse(readFileSync(fx, "utf8")).fixes ?? []) as LearnedStopFix[];
+      const file = JSON.parse(readFileSync(fx, "utf8")) as { use?: boolean; fixes?: LearnedStopFix[] };
+      // mientras el archivo no diga `use: true` (lo decide el dueño tras revisar lo que proponen los buses) solo se recolecta: no se corrige nada
+      const fixes = file.use === true ? file.fixes ?? [] : [];
+      if (file.use !== true && file.fixes?.length) console.log(`orden aprendido: ${file.fixes.length} corrección(es) propuestas, sin aplicar (use: false)`);
       const names = new Map(dto.routes.map((r) => [r.id, r.shortName])), known = new Set(dto.stops.map((s) => s.id));
       for (const f of applyLearnedStopFixes(dto.shapes, (id) => names.get(id), (id) => known.has(id), fixes)) console.log(`orden aprendido: ${f.why}`);
     } catch (e) { console.log("correcciones aprendidas ilegibles, se ignoran:", (e as Error).message); }

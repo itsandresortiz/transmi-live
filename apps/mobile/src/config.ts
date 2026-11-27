@@ -14,4 +14,10 @@ export const CONFIG = {
   signalLearningUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/aprendizaje.json",
   /** Huellas de los semáforos no medidos, sacadas de los buses detenidos (se usan solo si el archivo dice `use: true`). */
   footprintsUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/huellas.json",
+  /** Función de Supabase «viajes» (avisos del viaje que se corrigen con la app cerrada y posiciones compartidas). `null` = APAGADO:
+   *  los avisos son solo del teléfono, como siempre. Se enciende cuando el dueño la despliegue (ver supabase/LEEME-avisos.md); los avisos
+   *  remotos además necesitan compilar con TM_PUSH=1. Ejemplo: "https://<proyecto>.supabase.co/functions/v1/viajes". */
+  ridesUrl: null as string | null,
+  /** Posiciones compartidas vigentes (archivo público que publica la función «viajes»). `null` = apagado (no se pide nada). */
+  sharedRidesUrl: null as string | null,
 } as const;

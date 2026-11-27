@@ -42,7 +42,8 @@ export class BusRenderer {
   ) { this.canvas = new BusCanvas(mapc.map); this.motion = new MotionEngine(state); }
 
   start() {
-    this.mapc.busHit = (pt) => this.canvas.hitTest(pt);
+    // un bus que solo conoce quien va en él (compartido, «comp:…») no tiene ficha: tocarlo no abre nada
+    this.mapc.busHit = (pt) => { const id = this.canvas.hitTest(pt); return id?.startsWith("comp:") ? null : id; };
     // al mover o acercar el mapa se redibuja en el mismo cuadro, sin desfase
     this.mapc.map.on("move", () => { if (this.canvasOn) this.canvas.draw(this.items); });
     const loop = (t: number) => { this.raf = requestAnimationFrame(loop); this.frame(t); };
@@ -119,15 +120,24 @@ export class BusRenderer {
     const pad = 1800 / METERS_PER_WORLD_UNIT;   // un bus fuera de pantalla puede entrar en lo que dura la estimación
     const x0 = sw.x - pad, x1 = ne.x + pad, y0 = ne.y - pad, y1 = sw.y + pad;
     const items: BusDraw[] = [];
+    const shared = this.state.sharedRides.size > 0;
     for (const v of this.state.fleet.values()) {
       if (v.world.x < x0 || v.world.x > x1 || v.world.y < y0 || v.world.y > y1) continue;
       if (o.system && v.system !== o.system) continue;
       if (family && !family.has(v.routeId)) continue;      // la ruta elegida y su sentido contrario
       const w = o.motion === "predict" ? this.motion.step(v, nowSec) : this.step(v.id, v.world, nowMs, TAU_REPORTED_MS);
       if (o.motion === "predict") this.shown.set(v.id, { x: w.x, y: w.y, t: nowMs });
-      const g = toGeo(w);
+      // si alguien que va en este bus comparte su posición (opcional y anónimo), se dibuja donde va según esa persona
+      const sh = shared ? this.state.sharedRides.positionOf(this.state, v.id, nowSec) : null;
+      const g = sh ?? toGeo(w);
       items.push({ id: v.id, lon: g.lon, lat: g.lat, color: o.colorMode === "system" ? th.system[v.system] : this.delayColor(v, th),
         left: v.bearing != null && v.bearing > 180, angle: o.motion === "predict" ? this.motion.heading(v.id) ?? v.bearing : v.bearing, long: v.system === "troncal", label: this.state.routeOf(v)?.shortName ?? v.routeId, stale: isStaleReport(v, nowSec), last: this.state.serviceOf(v)?.isLast, alert: this.alertRoutes().has(v.routeId) });
+    }
+    // buses que TransMilenio no reporta pero alguien que va en ellos comparte su posición (≤60 s)
+    if (shared) for (const x of this.state.sharedRides.extras(this.state, nowSec)) {
+      const r = this.state.routeById(x.routeId);
+      if (!r || (o.system && r.system !== o.system) || (family && !family.has(x.routeId))) continue;
+      items.push({ id: x.id, lon: x.lon, lat: x.lat, color: th.system[r.system], left: x.heading > 180, angle: x.heading, long: r.system === "troncal", label: r.shortName });
     }
     this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
     this.items = items;

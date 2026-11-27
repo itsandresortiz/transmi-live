@@ -1,5 +1,6 @@
 import ActivityKit
 import ExpoModulesCore
+import Foundation
 
 /// Datos de la actividad en vivo del viaje. OJO: esta estructura está repetida, idéntica, en `targets/widget/TripActivity.swift`
 /// (la app la crea y el widget la dibuja; iOS las empareja por el nombre del tipo). Si se cambia una, hay que cambiar la otra.
@@ -21,11 +22,38 @@ struct TripActivityAttributes: ActivityAttributes {
 
 /// Crea, actualiza y termina la actividad en vivo del viaje. Si el teléfono no las permite, o la app se compiló sin el widget, no hace nada y devuelve `false`.
 public class TripActivityModule: Module {
+  /// Con avisos desde el servidor (compilación con TM_PUSH=1 y servidor encendido) la actividad se crea con token de push, para que el
+  /// servidor la actualice con la app cerrada. Apagado por defecto: sin el permiso de push en la app, pedir token haría fallar la creación.
+  nonisolated(unsafe) static var usePush = false
+  /// El último token de push de la actividad en curso (hexadecimal), o vacío.
+  nonisolated(unsafe) static var pushToken = ""
+  nonisolated(unsafe) static var tokenTask: Task<Void, Never>? = nil
+
+  /// Escucha los tokens de push de la actividad (iOS puede cambiarlo mientras dura) y guarda el último.
+  static func watchToken(_ activity: Activity<TripActivityAttributes>) {
+    tokenTask?.cancel()
+    pushToken = ""
+    tokenTask = Task {
+      for await data in activity.pushTokenUpdates {
+        let hex = data.map { String(format: "%02x", $0) }.joined()
+        TripActivityModule.pushToken = hex
+      }
+    }
+  }
+
   public func definition() -> ModuleDefinition {
     Name("TripActivity")
 
     Function("isAvailable") { () -> Bool in
       ActivityAuthorizationInfo().areActivitiesEnabled
+    }
+
+    Function("setPush") { (on: Bool) in
+      TripActivityModule.usePush = on
+    }
+
+    Function("pushToken") { () -> String in
+      TripActivityModule.pushToken
     }
 
     AsyncFunction("show") { (dest: String, json: String) async -> Bool in
@@ -40,13 +68,29 @@ public class TripActivityModule: Module {
         // antes se quedaba el del primer momento con la hora del destino nuevo
         let same = current.attributes.dest == dest
         if same {
+          // la app se reabrió con la actividad ya puesta: se recupera su token de push (el servidor lo necesita para actualizarla)
+          if TripActivityModule.usePush && TripActivityModule.tokenTask == nil {
+            TripActivityModule.watchToken(current)
+            if let token = current.pushToken {
+              TripActivityModule.pushToken = token.map { String(format: "%02x", $0) }.joined()
+            }
+          }
           await current.update(content)
           return true
         }
         await current.end(nil, dismissalPolicy: .immediate)
       }
+      let attributes = TripActivityAttributes(dest: dest)
+      if TripActivityModule.usePush {
+        // con token: el servidor la puede actualizar con la app cerrada. Si falla (p. ej. sin el permiso de push), se crea sin token.
+        if let activity = try? Activity<TripActivityAttributes>.request(attributes: attributes, content: content, pushType: .token) {
+          TripActivityModule.watchToken(activity)
+          return true
+        }
+      }
       do {
-        _ = try Activity<TripActivityAttributes>.request(attributes: TripActivityAttributes(dest: dest), content: content, pushType: nil)
+        _ = try Activity<TripActivityAttributes>.request(attributes: attributes, content: content, pushType: nil)
+        TripActivityModule.pushToken = ""
         return true
       } catch {
         return false
@@ -54,6 +98,8 @@ public class TripActivityModule: Module {
     }
 
     AsyncFunction("end") { () async -> Void in
+      TripActivityModule.tokenTask?.cancel()
+      TripActivityModule.pushToken = ""
       for activity in Activity<TripActivityAttributes>.activities {
         await activity.end(nil, dismissalPolicy: .immediate)
       }

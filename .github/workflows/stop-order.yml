@@ -3,9 +3,10 @@ name: Aprender el orden de paradas
 # stop-order. Publica ahí stop-fixes.json con las correcciones al GTFS que tengan evidencia fuerte (muchos buses, varios días); el
 # workflow «GTFS diario» las aplica al armar la red. Ver tools/stoporder.ts.
 on:
-  # Para que acumule días hay que encender el horario (quitar el «#» de las dos líneas). Cada corrida graba ~7 min; unas pocas al día bastan.
-  # schedule:
-  #   - cron: "23 12,17,22 * * *"   # 7:23, 12:23 y 17:23 hora de Bogotá (pico, valle, pico)
+  # Encendido el 2026-11-27 (pedido del dueño). Cada corrida graba ~7 min. Solo recolecta: las correcciones no se aplican hasta poner
+  # FIXES_USE = true en tools/stoporder.ts.
+  schedule:
+    - cron: "23 12,17,22 * * *"   # 7:23, 12:23 y 17:23 hora de Bogotá (pico, valle, pico)
   workflow_dispatch:
 permissions:
   contents: write

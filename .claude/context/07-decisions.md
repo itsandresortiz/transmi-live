@@ -119,3 +119,9 @@ Contexto: en la primera parada de una ruta casi nunca hay buses «antes» de ell
 
 ## 2026-11-27 · Las correcciones aprendidas del orden de paradas se aplican al armar la red, no en las apps
 Contexto: se podían aplicar en cada app (como `STOP_PATCHES`) o al publicar la red diaria. Se eligió lo segundo: llega a todas las versiones sin actualizar, y cada corrección exige que las paradas vecinas sigan igual (se apaga sola si TransMilenio corrige el GTFS). Límite: quien arme la red desde `gtfs-lite.zip` (respaldo) no las recibe.
+
+## 2026-11-27 · Con el servidor de avisos a cargo, la app quita sus avisos locales
+Contexto: con la app cerrada los avisos locales quedan con la última hora calculada; el servidor (`viajes`) recalcula y manda push. Para no sonar dos veces, cuando el servidor confirma el viaje la app quita sus avisos locales pendientes (`holdRideAlerts`) y los retoma si el servidor no responde en 90 s. Alternativa descartada: dejar los dos (avisos dobles). Riesgo aceptado: si el servidor falla con la app cerrada, ese viaje queda sin avisos.
+
+## 2026-11-27 · Compartir por dónde va el bus: opcional, apagado y sin coordenadas
+Contexto: la ubicación del teléfono de quien va en el bus es más exacta y reciente que el dato de TransMilenio (~1 min). Se envía solo la posición sobre el recorrido (ruta, sentido, metros, hora, velocidad, número del bus si existe), sin coordenadas ni identificador de persona o teléfono, 24 h de retención, vigente 60 s para dibujar. Alternativa descartada: encendido por defecto (decisión de privacidad: debe elegirlo la persona).

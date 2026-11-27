@@ -2,7 +2,8 @@ import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { clockOffsetMs } from "./clock";
 
-/** Avisos del viaje («prepárate», «bájate aquí»). Son notificaciones locales del teléfono: no pasan por ningún servidor ni se envía nada. */
+/** Avisos del viaje («prepárate», «bájate aquí»). Son notificaciones locales del teléfono: no pasan por ningún servidor ni se envía nada.
+ *  (Si el servidor de avisos está encendido —ver `rideServer.ts`, apagado por defecto—, «Voy en este bus» los recibe de allá.) */
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
 });
@@ -75,6 +76,16 @@ export async function schedule(id: RideAlert, at: number, title: string, body: s
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(when), channelId: CHANNEL },
     });
   } catch { /* sin permiso o sin soporte: la vibración y la pantalla siguen avisando */ }
+}
+
+/** Los avisos del viaje que ya sonaron en el teléfono (para que el servidor no los repita). */
+export const rangRideAlerts = (): RideAlert[] => IDS.filter(alreadyRang);
+/** El servidor se encarga de los avisos (se corrigen con la app cerrada): se quitan los que el teléfono tenía programados y aún no sonaron,
+ *  para que no suenen dos veces. Los que ya sonaron siguen marcados como sonados. */
+export async function holdRideAlerts(): Promise<void> {
+  const pending = IDS.filter((i) => programmed.has(i) && !alreadyRang(i));
+  for (const i of pending) programmed.delete(i);
+  try { await Promise.all(pending.map((i) => Notifications.cancelScheduledNotificationAsync(i))); } catch { /* nada que quitar */ }
 }
 
 export async function cancelAlerts(): Promise<void> {
