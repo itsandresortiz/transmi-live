@@ -113,8 +113,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 8. Optimizar el mapa de la app con una capa nativa para movimiento fluido.
 
 ## Pasos que dependen del dueño
-- **Urgente (2026-11-27, la app ya se promociona)**: desplegar la función `tm` (en producción `rapid-responder`) con `only` (deja de mandar los 7 MB de retrasos en cada cambio) y revisar en Supabase el uso de «Edge Function invocations» y «Egress» del mes. Las apps nuevas ya ahorran aun con la función vieja (preguntan `/meta`), pero las instaladas (≤1.0.9) siguen bajando todo hasta actualizarse.
-- Desplegar la función de Supabase con el arreglo de `Object.hasOwn` (2026-11-20, menor: evita consultas inútiles a TransMilenio con nombres como «constructor»).
+- ✅ (2026-11-27) El dueño desplegó `rapid-responder` con `only` y `Object.hasOwn` (comprobado: `/constructor` responde `{"ok":true,...}`). Consumo: 500–1.500 invocaciones/día desde el 10-nov (límite gratis ~16.000/día); si pasa de ~10.000/día, plan Pro. «Egress» marca ~0 (parece que no cuenta lo de las funciones **(?)**).
 - App Store: aprobada el 2026-11-11; falta que el dueño la libere (liberación manual). Antes de promocionarla, resolver la capacidad del proxy de Supabase (ver deuda).
 - Google Play: enviar la versión de producción a revisión («Resumen de publicación»).
 - Desplegar a mano cualquier cambio en `supabase/functions/tm`.
