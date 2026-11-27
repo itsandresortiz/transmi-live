@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { nowMs as clockNow } from "../clock";
-import { BUS_3D_MIN_ZOOM, MotionEngine, busVolumes, routeHasAlert, type TransitState } from "@transmi/application";
+import { BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, MotionEngine, busVolumes, routeHasAlert, type TransitState } from "@transmi/application";
 import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo, toWorld, isStaleReport } from "@transmi/domain";
 import { type BusDraw, BusCanvas } from "./BusCanvas";
 import type { MapController } from "./MapController";
@@ -100,7 +100,7 @@ export class BusRenderer {
     this.lastSolid = t;
     const b = this.mapc.map.getBounds(), padLon = (b.getEast() - b.getWest()) * 0.1, padLat = (b.getNorth() - b.getSouth()) * 0.1;
     const on = items.filter((x) => x.lon > b.getWest() - padLon && x.lon < b.getEast() + padLon && x.lat > b.getSouth() - padLat && x.lat < b.getNorth() + padLat);
-    this.mapc.setBusVolumes(busVolumes(on.map((x) => ({ id: x.id, lon: x.lon, lat: x.lat, heading: x.angle ?? null, left: x.left, color: x.color, long: x.long, stale: x.stale })), { dark: this.mapc.dark }));
+    this.mapc.setBusVolumes(busVolumes(on.map((x) => ({ id: x.id, lon: x.lon, lat: x.lat, heading: x.angle ?? null, left: x.left, color: x.color, long: x.long, stale: x.stale })), { dark: this.mapc.dark, detail: on.length <= BUS_3D_DETAIL_MAX }));
   }
 
   private frame(t: number) {

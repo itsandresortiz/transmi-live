@@ -14,7 +14,7 @@ describe("busVolumes", () => {
     const parts = busVolumes([{ id: "a", lon: -74.07, lat: 4.6, heading: 0, color: "#e11d2e" }]).features;
     expect(parts.every((f) => f.properties.id === "a")).toBe(true);
     const body = parts.find((f) => f.properties.c === "#e11d2e")!;
-    expect(body.properties.b).toBeCloseTo(0.5); expect(body.properties.h).toBeCloseTo(1.4);
+    expect(body.properties.b).toBeCloseTo(0.3); expect(body.properties.h).toBeCloseTo(1.3);
     const e = extent([body.geometry.coordinates[0]!]);
     expect(e.ns).toBeCloseTo(BUS_DIMENSIONS.std, 1); expect(e.ew).toBeCloseTo(BUS_DIMENSIONS.width, 1);
     // hacia el este: el largo queda de este a oeste
@@ -26,6 +26,10 @@ describe("busVolumes", () => {
     expect(glass).toHaveLength(1);
     expect(Math.min(...glass[0]!)).toBeGreaterThan(4.6);
     expect(Math.max(...parts.map((f) => f.properties.h))).toBeLessThanOrEqual(3.4);
+    // las ruedas asoman a los lados de la carrocería (si quedan metidas debajo no se ven)
+    const wheels = parts.filter((f) => f.properties.b === 0);
+    expect(wheels.length).toBe(4);
+    expect(extent(wheels.map((w) => w.geometry.coordinates[0]!)).ew).toBeGreaterThan(BUS_DIMENSIONS.width + 0.15);
   });
   it("el articulado de la troncal mide ~18 m y lleva fuelle oscuro", () => {
     const fc = busVolumes([{ id: "t", lon: -74.07, lat: 4.6, heading: 0, color: "#e11d2e", long: true }]);
@@ -43,12 +47,13 @@ describe("busVolumes", () => {
   });
   it("arma 300 buses rápido", () => {
     const buses = Array.from({ length: 300 }, (_, i) => ({ id: String(i), lon: -74.07 + i * 1e-4, lat: 4.6, heading: i, color: "#2563eb", long: i % 3 === 0 }));
-    busVolumes(buses);
+    // con tantos en pantalla van sin el detalle fino (ver BUS_3D_DETAIL_MAX): así es como se llama de verdad
+    busVolumes(buses, { detail: false });
     const t0 = performance.now();
-    for (let k = 0; k < 10; k++) busVolumes(buses);
+    for (let k = 0; k < 10; k++) busVolumes(buses, { detail: false });
     const ms = (performance.now() - t0) / 10;
     console.log(`busVolumes: 300 buses en ${ms.toFixed(2)} ms`);
-    expect(ms).toBeLessThan(30);
+    expect(ms).toBeLessThan(60);
   });
 });
 

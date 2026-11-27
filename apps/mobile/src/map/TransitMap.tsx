@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { BUILDINGS_3D_FILTER, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { BUILDINGS_3D_FILTER, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -428,7 +428,7 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
     return JSON.stringify(busVolumes(inView.map((f) => {
       const p = f.properties ?? {}, [lon, lat] = f.geometry.coordinates as [number, number];
       return { id: String(p.id), lon, lat, heading: typeof p.rot === "number" ? p.rot : null, color: String(p.color), long: String(p.sprite).endsWith("-l"), stale: typeof p.o === "number" && p.o < 1 };
-    }), { dark }));
+    }), { dark, detail: inView.length <= BUS_3D_DETAIL_MAX }));
   }, [solid, buses, dark]);   // eslint-disable-line react-hooks/exhaustive-deps
   const ringKey = highlightIds.join(",");
   const st = useMemo(() => ({
