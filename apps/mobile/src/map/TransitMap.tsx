@@ -448,7 +448,11 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
   }, [solid, buses, dark]);   // eslint-disable-line react-hooks/exhaustive-deps
   const ringKey = highlightIds.join(",");
   const st = useMemo(() => ({
-    ring: sp({ circleRadius: 22, circleColor: "#e11d2e", circleOpacity: 0.12, circleStrokeColor: "#e11d2e", circleStrokeWidth: 3 }),
+    // el bus que sigues o en el que vas: un halo de su propio color en el piso (resplandor suave + aro con filo blanco), no un círculo
+    // rojo fijo. Acostado sobre el mapa: en 3D queda en el suelo, bajo el bus
+    glow: sp({ circleRadius: ["interpolate", ["exponential", 2], ["zoom"], 12, 12, 16, 26, 18, 52], circleColor: ["get", "color"], circleBlur: 1, circleOpacity: 0.32, circlePitchAlignment: "map" }),
+    ring: sp({ circleRadius: ["interpolate", ["exponential", 2], ["zoom"], 12, 9, 16, 17, 18, 34], circleColor: ["get", "color"], circleOpacity: 0.05, circleStrokeColor: ["get", "color"], circleStrokeWidth: 3, circleStrokeOpacity: 0.95, circlePitchAlignment: "map" }),
+    ringEdge: sp({ circleRadius: ["interpolate", ["exponential", 2], ["zoom"], 12, 10.5, 16, 18.5, 18, 35.5], circleOpacity: 0, circleStrokeColor: "#ffffff", circleStrokeWidth: 1.2, circleStrokeOpacity: dark ? 0.55 : 0.9, circlePitchAlignment: "map" }),
     ringFilter: ["in", ["get", "id"], ["literal", highlightIds.length ? highlightIds : ["__ninguno__"]]] as never,
     hit: sp({ circleRadius: 20, circleColor: "#000000", circleOpacity: 0.01 }),
     alert: sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 13, 4.5, 17, 7], circleColor: "#f59e0b", circleStrokeColor: "#ffffff", circleStrokeWidth: 1.5, circleTranslate: [9, -9], circleOpacity: ["get", "o"], circleStrokeOpacity: ["get", "o"] }),
@@ -474,7 +478,9 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
       <Layer id="buses-3d" type="fill-extrusion" minzoom={BUS_3D_MIN_ZOOM} {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: ["get", "c"], fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 1, fillExtrusionVerticalGradient: true })} />
     </GeoJSONSource>
     <GeoJSONSource id="buses" data={json} onPress={press as never}>
-      <Layer id="bus-ring" type="circle" filter={st.ringFilter} {...st.ring} />
+      <Layer id="bus-glow" type="circle" beforeId="buses-3d" filter={st.ringFilter} {...st.glow} />
+      <Layer id="bus-ring" type="circle" beforeId="buses-3d" filter={st.ringFilter} {...st.ring} />
+      <Layer id="bus-ring-edge" type="circle" beforeId="buses-3d" filter={st.ringFilter} {...st.ringEdge} />
       <Layer id="bus-hit" type="circle" {...st.hit} />
       <Layer id="bus-dot" type="circle" maxzoom={11.8} {...st.dot} />
       <Layer id="bus-sprite" type="symbol" minzoom={11.8} {...st.sprite} />

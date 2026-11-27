@@ -30,7 +30,7 @@ const LAYER_TYPES = new Set(["fill", "line", "symbol", "circle", "fill-extrusion
 const VERIFIED = new Set([
   "visibility",
   "line-width", "line-color", "line-join", "line-cap", "line-opacity", "line-dasharray", "line-sort-key",
-  "circle-radius", "circle-color", "circle-stroke-width", "circle-stroke-color", "circle-opacity", "circle-translate", "circle-stroke-opacity",
+  "circle-radius", "circle-color", "circle-blur", "circle-pitch-alignment", "circle-stroke-width", "circle-stroke-color", "circle-opacity", "circle-translate", "circle-stroke-opacity",
   "text-size", "text-font", "text-field", "text-color", "text-halo-width", "text-halo-color", "text-offset", "text-max-width", "text-anchor",
   "text-allow-overlap", "text-variable-anchor", "text-radial-offset", "text-optional", "text-justify", "text-ignore-placement",
   "text-translate", "text-opacity",
