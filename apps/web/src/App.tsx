@@ -94,7 +94,7 @@ export function App() {
         s().setSheet("peek");
         m.flyTo(p, Math.max(m.zoom, 16), { ...mapPadding(), top: 420 });
         popup(p, <BusPopup v={v} th={thRef.current} following={s().followId === id}
-          onFollow={() => { const f = s().followId === id ? null : id; s().setFollow(f); closePopup(); if (f) { s().setSheet("peek"); mc.current?.flyTo(br.current?.position(id) ?? v.position, Math.max(mc.current.zoom, 16), mapPadding()); } }}
+          onFollow={() => { const f = s().followId === id ? null : id; s().setFollow(f); closePopup(); if (f) { s().setSheet("peek"); mc.current?.flyTo(br.current?.position(id) ?? v.position, Math.max(mc.current.zoom, mc.current.is3D ? 17.4 : 16), mapPadding()); /* en 3D, lo bastante cerca para ver el bus modelado */ } }}
           onRoute={() => a.openRoute(v.routeId, v.id)} />);
       },
       focusStop(id) { a.openStop(id); s().setSheet("half"); },      // tocar una parada en el mapa: el mapa sigue a la vista

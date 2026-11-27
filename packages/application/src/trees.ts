@@ -208,6 +208,35 @@ export function mergeTrees(realAll: readonly TreePoint[], planted: readonly Tree
   return [...real, ...planted.filter((p) => !near(p))];
 }
 
+/** Quita los árboles que caen dentro de las estaciones (o a menos de `margin` m de su borde): en el separador de la troncal OpenStreetMap
+ *  tiene árboles de verdad, y en 3D la copa salía encima de la estación. Las estaciones son pocas en pantalla: se revisa cada una. */
+export function treesOutside<T extends { lon: number; lat: number }>(trees: readonly T[], areas: readonly Polygon[], margin = 3): T[] {
+  if (!areas.length || !trees.length) return [...trees];
+  const rings = areas.map((a) => a.coordinates[0]!).filter((r) => r.length >= 4).map((r) => {
+    let w = Infinity, e = -Infinity, s = Infinity, n = -Infinity;
+    for (const [x, y] of r) { if (x! < w) w = x!; if (x! > e) e = x!; if (y! < s) s = y!; if (y! > n) n = y!; }
+    return { r, w, e, s, n };
+  });
+  const mx = margin / M_LON, my = margin / M_LAT;
+  const hit = (p: T) => rings.some(({ r, w, e, s, n }) => {
+    if (p.lon < w - mx || p.lon > e + mx || p.lat < s - my || p.lat > n + my) return false;
+    let inside = false;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [xi, yi] = r[i]!, [xj, yj] = r[j]!;
+      if ((yi! > p.lat) !== (yj! > p.lat) && p.lon < ((xj! - xi!) * (p.lat - yi!)) / (yj! - yi!) + xi!) inside = !inside;
+    }
+    if (inside) return true;
+    // cerca del borde (en metros)
+    for (let i = 1; i < r.length; i++) {
+      const ax = r[i - 1]![0]! * M_LON, ay = r[i - 1]![1]! * M_LAT, bx = r[i]![0]! * M_LON, by = r[i]![1]! * M_LAT, px = p.lon * M_LON, py = p.lat * M_LAT;
+      const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)) : 0;
+      if (Math.hypot(px - ax - t * dx, py - ay - t * dy) < margin) return true;
+    }
+    return false;
+  });
+  return trees.filter((p) => !hit(p));
+}
+
 /** Recorta un recuadro a un radio alrededor del centro (con el mapa inclinado, el recuadro visible se alarga hasta el horizonte). */
 export function clampBounds(b: Bounds, center: { lon: number; lat: number }, radiusM: number): Bounds {
   const dx = radiusM / (111_320 * Math.cos((center.lat * Math.PI) / 180)), dy = radiusM / M_LAT;

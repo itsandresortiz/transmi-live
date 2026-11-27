@@ -24,3 +24,14 @@ describe("eje de la estación: la fila de paradas manda en las cabeceras", () =>
     expect(stopsAxis(spread, shapes)).toEqual(shapes);      // no es una fila
   });
 });
+
+import { treesOutside } from "../src/trees";
+describe("árboles fuera de las estaciones", () => {
+  const box = { type: "Polygon" as const, coordinates: [[[-74.1, 4.65], [-74.0995, 4.65], [-74.0995, 4.6503], [-74.1, 4.6503], [-74.1, 4.65]]] };
+  it("quita los de adentro y los pegados al borde, deja los de afuera", () => {
+    const inside = { lon: -74.0997, lat: 4.65015 }, edge = { lon: -74.10001, lat: 4.65015 }, out = { lon: -74.0985, lat: 4.65015 };
+    expect(treesOutside([inside, edge, out], [box])).toEqual([out]);
+    expect(treesOutside([inside], [])).toEqual([inside]);
+  });
+});
+

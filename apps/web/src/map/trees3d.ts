@@ -1,6 +1,6 @@
 import type { Map as MLMap } from "maplibre-gl";
 import type { LineString, MultiLineString, MultiPolygon, Polygon } from "geojson";
-import { TREE_3D_MIN_ZOOM, capNearest, clampBounds, greenKeep, mergeTrees, plantTrees, treeCellLoader, type GreenArea } from "@transmi/application";
+import { TREE_3D_MIN_ZOOM, capNearest, clampBounds, greenKeep, mergeTrees, plantTrees, treeCellLoader, treesOutside, type GreenArea } from "@transmi/application";
 import { CONFIG } from "../config";
 import type { TreeLayer } from "./TreeLayer";
 
@@ -32,6 +32,9 @@ export class Trees3D {
   private timer: ReturnType<typeof setTimeout> | null = null;
   /** Llegó relieve nuevo: hay que volver a apoyar los árboles en el suelo. */
   private groundDirty = false;
+  /** Las bases de las estaciones de la troncal: ahí no va ningún árbol. */
+  private stations: Polygon[] = [];
+  setStations(bases: readonly Polygon[]) { this.stations = [...bases]; this.key = ""; }
 
   constructor(private readonly map: MLMap) {
     // al terminar de moverse y cuando llegan teselas (zonas verdes o relieve) se recalculan los árboles de la pantalla, medio segundo después
@@ -102,7 +105,7 @@ export class Trees3D {
     }
     const planted = plantTrees({ areas, avoidAreas: avoid, avoidLines: paths, clear: 2.5, roads, roadClear: 6, bounds, center, max: MAX * 2 });
     const real = await cells.inView(bounds, () => { this.key = ""; void this.refresh(); });
-    const trees = capNearest(mergeTrees(real, planted), MAX, center);
+    const trees = capNearest(treesOutside(mergeTrees(real, planted), this.stations), MAX, center);      // ninguno encima de una estación
     const key = `${this.dark}|${trees.length}|${trees[0]?.lon.toFixed(6)}|${trees[trees.length - 1]?.lat.toFixed(6)}`;
     this.stats.plantMs = Math.round(performance.now() - t0); this.stats.areas = areas.length; this.stats.planted = planted.length;
     if (key === this.key && !this.groundDirty) return;

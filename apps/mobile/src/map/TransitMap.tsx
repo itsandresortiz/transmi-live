@@ -210,12 +210,19 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       const lat = st.stops.reduce((a, s) => a + s.position.lat, 0) / st.stops.length, lon = st.stops.reduce((a, s) => a + s.position.lon, 0) / st.stops.length;
       const portal = st.stops.some((s) => !!transit.labelOf(s).platform) || /^(portal|terminal)\b/i.test(st.title);
       const l = st.stops.map((s) => lineOfStop[s.id]).find((x) => !!x) ?? "X";
-      features.push({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: { title: st.title, portal, l, letter: l === "X" ? "" : l } });
+      features.push({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: { title: st.title, portal, l, letter: l === "X" ? "" : l, stop: st.stops[0]!.id } });
     }
     // los portales no tienen vagones (tienen plataformas): se agregan con su nombre y su línea, sin repetir los que ya estén
     for (const p of PORTALS) {
       if (features.some((f) => f.properties?.portal && hav({ lat: f.geometry.coordinates[1]!, lon: f.geometry.coordinates[0]! }, p) < 400)) continue;
-      features.push({ type: "Feature", geometry: { type: "Point", coordinates: [p.lon, p.lat] }, properties: { title: p.name.replace(/\s+[–-]\s+.*$/, ""), portal: true, l: p.l, letter: p.l === "X" ? "" : p.l } });
+      // al tocarlo se abre el portal: su plataforma más cercana (la ficha muestra todo el portal)
+      let stop = "", best = 400;
+      for (const sp2 of transit.network.stops.values()) {
+        if (Math.abs(sp2.position.lat - p.lat) > 0.004 || Math.abs(sp2.position.lon - p.lon) > 0.004 || !transit.isServed(sp2.id)) continue;
+        const d = hav(sp2.position, p) - (transit.labelOf(sp2).platform ? 150 : 0);      // mejor una plataforma del portal que un paradero de la calle
+        if (d < best) { best = d; stop = sp2.id; }
+      }
+      features.push({ type: "Feature", geometry: { type: "Point", coordinates: [p.lon, p.lat] }, properties: { title: p.name.replace(/\s+[–-]\s+.*$/, ""), portal: true, l: p.l, letter: p.l === "X" ? "" : p.l, stop } });
     }
     return { type: "FeatureCollection", features };
   }, [geo]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -231,7 +238,11 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     return JSON.stringify(signalVolumes(pts));
   }, [signalPts, view]);
   /** Vista 3D de cerca: árboles con volumen en los parques (y los de verdad, si ya están publicados). */
-  const trees3dJson = useTrees3d(mapRef, view3d, view, lastCenter, c.dark);
+  // vista 3D: la estación plana se vuelve invisible desde el zoom de la de volumen (las capas planas se pintaban encima de los edificios y
+  // árboles); sigue ahí para poder tocarla
+  const flat3d = (normal: number) => (view3d ? ["step", ["zoom"], normal, STATION_3D_MIN_ZOOM, 0] : normal);
+  const stationPolys = useMemo(() => geo?.bases.features.map((f) => f.geometry) ?? [], [geo]);
+  const trees3dJson = useTrees3d(mapRef, view3d, view, lastCenter, c.dark, stationPolys);
   const testsOn = useTestsMode((t) => t.on);
   const liveSignalsJson = useLiveSignals(testsOn && showSignals && active);
   /** El viaje que se está siguiendo, como líneas y puntos. Las capas están siempre montadas: sin viaje, los datos van vacíos. */
@@ -308,12 +319,12 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <Layer id="network-line" type="line" {...sp({ lineColor: lineColor(c.dark ? "#ff5a5e" : "#e30613") as never, lineOpacity: showTraffic ? 0.25 : 0.7, lineWidth: ["interpolate", ["linear"], ["zoom"], 10, 1.2, 14, 3, 17, 6], lineCap: "round", lineJoin: "round" })} />
       </GeoJSONSource>
       <TrafficLayer json={trafficJson} show={showTraffic} moving={showTraffic && active && !calm && (view?.zoom ?? 0) >= 12.5} dark={c.dark} />
-      <GeoJSONSource id="stations" data={stationsJson}>
+      <GeoJSONSource id="stations" data={stationsJson} onPress={(e) => { const id = e.nativeEvent.features[0]?.properties?.stop as string | undefined; if (id) onStop?.(id); }}>
         {/* cada estación es una ficha del color de su línea con su letra; los portales, más grandes y visibles desde más lejos */}
         <Layer id="portal-dot" type="circle" minzoom={10.5} maxzoom={14.5} filter={isPortal as never} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 10.5, 6, 14.5, 11], circleColor: lineColor("#e11d2e") as never, circleStrokeColor: nameHalo, circleStrokeWidth: 2 })} />
         <Layer id="station-dot" type="circle" minzoom={11.8} maxzoom={14.5} filter={["!", isPortal] as never} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 11.8, 4, 14.5, 8], circleColor: lineColor("#e11d2e") as never, circleStrokeColor: nameHalo, circleStrokeWidth: 1.8 })} />
         <Layer id="station-letter" type="symbol" minzoom={12.6} maxzoom={14.5} {...sp({ textField: ["get", "letter"], textFont: ["Noto Sans Bold"], textSize: ["case", ["get", "portal"], 12, 10], textAllowOverlap: true, textIgnorePlacement: true, textColor: letterColor as never })} />
-        <Layer id="portal-label" type="symbol" minzoom={10.5} maxzoom={14.5} filter={isPortal as never} {...sp({ textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 10.5, 11.5, 14.5, 15], textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.15, textJustify: "auto", textMaxWidth: 8, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2.2 })} />
+        <Layer id="portal-label" type="symbol" minzoom={10.5} filter={isPortal as never} {...sp({ textAllowOverlap: true, textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 10.5, 11.5, 14.5, 15], textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.15, textJustify: "auto", textMaxWidth: 8, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2.2 })} />
         <Layer id="station-label" type="symbol" minzoom={12.6} maxzoom={14.5} filter={["!", isPortal] as never} {...sp({ textField: ["get", "title"], textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 12.6, 11, 14.5, 13.5], textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.05, textJustify: "auto", textMaxWidth: 8, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2 })} />
       </GeoJSONSource>
       {/* TransMiCable: siempre montado (agregar capas en caliente cierra la app) */}
@@ -350,19 +361,19 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       {(
         <>
           <GeoJSONSource id="station-bases" data={stationGeo.bases} onPress={(e) => { const ids = (e.nativeEvent.features[0]?.properties?.all as string | undefined)?.split(",")[0]; if (ids) onStop?.(ids); }}>
-            <Layer id="station-base-fill" type="fill" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#2b2e36" : "#dde2ea", fillOpacity: ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] })} />
-            <Layer id="station-base-line" type="line" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#a9b2c1") as never, lineWidth: ["interpolate", ["linear"], ["zoom"], 14.5, 1.4, 18, 2.6] })} />
+            <Layer id="station-base-fill" type="fill" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#2b2e36" : "#dde2ea", fillOpacity: view3d ? flat3d(0.9) : ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8] })} />
+            <Layer id="station-base-line" type="line" minzoom={14.5} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#a9b2c1") as never, lineWidth: ["interpolate", ["linear"], ["zoom"], 14.5, 1.4, 18, 2.6], lineOpacity: flat3d(1) })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-links" data={stationGeo.links}>
-            <Layer id="station-links-fill" type="fill" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#3a3e48" : "#c4ccd9" })} />
-            <Layer id="station-links-line" type="line" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#6f7a8d") as never, lineWidth: 1, lineOpacity: 0.75 })} />
+            <Layer id="station-links-fill" type="fill" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#3a3e48" : "#c4ccd9", fillOpacity: flat3d(1) })} />
+            <Layer id="station-links-line" type="line" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#6f7a8d") as never, lineWidth: 1, lineOpacity: flat3d(0.75) })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-capsules" data={stationGeo.capsules} onPress={(e) => { const ids = (e.nativeEvent.features[0]?.properties?.ids as string | undefined)?.split(",")[0]; if (ids) onStop?.(ids); }}>
-            <Layer id="station-capsule-fill" type="fill" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#4a4f5a" : "#ffffff", fillOpacity: 0.98 })} />
-            <Layer id="station-capsule-line" type="line" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#6f7a8d") as never, lineWidth: 1.8 })} />
+            <Layer id="station-capsule-fill" type="fill" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", fillColor: c.dark ? "#4a4f5a" : "#ffffff", fillOpacity: flat3d(0.98) })} />
+            <Layer id="station-capsule-line" type="line" minzoom={15.6} {...sp({ visibility: showStations ? "visible" : "none", lineColor: lineColor("#6f7a8d") as never, lineWidth: 1.8, lineOpacity: flat3d(1) })} />
           </GeoJSONSource>
           <GeoJSONSource id="station-doors" data={stationGeo.doors}>
-            <Layer id="station-doors-line" type="line" minzoom={17} {...sp({ visibility: showStations ? "visible" : "none", lineColor: "#6f7a8d", lineWidth: 1, lineOpacity: 0.55 })} />
+            <Layer id="station-doors-line" type="line" minzoom={17} {...sp({ visibility: showStations ? "visible" : "none", lineColor: "#6f7a8d", lineWidth: 1, lineOpacity: flat3d(0.55) })} />
           </GeoJSONSource>
           {/* vista 3D: vidrio translúcido (capa aparte, porque la opacidad no cambia por pieza) y plataforma y techos opacos */}
           <GeoJSONSource id="stations-3d" data={stations3dJson}>

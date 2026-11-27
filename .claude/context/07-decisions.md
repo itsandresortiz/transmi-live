@@ -137,3 +137,10 @@ Contexto: la app dibuja el mapa con MapLibre Native y `@maplibre/maplibre-react-
 - **Descartado**: arreglarlo pasando listas o parchando la librería. No se puede probar aquí y la sombra aportaba poco (solo se veía con el 3D).
 - **Por qué**: lo primero es que la app abra. Se agregó una prueba que obliga a revisar en las dos plataformas cada capa o propiedad nueva del mapa.
 
+## 2026-11-27 · Web: relieve solo sombreado (no levantado)
+- **Contexto**: con el relieve levantado (solo en computador), las teselas SRTM traen varios metros de ruido en lo plano. Las estaciones salían partidas en el borde de las teselas (La Campiña), los buses se hundían o saltaban, y había que corregir a mano la cámara bajo los cerros.
+- **Descartado**:
+  - Cortar cada pieza de la estación en tramos de 12 m: quedaba en escalones.
+  - Seguir levantando el relieve solo en los cerros: MapLibre levanta todo o nada.
+- **Por qué**: Bogotá es plana donde hay buses y estaciones. El sombreado sigue mostrando los cerros sin estos fallos.
+

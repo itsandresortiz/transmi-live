@@ -497,8 +497,7 @@ export class MapController {
     if (on) {
       this.addRelief();
       m.setMaxPitch(MAX_PITCH);
-      // levantar el relieve obliga a redibujar todo el mapa sobre el terreno en cada cuadro: en un celular se traba. Ahí los cerros solo
-      // se sombrean (como en la app); en un computador sí se levantan
+      // el relieve solo se sombrea (ver `raiseTerrain`)
       if (this.raiseTerrain) m.setTerrain({ source: "relieve", exaggeration: RELIEF_EXAGGERATION });
       this.paint3D();
       // los volúmenes de estaciones y semáforos se arman DESPUÉS de la animación de inclinar y por partes: antes se armaban aquí mismo
@@ -551,9 +550,18 @@ export class MapController {
     this.syncTrees();
     if (this.on3D && this.loaded3D) this.load3D();        // cambió la apariencia, las estaciones o las capas con el 3D ya encendido
     if (m.getLayer("semaforos-icons")) m.setLayerZoomRange("semaforos-icons", 15.4, this.on3D ? SIGNAL_3D_MIN_ZOOM : 24);
+    // estaciones: en 3D, desde que salen los edificios la estación plana se vuelve invisible y queda la de volumen (las capas planas van
+    // encima de todo lo de volumen y se pintaban sobre edificios y árboles). Invisible y no oculta: se sigue pudiendo tocar
+    const flat = (normal: unknown) => (this.on3D ? ["step", ["zoom"], normal, STATION_3D_MIN_ZOOM, 0] : normal);
+    const op = (id: string, prop: "fill-opacity" | "line-opacity", normal: unknown) => { if (m.getLayer(id)) m.setPaintProperty(id, prop, flat(normal) as never); };
+    op("station-base-fill", "fill-opacity", this.on3D ? 0.9 : ["interpolate", ["linear"], ["zoom"], 14.5, 0.9, 17, 0.8]);
+    op("station-base-line", "line-opacity", 1); op("station-links-fill", "fill-opacity", 1); op("station-links-line", "line-opacity", 0.75);
+    op("station-capsule-fill", "fill-opacity", 0.98); op("station-capsule-line", "line-opacity", 1); op("station-doors", "line-opacity", 0.55);
   }
-  /** ¿Se levanta el relieve? Solo donde hay con qué (un computador): en pantallas táctiles se sombrea y ya. */
-  private readonly raiseTerrain = typeof matchMedia === "undefined" || !matchMedia("(pointer: coarse)").matches;
+  /** ¿Se levanta el relieve? Desde el 2026-11-27, en ningún lado: las teselas de elevación (SRTM) traen varios metros de ruido en lo plano
+   *  (edificios, árboles), las estaciones salían partidas en escalones (La Campiña) y los buses se hundían y saltaban. Bogotá es plana
+   *  donde hay buses; los cerros se siguen viendo sombreados. */
+  private readonly raiseTerrain = false;
   private loaded3D = false;
   /** Arma (una vez por apariencia) las estaciones con volumen y los semáforos de la pantalla, en dos tandas para no trabar el mapa. */
   private load3D() {
@@ -751,6 +759,7 @@ export class MapController {
     (this.map.getSource("station-links") as GeoJSONSource | undefined)?.setData(g.links);
     (this.map.getSource("station-chips") as GeoJSONSource | undefined)?.setData(g.chips);
     this.paintStations();
+    (this.trees3d ??= new Trees3D(this.map)).setStations(g.bases.features.map((f) => f.geometry));      // sin árboles encima de las estaciones
     this.paint3D();
   }
   /** Ilumina los vagones donde se detiene la ruta elegida y marca el vagón de la parada abierta. */

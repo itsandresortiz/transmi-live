@@ -168,7 +168,7 @@ export function signalVolumes(points: readonly SignalVolumeInput[]): FeatureColl
 }
 
 /** Desde este zoom se levantan las estaciones de la troncal (las mismas formas planas de `buildStationGeometry`). */
-export const STATION_3D_MIN_ZOOM = 15.6;
+export const STATION_3D_MIN_ZOOM = 15;      // como los edificios: la estación plana se pintaba encima de ellos entre el 15 y el 15,6
 
 /** Estaciones de la troncal en 3D, sobrias y con el mismo dibujo del mapa plano: la base apenas se levanta, cada vagón y el pasillo tienen su plataforma (~0,9 m), cada vagón un
  *  cuerpo de vidrio claro (va en una capa translúcida: `g = 1`) con el techo del color de su línea, y el pasillo un vidrio más bajo con el

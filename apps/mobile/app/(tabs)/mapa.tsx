@@ -56,6 +56,7 @@ export default function Mapa() {
     const pts = [...(stop ? [stop.position] : []), ...nearest];
     if (pts.length) setTimeout(() => map.current?.fit(pts, 80), 250);
   }, [focused, focus.stopId, focus.routeId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const zoomNow = useRef(0);
   useEffect(() => {
     if (!focused || !focus.followBusId) return;
     // la cámara va a donde se DIBUJA el bus: si vas en él, donde va tu teléfono (el dato de TransMilenio llega ~1 min tarde y la cámara se
@@ -66,7 +67,10 @@ export default function Mapa() {
       if (!mine && !v) return;
       const p = v && !isVirtualRide(id) ? motion.peek(v.id) : null;
       const g = mine ?? (p ? toGeo(p) : v!.position);
-      map.current?.flyTo(g.lat, g.lon, 16.5);
+      // de cerca: en 3D lo bastante para ver el bus con volumen (salen desde el 16,5; antes se seguía justo en 16,5 y quedaba en el
+      // borde: se veía plano). Si acercaste más con los dedos, se respeta (antes la cámara te devolvía al 16,5 cada 1,5 s)
+      const near = useMapLayers.getState().view3d ? 17.4 : 16.5;
+      map.current?.flyTo(g.lat, g.lon, Math.min(19, Math.max(near, zoomNow.current)));
     }, 1500);
     return () => clearInterval(t);
   }, [focused, focus.followBusId]);
@@ -114,7 +118,7 @@ export default function Mapa() {
     if (hav(me, BOGOTA) < 60_000) setTimeout(() => map.current?.flyTo(me.lat, me.lon, 15.6), 250);
   }, [me, focused, focus.stopId, focus.routeId, focus.followBusId, focus.busIds.length, focus.locate]);
 
-  const onView = useCallback((v: { lat: number; lon: number; zoom: number; bearing: number }) => setCenter(v), []);
+  const onView = useCallback((v: { lat: number; lon: number; zoom: number; bearing: number }) => { zoomNow.current = v.zoom; setCenter(v); }, []);
   const rotated = !!center && Math.abs(((center.bearing + 180) % 360) - 180) > 1.5;      // la brújula solo se muestra cuando el mapa está girado
   const away = !me || !center || hav(center, me) > AWAY_METERS || center.zoom < 12.5;       // el botón solo hace falta cuando te alejaste (o aún no sabemos dónde estás)
   const locate = async () => {
