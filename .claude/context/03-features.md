@@ -76,3 +76,5 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 ## Añadido 2026-11-27
 - **Ficha de ruta con los dos sentidos** (app `app/route/[id].tsx`, web `RouteDetailView`): selector «Hacia X / Hacia Y»; favoritos por familia de ruta.
 - **Informe de semáforos** (web): `semaforos-informe.html` (+ `.csv`, `.json`), enlazado desde `soporte.html`.
+- **Vista 3D** (web y app): botón «3D» en el mapa; edificios, buses, estaciones y semáforos con volumen de cerca; relieve de los cerros (levantado en la web, sombreado en la app). `packages/application/src/map-volumes.ts`.
+- **Otras del 2026-11-27**: buses de la ruta de regreso en las cabeceras (`returning-buses.ts`), mapa base sin conexión en la web (`sw.js`), «Compartir por dónde va mi bus» y avisos desde el servidor (apagados hasta desplegar `viajes`).

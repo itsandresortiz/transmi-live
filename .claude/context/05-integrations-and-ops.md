@@ -93,3 +93,6 @@ Datos reales para validar: `git fetch origin +live-data:refs/remotes/origin/live
 
 ## Orden de paradas aprendido (2026-11-27)
 Rama `stop-order` (`stats.json.gz`, `stop-fixes.json`), workflow `stop-order.yml` (horario comentado: encenderlo es decisión del dueño), herramienta `tools/stoporder.ts` (`LOTES=<carpeta>` para solo informe). `gtfs-daily.yml` baja `stop-fixes.json` y `tools/network-dto.ts` lo aplica con `CORRECCIONES=`.
+
+## Relieve del mapa 3D (2026-11-27)
+Teselas de elevación «Terrain Tiles» (Mapzen) del Registro de Datos Abiertos de AWS: `s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png` (formato terrarium, sin llave, CORS abierto). Para Colombia son SRTM de la NASA (dominio público); se cita en los créditos del mapa. Solo se descargan cuando alguien enciende el 3D.
