@@ -130,7 +130,7 @@ export default function Mapa() {
       {focused ? <StatusBar style="dark" /> : null}
       {/* el mapa no se lee con VoiceOver: las pestañas Rutas y Cómo llegar dicen lo mismo con texto */}
       <View style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <TransitMap ref={map} system={system} active={focused} calm={calm} showSignals={layers.signals} showStations={layers.stations} showTraffic={layers.traffic} onView={onView} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={rideHighlight}
+      <TransitMap ref={map} system={system} active={focused} calm={calm} showSignals={layers.signals} showStations={layers.stations} showTraffic={layers.traffic} view3d={layers.view3d} onView={onView} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={rideHighlight}
         // el bus en el que vas abre tu viaje, no la ficha con «Voy en este bus»
         onBus={(id) => { void Haptics.selectionAsync(); if (id.startsWith("comp:")) router.navigate({ pathname: "/route/[id]", params: { id: id.split(":")[1]! } }); /* bus que solo conoce quien va en él: su ruta */ else if (id === useRide.getState().busId && useRide.getState().alightId) router.navigate({ pathname: "/ride/[id]", params: { id } }); else router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
         onStop={(id) => router.navigate({ pathname: "/stop/[id]", params: { id } })} />
@@ -144,7 +144,7 @@ export default function Mapa() {
           items={[{ key: "todos", label: "Todos" }, ...SYSTEMS.map((x) => ({ key: x, label: SYSTEM_LABEL[x], dot: SYSTEM_COLOR[x] }))]} />
       </View>
       {panel ? (
-        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(140)} style={[styles.panel, { bottom: insets.bottom + (away ? 140 : 80) }]}>
+        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(140)} style={[styles.panel, { bottom: insets.bottom + (away ? 198 : 138) }]}>
           <Glass scheme="light" style={styles.panelGlass}>
             <View style={{ padding: space[4], gap: space[3] }}>
               <Text style={[type.eyebrow, { color: om.sub }]}>CAPAS DEL MAPA</Text>
@@ -249,6 +249,13 @@ export default function Mapa() {
       <View pointerEvents="box-none" style={[styles.bottomRow, { bottom: insets.bottom + 12 }]}>
         <View pointerEvents="none"><FeedStatus light /></View>
         <View pointerEvents="box-none" style={styles.rightCol}>
+          {/* vista 3D (como en Mapas de Apple): inclina el mapa y levanta los edificios; se recuerda en el teléfono */}
+          <Tap onPress={() => { void Haptics.selectionAsync(); layers.set3d(!layers.view3d); }} accessibilityRole="button" accessibilityState={{ selected: layers.view3d }}
+            accessibilityLabel={layers.view3d ? "Volver al mapa plano" : "Ver el mapa en 3D"} style={styles.round3d}>
+            <Glass interactive scheme="light" style={styles.round3dGlass}>
+              <Text style={[type.headline, { color: layers.view3d ? om.accent : om.ink, fontWeight: "800" }]} maxFontSizeMultiplier={1.3}>3D</Text>
+            </Glass>
+          </Tap>
           <RoundButton symbol="square.3.layers.3d" label="Capas del mapa" onPress={() => setPanel((p) => !p)} size={46} light />
           {away ? <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)}><RoundButton symbol={denied ? "location.slash.fill" : "location.fill"} label={denied ? "Activar mi ubicación" : "Volver a mi ubicación"} onPress={() => void locate()} size={52} light /></Animated.View> : null}
         </View>
@@ -266,6 +273,8 @@ const styles = StyleSheet.create({
   panelGlass: { borderRadius: 28, overflow: "hidden" },
   panelRow: { flexDirection: "row", alignItems: "center", gap: space[3] },
   compass: { position: "absolute", right: space[4] },
+  round3d: { width: 46, height: 46 },
+  round3dGlass: { width: 46, height: 46, borderRadius: 23, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   compassGlass: { width: 46, height: 46, borderRadius: 23, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   scrim: { position: "absolute", top: 0, left: 0, right: 0 },
   focusChip: { position: "absolute", left: space[4], right: space[4] },

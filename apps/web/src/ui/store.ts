@@ -39,6 +39,9 @@ interface UiState {
   textScale: number;
   highContrast: boolean;
   setHighContrast(v: boolean): void;
+  /** Vista 3D del mapa (inclinado, edificios y relieve). Se recuerda en este navegador. */
+  view3d: boolean;
+  setView3d(v: boolean): void;
 
   setTab(t: Tab): void;
   setQuery(q: string): void;
@@ -71,13 +74,15 @@ if (typeof document !== "undefined") document.documentElement.style.setProperty(
 const savedContrast = safeStorage.get("tm.contrast") === "1";
 if (typeof document !== "undefined" && savedContrast) document.documentElement.dataset.contrast = "high";
 
+const saved3d = safeStorage.get("tm.3d") === "1";
 const savedTab = ((): Tab => { const t = safeStorage.get("tm.tab"); return t === "viaje" || t === "paradas" || t === "buses" ? t : "rutas"; })();
 const PAGE = 60;
 export const useUi = create<UiState>((set) => ({
   tab: savedTab, query: "", system: null, limit: PAGE, sheet: "peek", routeId: null, routeBusId: null, stopId: null, groupIds: null, stopRoute: null, direction: "0",
   openAlert: null, followId: null, followPaused: false, targetStopId: null, settingsOpen: false,
   layers: { streets: true, stops: true, network: false, buses: true, signals: true, traffic: false },
-  colorMode: "system", motion: "predict", toast: null, textScale: savedScale, highContrast: savedContrast,
+  colorMode: "system", motion: "predict", toast: null, textScale: savedScale, highContrast: savedContrast, view3d: saved3d,
+  setView3d: (view3d) => { safeStorage.set("tm.3d", view3d ? "1" : "0"); set({ view3d }); },
   setHighContrast: (highContrast) => { safeStorage.set("tm.contrast", highContrast ? "1" : "0"); if (highContrast) document.documentElement.dataset.contrast = "high"; else delete document.documentElement.dataset.contrast; set({ highContrast }); },
 
   setTab: (tab) => { if (tab !== "avisos") safeStorage.set("tm.tab", tab); set((s) => (s.tab === tab && !s.stopId ? s : { tab, stopId: null, groupIds: null, stopRoute: null, query: "", limit: PAGE })); },

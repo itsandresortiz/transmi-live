@@ -57,23 +57,39 @@ export class BusCanvas {
     this.ctx.clearRect(0, 0, this.cv.width, this.cv.height);
     this.hits = [];
   }
-  draw(items: readonly BusDraw[]) {
-    const ctx = this.ctx, z = this.map.getZoom(), k = iconScale(z), w = W * k, labels = z >= 16;
+  /** `solid`: los buses se ven con volumen en el mapa (vista 3D de cerca): aquí solo van el nombre, el aro y la marca «!», y el toque. */
+  draw(items: readonly BusDraw[], solid = false) {
+    const ctx = this.ctx, z = this.map.getZoom(), k = iconScale(z), labels = z >= 16;
     const cw = this.cv.width / this.dpr, ch = this.cv.height / this.dpr;
     this.clear();
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (labels) { ctx.font = this.font; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.lineJoin = "round"; ctx.lineWidth = 3.5; ctx.strokeStyle = this.haloColor; ctx.fillStyle = this.textColor; }
+    // vista 3D (mapa inclinado): los buses lejanos se dibujan más pequeños y los cercanos algo más grandes, como el resto del mapa.
+    // Se compara cuánto mide en pantalla un tramo corto de calle junto al bus con lo que mide en el centro.
+    const pitched = this.map.getPitch() > 1, D = 0.0002;
+    let ref = 1;
+    if (pitched) { const c = this.map.getCenter(), a = this.map.project(c), b2 = this.map.project([c.lng + D, c.lat]); ref = Math.hypot(b2.x - a.x, b2.y - a.y) || 1; }
     for (const b of items) {
       const p = this.map.project([b.lon, b.lat]);
-      const h = (b.long ? TOP_LONG_H : TOP_H) * k;      // largo del bus (el dibujo mira hacia arriba)
+      let s = 1;
+      if (pitched) {
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+        if (p.x < -60 || p.y < -60 || p.x > cw + 60 || p.y > ch + 60) continue;      // fuera de la pantalla: no se mide
+        const q = this.map.project([b.lon + D, b.lat]);
+        s = Math.min(1.35, Math.max(0.45, Math.hypot(q.x - p.x, q.y - p.y) / ref));
+      }
+      const w = W * k * s;
+      const h = (b.long ? TOP_LONG_H : TOP_H) * k * s;      // largo del bus (el dibujo mira hacia arriba)
       if (p.x < -h || p.y < -h || p.x > cw + h || p.y > ch + h) continue;
       // hacia dónde mira en la pantalla (grados desde arriba, en sentido del reloj); sin rumbo, de lado según su sentido
       const deg = b.angle != null ? b.angle - this.map.getBearing() : b.left ? -90 : 90, rad = (deg * Math.PI) / 180;
       if (b.last) { ctx.beginPath(); ctx.arc(p.x, p.y, h * 0.62, 0, Math.PI * 2); ctx.fillStyle = "rgba(245,158,11,.35)"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#f59e0b"; ctx.stroke(); ctx.fillStyle = this.textColor; ctx.lineWidth = 3.5; ctx.strokeStyle = this.haloColor; }
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rad);
-      if (b.stale) ctx.globalAlpha = 0.38;
-      ctx.drawImage(this.sprite(b.color, !!b.long), -w / 2, -h / 2, w, h);
-      ctx.restore();
+      if (!solid) {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rad);
+        if (b.stale) ctx.globalAlpha = 0.38;
+        ctx.drawImage(this.sprite(b.color, !!b.long), -w / 2, -h / 2, w, h);
+        ctx.restore();
+      }
       if (b.alert) {
         // marca ámbar «!» arriba a la derecha del bus: su ruta tiene un aviso vigente
         const r = Math.max(4, 5.5 * k), cx = p.x + w * 0.55, cy = p.y - h * 0.35;
@@ -88,7 +104,7 @@ export class BusCanvas {
         const up = (Math.abs(Math.cos(rad)) * h + Math.abs(Math.sin(rad)) * w) / 2;      // cuánto se extiende el bus hacia arriba, según su giro
         ctx.strokeText(b.label, p.x, p.y - up - 3); ctx.fillText(b.label, p.x, p.y - up - 3);
       }
-      this.hits.push({ id: b.id, x: p.x, y: p.y, r: (b.long ? 20 : 13) * k + 5 });
+      this.hits.push({ id: b.id, x: p.x, y: p.y, r: (b.long ? 20 : 13) * k * s + 5 });
     }
   }
   /** Bus bajo el dedo/cursor: se toca el dibujo del bus (con un margen para el dedo), no un círculo grande a su alrededor. */

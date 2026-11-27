@@ -19,6 +19,7 @@ export * from "./departures";
 export * from "./traffic";
 export * from "./planner";
 export * from "./station-geometry";
+export * from "./map-volumes";
 export * from "./trip-guide";
 export * from "./trunk-data";
 export * from "./widget-feed";

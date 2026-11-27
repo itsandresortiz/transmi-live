@@ -4,7 +4,7 @@ import baseDark from "./base-dark.json";
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
-import { type SignalRow, upcomingCablesGeo, flowDash, signalPoints, trafficBand } from "@transmi/application";
+import { type SignalRow, BUILDINGS_3D_FILTER, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, stationVolumes, upcomingCablesGeo, flowDash, signalPoints, signalVolumes, trafficBand } from "@transmi/application";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
@@ -53,6 +53,13 @@ const sidedIds = (id: string) => [id, ...Array.from({ length: SECTORS }, (_, k) 
 /** Nombres de calles del mapa base, según la apariencia (los juegos claro y oscuro llaman distinto a sus capas). */
 const streetLayers = (scheme: Scheme) => (scheme === "dark" ? ["bd-highway_name_other", "bd-highway_name_motorway", "bd-road_oneway", "bd-road_oneway_opposite"] : ["bl-highway-name-path", "bl-highway-name-minor", "bl-highway-name-major", "bl-highway-shield-non-us"]);
 const BUS_LAYERS = ["bus-dots", "bus-dots-minor"];
+/** Vista 3D: inclinación al encenderla, tope de inclinación con los dedos y zoom desde el que salen los edificios con volumen. */
+const PITCH_3D = 58, MAX_PITCH = 65, BUILD_MIN_Z = 15;
+/** Relieve: teselas de elevación abiertas «Terrain Tiles» (Mapzen) en AWS, formato terrarium, gratis y sin llave (datos SRTM/NASA,
+ *  GMTED2010 y ETOPO1, de dominio público). Se exagera un poco para que los cerros orientales se lean desde la ciudad. */
+const RELIEF_TILES = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+const RELIEF_ATTRIBUTION = "Relieve: Terrain Tiles (Mapzen, AWS) · SRTM";
+const RELIEF_EXAGGERATION = 1.25;
 const BOGOTA: [number, number] = [-74.075, 4.65];
 
 /** Las líneas de todas las rutas van tenues para que se lea la jerarquía de las calles; al elegir una ruta se resalta sola. */
@@ -95,7 +102,8 @@ export class MapController {
         layers: [...baseLayers(baseLight, "bl-", scheme !== "dark"), ...baseLayers(baseDark, "bd-", scheme === "dark")] as never,
       },
       center: BOGOTA, zoom: 11, minZoom: 9, maxZoom: 19.5,
-      attributionControl: false, dragRotate: true, pitchWithRotate: false, maxPitch: 0,
+      // la inclinación se habilita solo en la vista 3D (`set3D`): en 2D el tope es 0 y los gestos de inclinar no hacen nada
+      attributionControl: false, dragRotate: true, pitchWithRotate: true, maxPitch: 0,
       fadeDuration: 0, renderWorldCopies: false,
       // los rangos de tipografía que no incluimos (otros alfabetos) se resuelven en vacío, sin error
       transformRequest: (url, type) =>
@@ -125,6 +133,7 @@ export class MapController {
 
   private addLayers() {
     this.registerChip();
+    this.addBuildings();
     const m = this.map, t = this.theme;
     this.src("localidad-labels"); this.src("troncales");
     this.src("network"); this.src("estaciones"); this.src("stops");
@@ -201,6 +210,11 @@ export class MapController {
       paint: { "line-color": ["case", ["==", ["get", "hl"], true], ["get", "hlColor"], lineMatch(t, t.capsuleEdge)], "line-width": ["case", ["==", ["get", "sel"], true], 3, 1.8] },
     });
     m.addLayer({ id: "station-doors", type: "line", source: "station-doors", minzoom: 17, paint: { "line-color": t.capsuleEdge, "line-width": 1, "line-opacity": 0.55 } });
+    // vista 3D: las mismas estaciones levantadas; el vidrio va en una capa translúcida aparte (la opacidad no cambia por pieza)
+    this.src("estaciones-3d");
+    const ext3d = { "fill-extrusion-color": ["get", "c"], "fill-extrusion-base": ["get", "b"], "fill-extrusion-height": ["get", "h"] } as const;
+    m.addLayer({ id: "estaciones-3d", type: "fill-extrusion", source: "estaciones-3d", minzoom: STATION_3D_MIN_ZOOM, filter: ["!", ["has", "g"]], layout: { visibility: "none" }, paint: { ...ext3d, "fill-extrusion-opacity": 0.95 } } as never);
+    m.addLayer({ id: "estaciones-3d-vidrio", type: "fill-extrusion", source: "estaciones-3d", minzoom: STATION_3D_MIN_ZOOM, filter: ["has", "g"], layout: { visibility: "none" }, paint: { ...ext3d, "fill-extrusion-opacity": 0.45, "fill-extrusion-vertical-gradient": false } } as never);
     m.addLayer({
       id: "station-capsule-labels", type: "symbol", source: "station-labels", minzoom: 16.3,
       layout: { "text-field": ["step", ["zoom"], ["get", "text"], 17.3, ["concat", "Vagón ", ["get", "text"]]], "text-font": FONT, "text-size": ["interpolate", ["linear"], ["zoom"], 16.3, 10, 18.5, 13], "text-allow-overlap": true, "text-ignore-placement": true },
@@ -252,6 +266,10 @@ export class MapController {
         "icon-rotate": ["get", "rot"], "icon-rotation-alignment": "map",
         "text-field": ["step", ["zoom"], "", 13, ["get", "name"]], "text-font": FONT, "text-size": 12, "text-offset": [0, 1.6], "text-anchor": "top", "text-optional": true },
       paint: { "text-color": t.labelStrong, "text-halo-color": t.halo, "text-halo-width": 1.6 } });
+    // vista 3D de cerca: cada semáforo es un poste con su caja, sin luces de color (el color en vivo no se muestra al público)
+    this.src("semaforos-3d");
+    m.addLayer({ id: "semaforos-3d", type: "fill-extrusion", source: "semaforos-3d", minzoom: SIGNAL_3D_MIN_ZOOM, layout: { visibility: "none" },
+      paint: { "fill-extrusion-color": ["get", "c"], "fill-extrusion-base": ["get", "b"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 0.95 } });
     m.addLayer({
       id: "semaforos-labels", type: "symbol", source: "semaforos", minzoom: 17.2,
       layout: { "text-field": ["get", "dir"], "text-font": FONT, "text-size": 10.5, "text-offset": [0, 1.35], "text-anchor": "top", "text-optional": true },
@@ -295,7 +313,23 @@ export class MapController {
       id: "bus-dots", type: "circle", source: "buses", maxzoom: 13, filter: ["==", ["get", "m"], 1],
       paint: { "circle-radius": zoomWidth([9, 2.6], [13, 4.4]), "circle-color": ["get", "color"], "circle-opacity": ["coalesce", ["get", "o"], 1], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1, "circle-stroke-opacity": ["coalesce", ["get", "o"], 1] },
     });
+    this.addBusVolumes();
   }
+
+  /** Buses con volumen (vista 3D de cerca): los arma `BusRenderer` con `busVolumes` y los pone aquí; encima de todo lo demás. */
+  private addBusVolumes() {
+    this.src("buses-3d");
+    this.map.addLayer({ id: "buses-3d", type: "fill-extrusion", source: "buses-3d", minzoom: BUS_3D_MIN_ZOOM, layout: { visibility: "none" },
+      paint: { "fill-extrusion-color": ["get", "c"], "fill-extrusion-base": ["get", "b"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
+  }
+  setBusVolumes(fc: FeatureCollection | null) {
+    const src = this.map.getSource("buses-3d") as GeoJSONSource | undefined; if (!src) return;
+    if (!fc && !this.busVolumesShown) return;
+    this.busVolumesShown = !!fc?.features.length;
+    src.setData(fc ?? EMPTY);
+  }
+  private busVolumesShown = false;
+  get dark(): boolean { return this.scheme === "dark"; }
 
   /** Datos que vienen incluidos en la app: se cargan en segundo plano. */
   private async loadStatic() {
@@ -370,6 +404,111 @@ export class MapController {
     m.on("mousemove", (e) => { m.getCanvas().style.cursor = pick(e.point) ? "pointer" : ""; });
   }
 
+  /* ---------- vista 3D ---------- */
+  /** Edificios con volumen (capa `building` de OpenMapTiles, con `render_height`). Uno por juego de capas del mapa base (claro y
+   *  oscuro), cada uno debajo de los nombres de calles de su juego; ocultos hasta encender el 3D. No llevan el prefijo bl-/bd- para que
+   *  `setScheme` no los encienda. */
+  private addBuildings() {
+    const m = this.map;
+    const height = (k: "render_height" | "render_min_height"): ExpressionSpecification =>
+      ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", k], k === "render_height" ? 6 : 0]] as unknown as ExpressionSpecification;
+    for (const dark of [false, true]) {
+      const before = dark ? "bd-highway_name_other" : "bl-highway-name-path";
+      m.addLayer({
+        id: dark ? "edificios-3d-oscuro" : "edificios-3d-claro", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: BUILD_MIN_Z,
+        filter: BUILDINGS_3D_FILTER as never, layout: { visibility: "none" },
+        paint: {
+          // colores sobrios, cercanos al de los edificios planos del mapa base, y algo transparentes: no compiten con buses ni estaciones
+          "fill-extrusion-color": dark ? "#353943" : "#dcd7cc",
+          "fill-extrusion-height": height("render_height"), "fill-extrusion-base": height("render_min_height"),
+          "fill-extrusion-opacity": ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, dark ? 0.8 : 0.72],
+          "fill-extrusion-vertical-gradient": true,
+        },
+      } as never, m.getLayer(before) ? before : undefined);
+    }
+  }
+  private relieveAdded = false;
+  /** El relieve (cerros orientales, Monserrate) se agrega la primera vez que alguien enciende el 3D: quien no lo usa no descarga nada. */
+  private addRelief() {
+    if (this.relieveAdded) return;
+    this.relieveAdded = true;
+    const m = this.map;
+    m.addSource("relieve", { type: "raster-dem", tiles: [RELIEF_TILES], tileSize: 256, maxzoom: 14, encoding: "terrarium", attribution: RELIEF_ATTRIBUTION });
+    // la sombra usa otra fuente con las mismas teselas (MapLibre lo pide para no estropear el terreno; el navegador las reutiliza de su caché)
+    m.addSource("relieve-sombra", { type: "raster-dem", tiles: [RELIEF_TILES], tileSize: 256, maxzoom: 14, encoding: "terrarium" });
+    // sombra suave de las laderas (sin ella el relieve se ve plano); debajo de los edificios planos de cada juego
+    for (const dark of [false, true]) {
+      const before = dark ? "bd-building" : "bl-building";
+      m.addLayer({
+        id: dark ? "relieve-sombra-oscuro" : "relieve-sombra-claro", type: "hillshade", source: "relieve-sombra", layout: { visibility: "none" },
+        paint: { "hillshade-exaggeration": dark ? 0.35 : 0.3, "hillshade-shadow-color": dark ? "#000000" : "#6b6455", "hillshade-highlight-color": dark ? "#2a2e36" : "#ffffff", "hillshade-accent-color": dark ? "#000000" : "#8a8270" },
+      } as never, m.getLayer(before) ? before : undefined);
+    }
+  }
+  private on3D = false;
+  private unfreezeBound = false;
+  /** Enciende o apaga la vista 3D: cámara inclinada, gestos para inclinar, edificios con volumen y relieve. */
+  set3D(on: boolean) {
+    const m = this.map;
+    if (!m.getLayer("troncales-lines") || on === this.on3D) return;
+    this.on3D = on;
+    const quick = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (on) {
+      this.addRelief();
+      m.setMaxPitch(MAX_PITCH);
+      m.setTerrain({ source: "relieve", exaggeration: RELIEF_EXAGGERATION });
+      this.paint3D();
+      // `freezeElevation`: la altura de la cámara se recalcula al final (el relieve puede no haber llegado aún al empezar)
+      m.easeTo({ pitch: PITCH_3D, duration: quick ? 0 : 700, freezeElevation: true });
+      if (!this.unfreezeBound) {
+        this.unfreezeBound = true;
+        // MapLibre deja la altura de la cámara «congelada» tras un movimiento por código (vuelos, seguir un bus) hasta que alguien toca el
+        // mapa: si en ese rato se salta a otro sitio, la cámara queda bajo los cerros (Bogotá está a 2.600 m) y el mapa se ve en blanco.
+        // Al terminar cada movimiento se vuelve a apoyar la cámara sobre el relieve.
+        m.on("moveend", () => {
+          const mm = m as unknown as { _elevationFreeze?: boolean; _finalizeElevation?: () => void; terrain?: unknown };
+          if (this.on3D && mm.terrain && mm._elevationFreeze && !m.isMoving()) mm._finalizeElevation?.();
+        });
+      }
+    } else {
+      const done = () => {
+        if (this.on3D) return;                       // se volvió a encender mientras bajaba
+        m.setMaxPitch(0); m.setTerrain(null); this.paint3D();
+      };
+      if (quick || m.getPitch() < 0.5) { m.jumpTo({ pitch: 0 }); done(); }
+      else { m.easeTo({ pitch: 0, duration: 550 }); m.once("moveend", done); }
+    }
+  }
+  get is3D(): boolean { return this.on3D; }
+  /** Muestra los edificios y la sombra del relieve del juego de la apariencia actual (o nada, en 2D). */
+  private paint3D() {
+    const m = this.map, dark = this.scheme === "dark";
+    const vis = (id: string, v: boolean) => { if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", v ? "visible" : "none"); };
+    vis("edificios-3d-claro", this.on3D && !dark); vis("edificios-3d-oscuro", this.on3D && dark);
+    vis("relieve-sombra-claro", this.on3D && !dark); vis("relieve-sombra-oscuro", this.on3D && dark);
+    vis("buses-3d", this.on3D && this.busesOn);
+    // semáforos: en 3D, desde el zoom 16 el poste con su caja reemplaza al ícono plano
+    if (this.on3D && this.signalsOn && this.signalRows && !this.signals3dLoaded) {
+      this.signals3dLoaded = true;
+      (m.getSource("semaforos-3d") as GeoJSONSource | undefined)?.setData(signalVolumes(signalPoints(this.signalRows)) as FeatureCollection);
+    }
+    vis("semaforos-3d", this.on3D && this.signalsOn);
+    if (this.on3D && this.stationBase && this.stations3dFor !== this.scheme + "|" + this.stationsVersion) {
+      this.stations3dFor = this.scheme + "|" + this.stationsVersion;
+      const t = this.theme;
+      (m.getSource("estaciones-3d") as GeoJSONSource | undefined)?.setData(stationVolumes(this.stationBase, (l) => t.lines[l] ?? t.troncal, { dark }) as FeatureCollection);
+    }
+    vis("estaciones-3d", this.on3D && this.stopsOn); vis("estaciones-3d-vidrio", this.on3D && this.stopsOn);
+    if (m.getLayer("semaforos-icons")) m.setLayerZoomRange("semaforos-icons", 15.4, this.on3D ? SIGNAL_3D_MIN_ZOOM : 24);
+  }
+  private signalsOn = true;
+  private busesOn = true;
+  private stopsOn = true;
+  private stations3dFor = "";
+  private stationsVersion = 0;
+  private signalRows: readonly SignalRow[] | null = null;
+  private signals3dLoaded = false;
+
   /* ---------- operaciones ---------- */
   setScheme(scheme: Scheme) {
     this.theme = themeOf(scheme); this.scheme = scheme;
@@ -381,6 +520,7 @@ export class MapController {
       else if (l.id.startsWith("bd-")) m.setLayoutProperty(l.id, "visibility", scheme === "dark" ? "visible" : "none");
     }
     if (!this.streetsOn) for (const id of streetLayers(scheme)) if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", "none");
+    this.paint3D();
     m.setPaintProperty("troncales-lines", "line-color", lineMatch(t, t.troncal));
     m.setPaintProperty("localidad-names", "text-color", t.label);
     m.setPaintProperty("localidad-names", "text-halo-color", t.halo);
@@ -422,6 +562,7 @@ export class MapController {
     const m = this.map;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
     this.streetsOn = t.streets; vis(streetLayers(this.scheme), t.streets); vis([...sidedIds("stops-circles"), "station-base-fill", "station-base-line", "station-links-fill", "station-links-line", "station-capsule-fill", "station-capsule-line", "station-doors", "station-capsule-labels", "station-chips", "portal-chips"], t.stops); vis(["network-lines"], t.network); vis(["network-portal"], t.stops && !t.network); vis(["trafico-casing", "trafico-lines", "trafico-flow-0", "trafico-flow-1", "trafico-flow-2", "trafico-flow-3"], t.traffic); this.setFlow(t.traffic); vis(["semaforos-dots", "semaforos-icons", "semaforos-labels"], t.signals); vis(BUS_LAYERS, t.buses);
+    this.signalsOn = t.signals; this.busesOn = t.buses; this.stopsOn = t.stops; this.paint3D();
   }
 
   /** Velocidad de los buses en las calles (cada tramo con su banda de color). */
@@ -463,6 +604,7 @@ export class MapController {
   /** Pone los semáforos en el mapa (se llama la primera vez que el usuario enciende la capa). */
   setSignals(rows: readonly SignalRow[]) {
     this.signalsLoaded = true;
+    this.signalRows = rows; this.signals3dLoaded = false; this.paint3D();
     (this.map.getSource("semaforos") as GeoJSONSource | undefined)?.setData({
       type: "FeatureCollection",
       // cada semáforo en su sitio (de OpenStreetMap) y, donde no se sabe, el punto del cruce; el de TransMilenio lleva «TM»
@@ -508,12 +650,14 @@ export class MapController {
   /** Dibuja las estaciones de la troncal. */
   setStations(g: StationGeometry) {
     this.stationBase = g;
+    this.stationsVersion++;
     this.applyEstaciones();
     (this.map.getSource("station-bases") as GeoJSONSource | undefined)?.setData(g.bases);
     (this.map.getSource("station-doors") as GeoJSONSource | undefined)?.setData(g.doors);
     (this.map.getSource("station-links") as GeoJSONSource | undefined)?.setData(g.links);
     (this.map.getSource("station-chips") as GeoJSONSource | undefined)?.setData(g.chips);
     this.paintStations();
+    this.paint3D();
   }
   /** Ilumina los vagones donde se detiene la ruta elegida y marca el vagón de la parada abierta. */
   setStationState(hl: ReadonlySet<string>, color: string, sel: string | null) {
