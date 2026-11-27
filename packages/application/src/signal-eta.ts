@@ -1,5 +1,6 @@
 import { type GeoPoint, type RoadPath, toWorld } from "@transmi/domain";
 import { type SignalMark, type SignalModel, measuredSignals, opposite, signalNow, signalPlans } from "./signal-timing";
+import { type Footprint, footprintModel } from "./signal-footprint";
 
 /**
  * La espera en los semáforos medidos, sumada a las llegadas de los buses que tienen que cruzarlos.
@@ -25,9 +26,35 @@ export function busesConfirm(r: LearningRow | undefined): boolean {
   return (s.red ?? 0) / s.n >= (s.chance ?? 1) + 0.15 && (g.ok ?? 0) / g.n >= (g.chance ?? 1) + 0.15;
 }
 
+/** Un semáforo no medido con huella de los buses (ver signal-footprint.ts): su plan según el tipo de día, la franja y hacia dónde va el bus. */
+interface Footprinted { lat: number; lon: number; plans: Map<string, SignalModel> }
+const FRANJA = (h: number) => (h < 6 ? 0 : h < 10 ? 1 : h < 16 ? 2 : h < 20 ? 3 : 4);
+const DAY = (tMs: number) => { const w = new Date(tMs).getUTCDay(); return w === 0 ? "su" : w === 6 ? "sa" : "wk"; };      // como signalstats.ts
+const HEAD = (ux: number, uy: number) => { const deg = ((Math.atan2(ux, uy) * 180) / Math.PI + 360) % 360; return (["N", "E", "S", "O"] as const)[Math.round(deg / 90) % 4]!; };
+
 export class SignalWaits {
   private list: Confirmed[] = [];
-  get size(): number { return this.list.length; }
+  private prints: Footprinted[] = [];
+  /** Por cada trazado, los semáforos con huella que quedan sobre él (se calcula una vez por trazado). */
+  private along = new WeakMap<RoadPath, { s: number; f: Footprinted }[]>();
+  get size(): number { return this.list.length + this.prints.length; }
+
+  /** Las huellas que publica `signalstats.ts` (`huellas.json`). Solo se usan si el archivo dice `use: true` (se enciende cuando la medición
+   *  de precisión de las llegadas muestre que mejoran, sin sacar versión nueva). */
+  loadFootprints(data: unknown): void {
+    const d = data as { use?: boolean; s?: Record<string, Footprint> } | null;
+    this.along = new WeakMap();
+    if (!d || d.use !== true || !d.s) { this.prints = []; return; }
+    const by = new Map<string, Footprinted>();
+    for (const [key, fp] of Object.entries(d.s)) {
+      const [ll, day, bucket, dir] = key.split("|");
+      const [lon, lat] = (ll ?? "").split(",").map(Number);
+      if (!Number.isFinite(lon) || !Number.isFinite(lat) || !day || bucket == null || !dir || !Array.isArray(fp) || fp.length < 3) continue;
+      const f = by.get(ll!) ?? by.set(ll!, { lat: lat!, lon: lon!, plans: new Map() }).get(ll!)!;
+      f.plans.set(`${day}|${bucket}|${dir}`, footprintModel(fp));
+    }
+    this.prints = [...by.values()];
+  }
 
   /** `measured`: el archivo de medidas (`tools/data/mediciones-semaforos.json`); `learning`: `aprendizaje.json`. */
   load(measured: unknown, learning: unknown): void {
@@ -61,7 +88,32 @@ export class SignalWaits {
       if (c !== "r") continue;
       wait += redLeft(model, t * 1000, sig.inverse) / 1000;
     }
+    // semáforos no medidos, con la huella de los buses de ese día, franja y sentido
+    if (this.prints.length) {
+      for (const { s, f } of this.printsAlong(path)) {
+        if (s <= fromS || s >= toS) continue;
+        const t = arriveAt(s) + wait, tg = path.tangentAt(s);
+        const h = new Date(t * 1000 - 5 * 3600_000).getUTCHours();
+        const model = f.plans.get(`${DAY(t * 1000)}|${FRANJA(h)}|${HEAD(tg.ux, tg.uy)}`);
+        if (!model) continue;
+        const now = signalNow(model, t * 1000);
+        if (now.c === "r") wait += now.left / 1000;
+      }
+    }
     return wait;
+  }
+
+  private printsAlong(path: RoadPath): { s: number; f: Footprinted }[] {
+    let hit = this.along.get(path);
+    if (hit) return hit;
+    hit = [];
+    for (const f of this.prints) {
+      const p = path.projectAfter(toWorld(f as GeoPoint), 0, 25);      // (projectAfter descarta rápido lo que queda fuera del trazado)
+      if (p) hit.push({ s: p.s, f });
+    }
+    hit.sort((a, b2) => a.s - b2.s);
+    this.along.set(path, hit);
+    return hit;
   }
 }
 

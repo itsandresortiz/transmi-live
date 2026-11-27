@@ -45,6 +45,7 @@ export function startData(): () => void {
     // semáforos medidos y lo que dicen los buses de ellos: la espera solo se suma si los buses la confirman (ver signal-eta.ts)
     const j = (u: string) => fetch(`${u}?t=${hourNow()}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     void Promise.all([j(`${CONFIG.signalsUrl}`), j(`${CONFIG.signalLearningUrl}`)]).then(([m, l]) => { if (m && l) transit.signalWaits.load(m, l); });
+    void j(CONFIG.footprintsUrl).then((d) => { if (d) transit.signalWaits.loadFootprints(d); });
   };
   const hops = setTimeout(loadHops, 4000);
   // iOS puede tener la app suspendida días: al volver a ella tras más de 12 h se cargan de nuevo la red del día (con sus cierres temporales),

@@ -35,7 +35,7 @@ function colorAt(_m: unknown, inverse: boolean, tMs: number, shiftMs = 0): Signa
 /** 1 si el reporte encaja con el color (detenido en rojo, avanzando en verde), 0 si lo contradice, ½ en amarillo (puede ser cualquiera). */
 const fits = (still: boolean, c: SignalColor) => (c === "y" ? 0.5 : still === (c === "r") ? 1 : 0);
 
-export interface AxisLearning { axis: Axis; n: number; /** Cuánto encaja con el semáforo tal cual (0–1). */ same: number; /** Con el contrario. */ flipped: number; /** Lo que se concluye: `true` = ese eje sigue el ciclo contrario. */ inverse: boolean | null }
+export interface AxisLearning { axis: Axis; n: number; /** Cuánto encaja con el semáforo tal cual (0–1). */ same: number; /** Con el contrario. */ flipped: number; /** Lo que se concluye: `true` = ese eje sigue el ciclo contrario. */ inverse: boolean | null; /** Lo decidieron los buses detenidos. */ byStops?: boolean }
 export interface SignalLearning {
   n: number;
   axes: AxisLearning[];
@@ -68,6 +68,15 @@ export function headsWith(rumbo: number, o: { h: Heading; b?: number }): boolean
 
 /** `rumbo`: hacia dónde va el tráfico que controla el semáforo (de OpenStreetMap o de los recorridos). Si se sabe, solo cuentan los buses
  *  que van en ese sentido (los demás miran otro semáforo del cruce) y para ellos el color vale tal cual. */
+/** Detenidos que hacen falta en un eje para decidir su sentido por ellos. */
+const MIN_AXIS_STOPS = 40;
+/** Cuánto más se detienen los buses en el rojo que fuera de él (proporción de detenidos en rojo − fuera de rojo), o `null` sin datos. */
+function stopLift(list: readonly BusNearSignal[], inv: boolean): number | null {
+  let r = 0, rs = 0, g = 0, gs = 0;
+  for (const o of list) { const c = colorAt(null, inv, o.t * 1000); if (c === "g") { g++; if (o.still) gs++; } else { r++; if (o.still) rs++; } }
+  return r >= 20 && g >= 20 ? rs / r - gs / g : null;
+}
+
 export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, allObs: readonly BusNearSignal[], allGoes: readonly BusGo[] = [], rumbo?: number): SignalLearning {
   planAt = typeof plan === "function" ? plan : () => plan;
   // solo los reportes de horas en que se sabe qué plan tiene el semáforo (y, si se sabe hacia dónde mira, de buses en ese sentido)
@@ -81,11 +90,20 @@ export function learnFromBuses(plan: SignalModel | PlanAt, inverse: boolean, all
   for (const [axis, list] of byAxis) {
     const same = mean(list.map((o) => fits(o.still, colorAt(model, inverse, o.t * 1000))));
     const flipped = mean(list.map((o) => fits(o.still, colorAt(model, !inverse, o.t * 1000))));
-    axes.push({ axis, n: list.length, same, flipped, inverse: list.length >= MIN_AXIS && Math.abs(same - flipped) >= 0.08 ? flipped > same : null });
+    // el sentido lo deciden los buses DETENIDOS: en su rojo deben detenerse bastante más que en su verde. Antes se decidía por el
+    // «encaje» de todos los reportes, que dominan los buses andando (≈90 %) y casi no dicen nada: en la Cra. 102B Bis × Calle 145 eso
+    // dejaba el semáforo «tal cual» para los buses de la Calle 145, cuando sus detenidos (2.450 reportes, 2026-11-27) caen el doble en
+    // el rojo del CONTRARIO (10 % frente a 5 %): el semáforo medido es el de la otra calle
+    const lSame = stopLift(list, inverse), lFlip = stopLift(list, !inverse), stops = list.filter((o) => o.still).length;
+    // (solo si uno de los dos sentidos se detiene de más en el rojo y el otro de menos, y si los detenidos son pocos (<25 %), como en la calle:
+    // con la mayoría detenidos —una fila, un paradero— un ciclo corrido puede parecer «al revés»)
+    const byStops = stops >= MIN_AXIS_STOPS && stops / list.length < 0.25 && lSame != null && lFlip != null && Math.max(lSame, lFlip) >= 0.02 && Math.min(lSame, lFlip) < 0 ? lFlip > lSame : null;
+    axes.push({ axis, n: list.length, same, flipped, inverse: byStops ?? (list.length >= MIN_AXIS && Math.abs(same - flipped) >= 0.08 ? flipped > same : null), byStops: byStops != null });
   }
   axes.sort((a, b) => b.n - a.n);
-  // un eje sin conclusión se toma como el semáforo tal cual (el que se midió es el de ese eje casi siempre)
-  const flipOf = new Map(axes.map((a) => [a.axis, rumbo == null && a.inverse === true]));
+  // un eje sin conclusión se toma como el semáforo tal cual (el que se midió es el de ese eje casi siempre). Lo que dicen los detenidos
+  // vale también cuando se sabe hacia dónde mira el semáforo (el rumbo de OpenStreetMap dice la calle, no cuál de los dos semáforos se midió)
+  const flipOf = new Map(axes.map((a) => [a.axis, a.inverse === true && (rumbo == null || a.byStops === true)]));
   // un eje sin datos (p. ej. arranques por una calle sin reportes) va tal cual: antes `inverse !== undefined` lo daba al revés
   const flip = (a: Axis | null) => !!(a && flipOf.get(a));
   const used = obs.filter((o) => axisOf(o.h));

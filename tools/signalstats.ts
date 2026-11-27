@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { distanceMeters, toWorld } from "@transmi/domain";
-import { TransitState, learnFromBuses, measuredSignals, signalPlans, type BusGo, type BusNearSignal, type Heading } from "@transmi/application";
+import { TransitState, learnFromBuses, measuredSignals, signalFootprints, signalPlans, type BusGo, type BusNearSignal, type Heading } from "@transmi/application";
 import { buildNetwork, decodePositions, parseGtfsLite } from "@transmi/infrastructure";
 import { SignalNearCollector } from "./signal-near";
 
@@ -30,6 +30,8 @@ const KEEP_DAYS = 7;
 type NearStore = { obs: Record<string, [number, 0 | 1, Heading, number?][]>; goes: Record<string, [number, number, Heading, number?][]> };
 
 const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 18_000;
+/** Si las apps suman la espera de los semáforos no medidos (por su huella) a las llegadas. Apagado hasta medir que mejora. */
+const HUELLAS_USE = false;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live", TOKEN = process.env.GITHUB_TOKEN ?? "";
 const url = `https://${TOKEN ? `x-access-token:${TOKEN}@` : ""}github.com/${REPO}.git`;
 const NEAR_M = 35, STOP_EXCLUDE_M = 45, STILL_MPS = 1.2;
@@ -175,6 +177,10 @@ async function main() {
   writeFileSync(join(out, "aprendizaje.json"), JSON.stringify({ v: 1, updated: new Date().toISOString(), semaforos: learned }));
   console.log("semáforos medidos:", Object.entries(learned).map(([k, v]) => `${k}: ${(v as { text: string }).text}`).join("\n"));
   writeFileSync(join(out, "stats.json.gz"), gzipSync(JSON.stringify({ ...meta, stats: compact }), { level: 9 }));
+  // huellas de los semáforos no medidos (cuándo se amontonan los buses detenidos dentro de la vuelta): las apps las suman a las llegadas
+  // solo con `use: true`, que se pone a mano cuando la medición de precisión muestre que mejoran (ver signal-footprint.ts)
+  const prints = signalFootprints(compact);
+  writeFileSync(join(out, "huellas.json"), JSON.stringify({ v: 1, updated: new Date().toISOString(), use: HUELLAS_USE, semaforos: new Set(Object.keys(prints).map((k) => k.split("|")[0])).size, s: prints }));
   execFileSync("bash", ["scripts/publish.sh", out], { stdio: "inherit", env: { ...process.env, BRANCH: "signal-stats", GITHUB_REPOSITORY: REPO, GITHUB_TOKEN: TOKEN } });
   console.log("acumulado:", JSON.stringify(meta));
 }

@@ -12,7 +12,8 @@ describe("de los archivos reales al estado de la aplicación", () => {
   const state = new TransitState();
   const a = decodePositions(fx("positions.a")), b = decodePositions(fx("positions.b"));
   state.applyTripUpdates(decodeTripUpdates(fx("tripupdates")));
-  state.applyAlerts(decodeAlerts(fx("alerts")));
+  // a la hora de los lotes (los avisos tienen fecha de fin: con el reloj de hoy ya vencieron y la prueba fallaba desde el 2026-11-26)
+  state.applyAlerts(decodeAlerts(fx("alerts")), Math.max(...a.map((r) => r.reportedAt)) * 1000);
   state.applyPositions(a, 1_000);
   // los dos lotes reales están a 20 s; se separan a 30 s para alcanzar la base mínima de velocidad (28 s)
   state.applyPositions(b.map((r) => ({ ...r, reportedAt: r.reportedAt + 10 })), 2_000);

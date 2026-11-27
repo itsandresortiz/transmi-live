@@ -78,3 +78,20 @@ describe("arranques con rumbo", () => {
     expect(L.goes.ok).toBe(20);
   });
 });
+
+describe("el sentido del semáforo lo deciden los buses detenidos", () => {
+  // como en la Cra. 102B Bis × Calle 145: se midió el semáforo de la otra calle. Los buses de oriente a occidente se detienen poco
+  // (≈10 % en su rojo, ≈5 % fuera de él), y su rojo es el verde del medido (más largo): por «encaje» parecía ir tal cual
+  it("pocos detenidos, pero el doble en el rojo del contrario: va al revés", () => {
+    const out: BusNearSignal[] = [];
+    let k = 0;
+    for (let i = 0; i < 3000; i++) {
+      const t = 1_800_000_000 + i * 23, theirRed = !red(t);
+      k = (k + 1) % 20;
+      out.push({ t, still: theirRed ? k < 2 : k === 0, h: i % 2 ? "E" : "O" });
+    }
+    const L = learnFromBuses(model, false, out);
+    expect(L.axes.find((a) => a.axis === "EO")!.inverse).toBe(true);
+    expect(L.stopped.red / L.stopped.n).toBeGreaterThan(L.stopped.chance);
+  });
+});

@@ -12,4 +12,6 @@ export const CONFIG = {
   /** Semáforos medidos a mano y lo que los buses dicen de ellos (para sumar su espera a las llegadas, solo si los buses la confirman). */
   signalsUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/main/tools/data/mediciones-semaforos.json",
   signalLearningUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/aprendizaje.json",
+  /** Huellas de los semáforos no medidos, sacadas de los buses detenidos (se usan solo si el archivo dice `use: true`). */
+  footprintsUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/huellas.json",
 } as const;

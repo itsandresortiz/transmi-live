@@ -91,5 +91,7 @@ export async function loadSignalWaits(): Promise<void> {
     const t = Math.floor(Date.now() / 3_600_000);
     const [m, l] = await Promise.all([CONFIG.signalsUrl, CONFIG.signalLearningUrl].map((u) => fetch(`${u}?t=${t}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
     if (m && l) transit.signalWaits.load(m, l);
+    const fp = await fetch(`${CONFIG.footprintsUrl}?t=${t}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (fp) transit.signalWaits.loadFootprints(fp);
   } catch { /* sin conexión: no se suma nada */ }
 }

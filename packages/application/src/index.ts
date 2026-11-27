@@ -24,3 +24,4 @@ export * from "./trunk-data";
 export * from "./widget-feed";
 export * from "./ride-match";
 export * from "./signal-eta";
+export * from "./signal-footprint";
