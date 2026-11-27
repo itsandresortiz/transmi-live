@@ -1,5 +1,8 @@
 import { type GeoPoint, METERS_PER_WORLD_UNIT, type WorldPoint, toGeo, toWorld } from "../shared/geo";
 
+/** Tramos por grupo en la búsqueda del punto más cercano (ver `RoadPath.chunkBoxes`). */
+const CHUNK = 8;
+
 /** Trazado de una ruta en coordenadas de mundo, con distancias acumuladas, para avanzar «por la calle». */
 export class RoadPath {
   readonly xs: Float64Array;
@@ -24,18 +27,48 @@ export class RoadPath {
   get length(): number { return this.cum.length ? this.cum[this.cum.length - 1]! : 0; }
   get size(): number { return this.xs.length; }
 
+  /** Caja (minX, maxX, minY, maxY) de cada grupo de `CHUNK` tramos, para saltarse de una vez los grupos que quedan lejos del punto.
+   *  Proyectar los ~5.000 buses en cada lote recorría todos los tramos de cada trazado (~400) y era lo que más pesaba al procesar un lote.
+   *  Se arma la primera vez que hace falta. */
+  private boxes: Float64Array | null = null;
+  private chunkBoxes(): Float64Array {
+    if (this.boxes) return this.boxes;
+    const segs = this.size - 1, n = Math.ceil(segs / CHUNK), b = new Float64Array(n * 4);
+    for (let c = 0; c < n; c++) {
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (let i = c * CHUNK, end = Math.min(segs, i + CHUNK); i <= end; i++) {   // puntos i..end: los extremos de los tramos del grupo
+        const x = this.xs[i]!, y = this.ys[i]!;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+      b[c * 4] = x0; b[c * 4 + 1] = x1; b[c * 4 + 2] = y0; b[c * 4 + 3] = y1;
+    }
+    return (this.boxes = b);
+  }
+  /** Distancia² mínima posible de `p` a cualquier tramo del grupo `c` (rebajada un poco para que el redondeo nunca descarte un tramo válido). */
+  private static boxD2(b: Float64Array, c: number, p: WorldPoint): number {
+    const x0 = b[c * 4]!, x1 = b[c * 4 + 1]!, y0 = b[c * 4 + 2]!, y1 = b[c * 4 + 3]!;
+    const dx = p.x < x0 ? x0 - p.x : p.x > x1 ? p.x - x1 : 0, dy = p.y < y0 ? y0 - p.y : p.y > y1 ? p.y - y1 : 0;
+    return (dx * dx + dy * dy) * (1 - 1e-9);
+  }
+
   /** Punto del trazado más cercano a `p`: metros desde el inicio, distancia al trazado y sentido (+1/-1) respecto a (ux,uy). */
   project(p: WorldPoint, ux: number, uy: number, maxMeters: number): { s: number; dist: number; forward: boolean } | null {
     const pad = maxMeters / METERS_PER_WORLD_UNIT;
     if (this.size < 2 || p.x < this.minX - pad || p.x > this.maxX + pad || p.y < this.minY - pad || p.y > this.maxY + pad) return null;
+    // los grupos de tramos más lejos que `maxMeters` o que la mejor distancia hallada no pueden ganar (el resultado es idéntico a revisarlos todos)
+    const boxes = this.chunkBoxes(), segs = this.size - 1, max2 = pad * pad * (1 + 1e-9);
     let best = Infinity, bs = 0, bdot = 0;
-    for (let i = 0; i < this.size - 1; i++) {
-      const ax = this.xs[i]!, ay = this.ys[i]!, dx = this.xs[i + 1]! - ax, dy = this.ys[i + 1]! - ay;
-      const l2 = dx * dx + dy * dy;
-      let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
-      if (d2 < best) { best = d2; bs = this.cum[i]! + t * (this.cum[i + 1]! - this.cum[i]!); bdot = dx * ux + dy * uy; }
+    for (let c = 0, i = 0; i < segs; c++) {
+      const end = Math.min(segs, i + CHUNK), bd = RoadPath.boxD2(boxes, c, p);
+      if (bd > max2 || bd >= best) { i = end; continue; }
+      for (; i < end; i++) {
+        const ax = this.xs[i]!, ay = this.ys[i]!, dx = this.xs[i + 1]! - ax, dy = this.ys[i + 1]! - ay;
+        const l2 = dx * dx + dy * dy;
+        let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
+        if (d2 < best) { best = d2; bs = this.cum[i]! + t * (this.cum[i + 1]! - this.cum[i]!); bdot = dx * ux + dy * uy; }
+      }
     }
     const dist = Math.sqrt(best) * METERS_PER_WORLD_UNIT;
     return dist <= maxMeters ? { s: bs, dist, forward: bdot >= 0 } : null;
@@ -47,15 +80,20 @@ export class RoadPath {
     if (!ux && !uy) return this.project(p, ux, uy, maxMeters);
     const pad = maxMeters / METERS_PER_WORLD_UNIT;
     if (this.size < 2 || p.x < this.minX - pad || p.x > this.maxX + pad || p.y < this.minY - pad || p.y > this.maxY + pad) return null;
+    const boxes = this.chunkBoxes(), segs = this.size - 1, max2 = pad * pad * (1 + 1e-9);
     let best = Infinity, bs = 0;
-    for (let i = 0; i < this.size - 1; i++) {
-      const ax = this.xs[i]!, ay = this.ys[i]!, dx = this.xs[i + 1]! - ax, dy = this.ys[i + 1]! - ay;
-      if (dx * ux + dy * uy < 0) continue;
-      const l2 = dx * dx + dy * dy;
-      let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
-      if (d2 < best) { best = d2; bs = this.cum[i]! + t * (this.cum[i + 1]! - this.cum[i]!); }
+    for (let c = 0, i = 0; i < segs; c++) {
+      const end = Math.min(segs, i + CHUNK), bd = RoadPath.boxD2(boxes, c, p);
+      if (bd > max2 || bd >= best) { i = end; continue; }
+      for (; i < end; i++) {
+        const ax = this.xs[i]!, ay = this.ys[i]!, dx = this.xs[i + 1]! - ax, dy = this.ys[i + 1]! - ay;
+        if (dx * ux + dy * uy < 0) continue;
+        const l2 = dx * dx + dy * dy;
+        let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
+        if (d2 < best) { best = d2; bs = this.cum[i]! + t * (this.cum[i + 1]! - this.cum[i]!); }
+      }
     }
     const dist = Math.sqrt(best) * METERS_PER_WORLD_UNIT;
     return dist <= maxMeters ? { s: bs, dist, forward: true } : null;
@@ -69,17 +107,26 @@ export class RoadPath {
     if (this.size < 2 || p.x < this.minX - pad || p.x > this.maxX + pad || p.y < this.minY - pad || p.y > this.maxY + pad) return null;
     const near2 = (nearMeters / METERS_PER_WORLD_UNIT) ** 2;
     let all = Infinity, allS = 0, after = Infinity, afterS = 0, run = Infinity, runS = 0, inRun = false;
-    for (let i = 0; i < this.size - 1; i++) {
-      const ax = this.xs[i]!, ay = this.ys[i]!, dx = this.xs[i + 1]! - ax, dy = this.ys[i + 1]! - ay;
-      const l2 = dx * dx + dy * dy;
-      let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2, s = this.cum[i]! + t * (this.cum[i + 1]! - this.cum[i]!);
-      if (d2 < all) { all = d2; allS = s; }
-      if (s < minS) continue;
-      if (d2 < after) { after = d2; afterS = s; }
-      if (d2 <= near2) { inRun = true; if (d2 < run) { run = d2; runS = s; } }
-      else if (inRun) break;                       // terminó la primera pasada cercana: es esa
+    const boxes = this.chunkBoxes(), segs = this.size - 1, max2 = pad * pad * (1 + 1e-9);
+    scan: for (let c = 0, i = 0; i < segs; c++) {
+      const end = Math.min(segs, i + CHUNK), bd = RoadPath.boxD2(boxes, c, p);
+      // Se salta un grupo de tramos que no puede cambiar la respuesta: el que queda todo a más de `maxMeters` (lo que está tan lejos nunca
+      // se devuelve), o el que no mejora ninguna de las marcas ni queda cerca (si todo él queda antes de `minS`, solo cuenta la más cercana
+      // de todas). Si ya se iba por la pasada cercana, esta terminó ahí: los metros `s` solo crecen a lo largo del trazado.
+      // Da exactamente lo mismo que revisar todos los tramos (al abrir la app, esto era lo que más tardaba del primer lote).
+      if ((bd > max2 && bd > near2) || (bd >= all && (this.cum[end]! < minS || (bd >= after && bd > near2)))) { if (inRun) break; i = end; continue; }
+      for (; i < end; i++) {
+        const ax = this.xs[i]!, ay = this.ys[i]!, dx = this.xs[i + 1]! - ax, dy = this.ys[i + 1]! - ay;
+        const l2 = dx * dx + dy * dy;
+        let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2, s = this.cum[i]! + t * (this.cum[i + 1]! - this.cum[i]!);
+        if (d2 < all) { all = d2; allS = s; }
+        if (s < minS) continue;
+        if (d2 < after) { after = d2; afterS = s; }
+        if (d2 <= near2) { inRun = true; if (d2 < run) { run = d2; runS = s; } }
+        else if (inRun) break scan;                  // terminó la primera pasada cercana: es esa
+      }
     }
     const pick = run < Infinity ? { d2: run, s: runS } : after < Infinity ? { d2: after, s: afterS } : { d2: all, s: allS };
     let dist = Math.sqrt(pick.d2) * METERS_PER_WORLD_UNIT;

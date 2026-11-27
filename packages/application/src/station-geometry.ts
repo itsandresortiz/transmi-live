@@ -9,6 +9,8 @@ const CAPSULE_LENGTH = 30, CAPSULE_WIDTH = 9;
 const BASE_MARGIN_ALONG = 7, BASE_MARGIN_ACROSS = 1.6, BASE_RADIUS = 6;
 /** Pasillo que une los vagones de una misma estación. */
 const LINK_WIDTH = 4.5;
+/** Una estación se centra sobre la línea de su corredor si esta queda a lo sumo a estos metros. */
+const MEDIAN_SNAP_M = 35;
 /** Las paradas del mismo vagón (una por sentido) que están así de cerca (m) son el mismo vagón. */
 const MERGE_METERS = 45;
 
@@ -66,13 +68,25 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
     if (!l) continue;
     for (const sh of shapes) for (const id of sh.stopIds) { const c = letters.get(id) ?? letters.set(id, new Map()).get(id)!; c.set(l, (c.get(l) ?? 0) + 1); }
   }
+  // caja de cada corredor (lat, lon): los que quedan lejos de una parada o estación no se recorren tramo por tramo (al abrir, esto se
+  // hacía para cada parada contra todos los tramos de todos los corredores). No cambia el resultado: solo se saltan los que no pueden estar cerca
+  const cbox = corridors.map((c) => {
+    let s = Infinity, n = -Infinity, w = Infinity, e = -Infinity;
+    for (const [la, lo] of c.p) { if (la < s) s = la; if (la > n) n = la; if (lo < w) w = lo; if (lo > e) e = lo; }
+    return { s, n, w, e };
+  });
+  const farFrom = (i: number, lat: number, lon: number, meters: number): boolean => {
+    const b = cbox[i]!, dLat = (meters * 1.5) / 110_540, dLon = (meters * 1.5) / (111_320 * Math.cos((lat * Math.PI) / 180));      // con holgura
+    return lat < b.s - dLat || lat > b.n + dLat || lon < b.w - dLon || lon > b.e + dLon;
+  };
   // letras de las líneas dibujadas a menos de 45 m de la parada (cada corredor tiene su letra)
   const nearLetters = (id: string): Set<string> => {
     const out = new Set<string>(), st = state.network.stops.get(id);
     if (!st) return out;
     const { lat, lon } = st.position, kx = 111_320 * Math.cos((lat * Math.PI) / 180), ky = 110_540;
-    for (const c of corridors) {
-      if (out.has(c.l.trim())) continue;
+    for (let ci = 0; ci < corridors.length; ci++) {
+      const c = corridors[ci]!;
+      if (out.has(c.l.trim()) || farFrom(ci, lat, lon, 45)) continue;
       for (let i = 0; i + 1 < c.p.length; i++) {
         const a = c.p[i]!, b = c.p[i + 1]!;
         const ax = (a[1] - lon) * kx, ay = (a[0] - lat) * ky, bx = (b[1] - lon) * kx, by = (b[0] - lat) * ky;
@@ -91,13 +105,19 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
   };
   // líneas de los corredores en coordenadas de mundo: se usan para centrar cada estación en la mediana de su avenida
   const medians = corridors.map((c) => c.p.map(([la, lo]) => toWorld({ lat: la, lon: lo })));
+  /** El punto de corredor más cercano. Solo se miran los corredores que pueden quedar a ≤ `MEDIAN_SNAP_M`: más lejos no se usa. */
   const nearestMedian = (w: { x: number; y: number }): { x: number; y: number; dist: number } | null => {
     let best: { x: number; y: number; dist: number } | null = null;
-    for (const pts of medians) for (let i = 0; i + 1 < pts.length; i++) {
-      const a = pts[i]!, b = pts[i + 1]!, dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy || 1e-18;
-      const t = Math.max(0, Math.min(1, ((w.x - a.x) * dx + (w.y - a.y) * dy) / len2));
-      const px = a.x + t * dx, py = a.y + t * dy, d = Math.hypot(px - w.x, py - w.y) * METERS_PER_WORLD_UNIT;
-      if (!best || d < best.dist) best = { x: px, y: py, dist: d };
+    const g = toGeo(w);
+    for (let ci = 0; ci < medians.length; ci++) {
+      if (farFrom(ci, g.lat, g.lon, MEDIAN_SNAP_M)) continue;
+      const pts = medians[ci]!;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const a = pts[i]!, b = pts[i + 1]!, dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy || 1e-18;
+        const t = Math.max(0, Math.min(1, ((w.x - a.x) * dx + (w.y - a.y) * dy) / len2));
+        const px = a.x + t * dx, py = a.y + t * dy, d = Math.hypot(px - w.x, py - w.y) * METERS_PER_WORLD_UNIT;
+        if (!best || d < best.dist) best = { x: px, y: py, dist: d };
+      }
     }
     return best;
   };
@@ -150,7 +170,7 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
       const vMid0 = wagons.reduce((a, w) => a + w.v, 0) / wagons.length, uMid0 = wagons.reduce((a, w) => a + w.u, 0) / wagons.length;
       const cw = { x: (uMid0 * axis.ux + vMid0 * nx) * m, y: (uMid0 * axis.uy + vMid0 * ny) * m };
       const nm = nearestMedian(cw);
-      if (nm && nm.dist <= 35) {
+      if (nm && nm.dist <= MEDIAN_SNAP_M) {
         const dv = uv(nm).v - vMid0;
         if (Math.abs(dv) >= 1.5 && Math.abs(dv) <= 28) for (const w of wagons) w.v += dv;
       }

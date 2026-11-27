@@ -1,4 +1,5 @@
 import { AppState } from "react-native";
+import { prepareNetworkInSlices } from "@transmi/application";
 import { gunzipSync } from "fflate";
 import { CONFIG, liveData, networkSource, transit } from "./composition-root";
 import { isDemo } from "./demo";
@@ -31,7 +32,11 @@ export function startData(): () => void {
     if (loading || (haveNet && haveEnds && haveDeps)) return;
     loading = true; clearTimeout(retry);
     await Promise.all([
-      haveNet ? null : networkSource.load().then((n) => { transit.setNetwork(n); haveNet = true; }).catch(() => undefined),
+      haveNet ? null : networkSource.load().then((n) => {
+        transit.setNetwork(n); haveNet = true;
+        // lo que el primer lote de buses necesita de cada recorrido, en trozos cortos entre cuadros (si no, la app se congela al llegar ese lote)
+        prepareNetworkInSlices(transit, (next) => { setTimeout(next, 0); }, 6);
+      }).catch(() => undefined),
       haveEnds ? null : gz<Parameters<typeof transit.setServiceEnds>[0]>(`${CONFIG.scheduleBase}service-ends.json.gz?t=${hourNow()}`, "service-ends.json.gz").then((d) => { if (d) { transit.setServiceEnds(d); haveEnds = true; } }),
       haveDeps ? null : gz<Parameters<typeof transit.setDepartures>[0]>(`${CONFIG.scheduleBase}departures.json.gz?t=${hourNow()}`, "departures.json.gz").then((d) => { if (d) { transit.setDepartures(d); haveDeps = true; } }),
     ]);

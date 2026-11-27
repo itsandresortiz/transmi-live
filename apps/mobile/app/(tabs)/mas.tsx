@@ -132,9 +132,9 @@ export default function Mas() {
           </View>
         </Group>
 
-        {/* opcional y anónimo; solo aparece cuando el servidor está configurado (ver supabase/LEEME-avisos.md) */}
+        {/* anónimo, encendido por defecto y se puede apagar; solo aparece cuando el servidor está configurado (ver supabase/LEEME-avisos.md) */}
         {shareAvailable() ? (
-        <Group title="AYUDAR A MEJORAR EL MAPA" footer="Si lo enciendes, cuando uses «Voy en este bus» y tu ubicación confirme que vas en él, la app envía cada 20 segundos por dónde va ese bus en su recorrido. No se envía nada tuyo: ni tu nombre, ni tu teléfono, ni tus coordenadas. Así los demás ven ese bus donde va de verdad. Se borra a las 24 horas.">
+        <Group title="AYUDAR A MEJORAR EL MAPA" footer="Cuando usas «Voy en este bus» y tu ubicación confirma que vas en él, la app envía cada 20 segundos por dónde va ese bus en su recorrido. No se envía nada tuyo: ni tu nombre, ni tu teléfono, ni tus coordenadas. Así los demás ven ese bus donde va de verdad. Se borra a las 24 horas. Puedes apagarlo aquí cuando quieras.">
           <View style={styles.row}>
             <View style={[styles.tile, { backgroundColor: "#16a34a" }]}><SymbolView name="bus.fill" tintColor="#ffffff" size={15} /></View>
             <View style={styles.rowBody}>

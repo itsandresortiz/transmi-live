@@ -8,7 +8,7 @@ import type { SceneKind } from "@/ui/Illustrations";
 
 /** Hojas de consejo: explican una función la primera vez que se usa (ilustración, título, texto y «Entendido»). Cada una sale una sola vez
  *  por teléfono; lo que ya se vio se guarda aquí (sin cuenta, solo en el teléfono). */
-export type TipId = "ride" | "coming" | "plan";
+export type TipId = "ride" | "coming" | "plan" | "share";
 
 export interface Tip { title: string; text: string; points: { symbol: SFSymbol; text: string }[]; badge: SFSymbol; scene: SceneKind; moving: boolean }
 
@@ -21,6 +21,18 @@ export const TIPS: Record<TipId, Tip> = {
       { symbol: "mappin.circle.fill", text: "Toca la parada donde te bajas. Cuando estés cerca, te avisamos para que alcances a timbrar." },
       { symbol: "location.fill", text: "Si el bus deja de enviar su ubicación, te seguimos con la tuya mientras la app esté abierta." },
       { symbol: "lock.fill", text: "Puedes bloquear el teléfono: el aviso de bajada llega a la hora calculada." },
+    ],
+  },
+  // «Compartir por dónde va mi bus» viene encendido: se cuenta una vez, la primera vez que se usa «Voy en este bus» con el servidor ya
+  // disponible (también a quien ya había visto la hoja de «Vas en este bus»)
+  share: {
+    title: "Tu bus ayuda a los demás",
+    text: "Mientras vas en el bus, la app comparte por dónde va ese bus para que todos lo vean donde va de verdad.",
+    badge: "bus.fill", scene: "city", moving: true,
+    points: [
+      { symbol: "bus.fill", text: "Se comparte solo por dónde va el bus en su recorrido, cada 20 segundos, mientras usas «Voy en este bus»." },
+      { symbol: "lock.fill", text: "No se envía nada tuyo: ni tu nombre, ni tu teléfono, ni tu ubicación. Se borra a las 24 horas." },
+      { symbol: "hand.raised.fill", text: "Si prefieres no compartir, apágalo en Más → «Compartir por dónde va mi bus»." },
     ],
   },
   coming: {

@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { allowAlerts } from "@/notify";
+import { shareAvailable, useShareRides } from "@/shareRide";
 import { useRide } from "@/ride";
 import { SymbolView } from "@/ui/Symbol";
 import { rideShownArrival } from "@transmi/application";
@@ -50,6 +51,8 @@ export default function Ride() {
   // la primera vez: hoja de consejo («marca tu parada y te avisamos»)
   const hasBus = !!v;
   useEffect(() => { if (hasBus) void tipOnce("ride", 700); }, [hasBus]);
+  // compartir por dónde va el bus viene encendido: se explica una vez (si la hoja anterior está saliendo, queda para la próxima vez)
+  useEffect(() => { if (hasBus && shareAvailable() && useShareRides.getState().on) void tipOnce("share", 1200); }, [hasBus]);
   const virtual = isVirtualRide(id);
   const found = !virtual && rideBus === id && wasLinked(id);
   const r = v ? transit.routeOf(v) : undefined;

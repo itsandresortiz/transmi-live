@@ -1,4 +1,4 @@
-// GENERADO por tools/edge-core.ts: no editar a mano. huella 497d60e81d44ede6
+// GENERADO por tools/edge-core.ts: no editar a mano. huella adc2bf8720a60756
 // packages/domain/src/shared/geo.ts
 var METERS_PER_WORLD_UNIT = 40075016686e-3 * Math.cos(4.65 * Math.PI / 180);
 function toWorld(p) {
@@ -245,7 +245,8 @@ var TransitNetwork = class {
 };
 
 // packages/domain/src/transit/path.ts
-var RoadPath = class {
+var CHUNK = 8;
+var RoadPath = class _RoadPath {
   xs;
   ys;
   /** Metros acumulados desde el inicio hasta cada punto. */
@@ -281,21 +282,58 @@ var RoadPath = class {
   get size() {
     return this.xs.length;
   }
+  /** Caja (minX, maxX, minY, maxY) de cada grupo de `CHUNK` tramos, para saltarse de una vez los grupos que quedan lejos del punto.
+   *  Proyectar los ~5.000 buses en cada lote recorría todos los tramos de cada trazado (~400) y era lo que más pesaba al procesar un lote.
+   *  Se arma la primera vez que hace falta. */
+  boxes = null;
+  chunkBoxes() {
+    if (this.boxes) return this.boxes;
+    const segs = this.size - 1, n = Math.ceil(segs / CHUNK), b = new Float64Array(n * 4);
+    for (let c = 0; c < n; c++) {
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (let i = c * CHUNK, end = Math.min(segs, i + CHUNK); i <= end; i++) {
+        const x = this.xs[i], y = this.ys[i];
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+      b[c * 4] = x0;
+      b[c * 4 + 1] = x1;
+      b[c * 4 + 2] = y0;
+      b[c * 4 + 3] = y1;
+    }
+    return this.boxes = b;
+  }
+  /** Distancia² mínima posible de `p` a cualquier tramo del grupo `c` (rebajada un poco para que el redondeo nunca descarte un tramo válido). */
+  static boxD2(b, c, p) {
+    const x0 = b[c * 4], x1 = b[c * 4 + 1], y0 = b[c * 4 + 2], y1 = b[c * 4 + 3];
+    const dx = p.x < x0 ? x0 - p.x : p.x > x1 ? p.x - x1 : 0, dy = p.y < y0 ? y0 - p.y : p.y > y1 ? p.y - y1 : 0;
+    return (dx * dx + dy * dy) * (1 - 1e-9);
+  }
   /** Punto del trazado más cercano a `p`: metros desde el inicio, distancia al trazado y sentido (+1/-1) respecto a (ux,uy). */
   project(p, ux, uy, maxMeters) {
     const pad = maxMeters / METERS_PER_WORLD_UNIT;
     if (this.size < 2 || p.x < this.minX - pad || p.x > this.maxX + pad || p.y < this.minY - pad || p.y > this.maxY + pad) return null;
+    const boxes = this.chunkBoxes(), segs = this.size - 1, max2 = pad * pad * (1 + 1e-9);
     let best = Infinity, bs = 0, bdot = 0;
-    for (let i = 0; i < this.size - 1; i++) {
-      const ax = this.xs[i], ay = this.ys[i], dx = this.xs[i + 1] - ax, dy = this.ys[i + 1] - ay;
-      const l2 = dx * dx + dy * dy;
-      let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
-      if (d2 < best) {
-        best = d2;
-        bs = this.cum[i] + t * (this.cum[i + 1] - this.cum[i]);
-        bdot = dx * ux + dy * uy;
+    for (let c = 0, i = 0; i < segs; c++) {
+      const end = Math.min(segs, i + CHUNK), bd = _RoadPath.boxD2(boxes, c, p);
+      if (bd > max2 || bd >= best) {
+        i = end;
+        continue;
+      }
+      for (; i < end; i++) {
+        const ax = this.xs[i], ay = this.ys[i], dx = this.xs[i + 1] - ax, dy = this.ys[i + 1] - ay;
+        const l2 = dx * dx + dy * dy;
+        let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
+        if (d2 < best) {
+          best = d2;
+          bs = this.cum[i] + t * (this.cum[i + 1] - this.cum[i]);
+          bdot = dx * ux + dy * uy;
+        }
       }
     }
     const dist = Math.sqrt(best) * METERS_PER_WORLD_UNIT;
@@ -307,17 +345,25 @@ var RoadPath = class {
     if (!ux && !uy) return this.project(p, ux, uy, maxMeters);
     const pad = maxMeters / METERS_PER_WORLD_UNIT;
     if (this.size < 2 || p.x < this.minX - pad || p.x > this.maxX + pad || p.y < this.minY - pad || p.y > this.maxY + pad) return null;
+    const boxes = this.chunkBoxes(), segs = this.size - 1, max2 = pad * pad * (1 + 1e-9);
     let best = Infinity, bs = 0;
-    for (let i = 0; i < this.size - 1; i++) {
-      const ax = this.xs[i], ay = this.ys[i], dx = this.xs[i + 1] - ax, dy = this.ys[i + 1] - ay;
-      if (dx * ux + dy * uy < 0) continue;
-      const l2 = dx * dx + dy * dy;
-      let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
-      if (d2 < best) {
-        best = d2;
-        bs = this.cum[i] + t * (this.cum[i + 1] - this.cum[i]);
+    for (let c = 0, i = 0; i < segs; c++) {
+      const end = Math.min(segs, i + CHUNK), bd = _RoadPath.boxD2(boxes, c, p);
+      if (bd > max2 || bd >= best) {
+        i = end;
+        continue;
+      }
+      for (; i < end; i++) {
+        const ax = this.xs[i], ay = this.ys[i], dx = this.xs[i + 1] - ax, dy = this.ys[i + 1] - ay;
+        if (dx * ux + dy * uy < 0) continue;
+        const l2 = dx * dx + dy * dy;
+        let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2;
+        if (d2 < best) {
+          best = d2;
+          bs = this.cum[i] + t * (this.cum[i + 1] - this.cum[i]);
+        }
       }
     }
     const dist = Math.sqrt(best) * METERS_PER_WORLD_UNIT;
@@ -331,28 +377,37 @@ var RoadPath = class {
     if (this.size < 2 || p.x < this.minX - pad || p.x > this.maxX + pad || p.y < this.minY - pad || p.y > this.maxY + pad) return null;
     const near2 = (nearMeters / METERS_PER_WORLD_UNIT) ** 2;
     let all = Infinity, allS = 0, after = Infinity, afterS = 0, run = Infinity, runS = 0, inRun = false;
-    for (let i = 0; i < this.size - 1; i++) {
-      const ax = this.xs[i], ay = this.ys[i], dx = this.xs[i + 1] - ax, dy = this.ys[i + 1] - ay;
-      const l2 = dx * dx + dy * dy;
-      let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2, s = this.cum[i] + t * (this.cum[i + 1] - this.cum[i]);
-      if (d2 < all) {
-        all = d2;
-        allS = s;
+    const boxes = this.chunkBoxes(), segs = this.size - 1, max2 = pad * pad * (1 + 1e-9);
+    scan: for (let c = 0, i = 0; i < segs; c++) {
+      const end = Math.min(segs, i + CHUNK), bd = _RoadPath.boxD2(boxes, c, p);
+      if (bd > max2 && bd > near2 || bd >= all && (this.cum[end] < minS || bd >= after && bd > near2)) {
+        if (inRun) break;
+        i = end;
+        continue;
       }
-      if (s < minS) continue;
-      if (d2 < after) {
-        after = d2;
-        afterS = s;
-      }
-      if (d2 <= near2) {
-        inRun = true;
-        if (d2 < run) {
-          run = d2;
-          runS = s;
+      for (; i < end; i++) {
+        const ax = this.xs[i], ay = this.ys[i], dx = this.xs[i + 1] - ax, dy = this.ys[i + 1] - ay;
+        const l2 = dx * dx + dy * dy;
+        let t = l2 ? ((p.x - ax) * dx + (p.y - ay) * dy) / l2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d2 = (p.x - (ax + t * dx)) ** 2 + (p.y - (ay + t * dy)) ** 2, s = this.cum[i] + t * (this.cum[i + 1] - this.cum[i]);
+        if (d2 < all) {
+          all = d2;
+          allS = s;
         }
-      } else if (inRun) break;
+        if (s < minS) continue;
+        if (d2 < after) {
+          after = d2;
+          afterS = s;
+        }
+        if (d2 <= near2) {
+          inRun = true;
+          if (d2 < run) {
+            run = d2;
+            runS = s;
+          }
+        } else if (inRun) break scan;
+      }
     }
     const pick2 = run < Infinity ? { d2: run, s: runS } : after < Infinity ? { d2: after, s: afterS } : { d2: all, s: allS };
     let dist = Math.sqrt(pick2.d2) * METERS_PER_WORLD_UNIT;
@@ -1385,6 +1440,7 @@ var TransitState = class {
   trunk = null;
   served = null;
   labels = /* @__PURE__ */ new Map();
+  /** Ruta → parada → ruta del viaje → dónde queda en el recorrido (mapas anidados: una clave de texto armada en cada llamada costaba más que la búsqueda). */
   seq = /* @__PURE__ */ new Map();
   listeners = /* @__PURE__ */ new Set();
   subscribe(fn) {
@@ -1439,9 +1495,18 @@ var TransitState = class {
   /** Estado de la ruta hoy (antes del primer servicio, en servicio o terminada). Sin datos en vivo no se afirma nada. */
   routeStatus(routeId, nowMs) {
     if (this.fleet.size < 50) return void 0;
-    let n = 0;
-    for (const v of this.fleet.values()) if (v.routeId === routeId) n++;
-    return this.serviceEnds.routeStatus(routeId, nowMs, n);
+    return this.serviceEnds.routeStatus(routeId, nowMs, this.busesOnRoute(routeId));
+  }
+  /** Cuántos buses hay de cada ruta, contados una vez por cambio de la flota: «Cómo llegar» pregunta por ~700 rutas y recorrer los ~5.000 buses
+   *  en cada pregunta costaba ~90 ms por búsqueda. */
+  routeCounts = null;
+  busesOnRoute(routeId) {
+    if (this.routeCounts?.version !== this.fleet.version) {
+      const counts = /* @__PURE__ */ new Map();
+      for (const v of this.fleet.values()) counts.set(v.routeId, (counts.get(v.routeId) ?? 0) + 1);
+      this.routeCounts = { version: this.fleet.version, counts };
+    }
+    return this.routeCounts.counts.get(routeId) ?? 0;
   }
   /** Puntualidad del bus según TransMilenio, o «sin dato». Solo vale si ese dato es de la misma época que la posición del bus:
    *  en nov. 2026 el archivo de retrasos trae datos de hace horas (mediana 3,5 h; solo 231 de 4.079 buses, todos zonales, y más de la
@@ -1511,7 +1576,11 @@ var TransitState = class {
       const clear = !agrees && !fix;
       if (fix) v.lastStopId = fix;
       else if (clear) v.lastStopId = void 0;
-      this.fixedStops.set(v.id, { reportedAt: v.reportedAt, stopId: fix, clear });
+      if (memo) {
+        memo.reportedAt = v.reportedAt;
+        memo.stopId = fix;
+        memo.clear = clear;
+      } else this.fixedStops.set(v.id, { reportedAt: v.reportedAt, stopId: fix, clear });
     }
     if (this.fixedStops.size > this.fleet.size * 2) {
       for (const id of this.fixedStops.keys()) if (!this.fleet.get(id)) this.fixedStops.delete(id);
@@ -1545,16 +1614,32 @@ var TransitState = class {
     }
     return best ? { shape: best.shape, index: best.index } : void 0;
   }
+  /** Lo último que resolvió `sequenceByStop` para cada bus: se llama miles de veces por lote (corregir paradas, llegadas, «Cómo llegar») y armar
+   *  la clave de texto en cada llamada pesaba más que la búsqueda misma. Vale mientras no cambien su ruta, viaje ni última parada, ni la red.
+   *  Guarda dos: la parada que informa TransMilenio y la corregida (`reconcileLastStops`), que se alternan en cada lote. */
+  seqByBus = /* @__PURE__ */ new WeakMap();
   sequenceByStop(v) {
-    if (!v.lastStopId) return void 0;
-    const key = `${v.routeId}|${v.lastStopId}|${v.tripId?.split(".").pop() ?? ""}`;
-    let hit = this.seq.get(key);
+    const stopId = v.lastStopId;
+    if (!stopId) return void 0;
+    let memo = this.seqByBus.get(v);
+    if (!memo) this.seqByBus.set(v, memo = []);
+    for (const m of memo) if (m.stopId === stopId && m.routeId === v.routeId && m.tripId === v.tripId) return m.hit ?? void 0;
+    const hit = this.sequenceByStopKey(v, stopId);
+    if (memo.length >= 2) memo.shift();
+    memo.push({ routeId: v.routeId, stopId, tripId: v.tripId, hit: hit ?? null });
+    return hit;
+  }
+  sequenceByStopKey(v, stopId) {
+    const tripId = v.tripId, tripKey = tripId ? tripId.slice(tripId.lastIndexOf(".") + 1) : "";
+    const byRoute = this.seq.get(v.routeId) ?? this.seq.set(v.routeId, /* @__PURE__ */ new Map()).get(v.routeId);
+    const byStop = byRoute.get(stopId) ?? byRoute.set(stopId, /* @__PURE__ */ new Map()).get(stopId);
+    let hit = byStop.get(tripKey);
     if (hit === void 0) {
       hit = null;
-      const tripRoute = v.tripId?.split(".").pop();
+      const tripRoute = tripId != null ? tripKey : void 0;
       for (const rid of tripRoute && tripRoute !== v.routeId ? [v.routeId, tripRoute] : [v.routeId]) {
         for (const shape of this.network.shapes.get(rid) ?? []) {
-          const index = shape.stopIds.indexOf(v.lastStopId);
+          const index = shape.stopIds.indexOf(stopId);
           if (index >= 0) {
             hit = { shape, index };
             break;
@@ -1562,7 +1647,7 @@ var TransitState = class {
         }
         if (hit) break;
       }
-      this.seq.set(key, hit);
+      byStop.set(tripKey, hit);
     }
     return hit ?? void 0;
   }
@@ -1617,6 +1702,7 @@ var TransitState = class {
   setNetwork(network) {
     this.network = network;
     this.seq.clear();
+    this.seqByBus = /* @__PURE__ */ new WeakMap();
     this.trunk = null;
     this.served = null;
     this.labels.clear();

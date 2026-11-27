@@ -68,7 +68,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 
 ## Bugs conocidos / limitaciones
 - ✅ (2026-11-27, sin ver en teléfono) Rutas con un código por sentido: una sola ficha con selector de sentido en app y web; favoritos por familia.
-- ✅ (2026-11-24, sin probar) Sin conexión: la app guarda el mapa base de Bogotá (zoom 9–14). La web sigue dependiendo de internet para el mapa base.
+- ✅ (2026-11-24, sin probar) Sin conexión: la app guarda el mapa base de Bogotá (zoom 9–14). ✅ (2026-11-27) La web guarda lo visto y Bogotá a zoom 9–12 (probado en Chrome; falta Safari de iPhone).
 - ✅ (2026-11-11) Avisos con nombre de ruta y sin prefijo «TM_».
 - ✅ (2026-11-12) Llegadas: el bus que ya debió pasar no se anuncia. **Pendiente**: la app anuncia la llegada ~40 s antes de lo real en hora pico (buses más lentos que el tiempo fijo por parada); repetir `eta-precision.yml` (ya corregido) en pico, valle y noche y decidir un factor por franja, o usar el perfil de `hop-stats`.
 - Mensajes del dueño: tardan ~5 min (caché de GitHub); si hace falta inmediato, servirlos por la función de Supabase.
@@ -94,7 +94,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - ✅ (2026-11-14, **sin probar en el Mac**) iOS: el número de compilación ya sale de la fecha para la app y el widget (`TM_BUILD_NUMBER`). Comprobar en la próxima entrega que Transporter muestre un número con la fecha y no «3» o «4».
 - Abrir la app procesa la red en el hilo principal. ✅ (2026-11-17) Formato compacto `network2.json.gz` (la mitad de peso, ~2× más rápido de leer). Queda armar la red (`buildNetwork`, ~56 ms en Node) y las formas de estaciones (~32 ms); medir en un teléfono lento antes de seguir.
 - ✅ (2026-11-24) La web lee `network2.json.gz` como la app (respaldo: `network.json.gz` y `gtfs-lite.zip`).
-- Rendimiento: lo que queda más caro por lote es `applyPositions` (~38 ms en Node; en un teléfono lento puede notarse como un tirón cada ~20 s) y «Cómo llegar» (190–350 ms en Node). No se ha medido en un teléfono lento real.
+- ✅ (2026-11-27) Rendimiento: `applyPositions` ~27 ms por lote, primer lote ~40 ms, «Cómo llegar» ~280–360 ms (Node). Queda: leer la red + `buildNetwork` + `trunkStations` al abrir (~180 ms) y medir en un teléfono lento real.
 - `packages/application/src/trunk-data.ts` copia `apps/web/src/data/troncales.json` y los portales de `estaciones.json`: hacer que la web lea del mismo sitio.
 - Duplicados: `apps/mobile/src/format.ts`, `stopname.ts`, `lastService.ts`, `planner/format.ts` vs sus equivalentes en `apps/web/src/ui/` → mover a `packages/application`.
 - `apps/web/src/map/sprites.ts` conserva `busSprite` (bus de lado, ya sin uso) y `MapController.ts` lo importa sin llamarlo: limpiar.

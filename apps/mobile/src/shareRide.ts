@@ -9,14 +9,15 @@ import { transit } from "./composition-root";
 import { nowMs } from "./clock";
 
 /**
- * «Ayudar a mejorar el mapa» (opcional, APAGADO por defecto, interruptor en Más): mientras vas en un bus con «Voy en este bus» y tu GPS
+ * «Ayudar a mejorar el mapa» (ENCENDIDO por defecto desde el 2026-11-27, decisión del dueño; se apaga en Más y se explica en la hoja
+ * de consejo de «Voy en este bus» y en la política de privacidad): mientras vas en un bus con «Voy en este bus» y tu GPS
  * confirma que vas en él, cada ~20 s se manda por dónde va ESE BUS sobre su recorrido: ruta, recorrido, metros desde el inicio, hora,
  * velocidad y el número del bus solo si es uno de los datos de TransMilenio. Nada de ti ni de tu teléfono (ni coordenadas, ni identificador).
  * Con eso todas las apps dibujan ese bus donde va de verdad durante ≤60 s. El servidor lo borra a las 24 h.
  * Si el servidor está apagado (`CONFIG.ridesUrl` en `null`), el interruptor no aparece y no se envía nada.
  */
 interface ShareState { on: boolean; set(on: boolean): void }
-export const useShareRides = create<ShareState>()(persist((set) => ({ on: false, set: (on) => set({ on }) }), {
+export const useShareRides = create<ShareState>()(persist((set) => ({ on: true, set: (on) => set({ on }) }), {
   name: "tm.share.v1", storage: createJSONStorage(() => AsyncStorage), partialize: (s) => ({ on: s.on }),
 }));
 /** ¿Se puede ofrecer? (el servidor está configurado). */
