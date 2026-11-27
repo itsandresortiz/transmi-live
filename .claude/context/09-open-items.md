@@ -68,6 +68,8 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 
 - **Vista 3D** (2026-11-27, sin ver en teléfono): botón 3D en claro y oscuro (inclinar, girar, volver a plano); que **no se cierre la app** con las capas nuevas; calor y fluidez de cerca; tocar un bus en 3D y el aro de «Voy en este bus»; techos de estaciones y sombra de los cerros en iPhone y Android. Limitaciones: OpenStreetMap trae la cubierta de muchas estaciones como un edificio de 5 m (queda un volumen pálido alrededor); las cabinas del cable siguen planas; en la app el relieve solo se sombrea.
 
+- **En curso (2026-11-27)**: buses modelados con three.js en la web; zonas verdes más visibles, nombres de parques y árboles 3D (web con three.js, app con volúmenes); después, **3D de la app con el mapa web dentro de una vista web** (ver `07-decisions`).
+
 ## Bugs conocidos / limitaciones
 - ✅ (2026-11-27, sin ver en teléfono) Rutas con un código por sentido: una sola ficha con selector de sentido en app y web; favoritos por familia.
 - ✅ (2026-11-24, sin probar) Sin conexión: la app guarda el mapa base de Bogotá (zoom 9–14). ✅ (2026-11-27) La web guarda lo visto y Bogotá a zoom 9–12 (probado en Chrome; falta Safari de iPhone).
