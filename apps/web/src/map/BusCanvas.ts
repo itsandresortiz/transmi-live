@@ -57,8 +57,9 @@ export class BusCanvas {
     this.ctx.clearRect(0, 0, this.cv.width, this.cv.height);
     this.hits = [];
   }
-  /** `solid`: los buses se ven con volumen en el mapa (vista 3D de cerca): aquí solo van el nombre, el aro y la marca «!», y el toque. */
-  draw(items: readonly BusDraw[], solid = false) {
+  /** `solid`: los buses se ven con volumen en el mapa (vista 3D de cerca): aquí solo van el nombre, el aro y la marca «!», y el toque.
+   *  `lift` (buses modelados): punto de la pantalla a `alt` m sobre el bus; el nombre y la marca van sobre el techo y el toque cubre el cuerpo. */
+  draw(items: readonly BusDraw[], solid = false, lift?: (b: BusDraw, alt: number) => { x: number; y: number } | null) {
     const ctx = this.ctx, z = this.map.getZoom(), k = iconScale(z), labels = z >= 16;
     const cw = this.cv.width / this.dpr, ch = this.cv.height / this.dpr;
     this.clear();
@@ -90,9 +91,11 @@ export class BusCanvas {
         ctx.drawImage(this.sprite(b.color, !!b.long), -w / 2, -h / 2, w, h);
         ctx.restore();
       }
+      // bus modelado: su techo en la pantalla (a 3,3 m) y su cuerpo (a 1,5 m)
+      const top = solid && lift ? lift(b, 3.3) : null, mid = top && lift ? lift(b, 1.5) : null;
       if (b.alert) {
         // marca ámbar «!» arriba a la derecha del bus: su ruta tiene un aviso vigente
-        const r = Math.max(4, 5.5 * k), cx = p.x + w * 0.55, cy = p.y - h * 0.35;
+        const r = Math.max(4, 5.5 * k), cx = (top?.x ?? p.x) + w * 0.55, cy = top ? top.y - 2 : p.y - h * 0.35;
         ctx.save();
         if (b.stale) ctx.globalAlpha = 0.38;
         ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = "#f59e0b"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "#ffffff"; ctx.stroke();
@@ -102,9 +105,11 @@ export class BusCanvas {
       }
       if (labels) {
         const up = (Math.abs(Math.cos(rad)) * h + Math.abs(Math.sin(rad)) * w) / 2;      // cuánto se extiende el bus hacia arriba, según su giro
-        ctx.strokeText(b.label, p.x, p.y - up - 3); ctx.fillText(b.label, p.x, p.y - up - 3);
+        const lx = top?.x ?? p.x, ly = top ? Math.min(p.y - up - 3, top.y - 8) : p.y - up - 3;
+        ctx.strokeText(b.label, lx, ly); ctx.fillText(b.label, lx, ly);
       }
       this.hits.push({ id: b.id, x: p.x, y: p.y, r: (b.long ? 20 : 13) * k * s + 5 });
+      if (mid) this.hits.push({ id: b.id, x: mid.x, y: mid.y, r: (b.long ? 20 : 13) * k * s + 5 });
     }
   }
   /** Bus bajo el dedo/cursor: se toca el dibujo del bus (con un margen para el dedo), no un círculo grande a su alrededor. */

@@ -45,7 +45,7 @@ export class BusRenderer {
     // un bus que solo conoce quien va en él (compartido, «comp:…») no tiene ficha: tocarlo no abre nada
     this.mapc.busHit = (pt) => { const id = this.canvas.hitTest(pt); return id?.startsWith("comp:") ? null : id; };
     // al mover o acercar el mapa se redibuja en el mismo cuadro, sin desfase
-    this.mapc.map.on("move", () => { if (this.canvasOn) this.canvas.draw(this.items, this.solidOn); });
+    this.mapc.map.on("move", () => { if (this.canvasOn) this.canvas.draw(this.items, this.solidOn, this.lift); });
     const loop = (t: number) => { this.raf = requestAnimationFrame(loop); this.frame(t); };
     this.raf = requestAnimationFrame(loop);
   }
@@ -85,16 +85,36 @@ export class BusRenderer {
     return s;
   }
 
+  /** Con los buses modelados: punto de la pantalla a cierta altura sobre el bus (el nombre va sobre el techo y el toque cubre el cuerpo). */
+  private readonly lift = (b: BusDraw, alt: number) => (this.modelsOn ? this.mapc.busScreenAt(b, alt) : null);
   private lastDots = 0;
   private canvasOn = false;
   /** Buses con volumen (vista 3D de cerca) y cuándo se mandaron por última vez al mapa. */
   private solidOn = false;
   private lastSolid = 0;
-  /** Vista 3D de cerca: los buses en pantalla se mandan como volúmenes ~8 veces por segundo (a este zoom el salto es de menos de un píxel). */
-  private clearSolid() { if (this.solidOn) { this.solidOn = false; this.mapc.setBusVolumes(null); } }
+  /** Vista 3D de cerca: los buses se dibujan modelados (three.js, en cada cuadro, con la misma posición suavizada de aquí). Mientras el
+   *  modelo carga, o si el navegador no puede dibujarlo, van como volúmenes simples ~8 veces por segundo (a este zoom el salto es de
+   *  menos de un píxel). */
+  private modelsOn = false;
+  private lastModels = 0;
+  private readonly reduceMotion = typeof matchMedia !== "undefined" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+  private clearSolid() {
+    if (this.solidOn) { this.solidOn = false; this.mapc.setBusVolumes(null); }
+    if (this.modelsOn) { this.modelsOn = false; this.mapc.setBusModels(null); }
+  }
   private updateSolid(items: readonly BusDraw[], t: number) {
     const want = this.mapc.is3D && this.mapc.zoom >= BUS_3D_MIN_ZOOM;
     if (!want) { this.clearSolid(); return; }
+    if (this.mapc.busModelsReady()) {
+      if (this.solidOn) { this.mapc.setBusVolumes(null); }
+      this.solidOn = true; this.modelsOn = true;
+      // «Reducir movimiento»: los buses se mueven a saltos de un segundo en vez de deslizarse
+      if (this.reduceMotion?.matches && t - this.lastModels < 1000) return;
+      this.lastModels = t;
+      this.mapc.setBusModels(items);
+      return;
+    }
+    if (this.modelsOn) { this.modelsOn = false; this.mapc.setBusModels(null); }
     this.solidOn = true;
     if (t - this.lastSolid < 120) return;
     this.lastSolid = t;
@@ -158,7 +178,7 @@ export class BusRenderer {
     this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
     this.items = items;
     this.updateSolid(items, t);
-    this.canvas.draw(items, this.solidOn);
+    this.canvas.draw(items, this.solidOn, this.lift);
     this.applyFollow(nowMs);
     if (nowMs - this.lastPrune > 30_000) {
       this.lastPrune = nowMs;
