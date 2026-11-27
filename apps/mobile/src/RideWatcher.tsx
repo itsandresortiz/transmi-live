@@ -3,12 +3,14 @@ import { Alert, AppState } from "react-native";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { type PhoneFix, arrivalAtIndex, busForGpsRide, checkOnShape, checkRide, rideArrival } from "@transmi/application";
+import { type PhoneFix, arrivalAtIndex, busForGpsRide, checkOnShape, checkRide, rideActivityState, rideArrival } from "@transmi/application";
 import { isVirtualRide, linkRide, rideSequence, rideVehicle, virtualParts, virtualRideId } from "./virtualRide";
 import { clearRideSnap, rideCheckOf, rideNextStop, rideSnapOf, setRideCheck } from "./rideSnap";
 import { transit } from "./composition-root";
 import { nowMs } from "./clock";
-import { cancelAlerts, onAlertTap, schedule } from "./notify";
+import { cancelAlerts, holdRideAlerts, onAlertTap, schedule } from "./notify";
+import { endRideServer, rideServerOwns, syncRideServer } from "./rideServer";
+import { maybeShareRide } from "./shareRide";
 import { stopText } from "./stopname";
 import { useRide } from "./ride";
 import { useTrip } from "./trip";
@@ -59,13 +61,13 @@ export function RideWatcher() {
 
   useEffect(() => {
     // antes de leer el viaje guardado, «sin viaje» no quiere decir que terminó: no se le cancelan los avisos
-    if (!busId || !alightId) { if (hydrated) { void cancelAlerts(); if (!busId && !useTrip.getState().it) void endTripActivity(); } return; }
+    if (!busId || !alightId) { if (hydrated) { void cancelAlerts(); void endRideServer(); if (!busId && !useTrip.getState().it) void endTripActivity(); } return; }
     let warned = 99, shown = "", seen = false, missingSince = 0, doubt = 0, asked = false, notYet = 0;
     // si se cambió la parada de bajada, los avisos de la anterior ya no sirven
     if (lastAlight && lastAlight !== alightId) void cancelAlerts();
     lastAlight = alightId;
     void activateKeepAwakeAsync(TAG).catch(() => undefined);
-    const finish = () => { void cancelAlerts(); if (!useTrip.getState().it) void endTripActivity(); clearRideSnap(); useRide.getState().clear(); };
+    const finish = () => { void cancelAlerts(); void endRideServer(); if (!useTrip.getState().it) void endTripActivity(); clearRideSnap(); useRide.getState().clear(); };
 
     /** Si el teléfono va en movimiento y lejos del bus un buen rato, se pregunta una vez: puede haber marcado otro bus, o ya se bajó. */
     const doubtCheck = (route: string, plate: string, routeId: string) => {
@@ -119,21 +121,27 @@ export function RideWatcher() {
       else if (left === 1 && warned > 1) { warned = 1; void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); }
       else if (left === 3 && warned > 3) { warned = 3; void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
 
-      // avisos del teléfono (también si la app queda en segundo plano): se programan con la última hora estimada
+      // el servidor de avisos (si está encendido; apagado por defecto) recalcula con la app cerrada: se le cuenta el viaje cada ~25 s
+      const color = SYSTEM_COLOR[v.system];
+      // (un viaje solo con GPS no se puede seguir desde el servidor: al recibirlo, el servidor lo suelta y responde que no avisa)
+      void syncRideServer({ busId, alightId, total: useRide.getState().total, route: route?.shortName ?? "", color, stop: name });
+      // avisos del teléfono (también si la app queda en segundo plano): se programan con la última hora estimada. Si el servidor se
+      // encarga, se quitan los del teléfono (sonarían dos veces); si deja de responder, se vuelven a programar en la vuelta siguiente
       const data = { busId, alightId, total: useRide.getState().total };
-      if (left >= 3) void schedule("ride-3", at(ti - 3), "Faltan 3 paradas", `Te bajas en ${name}.`, data);
-      if (left >= 2) void schedule("ride-1", at(ti - 1), "Prepárate para bajar", `La siguiente parada es ${name}.`, data);
-      if (left >= 1) void schedule("ride-0", at(ti) - 20, "Bájate aquí", `Estás llegando a ${name}.`, data);
+      if (rideServerOwns()) void holdRideAlerts();
+      else {
+        if (left >= 3) void schedule("ride-3", at(ti - 3), "Faltan 3 paradas", `Te bajas en ${name}.`, data);
+        if (left >= 2) void schedule("ride-1", at(ti - 1), "Prepárate para bajar", `La siguiente parada es ${name}.`, data);
+        if (left >= 1) void schedule("ride-0", at(ti) - 20, "Bájate aquí", `Estás llegando a ${name}.`, data);
+      }
       // lo mismo en la pantalla de bloqueo y la isla dinámica (si no hay ya un viaje de «Cómo llegar» ocupándola)
       if (!useTrip.getState().it && left > 0) {
-        const eta = at(ti), key = `${left}|${Math.round(eta / 20)}`, total = Math.max(useRide.getState().total, left, 1);
+        const eta = at(ti), key = `${left}|${Math.round(eta / 20)}`;
         if (key !== shown) {
           shown = key;
-          void showTripActivity(name, {
-            title: `Vas en el ${route?.shortName ?? "bus"}`, detail: left === 1 ? `La siguiente parada es la tuya: ${name}.` : `Te bajas en ${name}. Faltan ${left} paradas.`,
-            badge: route?.shortName ?? "", color: SYSTEM_COLOR[v.system], until: eta, untilLabel: "Te bajas en",
-            step: total - left, steps: total, arrive: eta, link: `transmilive:///ride/${busId}`,
-          }).then((ok) => { if (!ok && shown === key) shown = ""; });   // si no se pudo mostrar (permiso aún en pantalla), se reintenta
+          // mismo texto que manda el servidor de avisos con la app cerrada (`rideActivityState`)
+          void showTripActivity(name, rideActivityState({ busId, route: route?.shortName ?? "", color, stop: name, total: useRide.getState().total }, left, eta))
+            .then((ok) => { if (!ok && shown === key) shown = ""; });   // si no se pudo mostrar (permiso aún en pantalla), se reintenta
         }
       }
       if (left <= 0) finish();
@@ -162,6 +170,8 @@ export function RideWatcher() {
           const vp = virtualParts(busId), seq = vp ? rideSequence(rideVehicle(busId, now)!) : undefined;
           const check = vp && seq ? checkOnShape(transit, vp.shape, seq.index, fix, now, prevFix) : null;
           if (vp && seq && check) setRideCheck(busId, vp.shape, seq.index, check, now);
+          // «Ayudar a mejorar el mapa» (solo con el permiso encendido en Más): por dónde va este bus, sin nada de la persona
+          if (vp && check?.kind === "on") maybeShareRide(busId, vp.routeId, vp.shape, check.snap.s, fix.speed);
           // ¿apareció tu bus en los datos? Un bus de tu ruta y sentido que reporta justo donde vas tú, dos veces seguidas: se pasa el viaje
           // a ese bus (con tu parada de bajada y sus avisos), así lo ven también los demás en el mapa y sus datos se suman a los tuyos
           if (vp && check?.kind === "on" && check.moving) {
@@ -185,7 +195,9 @@ export function RideWatcher() {
           }
         } else {
           const v = transit.fleet.get(busId), seq = v ? transit.sequenceForDisplay(v) : undefined;
-          if (v && seq) setRideCheck(busId, seq.shape, seq.index, checkRide(transit, v, seq.shape, seq.index, fix, now, prevFix), now);
+          const check = v && seq ? checkRide(transit, v, seq.shape, seq.index, fix, now, prevFix) : null;
+          if (v && seq && check) setRideCheck(busId, seq.shape, seq.index, check, now);
+          if (v && seq && check?.kind === "on") maybeShareRide(busId, seq.shape.routeId, seq.shape, check.snap.s, fix.speed);
         }
         prevFix = fix;
       }).catch(() => undefined);

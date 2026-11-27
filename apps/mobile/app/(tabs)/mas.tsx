@@ -16,6 +16,7 @@ import { useAppearance, type AppearanceMode } from "@/appearance";
 import { useOfflineMap } from "@/map/offlineMap";
 import { useSaved } from "@/favorites";
 import { useDemo } from "@/demo";
+import { shareAvailable, useShareRides } from "@/shareRide";
 import { usePlanner } from "@/planner/store";
 import { Tap, PAGE, Toggle } from "@/ui/kit";
 import { useTestsMode } from "@/tests";
@@ -58,6 +59,7 @@ export default function Mas() {
   const c = useColors();
   const appearance = useAppearance();
   const offline = useOfflineMap();
+  const sharing = useShareRides();
   const saved = useSaved();
   const demo = useDemo();
   // casa y trabajo: si no hay, se busca el lugar; si ya hay, se puede cambiar o quitar
@@ -129,6 +131,19 @@ export default function Mas() {
             </View>
           </View>
         </Group>
+
+        {/* opcional y anónimo; solo aparece cuando el servidor está configurado (ver supabase/LEEME-avisos.md) */}
+        {shareAvailable() ? (
+        <Group title="AYUDAR A MEJORAR EL MAPA" footer="Si lo enciendes, cuando uses «Voy en este bus» y tu ubicación confirme que vas en él, la app envía cada 20 segundos por dónde va ese bus en su recorrido. No se envía nada tuyo: ni tu nombre, ni tu teléfono, ni tus coordenadas. Así los demás ven ese bus donde va de verdad. Se borra a las 24 horas.">
+          <View style={styles.row}>
+            <View style={[styles.tile, { backgroundColor: "#16a34a" }]}><SymbolView name="bus.fill" tintColor="#ffffff" size={15} /></View>
+            <View style={styles.rowBody}>
+              <Text style={[type.body, { color: c.text, flex: 1 }]}>Compartir por dónde va mi bus</Text>
+              <Toggle value={sharing.on} onChange={(v) => sharing.set(v)} label="Compartir de forma anónima por dónde va el bus en el que voy" />
+            </View>
+          </View>
+        </Group>
+        ) : null}
 
         <Group bare title="APARIENCIA" footer="Automático usa la del teléfono.">
           <View>

@@ -1,3 +1,4 @@
+import { SharedRides } from "./shared-rides";
 import { SignalWaits } from "./signal-eta";
 import { EtaHold } from "./eta-hold";
 import {
@@ -42,6 +43,8 @@ export class TransitState {
   readonly signalWaits = new SignalWaits();
   /** Lo que se mostró de cada llegada: la cuenta regresiva se detiene en vez de subir de golpe (ver `eta-hold.ts`). */
   readonly etaHold = new EtaHold();
+  /** Posiciones que comparte la gente que va en un bus (opcional y anónimo; ver `shared-rides.ts`). Vacío si el servidor está apagado. */
+  readonly sharedRides = new SharedRides();
   // festivos: los tiempos aprendidos se eligen por el tipo de día de servicio, no solo por el día de la semana
   private readonly hopDayWired = (this.hopProfile.dayOf = (t: number) => this.serviceEnds.dayAt(t).type);
   /** Primer y último viaje de cada ruta, para marcar «último servicio». */

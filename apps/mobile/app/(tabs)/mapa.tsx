@@ -132,7 +132,7 @@ export default function Mapa() {
       <View style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <TransitMap ref={map} system={system} active={focused} calm={calm} showSignals={layers.signals} showStations={layers.stations} showTraffic={layers.traffic} onView={onView} attributionPosition={{ bottom: insets.bottom + 72, right: 18 }} routeId={focus.routeId} focusStopId={focus.stopId} highlightIds={rideHighlight}
         // el bus en el que vas abre tu viaje, no la ficha con «Voy en este bus»
-        onBus={(id) => { void Haptics.selectionAsync(); if (id === useRide.getState().busId && useRide.getState().alightId) router.navigate({ pathname: "/ride/[id]", params: { id } }); else router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
+        onBus={(id) => { void Haptics.selectionAsync(); if (id.startsWith("comp:")) router.navigate({ pathname: "/route/[id]", params: { id: id.split(":")[1]! } }); /* bus que solo conoce quien va en él: su ruta */ else if (id === useRide.getState().busId && useRide.getState().alightId) router.navigate({ pathname: "/ride/[id]", params: { id } }); else router.navigate({ pathname: "/bus/[id]", params: { id } }); }}
         onStop={(id) => router.navigate({ pathname: "/stop/[id]", params: { id } })} />
       </View>
       {/* velo bajo la hora y la batería: el mapa es claro y el texto del sistema no siempre contrasta */}

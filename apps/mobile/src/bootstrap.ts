@@ -4,6 +4,7 @@ import { CONFIG, liveData, networkSource, transit } from "./composition-root";
 import { isDemo } from "./demo";
 import { cachedBytes } from "./offline";
 import { refreshMessages } from "./messages";
+import { startSharedRides } from "./shareRide";
 
 /** Hermes (el motor de JavaScript del teléfono) no trae DecompressionStream: los archivos .gz se abren con fflate. */
 async function gz<T>(url: string, name: string): Promise<T | null> {
@@ -58,5 +59,7 @@ export function startData(): () => void {
   void refreshMessages();
   const msgTimer = setInterval(() => { if (AppState.currentState === "active") void refreshMessages(); }, 120_000);
   const sub = AppState.addEventListener("change", (s) => { if (s !== "active") return; refreshIfOld(); void loadStatic(); void refreshMessages(); if (!isDemo()) void liveData.refresh(true).catch(() => undefined); });
-  return () => { clearTimeout(hops); clearInterval(timer); clearInterval(msgTimer); clearTimeout(retry); sub.remove(); started = false; };
+  // posiciones que comparte la gente que va en un bus (apagado mientras el servidor no esté configurado)
+  const stopShared = startSharedRides();
+  return () => { clearTimeout(hops); clearInterval(timer); clearInterval(msgTimer); clearTimeout(retry); sub.remove(); stopShared(); started = false; };
 }

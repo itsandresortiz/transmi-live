@@ -51,9 +51,11 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       if (inView.length > limit) inView = inView.map((v) => ({ v, k: keepSet.has(v.id) ? -1 : PRIORITY[v.system] * 1e10 + (hash(v.id) % 1e9) })).sort((a, b) => a.k - b.k).slice(0, limit).map((x) => x.v);
       const ride = useRide.getState().busId, rideNow = t * 1000;      // mismo reloj con que se guardan las lecturas del GPS
       const warn = alertRoutes();      // rutas con un aviso vigente: sus buses llevan una marca ámbar
+      const shared = transit.sharedRides.size > 0;
       for (const v of inView) {
         // el bus en el que vas se dibuja donde va tu teléfono (el dato de TransMilenio llega ~1 min tarde y el bus se veía atrás o adelantado)
-        const mine = v.id === ride ? snappedPosition(v.id, rideNow) : null;
+        // y si alguien que va en él comparte su posición (opcional y anónimo), donde va según esa persona
+        const mine = v.id === ride ? snappedPosition(v.id, rideNow) : shared ? transit.sharedRides.positionOf(transit, v.id, t) : null;
         const g = mine ?? toGeo(motion.step(v, t));
         if (g.lon < view.west - padX || g.lon > view.east + padX || g.lat < view.south - padY || g.lat > view.north + padY) continue;
         const h = (((mine?.heading ?? motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;
@@ -63,6 +65,13 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
       if (isVirtualRide(ride) && (!system || transit.routeById(virtualParts(ride)?.routeId ?? "")?.system === system)) {
         const g = snappedPosition(ride, rideNow), vp = virtualParts(ride), r = vp ? transit.routeById(vp.routeId) : undefined;
         if (g && r) features.push({ type: "Feature", id: ride, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: ride, color: SYSTEM_COLOR[r.system], sprite: `top-${r.system}-${r.system === "troncal" ? "l" : "s"}`, rot: ((g.heading % 360) + 360) % 360, o: 1, route: labels ? r.shortName : "" } });
+      }
+      // buses que TransMilenio no reporta pero alguien que va en ellos comparte su posición (≤60 s)
+      if (shared) for (const x of transit.sharedRides.extras(transit, t)) {
+        const r = transit.routeById(x.routeId);
+        if (!r || x.id === ride || (system && r.system !== system) || (family && !family.has(x.routeId)) || (onlySet && !onlySet.has(x.routeId))) continue;
+        if (x.lon < view.west - padX || x.lon > view.east + padX || x.lat < view.south - padY || x.lat > view.north + padY) continue;
+        features.push({ type: "Feature", id: x.id, geometry: { type: "Point", coordinates: [x.lon, x.lat] }, properties: { id: x.id, color: SYSTEM_COLOR[r.system], sprite: `top-${r.system}-${r.system === "troncal" ? "l" : "s"}`, rot: ((x.heading % 360) + 360) % 360, o: 1, route: labels ? r.shortName : "" } });
       }
       setData({ type: "FeatureCollection", features });
       return features.length;

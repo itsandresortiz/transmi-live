@@ -13,9 +13,11 @@ module.exports = ({ config }) => {
       entitlements: { ...config.ios?.entitlements, ...(widget ? { "com.apple.security.application-groups": [GROUP] } : {}) },
     },
     // Google Play exige que cada paquete que se sube tenga un número mayor que el anterior: el script de la tienda lo pone con la fecha y la hora
-    android: { ...config.android, ...(process.env.TM_VERSION_CODE ? { versionCode: Number(process.env.TM_VERSION_CODE) } : {}) },
+    // TM_FCM_FILE: ruta al google-services.json de Firebase (avisos del viaje desde el servidor en Android; ver supabase/LEEME-avisos.md)
+    android: { ...config.android, ...(process.env.TM_VERSION_CODE ? { versionCode: Number(process.env.TM_VERSION_CODE) } : {}), ...(process.env.TM_FCM_FILE ? { googleServicesFile: process.env.TM_FCM_FILE } : {}) },
     plugins: [...(config.plugins ?? []), ...(widget ? ["@bacons/apple-targets"] : [])],
     // TM_CAPTURAS=1: compilación solo para el simulador que saca capturas (scripts/capturas.sh): sin la pantalla de bienvenida
-    extra: { ...config.extra, widget, widgetGroup: GROUP, capturas: process.env.TM_CAPTURAS === "1" },
+    // push: la app se compiló con el permiso de avisos remotos (iPhone: TM_PUSH=1; Android: TM_FCM_FILE). Sin eso no se pide token al servidor.
+    extra: { ...config.extra, widget, widgetGroup: GROUP, capturas: process.env.TM_CAPTURAS === "1", pushIos: process.env.TM_PUSH === "1", pushAndroid: !!process.env.TM_FCM_FILE },
   };
 };
