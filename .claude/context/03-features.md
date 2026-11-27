@@ -72,3 +72,7 @@ Una sola página con mapa a pantalla completa y una hoja deslizable (`ui/Sheet.t
 - **Widget**: iPhone pequeño 1 parada, mediano 2, grande 3, elegir parada con «Editar widget» (AppIntents); Android «Parada favorita» (tocar el nombre pasa a la siguiente favorita, «1 de 3 ›») y «Paradas favoritas» 4×3 (hasta 3). La app pasa hasta 6 favoritas (`src/widgetSync.tsx`).
 - **Ilustraciones** (`src/ui/Illustrations.tsx`): bienvenida (`app/onboarding.tsx`), cabecera de ruta (130 pt) y de parada (140 pt: estación, paradero o cable), hojas de consejo `app/tip/[id].tsx` con textos en `src/tips.ts` (se muestran una sola vez).
 - **Llegadas**: espera de semáforos confirmados por los buses (`signal-eta.ts`); los buses del mapa avanzan con el ritmo aprendido de cada tramo (`motion.ts`).
+
+## Añadido 2026-11-27
+- **Ficha de ruta con los dos sentidos** (app `app/route/[id].tsx`, web `RouteDetailView`): selector «Hacia X / Hacia Y»; favoritos por familia de ruta.
+- **Informe de semáforos** (web): `semaforos-informe.html` (+ `.csv`, `.json`), enlazado desde `soporte.html`.

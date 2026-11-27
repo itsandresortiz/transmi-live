@@ -87,3 +87,6 @@ Datos reales para validar: `git fetch origin +live-data:refs/remotes/origin/live
 - TestFlight: desde 2026-11-18 `apps/mobile/scripts/testflight-local.sh` incluye el widget y la actividad en vivo por defecto (antes había que poner `WIDGET=1`; sin él, el widget instalado queda gris y sin responder).
 - `osm-calles.yml` (a mano): pide a OpenStreetMap la calle y el rumbo de cada semáforo y publica `osm-calles.json` en la rama `signal-stats` (lo usa `signalstats.ts`). Desde el contenedor de Claude el servidor de consultas de OpenStreetMap corta la conexión: correrlo en GitHub.
 - Android/Google Play (2026-11-21): toda función de hardware que la app no necesite de verdad debe ir con `android:required="false"` (NFC en el módulo `tullave`; pantalla vertical/horizontal en `plugins/android-opcional.js`); si no, Play frena el envío por restringir dispositivos.
+
+## Informe de semáforos (2026-11-27)
+`deploy-web.yml` corre `tools/informe-semaforos.ts` sobre `apps/web/dist` (con `continue-on-error`: si falla queda la copia de `apps/web/public/`). Lee la rama `signal-stats` y los nombres de `semaforos.json` o de la red semafórica de Movilidad.

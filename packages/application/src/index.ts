@@ -27,3 +27,4 @@ export * from "./signal-eta";
 export * from "./signal-footprint";
 export * from "./eta-hold";
 export * from "./route-directions";
+export * from "./signal-report";
