@@ -1,5 +1,7 @@
 import { create } from "zustand";
+import { toggleSavedRoute } from "@transmi/application";
 import { safeStorage } from "../storage";
+import { transit } from "../composition-root";
 
 interface Favs {
   stops: string[];
@@ -21,5 +23,7 @@ const flip = (a: string[], id: string) => (a.includes(id) ? a.filter((x) => x !=
 export const useFavs = create<Favs>((set, get) => ({
   ...load(),
   toggleStop: (id) => { set({ stops: flip(get().stops, id) }); safeStorage.set(KEY, JSON.stringify({ stops: get().stops, routes: get().routes })); },
-  toggleRoute: (id) => { set({ routes: flip(get().routes, id) }); safeStorage.set(KEY, JSON.stringify({ stops: get().stops, routes: get().routes })); },
+  // una ruta guardada es la ruta en sus dos sentidos: quitarla borra todos sus códigos (también los que quedaron de antes, cuando cada
+  // sentido se guardaba aparte), así que los favoritos viejos siguen sirviendo sin migrarlos
+  toggleRoute: (id) => { set({ routes: toggleSavedRoute(transit, get().routes, id) }); safeStorage.set(KEY, JSON.stringify({ stops: get().stops, routes: get().routes })); },
 }));

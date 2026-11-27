@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStopGroups, siblingStops,
+  pickDirection, routeDirections,
 } from "@transmi/application";
 import { useRide } from "./ride";
 import { nowMode } from "./plannerStore";
@@ -101,10 +102,12 @@ export function routeSub(r: Route): string {
 export function RoutesView({ th, act }: Props) {
   useTransitVersion();
   const { query, system, limit } = useUi();
-  const list = searchRoutes(transit, { query, system });
+  // una fila por ruta aunque TransMilenio publique cada sentido con otro código (como en la app); la ficha tiene el selector de sentido
+  const list = searchRoutes(transit, { query, system, mergeDirections: true });
   const counts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const v of transit.fleet.values()) m.set(v.routeId, (m.get(v.routeId) ?? 0) + 1);
+    const byId = new Map<string, number>(), m = new Map<string, number>();
+    for (const v of transit.fleet.values()) byId.set(v.routeId, (byId.get(v.routeId) ?? 0) + 1);
+    for (const r of transit.routes()) m.set(r.id, transit.routeFamily(r.id).reduce((n, id) => n + (byId.get(id) ?? 0), 0));      // los dos sentidos
     return m;
   }, [transit.version]); // eslint-disable-line react-hooks/exhaustive-deps
   const page = list.slice(0, limit);
@@ -303,15 +306,20 @@ export function AlertsView({ th, act }: Props) {
 export function RouteDetailView({ id, th, act }: { id: string } & Props) {
   useTransitVersion();
   const nowSec = useNow() / 1000;
-  const { direction, setDirection, setRoute, routeBusId } = useUi();
+  const { direction, setRouteDirection, setRoute, routeBusId } = useUi();
   const d = routeDetail(transit, id);
+  // los sentidos de la ruta con todos sus códigos: una sola ficha; elegir el otro sentido cambia paradas, buses y mapa aquí mismo
+  const dirs = useMemo(() => routeDirections(transit, id), [id, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const family = transit.routeFamily(id);
+  const vehicles = family.length > 1 ? family.flatMap((rid) => listVehicles(transit, { routeId: rid })) : d?.vehicles ?? [];
   const nextRef = useRef<HTMLLIElement>(null);
   const bus = routeBusId ? transit.fleet.get(routeBusId) : undefined;
-  const shapes = transit.network.shapes.get(id) ?? [];
   // si se abrió desde un bus, se muestra el sentido en el que va ese bus
   const busSeq = bus ? transit.sequenceForDisplay(bus) : undefined;      // por su última parada y, si no sirve, por dónde va sobre el recorrido
   const busShape = busSeq?.shape;
-  const cur = busShape ?? shapes.find((s) => s.direction === direction) ?? shapes[0];
+  const sel = pickDirection(dirs, { routeId: id, direction });
+  const cur = busShape ?? sel?.shape;
+  const curDir = cur ? dirs.find((x) => x.shapes.includes(cur)) : undefined;
   const k = busSeq && cur === busSeq.shape ? busSeq.index : -1;      // última parada a la que llegó; la que sigue es k + 1
   useEffect(() => {
     const el = nextRef.current, box = el?.closest(".view") as HTMLElement | null;
@@ -331,15 +339,15 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
       <button className="back" onClick={() => setRoute(null)}><Back /> {bus ? "Atrás" : "Rutas"}</button>
       <div className="dcard">
         <span className="rb big" style={{ ["--c" as string]: color }}>{route.shortName}</span>
-        <div style={{ flex: 1, minWidth: 0 }}><h2>{cur?.headsign ? `Hacia ${cur.headsign}` : route.longName ? routeTitle(route) : SYSTEM_LABEL[route.system]}</h2>
+        <div style={{ flex: 1, minWidth: 0 }}><h2>{curDir?.toward ? curDir.label : route.longName ? routeTitle(route) : SYSTEM_LABEL[route.system]}</h2>
           {route.longName && <p className="official">Nombre oficial: {routeOfficialName(route)}</p>}
-          <p>{routeSub(route)}{bus ? ` · bus ${bus.plate || bus.label || bus.id}` : ` · ${d.vehicles.length} ${d.vehicles.length === 1 ? "bus" : "buses"}`}{!bus && avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
+          <p>{routeSub(route)}{bus ? ` · bus ${bus.plate || bus.label || bus.id}` : ` · ${vehicles.length} ${vehicles.length === 1 ? "bus" : "buses"}${dirs.length > 1 ? " en los dos sentidos" : ""}`}{!bus && avg != null && Math.abs(avg) < 7200 ? ` · ${avg > 120 ? Math.round(avg / 60) + " min tarde" : avg < -120 ? Math.round(-avg / 60) + " min antes" : "a tiempo"} en promedio` : ""}</p></div>
         <ShareButton target={{ kind: "ruta", id, direction: cur?.direction }} title={`Ruta ${route.shortName}`} />
         <StarButton kind="route" id={id} />
       </div>
-      {!bus && shapes.length > 1 && (
-        <div className="seg" role="group" aria-label="Sentido">
-          {shapes.map((s) => <button key={s.direction} aria-pressed={cur?.direction === s.direction} onClick={() => setDirection(s.direction)}>{s.headsign ? `Hacia ${s.headsign}` : `Sentido ${Number(s.direction) + 1}`}</button>)}
+      {!bus && sel && dirs.length > 1 && (
+        <div className="seg" role="group" aria-label="Sentido de la ruta">
+          {dirs.map((x) => <button key={x.key} aria-pressed={sel.key === x.key} title={x.label} onClick={() => { if (sel.key !== x.key) { haptic(); setRouteDirection(x.routeId, x.direction); } }}>{x.label}</button>)}
         </div>
       )}
       <RouteStatusNote routeId={id} nowMs={nowSec * 1000} />
@@ -356,7 +364,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
               const tag = !bus || k < 0 || i <= k ? null
                 : `${isNext ? "Próxima parada · " : "aprox. "}${etaText(arrivalAtIndex(transit, bus, cur, k, i, nowMs()), nowSec)}`;
               // vista general de la ruta: buses que van hacia esta parada (es la siguiente de cada uno)
-              const heading = !bus ? d.vehicles.filter((v) => { const q = transit.sequenceOf(v); return q?.shape === cur && q.index + 1 === i; }) : [];
+              const heading = !bus ? vehicles.filter((v) => { const q = transit.sequenceOf(v); return q?.shape === cur && q.index + 1 === i; }) : [];
               return (
                 <li key={sid} ref={isNext ? nextRef : undefined} className={`${isNext ? "next" : ""}${passed ? " passed" : ""}${heading.length ? " here" : ""}`} onClick={() => act.openStop(sid)}>
                   {stopText(s, sid)}{tag && <span className={`bx${isNext ? "" : " soft"}`}>{tag}</span>}
@@ -369,8 +377,8 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
         </>
       )}
       <details className="morebuses">
-        <summary>Ver los {d.vehicles.length} {d.vehicles.length === 1 ? "bus" : "buses"} de esta ruta</summary>
-        {d.vehicles.length ? <div className="list">{d.vehicles.slice(0, 40).map((v) => <BusRow key={v.id} v={v} th={th} act={act} />)}</div> : liveDown() ? <Empty title={downText().title} text="TransMilenio no está enviando la ubicación de los buses. Eso no significa que la ruta no tenga servicio: revisa su horario arriba." /> : <Empty title="Sin buses ahora" text="Ningún bus de esta ruta está reportando en este momento." />}
+        <summary>Ver los {vehicles.length} {vehicles.length === 1 ? "bus" : "buses"} de esta ruta</summary>
+        {vehicles.length ? <div className="list">{vehicles.slice(0, 40).map((v) => <BusRow key={v.id} v={v} th={th} act={act} />)}</div> : liveDown() ? <Empty title={downText().title} text="TransMilenio no está enviando la ubicación de los buses. Eso no significa que la ruta no tenga servicio: revisa su horario arriba." /> : <Empty title="Sin buses ahora" text="Ningún bus de esta ruta está reportando en este momento." />}
       </details>
     </>
   );

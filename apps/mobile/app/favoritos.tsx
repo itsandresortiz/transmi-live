@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Animated, { LinearTransition } from "react-native-reanimated";
 import { SymbolView } from "@/ui/Symbol";
-import { upcomingAtStop } from "@transmi/application";
+import { savedRouteFamilies, upcomingAtStop } from "@transmi/application";
 import { routeTitle, stopLabelText } from "@transmi/domain";
 import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";
@@ -26,7 +26,7 @@ export default function Favoritos() {
   useTransitVersion();
   const now = useNow(5000) / 1000;
   const saved = useSaved();
-  const routes = saved.routes.map((id) => transit.routeById(id)).filter((r) => !!r);
+  const routes = savedRouteFamilies(transit, saved.routes).map((id) => transit.routeById(id)).filter((r) => !!r);
   // lo que viene a cada parada se calcula cada pocos segundos, no en cada pintada: así los toques (cerrar, abrir) responden al instante
   const version = transit.version;
   const stops = useMemo(() => saved.stops.map((id) => transit.stopById(id)).filter((s) => !!s).map((stop) => ({ stop: stop!, next: upcomingAtStop(transit, stop!.id, nowSec(), 1).slice(0, 3) })), [saved.stops, version, Math.floor(now / 5)]);   // eslint-disable-line react-hooks/exhaustive-deps

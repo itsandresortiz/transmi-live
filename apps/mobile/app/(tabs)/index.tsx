@@ -5,7 +5,7 @@ import { SymbolView } from "@/ui/Symbol";
 import { router } from "expo-router";
 import { transit } from "@/composition-root";
 import { useNow, useTransitVersion } from "@/hooks";
-import { lastBusSoon, liveLevel, searchAlerts, upcomingAtStop } from "@transmi/application";
+import { lastBusSoon, liveLevel, savedRouteFamilies, searchAlerts, upcomingAtStop } from "@transmi/application";
 import type { Route } from "@transmi/domain";
 import { clockOfDay, downText } from "@/lastService";
 import { stopKind, stopTag } from "@/stopname";
@@ -179,7 +179,7 @@ export default function Inicio() {
           <>
             <SectionTitle title="Tus rutas" />
             <View style={[styles.favRoutes, { paddingHorizontal: space[5] }]}>
-              {saved.routes.slice(0, 16).map((id) => { const r = transit.routeById(id); return r ? <Tap key={id} onPress={() => router.push({ pathname: "/route/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${r.shortName}`}><RouteBadge route={r} /></Tap> : null; })}
+              {savedRouteFamilies(transit, saved.routes).slice(0, 16).map((id) => { const r = transit.routeById(id); return r ? <Tap key={id} onPress={() => router.push({ pathname: "/route/[id]", params: { id } })} accessibilityRole="button" accessibilityLabel={`Ruta ${r.shortName}`}><RouteBadge route={r} /></Tap> : null; })}
             </View>
           </>
         ) : null}
