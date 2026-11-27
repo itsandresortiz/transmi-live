@@ -148,9 +148,13 @@ export function plantTrees(input: PlantInput): TreePoint[] {
       if (w >= e || s >= n) continue;
       const i0 = Math.floor((w * M_LON) / sp) - 1, i1 = Math.ceil((e * M_LON) / sp) + 1, j0 = Math.floor((s * M_LAT) / sp) - 1, j1 = Math.ceil((n * M_LAT) / sp) + 1;
       if ((i1 - i0) * (j1 - j0) > 400_000) continue;            // una zona enorme a la vista (no pasa de cerca): no se siembra
+      // parques grandes, menos árboles y en grupos (como en Mapas de Apple): un parque de 2 ha va con la densidad normal; uno de 100 ha
+      // (Simón Bolívar ~360 ha) con ~1/7, en bosquecitos de ~50 m con prados entre ellos. Antes se llenaban de árboles por igual
+      const f = sizeFactor(rings), groves = f < 1 ? Math.min(1, Math.max(0.18, f * 1.6)) : 1, keep = (area.keep * f) / groves;
       for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
         const key = `${i},${j}`;
-        if (chosen.has(key) || hash01(i, j, 2) >= area.keep) continue;
+        if (chosen.has(key) || hash01(i, j, 2) >= keep) continue;
+        if (groves < 1 && hash01(Math.floor((i * sp) / GROVE_M), Math.floor((j * sp) / GROVE_M), 3) >= groves) continue;
         const lon = ((i + 0.5 + (hash01(i, j, 0) - 0.5) * 0.8) * sp) / M_LON, lat = ((j + 0.5 + (hash01(i, j, 1) - 0.5) * 0.8) * sp) / M_LAT;
         if (lon < b.west || lon > b.east || lat < b.south || lat > b.north) continue;
         if (!inRings(lon, lat, rings)) continue;
@@ -165,8 +169,34 @@ export function plantTrees(input: PlantInput): TreePoint[] {
   return capNearest(out, input.max, input.center ?? { lon: (b.west + b.east) / 2, lat: (b.south + b.north) / 2 });
 }
 
-/** Junta los árboles de verdad con los sembrados: un sembrado a menos de `minDist` m de uno de verdad sobra. */
-export function mergeTrees(real: readonly TreePoint[], planted: readonly TreePoint[], minDist = 5): TreePoint[] {
+/** Tamaño de zona verde (m²) hasta el que se siembra con la densidad normal; más grande, menos (raíz del cociente). */
+export const TREES_FULL_AREA_M2 = 20_000;
+/** Lado (m) de los bosquecitos en que se agrupan los árboles de un parque grande. */
+const GROVE_M = 50;
+/** Factor de densidad de una zona verde según su tamaño (1 hasta `TREES_FULL_AREA_M2`; 0,07 en una de 400 ha). */
+export function sizeFactor(rings: readonly (readonly number[][])[]): number {
+  const outer = rings[0];
+  if (!outer || outer.length < 4) return 1;
+  let a = 0;
+  for (let i = 0; i + 1 < outer.length; i++) a += outer[i]![0]! * M_LON * outer[i + 1]![1]! * M_LAT - outer[i + 1]![0]! * M_LON * outer[i]![1]! * M_LAT;
+  const area = Math.abs(a) / 2;
+  return area <= TREES_FULL_AREA_M2 ? 1 : Math.sqrt(TREES_FULL_AREA_M2 / area);
+}
+/** Árboles de verdad (OpenStreetMap, censo) sin dibujarlos todos: como mucho uno cada `cellM` m (el censo trae árboles a 2–3 m unos de
+ *  otros; dibujarlos todos no se ve mejor y pesa mucho en el teléfono). Siempre los mismos (por posición). */
+export function thinTrees(trees: readonly TreePoint[], cellM = 9): TreePoint[] {
+  const seen = new Set<string>(), out: TreePoint[] = [];
+  for (const t of trees) {
+    const k = `${Math.floor((t.lon * M_LON) / cellM)},${Math.floor((t.lat * M_LAT) / cellM)}`;
+    if (seen.has(k)) continue;
+    seen.add(k); out.push(t);
+  }
+  return out;
+}
+
+/** Junta los árboles de verdad (aligerados con `thinTrees`) con los sembrados: un sembrado a menos de `minDist` m de uno de verdad sobra. */
+export function mergeTrees(realAll: readonly TreePoint[], planted: readonly TreePoint[], minDist = 5): TreePoint[] {
+  const real = thinTrees(realAll);
   if (!real.length) return [...planted];
   const cell = minDist, grid = new Set<string>();
   for (const p of real) grid.add(`${Math.floor((p.lon * M_LON) / cell)},${Math.floor((p.lat * M_LAT) / cell)}`);

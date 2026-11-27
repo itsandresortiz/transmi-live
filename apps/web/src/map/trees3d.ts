@@ -10,7 +10,8 @@ import type { TreeLayer } from "./TreeLayer";
 const ID = "arboles-3d";
 /** En pantallas táctiles (celulares) menos árboles y más cerca: three.js dibuja cada esfera y el teléfono se calienta. */
 const coarse = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
-const MAX = coarse ? 700 : 2000, RADIUS_M = coarse ? 450 : 800;
+// tope más bajo desde que los parques grandes llevan menos árboles (2026-11-27): con eso se ven igual de llenos y pesan menos
+const MAX = coarse ? 450 : 1200, RADIUS_M = coarse ? 450 : 800;
 /** Radio de siembra alrededor del centro: más chico al acercarse (a zoom 18 la pantalla abarca ~300 m). */
 const radiusAt = (z: number) => Math.max(260, Math.min(RADIUS_M, RADIUS_M / 2 ** ((z - 16) * 0.75)));
 /** Calles: ningún árbol a menos de estos metros del eje (senderos y calles). */

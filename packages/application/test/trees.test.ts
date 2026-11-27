@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Polygon } from "geojson";
-import { clampBounds, decodeTreeCell, encodeTreeCell, greenKeep, hash01, mergeTrees, plantTrees, treeCellKey, treeCellsIn, treeShape, treeVolumes } from "../src/trees";
+import { clampBounds, decodeTreeCell, encodeTreeCell, greenKeep, hash01, mergeTrees, plantTrees, thinTrees, treeCellKey, treeCellsIn, treeShape, treeVolumes } from "../src/trees";
 
 const M_LAT = 110_540, M_LON = 111_320 * Math.cos((4.65 * Math.PI) / 180);
 /** Un cuadrado de `side` m con esquina suroeste en (lon, lat). */
@@ -20,12 +20,28 @@ describe("hash01", () => {
   });
 });
 
+describe("parques grandes: menos árboles y en grupos; árboles de verdad aligerados", () => {
+  it("un parque de 1 km² lleva muchos menos árboles por hectárea que uno de 1 ha", () => {
+    const small = plantTrees({ areas: [{ geometry: square(-74.1, 4.65, 100), keep: 0.5 }], bounds: B });
+    const big = plantTrees({ areas: [{ geometry: square(-74.1, 4.65, 1000), keep: 0.5 }], bounds: { west: -74.11, south: 4.64, east: -74.08, north: 4.67 } });
+    const perHaSmall = small.length / 1, perHaBig = big.length / 100;
+    expect(perHaBig).toBeLessThan(perHaSmall / 3);
+    expect(big.length).toBeGreaterThan(200);
+  });
+  it("los árboles de verdad muy juntos se dibujan de a uno cada ~9 m", () => {
+    const dense = Array.from({ length: 100 }, (_, i) => ({ lon: -74.1 + (i % 10) * 2.5e-5, lat: 4.65 + Math.floor(i / 10) * 2.5e-5 }));      // cada ~2,8 m
+    const out = thinTrees(dense);
+    expect(out.length).toBeLessThan(25);
+    expect(out.length).toBeGreaterThan(4);
+  });
+});
+
 describe("plantTrees", () => {
   const park = square(-74.1, 4.65, 200);          // 4 ha
   it("siembra con la densidad pedida, siempre en los mismos sitios y dentro del parque", () => {
     const a = plantTrees({ areas: [{ geometry: park, keep: 0.5 }], bounds: B });
-    // 200 × 200 m a 10 m = 400 puntos; con 0,5 → ~200
-    expect(a.length).toBeGreaterThan(150); expect(a.length).toBeLessThan(250);
+    // 200 × 200 m a 10 m = 400 puntos; con 0,5 → ~200, y por ser de 4 ha (el doble del tamaño de densidad plena) × √½ → ~140, en grupos
+    expect(a.length).toBeGreaterThan(90); expect(a.length).toBeLessThan(190);
     const b = plantTrees({ areas: [{ geometry: park, keep: 0.5 }], bounds: B });
     expect(b).toEqual(a);
     const ring = park.coordinates[0]!;
