@@ -73,9 +73,11 @@ describe("stationVolumes", () => {
     const fc = (props: Record<string, unknown>) => ({ type: "FeatureCollection" as const, features: [{ type: "Feature" as const, properties: props, geometry: sq }] });
     const out = stationVolumes({ bases: fc({ all: "a,b" }), capsules: fc({ ids: "a", l: "B" }), links: { type: "FeatureCollection", features: [] } }, (l) => (l === "B" ? "#00a650" : "#999999"));
     const by = (b: number) => out.features.find((f) => f.properties.b === b)!.properties;
-    expect(by(0)).toMatchObject({ h: 0.9 });
-    expect(by(0.9)).toMatchObject({ h: 3.4, g: 1 });
-    expect(by(3.4)).toMatchObject({ c: "#00a650", h: 3.95 });
-    expect(by(3.4).g).toBeUndefined();
+    expect(by(0)).toMatchObject({ h: 0.25 });
+    expect(by(0.25)).toMatchObject({ h: 0.9 });
+    expect(by(0.9)).toMatchObject({ h: 5.1, g: 1 });
+    expect(by(5.1)).toMatchObject({ c: "#00a650", h: 5.7 });
+    expect(by(5.1).g).toBeUndefined();
   });
 });
+

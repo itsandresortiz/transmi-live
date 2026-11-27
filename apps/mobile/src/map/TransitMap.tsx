@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { BUILDINGS_3D_FILTER, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -279,7 +279,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       <RasterDEMSource id="relieve" tiles={RELIEF_TILES} tileSize={256} maxzoom={14} encoding="terrarium" attribution="Relieve: Terrain Tiles (Mapzen, AWS) · SRTM">
         <Layer id="relieve-sombra" type="hillshade" beforeId="building" {...sp({ visibility: view3d ? "visible" : "none", hillshadeExaggeration: c.dark ? 0.35 : 0.3, hillshadeShadowColor: c.dark ? "#000000" : "#6b6455", hillshadeHighlightColor: c.dark ? "#2a2e36" : "#ffffff", hillshadeAccentColor: c.dark ? "#000000" : "#8a8270" })} />
       </RasterDEMSource>
-      <Layer id="edificios-3d" type="fill-extrusion" source="openmaptiles" source-layer="building" minzoom={BUILD_MIN_Z} beforeId={c.dark ? "highway_name_other" : "highway-name-path"} filter={["!=", ["get", "hide_3d"], true] as never}
+      <Layer id="edificios-3d" type="fill-extrusion" source="openmaptiles" source-layer="building" minzoom={BUILD_MIN_Z} beforeId={c.dark ? "highway_name_other" : "highway-name-path"} filter={BUILDINGS_3D_FILTER as never}
         {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: c.dark ? "#353943" : "#dcd7cc",
           fillExtrusionHeight: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_height"], 6]],
           fillExtrusionBase: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_min_height"], 0]],

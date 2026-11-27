@@ -122,7 +122,7 @@ export function signalVolumes(points: readonly SignalVolumeInput[]): FeatureColl
 /** Desde este zoom se levantan las estaciones de la troncal (las mismas formas planas de `buildStationGeometry`). */
 export const STATION_3D_MIN_ZOOM = 15.6;
 
-/** Estaciones de la troncal en 3D, sobrias y con el mismo dibujo del mapa plano: la base es una plataforma baja (~0,9 m), cada vagón un
+/** Estaciones de la troncal en 3D, sobrias y con el mismo dibujo del mapa plano: la base apenas se levanta, cada vagón y el pasillo tienen su plataforma (~0,9 m), cada vagón un
  *  cuerpo de vidrio claro (va en una capa translúcida: `g = 1`) con el techo del color de su línea, y el pasillo un vidrio más bajo con el
  *  techo del mismo color, aclarado. `colorOf` da el color de cada línea (A, B, C…) según la apariencia. */
 export function stationVolumes(
@@ -130,20 +130,34 @@ export function stationVolumes(
   colorOf: (line: string) => string, opts: { dark?: boolean } = {},
 ): FeatureCollection<Polygon, BusVolumeProps> {
   const features: Feature<Polygon, BusVolumeProps>[] = [];
-  const platform = opts.dark ? "#3b3f48" : "#cfd5de", glass = opts.dark ? "#8fa3b8" : "#cfe0ee";
+  const base = opts.dark ? "#2e3139" : "#d9dde3", platform = opts.dark ? "#4a4f5a" : "#b9c0ca", glass = opts.dark ? "#8fb0cf" : "#b9d6ec";
   const add = (geometry: Polygon, id: string, c: string, b: number, h: number, glassy = false) =>
     features.push({ type: "Feature", properties: glassy ? { id, c, b, h, g: 1 } : { id, c, b, h }, geometry });
-  for (const f of g.bases.features) add(f.geometry, String(f.properties?.all ?? ""), platform, 0, 0.9);
+  // la base (el contorno de toda la estación, más ancho que los vagones) apenas se levanta: si fuera de 0,9 m taparía la estación entera
+  for (const f of g.bases.features) add(f.geometry, String(f.properties?.all ?? ""), base, 0, 0.25);
   // el pasillo: vidrio más bajo y techo del color de la línea, aclarado (los vagones, más altos, llevan el color pleno)
   for (const f of g.links.features) {
     const id = String(f.properties?.all ?? ""), line = String(f.properties?.l ?? "");
-    add(f.geometry, id, glass, 0.9, 3.0, true);
-    add(f.geometry, id, mixHex(colorOf(line), opts.dark ? "#000000" : "#ffffff", 0.35), 3.0, 3.3);
+    add(f.geometry, id, platform, 0.25, 0.9);
+    add(f.geometry, id, glass, 0.9, 4.6, true);
+    add(f.geometry, id, mixHex(colorOf(line), opts.dark ? "#000000" : "#ffffff", 0.35), 4.6, 5.0);
   }
   for (const f of g.capsules.features) {
     const id = String(f.properties?.ids ?? ""), line = String(f.properties?.l ?? "");
-    add(f.geometry, id, glass, 0.9, 3.4, true);
-    add(f.geometry, id, colorOf(line), 3.4, 3.95);      // techo con la franja del color de la línea
+    add(f.geometry, id, platform, 0.25, 0.9);      // plataforma del vagón
+    // el techo va a 5,1–5,7 m: OpenStreetMap trae la cubierta de muchas estaciones como un edificio de 5 m (no se puede separar de los
+    // demás edificios: viene fundido con ellos) y así el techo del color de la línea queda encima y se reconoce la estación
+    add(f.geometry, id, glass, 0.9, 5.1, true);
+    add(f.geometry, id, colorOf(line), 5.1, 5.7);      // techo con la franja del color de la línea
   }
   return { type: "FeatureCollection", features };
 }
+
+/** Filtro de los edificios en 3D (capa `building` de OpenMapTiles): fuera las piezas que OpenStreetMap marca como «no levantar» y los
+ *  techos bajos que flotan (marquesinas, puentes peatonales y los techos de las estaciones de TransMilenio, que si no taparían la
+ *  estación que dibujamos nosotros). */
+export const BUILDINGS_3D_FILTER = ["all",
+  ["!=", ["get", "hide_3d"], true],
+  ["!", ["all", [">", ["coalesce", ["get", "render_min_height"], 0], 0], ["<", ["coalesce", ["get", "render_height"], 0], 12]]],
+] as const;
+

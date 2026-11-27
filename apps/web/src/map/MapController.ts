@@ -4,7 +4,7 @@ import baseDark from "./base-dark.json";
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
-import { type SignalRow, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, stationVolumes, upcomingCablesGeo, flowDash, signalPoints, signalVolumes, trafficBand } from "@transmi/application";
+import { type SignalRow, BUILDINGS_3D_FILTER, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, stationVolumes, upcomingCablesGeo, flowDash, signalPoints, signalVolumes, trafficBand } from "@transmi/application";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
@@ -416,7 +416,7 @@ export class MapController {
       const before = dark ? "bd-highway_name_other" : "bl-highway-name-path";
       m.addLayer({
         id: dark ? "edificios-3d-oscuro" : "edificios-3d-claro", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: BUILD_MIN_Z,
-        filter: ["!=", ["get", "hide_3d"], true], layout: { visibility: "none" },
+        filter: BUILDINGS_3D_FILTER as never, layout: { visibility: "none" },
         paint: {
           // colores sobrios, cercanos al de los edificios planos del mapa base, y algo transparentes: no compiten con buses ni estaciones
           "fill-extrusion-color": dark ? "#353943" : "#dcd7cc",
@@ -434,16 +434,19 @@ export class MapController {
     this.relieveAdded = true;
     const m = this.map;
     m.addSource("relieve", { type: "raster-dem", tiles: [RELIEF_TILES], tileSize: 256, maxzoom: 14, encoding: "terrarium", attribution: RELIEF_ATTRIBUTION });
+    // la sombra usa otra fuente con las mismas teselas (MapLibre lo pide para no estropear el terreno; el navegador las reutiliza de su caché)
+    m.addSource("relieve-sombra", { type: "raster-dem", tiles: [RELIEF_TILES], tileSize: 256, maxzoom: 14, encoding: "terrarium" });
     // sombra suave de las laderas (sin ella el relieve se ve plano); debajo de los edificios planos de cada juego
     for (const dark of [false, true]) {
       const before = dark ? "bd-building" : "bl-building";
       m.addLayer({
-        id: dark ? "relieve-sombra-oscuro" : "relieve-sombra-claro", type: "hillshade", source: "relieve", layout: { visibility: "none" },
+        id: dark ? "relieve-sombra-oscuro" : "relieve-sombra-claro", type: "hillshade", source: "relieve-sombra", layout: { visibility: "none" },
         paint: { "hillshade-exaggeration": dark ? 0.35 : 0.3, "hillshade-shadow-color": dark ? "#000000" : "#6b6455", "hillshade-highlight-color": dark ? "#2a2e36" : "#ffffff", "hillshade-accent-color": dark ? "#000000" : "#8a8270" },
       } as never, m.getLayer(before) ? before : undefined);
     }
   }
   private on3D = false;
+  private unfreezeBound = false;
   /** Enciende o apaga la vista 3D: cámara inclinada, gestos para inclinar, edificios con volumen y relieve. */
   set3D(on: boolean) {
     const m = this.map;
@@ -455,7 +458,18 @@ export class MapController {
       m.setMaxPitch(MAX_PITCH);
       m.setTerrain({ source: "relieve", exaggeration: RELIEF_EXAGGERATION });
       this.paint3D();
-      m.easeTo({ pitch: PITCH_3D, duration: quick ? 0 : 700 });
+      // `freezeElevation`: la altura de la cámara se recalcula al final (el relieve puede no haber llegado aún al empezar)
+      m.easeTo({ pitch: PITCH_3D, duration: quick ? 0 : 700, freezeElevation: true });
+      if (!this.unfreezeBound) {
+        this.unfreezeBound = true;
+        // MapLibre deja la altura de la cámara «congelada» tras un movimiento por código (vuelos, seguir un bus) hasta que alguien toca el
+        // mapa: si en ese rato se salta a otro sitio, la cámara queda bajo los cerros (Bogotá está a 2.600 m) y el mapa se ve en blanco.
+        // Al terminar cada movimiento se vuelve a apoyar la cámara sobre el relieve.
+        m.on("moveend", () => {
+          const mm = m as unknown as { _elevationFreeze?: boolean; _finalizeElevation?: () => void; terrain?: unknown };
+          if (this.on3D && mm.terrain && mm._elevationFreeze && !m.isMoving()) mm._finalizeElevation?.();
+        });
+      }
     } else {
       const done = () => {
         if (this.on3D) return;                       // se volvió a encender mientras bajaba
