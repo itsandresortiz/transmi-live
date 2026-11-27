@@ -26,3 +26,5 @@ export * from "./ride-match";
 export * from "./signal-eta";
 export * from "./signal-footprint";
 export * from "./eta-hold";
+export * from "./returning-buses";
+export * from "./stop-order";

@@ -1,5 +1,6 @@
 import { routeTitle, type Route, type SystemType, type Vehicle, type ServiceAlert, type Stop, alertSeverity } from "@transmi/domain";
 import { arrivalOrPassed, hav } from "./eta";
+import { returningBuses } from "./returning-buses";
 import { alertDedupKey, alertView } from "./alert-view";
 import type { TransitState } from "./transit-state";
 
@@ -274,6 +275,8 @@ export interface UpcomingBus {
   official: boolean;
   /** Paradas que le faltan hasta llegar (1 = la siguiente; 0 = ya está en esta parada, que es la primera de su recorrido, esperando para salir). */
   stopsAway: number;
+  /** Si viene del otro sentido: la parada donde termina su ruta actual y da la vuelta (ver `returning-buses.ts`). */
+  turnsAt?: string;
 }
 export interface UpcomingRoute { route: Route; headsign: string; direction: string; buses: UpcomingBus[] }
 
@@ -287,8 +290,8 @@ export function upcomingAtStop(state: TransitState, stopId: string, nowSec: numb
   for (const v of state.fleet.values()) { const l = byRoute.get(v.routeId); l ? l.push(v) : byRoute.set(v.routeId, [v]); }
   for (const [routeId, shapes] of state.network.shapes) {
     const route = state.routeById(routeId);
-    const vehicles = byRoute.get(routeId);
-    if (!route || !vehicles) continue;
+    const vehicles = byRoute.get(routeId) ?? [];       // sin buses propios aún pueden venir del otro sentido (ver abajo)
+    if (!route) continue;
     for (const shape of shapes) {
       const j = shape.stopIds.indexOf(stopId);
       if (j < 0) continue;
@@ -313,6 +316,8 @@ export function upcomingAtStop(state: TransitState, stopId: string, nowSec: numb
         buses.push({ vehicle: v, etaAt, official: false, stopsAway: j - k });
       }
       if (waiting) buses.push({ vehicle: waiting.v, etaAt: nowSec, official: false, stopsAway: 0 });
+      // si faltan, los que vienen del otro sentido y dan la vuelta al final (en las primeras paradas de cada ruta casi nunca hay otros)
+      if (buses.length < perRoute) for (const b of returningBuses(state, shape, j, nowSec, byRoute, waiting ? new Set([waiting.v.id]) : undefined)) buses.push({ ...b, official: false });
       if (!buses.length) continue;
       buses.sort((a, b) => a.etaAt - b.etaAt);
       out.push({ route, headsign: shape.headsign, direction: shape.direction, buses: buses.slice(0, perRoute) });
