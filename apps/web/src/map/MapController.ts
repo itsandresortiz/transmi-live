@@ -10,6 +10,8 @@ import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
 import { cableCabinImage, stationChipImage, trafficLightImage } from "./sprites";
 import { type MapTheme, type Scheme, themeOf } from "./theme";
+import type { BusModelLayer } from "./bus-models";
+import type { BusDraw } from "./BusCanvas";
 
 export interface MapEvents {
   onBusClick(id: string): void;
@@ -322,6 +324,44 @@ export class MapController {
     this.map.addLayer({ id: "buses-3d", type: "fill-extrusion", source: "buses-3d", minzoom: BUS_3D_MIN_ZOOM, layout: { visibility: "none" },
       paint: { "fill-extrusion-color": ["get", "c"], "fill-extrusion-base": ["get", "b"], "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
   }
+  /* ---------- buses modelados (three.js) ---------- */
+  /** Buses modelados de verdad (vista 3D de cerca): three.js y el modelo se cargan aparte la primera vez que hacen falta; mientras tanto (o
+   *  si el navegador no puede dibujarlos) se ven los volúmenes simples de `buses-3d`. */
+  private busModels: BusModelLayer | null = null;
+  private busModelsState: "idle" | "loading" | "ready" | "failed" = "idle";
+  /** ¿Están listos los buses modelados? Si no, empieza a cargarlos (una sola vez). */
+  busModelsReady(): boolean {
+    if (this.busModelsState === "idle") {
+      this.busModelsState = "loading";
+      import("./bus-models").then((mod) => {
+        if (this.map.getLayer("buses-modelo")) return;
+        const layer = new mod.BusModelLayer(this.map, () => { this.busModelsState = "failed"; this.paint3D(); });
+        try {
+          // encima de todo lo del mapa (como `buses-3d`): nombres, aro y marca «!» van en el lienzo de encima
+          this.map.addLayer(layer);
+          this.busModels = layer; this.busModelsState = "ready";
+        } catch (e) {
+          console.warn("Buses 3D: el navegador no pudo preparar el modelo", e);
+          if (this.map.getLayer("buses-modelo")) this.map.removeLayer("buses-modelo");
+          this.busModelsState = "failed";
+        }
+        this.paint3D();
+      }).catch(() => { this.busModelsState = "failed"; });
+    }
+    return this.busModelsState === "ready" && !!this.busModels && !this.busModels.failed;
+  }
+  /** Pone los buses modelados (o los quita con `null`). */
+  setBusModels(items: readonly BusDraw[] | null) {
+    const l = this.busModels; if (!l || l.failed) return;
+    if (!items && l.shown === 0) return;
+    if (l.setBuses(items, this.dark)) this.map.triggerRepaint();
+  }
+  /** Punto de la pantalla a `alt` m sobre el suelo de un bus modelado (para el nombre y el toque); `null` sin el modelo. */
+  busScreenAt(b: BusDraw, alt: number): { x: number; y: number } | null {
+    return this.busModelsState === "ready" ? this.busModels?.screenAt(b.lon, b.lat, b.id, alt) ?? null : null;
+  }
+  get busModelsActive(): boolean { return this.busModelsState === "ready"; }
+
   setBusVolumes(fc: FeatureCollection | null) {
     const src = this.map.getSource("buses-3d") as GeoJSONSource | undefined; if (!src) return;
     if (!fc && !this.busVolumesShown) return;
@@ -492,7 +532,9 @@ export class MapController {
     const vis = (id: string, v: boolean) => { if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", v ? "visible" : "none"); };
     vis("edificios-3d-claro", this.on3D && !dark); vis("edificios-3d-oscuro", this.on3D && dark);
     vis("relieve-sombra-claro", this.on3D && !dark); vis("relieve-sombra-oscuro", this.on3D && dark);
-    vis("buses-3d", this.on3D && this.busesOn);
+    // con los buses modelados listos, los volúmenes simples quedan de respaldo (ocultos)
+    vis("buses-3d", this.on3D && this.busesOn && this.busModelsState !== "ready");
+    vis("buses-modelo", this.on3D && this.busesOn && this.busModelsState === "ready");
     // semáforos: en 3D, desde el zoom 16 el poste con su caja reemplaza al ícono plano
     vis("semaforos-3d", this.on3D && this.signalsOn);
     vis("estaciones-3d", this.on3D && this.stopsOn); vis("estaciones-3d-vidrio", this.on3D && this.stopsOn);
