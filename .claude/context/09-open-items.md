@@ -70,6 +70,8 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 
 - **En curso (2026-11-27)**: buses modelados con three.js en la web; zonas verdes más visibles, nombres de parques y árboles 3D (web con three.js, app con volúmenes); después, **3D de la app con el mapa web dentro de una vista web** (ver `07-decisions`).
 
+- **Estaciones sobre los carriles** (2026-11-27): medido con la red real, vagones con un recorrido de bus pasando por encima (<3 m de su centro): 135 de 345 antes del ajuste, 63 después (`station-geometry.ts`, centrado entre los recorridos). Los que quedan (Toberín 7, Calle 53 5, Granja-Cra. 77 4, Patio Bonito 4, Calle 72 4, Laureles 4, Castellana 3, Tibanica 3…) suelen ser estaciones con vagones escalonados o recorridos del GTFS dibujados por el centro de la avenida: revisarlas con el dueño en el mapa.
+
 ## Bugs conocidos / limitaciones
 - ✅ (2026-11-27, sin ver en teléfono) Rutas con un código por sentido: una sola ficha con selector de sentido en app y web; favoritos por familia.
 - ✅ (2026-11-24, sin probar) Sin conexión: la app guarda el mapa base de Bogotá (zoom 9–14). ✅ (2026-11-27) La web guarda lo visto y Bogotá a zoom 9–12 (probado en Chrome; falta Safari de iPhone).
