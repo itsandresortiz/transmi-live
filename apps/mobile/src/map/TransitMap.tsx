@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -184,6 +184,11 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     return { bases: j(g.bases), links: j(g.links), capsules: j(g.capsules), doors: j(g.doors), labels: j(g.labels), chips: j(g.chips) };
   }, [geo]);
 
+  /** Vista 3D: las mismas estaciones levantadas (plataforma, vagones de vidrio con el techo del color de su línea). Se arman una vez al encender el 3D. */
+  const stations3dJson = useMemo(() => JSON.stringify(view3d && geo
+    ? stationVolumes(geo, (l) => (TRUNK_LINES as Record<string, { light: string; dark: string } | undefined>)[l]?.[c.dark ? "dark" : "light"] ?? "#e11d2e", { dark: c.dark })
+    : { type: "FeatureCollection", features: [] }), [view3d, geo, c.dark]);
+
   /** Estaciones y portales de la troncal: un punto en el centro de sus vagones, su nombre y la letra de su línea (A, B, C…), que le da el color. */
   const stations = useMemo<FeatureCollection<Point>>(() => {
     const features: Feature<Point>[] = [];
@@ -205,6 +210,15 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   }, [geo]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const signalsJson = useSemaforos(showSignals);
+  // vista 3D de cerca: los semáforos de la pantalla como poste y caja, sin luces de color (el color en vivo no se muestra al público)
+  const signalPts = useMemo(() => {
+    if (!view3d) return null;
+    try { return (JSON.parse(signalsJson) as FeatureCollection<Point>).features.map((f) => ({ lon: f.geometry.coordinates[0]!, lat: f.geometry.coordinates[1]! })); } catch { return null; }
+  }, [view3d, signalsJson]);
+  const signals3dJson = useMemo(() => {
+    const pts = signalPts && view && view.zoom >= SIGNAL_3D_MIN_ZOOM - 0.3 ? signalPts.filter((p) => p.lon > view.west && p.lon < view.east && p.lat > view.south && p.lat < view.north).slice(0, 400) : [];
+    return JSON.stringify(signalVolumes(pts));
+  }, [signalPts, view]);
   const testsOn = useTestsMode((t) => t.on);
   const liveSignalsJson = useLiveSignals(testsOn && showSignals && active);
   /** El viaje que se está siguiendo, como líneas y puntos. Las capas están siempre montadas: sin viaje, los datos van vacíos. */
@@ -335,6 +349,11 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
           <GeoJSONSource id="station-doors" data={stationGeo.doors}>
             <Layer id="station-doors-line" type="line" minzoom={17} {...sp({ visibility: showStations ? "visible" : "none", lineColor: "#6f7a8d", lineWidth: 1, lineOpacity: 0.55 })} />
           </GeoJSONSource>
+          {/* vista 3D: vidrio translúcido (capa aparte, porque la opacidad no cambia por pieza) y plataforma y techos opacos */}
+          <GeoJSONSource id="stations-3d" data={stations3dJson}>
+            <Layer id="stations-3d" type="fill-extrusion" minzoom={STATION_3D_MIN_ZOOM} filter={["!", ["has", "g"]] as never} {...sp({ visibility: view3d && showStations ? "visible" : "none", fillExtrusionColor: ["get", "c"], fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 0.95 })} />
+            <Layer id="stations-3d-glass" type="fill-extrusion" minzoom={STATION_3D_MIN_ZOOM} filter={["has", "g"] as never} {...sp({ visibility: view3d && showStations ? "visible" : "none", fillExtrusionColor: ["get", "c"], fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 0.45, fillExtrusionVerticalGradient: false })} />
+          </GeoJSONSource>
           <GeoJSONSource id="station-labels" data={stationGeo.labels}>
             <Layer id="station-wagon-labels" type="symbol" minzoom={16.3} {...sp({ visibility: showStations ? "visible" : "none", textField: ["step", ["zoom"], ["get", "text"], 17.3, ["concat", "Vagón ", ["get", "text"]]], textFont: ["Noto Sans Regular"], textSize: ["interpolate", ["linear"], ["zoom"], 16.3, 10, 18.5, 13], textAllowOverlap: true, textIgnorePlacement: true, textColor: c.dark ? "#f4f4f5" : "#1c1c1e" })} />
           </GeoJSONSource>
@@ -346,10 +365,13 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       {(
         <GeoJSONSource id="semaforos" data={signalsJson} onPress={(e) => { if (!useTestsMode.getState().on) return; const pr = e.nativeEvent.features[0]?.properties; if (pr?.title) Alert.alert(String(pr.title), String(pr.text ?? "")); }}>
           <Layer id="semaforos-dots" type="circle" minzoom={13.2} maxzoom={15.4} {...sp({ visibility: showSignals ? "visible" : "none", circleRadius: ["interpolate", ["linear"], ["zoom"], 13.2, 1.6, 15.4, 3.2], circleColor: "#e8503f", circleStrokeColor: "#ffffff", circleStrokeWidth: 1 })} />
-          <Layer id="semaforos-icons" type="symbol" minzoom={15.4} {...sp({ visibility: showSignals ? "visible" : "none", iconImage: "semaforo", iconSize: ["interpolate", ["linear"], ["zoom"], 15.4, 0.2, 18, 0.36], iconAllowOverlap: true, iconIgnorePlacement: true })} />
+          <Layer id="semaforos-icons" type="symbol" minzoom={15.4} {...sp({ visibility: showSignals ? "visible" : "none", iconImage: "semaforo", iconSize: ["interpolate", ["linear"], ["zoom"], 15.4, 0.2, 18, 0.36], iconAllowOverlap: true, iconIgnorePlacement: true, iconOpacity: view3d ? ["step", ["zoom"], 1, SIGNAL_3D_MIN_ZOOM, 0] : 1 })} />
           <Layer id="semaforos-labels" type="symbol" minzoom={17.2} {...sp({ visibility: showSignals ? "visible" : "none", textField: ["get", "dir"], textFont: ["Noto Sans Regular"], textSize: 10.5, textOffset: [0, 1.35], textAnchor: "top", textOptional: true, textColor: c.dark ? "#b4b4bb" : "#6c6c70", textHaloColor: c.dark ? "#0b0b0d" : "#eef0f3", textHaloWidth: 1.2 })} />
         </GeoJSONSource>
       )}
+      <GeoJSONSource id="semaforos-3d" data={signals3dJson}>
+        <Layer id="semaforos-3d" type="fill-extrusion" minzoom={SIGNAL_3D_MIN_ZOOM} {...sp({ visibility: view3d && showSignals ? "visible" : "none", fillExtrusionColor: ["get", "c"], fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 0.95 })} />
+      </GeoJSONSource>
       {/* solo en modo de pruebas: los semáforos medidos a mano con el color que deberían tener ahora (siempre montada, vacía si no) */}
       <GeoJSONSource id="signal-live" data={liveSignalsJson}>
         <Layer id="signal-live-dot" type="circle" minzoom={13} {...sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 13, 5, 18, 11], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 2, circleTranslate: [14, -14] })} />
@@ -372,18 +394,31 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
         <Layer id="trip-dot" type="circle" {...sp({ circleRadius: ["match", ["get", "kind"], "dest", 8, "origin", 6, 6.5], circleColor: ["match", ["get", "kind"], "dest", "#e11d2e", "origin", "#3b82f6", "#ffffff"], circleStrokeColor: ["match", ["get", "kind"], "dest", "#ffffff", "origin", "#ffffff", "#1c1c1e"], circleStrokeWidth: 2.5 })} />
         <Layer id="trip-label" type="symbol" minzoom={12.5} {...sp({ textField: ["get", "name"], textFont: ["Noto Sans Bold"], textSize: 12, textVariableAnchor: ["top", "bottom", "left", "right"], textRadialOffset: 1.1, textJustify: "auto", textMaxWidth: 10, textColor: nameColor, textHaloColor: nameHalo, textHaloWidth: 2 })} />
       </GeoJSONSource>
-      <BusLayer view={view} system={system} routeId={routeId} routeIds={onlyRoutes} active={active} calm={calm} highlightIds={highlightIds} dark={c.dark} onBus={onBus} />
+      <BusLayer view={view} system={system} routeId={routeId} routeIds={onlyRoutes} active={active} calm={calm} highlightIds={highlightIds} dark={c.dark} view3d={view3d} onBus={onBus} />
       {children}
     </Map>
   );
 });
 
+const EMPTY_FC = JSON.stringify({ type: "FeatureCollection", features: [] });
 /** Los buses, aparte del resto del mapa: se recalculan muchas veces por segundo y así solo se repinta esta capa (no las estaciones, la red ni los semáforos).
  *  Los estilos de las capas se crean una sola vez: en cada tanda lo único que cambia son los datos. */
-const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null, active, calm, highlightIds, dark, onBus }: { view: Viewport | null; system: SystemType | null; routeId: string | null; routeIds?: readonly string[] | null; active: boolean; calm: boolean; highlightIds: string[]; dark: boolean; onBus?: (id: string) => void }) {
+const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null, active, calm, highlightIds, dark, view3d = false, onBus }: { view: Viewport | null; system: SystemType | null; routeId: string | null; routeIds?: readonly string[] | null; active: boolean; calm: boolean; highlightIds: string[]; dark: boolean; view3d?: boolean; onBus?: (id: string) => void }) {
   const { reduceMotion } = useAccessibility();
   const buses = useBusFeatures(view, { system, routeId, routeIds, enabled: active, everyMs: calm ? 2000 : reduceMotion ? 250 : 0, keepIds: highlightIds });
   const json = useMemo(() => JSON.stringify(buses), [buses]);
+  // vista 3D de cerca: cada bus con volumen (carrocería, vidrios, techo; la troncal con fuelle), armado con la misma cuenta que la web.
+  // Solo los de la pantalla y solo desde un poco antes del zoom en que se ven; la capa está siempre montada.
+  const solid = view3d && !!view && view.zoom >= BUS_3D_MIN_ZOOM - 0.5;
+  const volumesJson = useMemo(() => {
+    if (!solid || !view) return EMPTY_FC;
+    const px = (view.east - view.west) * 0.15, py = (view.north - view.south) * 0.15;      // margen: buses que entran a la pantalla entre un movimiento y otro
+    const inView = buses.features.filter((f) => { const [lon, lat] = f.geometry.coordinates as [number, number]; return lon > view.west - px && lon < view.east + px && lat > view.south - py && lat < view.north + py; });
+    return JSON.stringify(busVolumes(inView.map((f) => {
+      const p = f.properties ?? {}, [lon, lat] = f.geometry.coordinates as [number, number];
+      return { id: String(p.id), lon, lat, heading: typeof p.rot === "number" ? p.rot : null, color: String(p.color), long: String(p.sprite).endsWith("-l"), stale: typeof p.o === "number" && p.o < 1 };
+    }), { dark }));
+  }, [solid, buses, dark]);   // eslint-disable-line react-hooks/exhaustive-deps
   const ringKey = highlightIds.join(",");
   const st = useMemo(() => ({
     ring: sp({ circleRadius: 22, circleColor: "#e11d2e", circleOpacity: 0.12, circleStrokeColor: "#e11d2e", circleStrokeWidth: 3 }),
@@ -393,7 +428,8 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
     alertMark: sp({ textField: "!", textFont: ["Noto Sans Bold"], textSize: ["interpolate", ["linear"], ["zoom"], 13, 8, 17, 11], textColor: "#ffffff", textTranslate: [9, -9], textAllowOverlap: true, textIgnorePlacement: true, textOpacity: ["get", "o"] }),
     dot: sp({ circleRadius: ["interpolate", ["linear"], ["zoom"], 9, 2.6, 11.8, 4], circleColor: ["get", "color"], circleStrokeColor: "#ffffff", circleStrokeWidth: 1, circleOpacity: ["get", "o"], circleStrokeOpacity: ["get", "o"] }),
     sprite: sp({
-      iconOpacity: ["get", "o"],      // un bus que dejó de reportar hace rato se ve atenuado: sigue ahí, pero su dato es viejo
+      // un bus que dejó de reportar hace rato se ve atenuado: sigue ahí, pero su dato es viejo. En 3D de cerca lo reemplaza el bus con volumen
+      iconOpacity: view3d ? ["step", ["zoom"], ["get", "o"], BUS_3D_MIN_ZOOM, 0] : ["get", "o"],
       iconImage: ["get", "sprite"], iconSize: ["interpolate", ["linear"], ["zoom"], 11.8, 0.115, 14, 0.19, 16, 0.3, 18, 0.45],
       iconRotate: ["get", "rot"], iconRotationAlignment: "map", iconPitchAlignment: "map", iconAllowOverlap: true, iconIgnorePlacement: true,
     }),
@@ -401,9 +437,13 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
       textField: ["get", "route"], textFont: ["Noto Sans Regular"], textSize: 11, textOffset: [0, -1.5], textColor: dark ? "#f4f4f5" : "#111827",
       textHaloColor: dark ? "#18181b" : "#ffffff", textHaloWidth: 1.6, textAllowOverlap: false,
     }),
-  }), [dark, ringKey]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }), [dark, ringKey, view3d]);   // eslint-disable-line react-hooks/exhaustive-deps
   const press = useCallback((e: { nativeEvent: { features: { properties?: Record<string, unknown> | null }[] } }) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onBus?.(id); }, [onBus]);
   return (
+    <>
+    <GeoJSONSource id="buses-3d" data={volumesJson} onPress={press as never}>
+      <Layer id="buses-3d" type="fill-extrusion" minzoom={BUS_3D_MIN_ZOOM} {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: ["get", "c"], fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 1, fillExtrusionVerticalGradient: true })} />
+    </GeoJSONSource>
     <GeoJSONSource id="buses" data={json} onPress={press as never}>
       <Layer id="bus-ring" type="circle" filter={st.ringFilter} {...st.ring} />
       <Layer id="bus-hit" type="circle" {...st.hit} />
@@ -414,6 +454,7 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
       <Layer id="bus-alert" type="circle" minzoom={13} filter={["==", ["get", "al"], 1] as never} {...st.alert} />
       <Layer id="bus-alert-mark" type="symbol" minzoom={13} filter={["==", ["get", "al"], 1] as never} {...st.alertMark} />
     </GeoJSONSource>
+    </>
   );
 });
 

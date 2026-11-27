@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { nowMs as clockNow } from "../clock";
-import { MotionEngine, routeHasAlert, type TransitState } from "@transmi/application";
+import { BUS_3D_MIN_ZOOM, MotionEngine, busVolumes, routeHasAlert, type TransitState } from "@transmi/application";
 import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo, toWorld, isStaleReport } from "@transmi/domain";
 import { type BusDraw, BusCanvas } from "./BusCanvas";
 import type { MapController } from "./MapController";
@@ -44,7 +44,7 @@ export class BusRenderer {
   start() {
     this.mapc.busHit = (pt) => this.canvas.hitTest(pt);
     // al mover o acercar el mapa se redibuja en el mismo cuadro, sin desfase
-    this.mapc.map.on("move", () => { if (this.canvasOn) this.canvas.draw(this.items); });
+    this.mapc.map.on("move", () => { if (this.canvasOn) this.canvas.draw(this.items, this.solidOn); });
     const loop = (t: number) => { this.raf = requestAnimationFrame(loop); this.frame(t); };
     this.raf = requestAnimationFrame(loop);
   }
@@ -86,17 +86,33 @@ export class BusRenderer {
 
   private lastDots = 0;
   private canvasOn = false;
+  /** Buses con volumen (vista 3D de cerca) y cuándo se mandaron por última vez al mapa. */
+  private solidOn = false;
+  private lastSolid = 0;
+  /** Vista 3D de cerca: los buses en pantalla se mandan como volúmenes ~8 veces por segundo (a este zoom el salto es de menos de un píxel). */
+  private clearSolid() { if (this.solidOn) { this.solidOn = false; this.mapc.setBusVolumes(null); } }
+  private updateSolid(items: readonly BusDraw[], t: number) {
+    const want = this.mapc.is3D && this.mapc.zoom >= BUS_3D_MIN_ZOOM;
+    if (!want) { this.clearSolid(); return; }
+    this.solidOn = true;
+    if (t - this.lastSolid < 120) return;
+    this.lastSolid = t;
+    const b = this.mapc.map.getBounds(), padLon = (b.getEast() - b.getWest()) * 0.1, padLat = (b.getNorth() - b.getSouth()) * 0.1;
+    const on = items.filter((x) => x.lon > b.getWest() - padLon && x.lon < b.getEast() + padLon && x.lat > b.getSouth() - padLat && x.lat < b.getNorth() + padLat);
+    this.mapc.setBusVolumes(busVolumes(on.map((x) => ({ id: x.id, lon: x.lon, lat: x.lat, heading: x.angle ?? null, left: x.left, color: x.color, long: x.long, stale: x.stale })), { dark: this.mapc.dark }));
+  }
 
   private frame(t: number) {
     const o = this.options(), th = this.theme();
     const family = o.routeId ? new Set(this.state.routeFamily(o.routeId)) : null;
     const zoom = this.mapc.zoom, nowMs = clockNow(), nowSec = nowMs / 1000;
-    if (!o.visible) { if (this.canvasOn) { this.canvas.clear(); this.canvasOn = false; } this.mapc.setBuses(EMPTY); this.lastDots = t; return; }
+    if (!o.visible) { if (this.canvasOn) { this.canvas.clear(); this.canvasOn = false; } this.mapc.setBuses(EMPTY); this.clearSolid(); this.lastDots = t; return; }
     const tau = o.motion === "predict" ? TAU_PREDICT_MS : TAU_REPORTED_MS;
 
     if (zoom < 13) {
       // vista lejana: puntos simples, pocas veces por segundo
       if (this.canvasOn) { this.canvas.clear(); this.canvasOn = false; this.lastDots = 0; }
+      this.clearSolid();
       if (t - this.lastDots < 1500 && this.last) return;
       this.last = 1; this.lastDots = t;
       const features: Feature<Point>[] = [];
@@ -131,7 +147,8 @@ export class BusRenderer {
     }
     this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
     this.items = items;
-    this.canvas.draw(items);
+    this.updateSolid(items, t);
+    this.canvas.draw(items, this.solidOn);
     this.applyFollow(nowMs);
     if (nowMs - this.lastPrune > 30_000) {
       this.lastPrune = nowMs;

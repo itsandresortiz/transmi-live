@@ -57,7 +57,8 @@ export class BusCanvas {
     this.ctx.clearRect(0, 0, this.cv.width, this.cv.height);
     this.hits = [];
   }
-  draw(items: readonly BusDraw[]) {
+  /** `solid`: los buses se ven con volumen en el mapa (vista 3D de cerca): aquí solo van el nombre, el aro y la marca «!», y el toque. */
+  draw(items: readonly BusDraw[], solid = false) {
     const ctx = this.ctx, z = this.map.getZoom(), k = iconScale(z), labels = z >= 16;
     const cw = this.cv.width / this.dpr, ch = this.cv.height / this.dpr;
     this.clear();
@@ -83,10 +84,12 @@ export class BusCanvas {
       // hacia dónde mira en la pantalla (grados desde arriba, en sentido del reloj); sin rumbo, de lado según su sentido
       const deg = b.angle != null ? b.angle - this.map.getBearing() : b.left ? -90 : 90, rad = (deg * Math.PI) / 180;
       if (b.last) { ctx.beginPath(); ctx.arc(p.x, p.y, h * 0.62, 0, Math.PI * 2); ctx.fillStyle = "rgba(245,158,11,.35)"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#f59e0b"; ctx.stroke(); ctx.fillStyle = this.textColor; ctx.lineWidth = 3.5; ctx.strokeStyle = this.haloColor; }
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rad);
-      if (b.stale) ctx.globalAlpha = 0.38;
-      ctx.drawImage(this.sprite(b.color, !!b.long), -w / 2, -h / 2, w, h);
-      ctx.restore();
+      if (!solid) {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rad);
+        if (b.stale) ctx.globalAlpha = 0.38;
+        ctx.drawImage(this.sprite(b.color, !!b.long), -w / 2, -h / 2, w, h);
+        ctx.restore();
+      }
       if (b.alert) {
         // marca ámbar «!» arriba a la derecha del bus: su ruta tiene un aviso vigente
         const r = Math.max(4, 5.5 * k), cx = p.x + w * 0.55, cy = p.y - h * 0.35;
