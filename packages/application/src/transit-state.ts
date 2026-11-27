@@ -12,6 +12,8 @@ import { HopProfile } from "./hop-profile";
 import { alertRouteCode, alertRouteName } from "./alert-route";
 import type { FeedSource } from "./ports";
 
+interface SeqMemo { routeId: string; stopId: string; tripId: string | undefined; hit: { shape: RouteShape; index: number } | null }
+
 /** Estado vivo de todo lo que sabe la aplicación: flota, red, retrasos y avisos. */
 /** Antigüedad máxima (s) del dato de retraso de un viaje frente al reporte de posición de su bus para tomarlo como puntualidad. */
 const DELAY_MAX_AGE_S = 600;
@@ -51,7 +53,8 @@ export class TransitState {
   private trunk: Set<string> | null = null;
   private served: Set<string> | null = null;
   private labels = new Map<string, StopLabel>();
-  private seq = new Map<string, { shape: RouteShape; index: number } | null>();
+  /** Ruta → parada → ruta del viaje → dónde queda en el recorrido (mapas anidados: una clave de texto armada en cada llamada costaba más que la búsqueda). */
+  private seq = new Map<string, Map<string, Map<string, { shape: RouteShape; index: number } | null>>>();
   private listeners = new Set<() => void>();
 
   subscribe(fn: () => void): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -85,9 +88,18 @@ export class TransitState {
   /** Estado de la ruta hoy (antes del primer servicio, en servicio o terminada). Sin datos en vivo no se afirma nada. */
   routeStatus(routeId: string, nowMs: number): RouteDayStatus | undefined {
     if (this.fleet.size < 50) return undefined;
-    let n = 0;
-    for (const v of this.fleet.values()) if (v.routeId === routeId) n++;
-    return this.serviceEnds.routeStatus(routeId, nowMs, n);
+    return this.serviceEnds.routeStatus(routeId, nowMs, this.busesOnRoute(routeId));
+  }
+  /** Cuántos buses hay de cada ruta, contados una vez por cambio de la flota: «Cómo llegar» pregunta por ~700 rutas y recorrer los ~5.000 buses
+   *  en cada pregunta costaba ~90 ms por búsqueda. */
+  private routeCounts: { version: number; counts: Map<string, number> } | null = null;
+  busesOnRoute(routeId: string): number {
+    if (this.routeCounts?.version !== this.fleet.version) {
+      const counts = new Map<string, number>();
+      for (const v of this.fleet.values()) counts.set(v.routeId, (counts.get(v.routeId) ?? 0) + 1);
+      this.routeCounts = { version: this.fleet.version, counts };
+    }
+    return this.routeCounts.counts.get(routeId) ?? 0;
   }
 
   /** Puntualidad del bus según TransMilenio, o «sin dato». Solo vale si ese dato es de la misma época que la posición del bus:
@@ -144,7 +156,7 @@ export class TransitState {
       // si no concuerda y tampoco se pudo ubicar por su posición, el dato está mal y no hay con qué reemplazarlo: se quita (mejor «sin próxima parada» que anunciar una a kilómetros)
       const clear = !agrees && !fix;
       if (fix) v.lastStopId = fix; else if (clear) v.lastStopId = undefined;
-      this.fixedStops.set(v.id, { reportedAt: v.reportedAt, stopId: fix, clear });
+      if (memo) { memo.reportedAt = v.reportedAt; memo.stopId = fix; memo.clear = clear; } else this.fixedStops.set(v.id, { reportedAt: v.reportedAt, stopId: fix, clear });
     }
     if (this.fixedStops.size > this.fleet.size * 2) for (const id of this.fixedStops.keys()) if (!this.fleet.get(id)) this.fixedStops.delete(id);
   }
@@ -174,22 +186,38 @@ export class TransitState {
     }
     return best ? { shape: best.shape, index: best.index } : undefined;
   }
+  /** Lo último que resolvió `sequenceByStop` para cada bus: se llama miles de veces por lote (corregir paradas, llegadas, «Cómo llegar») y armar
+   *  la clave de texto en cada llamada pesaba más que la búsqueda misma. Vale mientras no cambien su ruta, viaje ni última parada, ni la red.
+   *  Guarda dos: la parada que informa TransMilenio y la corregida (`reconcileLastStops`), que se alternan en cada lote. */
+  private seqByBus = new WeakMap<Vehicle, SeqMemo[]>();
   private sequenceByStop(v: Vehicle): { shape: RouteShape; index: number } | undefined {
-    if (!v.lastStopId) return undefined;
-    const key = `${v.routeId}|${v.lastStopId}|${v.tripId?.split(".").pop() ?? ""}`;
-    let hit = this.seq.get(key);
+    const stopId = v.lastStopId;
+    if (!stopId) return undefined;
+    let memo = this.seqByBus.get(v);
+    if (!memo) this.seqByBus.set(v, (memo = []));
+    for (const m of memo) if (m.stopId === stopId && m.routeId === v.routeId && m.tripId === v.tripId) return m.hit ?? undefined;
+    const hit = this.sequenceByStopKey(v, stopId);
+    if (memo.length >= 2) memo.shift();
+    memo.push({ routeId: v.routeId, stopId, tripId: v.tripId, hit: hit ?? null });
+    return hit;
+  }
+  private sequenceByStopKey(v: Vehicle, stopId: string): { shape: RouteShape; index: number } | undefined {
+    const tripId = v.tripId, tripKey = tripId ? tripId.slice(tripId.lastIndexOf(".") + 1) : "";      // = último tramo del código del viaje
+    const byRoute = this.seq.get(v.routeId) ?? this.seq.set(v.routeId, new Map()).get(v.routeId)!;
+    const byStop = byRoute.get(stopId) ?? byRoute.set(stopId, new Map()).get(stopId)!;
+    let hit = byStop.get(tripKey);
     if (hit === undefined) {
       hit = null;
       // la ruta que informa TransMilenio a veces no es la del viaje: si la parada no está en su trazado, se prueba con la ruta que nombra el viaje (último tramo de su código)
-      const tripRoute = v.tripId?.split(".").pop();
+      const tripRoute = tripId != null ? tripKey : undefined;
       for (const rid of tripRoute && tripRoute !== v.routeId ? [v.routeId, tripRoute] : [v.routeId]) {
         for (const shape of this.network.shapes.get(rid) ?? []) {
-          const index = shape.stopIds.indexOf(v.lastStopId);
+          const index = shape.stopIds.indexOf(stopId);
           if (index >= 0) { hit = { shape, index }; break; }
         }
         if (hit) break;
       }
-      this.seq.set(key, hit);
+      byStop.set(tripKey, hit);
     }
     return hit ?? undefined;
   }
@@ -248,7 +276,7 @@ export class TransitState {
 
   setNetwork(network: TransitNetwork): void {
     this.network = network;
-    this.seq.clear(); this.trunk = null; this.served = null; this.labels.clear(); this.fixedStops.clear(); this.families = null;
+    this.seq.clear(); this.seqByBus = new WeakMap(); this.trunk = null; this.served = null; this.labels.clear(); this.fixedStops.clear(); this.families = null;
     this.resolveSystems();
     this.reconcileLastStops();
     this.applyAlerts(this.feedAlerts);       // los cierres que trae la red y las rutas deducidas de los avisos dependen de la red

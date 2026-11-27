@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { alertKey, firstRun, useAlertsSeen } from "./ui/alertsSeen";
 import { createRoot } from "react-dom/client";
-import { type SignalRow, simulatedCabins, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
+import { type SignalRow, prepareNetworkInSlices, simulatedCabins, alertStretch, connectionStatus, routeAlertViews, trafficSegments, trunkStations, upcomingAtStop, type ConnectionStatus, serviceClosedNow } from "@transmi/application";
 import { RoadPath, SYSTEM_LABEL, toWorld } from "@transmi/domain";
 import { CONFIG, liveData, loadDepartures, loadHopProfile, loadServiceEnds, loadSignalWaits, networkSource, transit } from "./composition-root";
 import { nowMs, nowSec } from "./clock";
@@ -158,6 +158,7 @@ export function App() {
     void networkSource.load().then((n) => {
       if (stopped) return;
       transit.setNetwork(n);
+      prepareNetworkInSlices(transit, (next) => { setTimeout(next, 0); }, 8);      // de a poco: así el primer lote de buses no congela la página
       void Promise.all([m.ready, loadTroncales()]).then(([, lines]) => { m.setStations(buildStationGeometry(transit, trunkStations(transit), lines)); m.setNetwork(n); setNet((x) => x + 1); });
     }).catch(() => uiRef.current.showToast("No pudimos cargar las rutas; los buses siguen en vivo"));
 

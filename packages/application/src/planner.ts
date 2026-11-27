@@ -300,16 +300,22 @@ function raptor(ix: Index, live: Live, origin: GeoPoint, dest: GeoPoint, nowSec:
     return { dep: t + w, wait: w, live: false };
   };
 
+  // qué patrones se pueden usar en esta búsqueda (ruta operando y no prohibida), una vez y no en cada parada marcada de cada vuelta:
+  // preguntarlo en los conjuntos de texto era lo que más pesaba de «Cómo llegar»
+  const nP = ix.patterns.length, usable = new Uint8Array(nP);
+  for (let p = 0; p < nP; p++) { const pt = ix.patterns[p]!; usable[p] = live.running.has(pt.routeId) && !banned.has(pt.route.shortName) ? 1 : 0; }
+  const qStart = new Int32Array(nP).fill(-1), qOrder: number[] = [];      // patrón → posición más temprana marcada (y en qué orden entraron)
   for (let k = 1; k <= maxRounds; k++) {
-    const queue = new Map<number, number>();                        // patrón → posición más temprana marcada
+    for (const p of qOrder) qStart[p] = -1;
+    qOrder.length = 0;
     for (const s of marked) for (const { p, i } of ix.atStop[s]!) {
-      if (!live.running.has(ix.patterns[p]!.routeId) || banned.has(ix.patterns[p]!.route.shortName)) continue;
-      const cur = queue.get(p);
-      if (cur == null || i < cur) queue.set(p, i);
+      if (!usable[p]) continue;
+      const cur = qStart[p]!;
+      if (cur < 0) { qStart[p] = i; qOrder.push(p); } else if (i < cur) qStart[p] = i;
     }
     const improved = new Set<number>();
-    for (const [p, start] of queue) {
-      const pat = ix.patterns[p]!;
+    for (const p of qOrder) {
+      const start = qStart[p]!, pat = ix.patterns[p]!;
       let board = -1, dep = 0, wait = 0, liveW = false, bus: LiveBus | undefined;
       for (let i = start; i < pat.stops.length; i++) {
         const s = pat.stops[i]!;
