@@ -134,3 +134,42 @@ describe("parseLiveFrames", async () => {
     expect(parseLiveFrames(frame({ at: 1, parts: [{ k: "pos", sig: "a", len: 5 }] }, [1]))).toBeNull();
   });
 });
+
+describe("los retrasos (7 MB) se piden cada 5 min, no en cada cambio", () => {
+  const pos = fx("positions.a"), tu = fx("tripupdates");
+  /** `/live` que manda posiciones nuevas cada vez y retrasos si se piden (o siempre, si `old`: la función de antes ignora `only`). */
+  const server = (old: boolean, log: string[]) => {
+    let n = 0;
+    return (async (input: RequestInfo | URL) => {
+      const u = new URL(String(input));
+      log.push(u.pathname.split("/").pop() + "?" + u.searchParams.toString());
+      if (u.pathname.endsWith("/meta")) return reply({ pos: `P${n}`, tu: "T9", al: "A1" });
+      n++;
+      const only = (u.searchParams.get("only") ?? "pos,tu,al").split(",");
+      const parts: { k: string; sig: string; body: Uint8Array }[] = [{ k: "pos", sig: `P${n}`, body: pos }];
+      if ((old || only.includes("tu")) && u.searchParams.get("tu") !== "T9") parts.push({ k: "tu", sig: "T9", body: tu });
+      const head = new TextEncoder().encode(JSON.stringify({ at: 1_800_000_000, parts: parts.map((p) => ({ k: p.k, sig: p.sig, len: p.body.length })) }));
+      const out = new Uint8Array(4 + head.length + parts.reduce((s, p) => s + p.body.length, 0));
+      new DataView(out.buffer).setUint32(0, head.length); out.set(head, 4);
+      let o = 4 + head.length; for (const p of parts) { out.set(p.body, o); o += p.body.length; }
+      return reply(out);
+    }) as typeof fetch;
+  };
+  it("con la función nueva: retrasos la primera vez y luego solo posiciones", async () => {
+    const log: string[] = [];
+    const feed = new ProxyLiveFeed({ primaryBase: "https://proxy.test/fn", fetchFn: server(false, log), waitSeconds: 20 });
+    expect((await feed.poll({}))!.batch.tripUpdates).toBeDefined();
+    const second = await feed.poll({ pos: "P1", tu: "T1" });
+    expect(second!.batch.tripUpdates).toBeUndefined();
+    expect(log[1]).toContain("only=pos%2Cal");
+  });
+  it("con la función de antes (ignora `only`): pregunta la huella y no vuelve a bajar los retrasos", async () => {
+    const log: string[] = [];
+    const feed = new ProxyLiveFeed({ primaryBase: "https://proxy.test/fn", fetchFn: server(true, log), waitSeconds: 20 });
+    await feed.poll({});
+    await feed.poll({ pos: "P1", tu: "T1" });             // la manda sin pedirla: se aprende que es la función de antes
+    const third = await feed.poll({ pos: "P2", tu: "T1" });
+    expect(third!.batch.tripUpdates).toBeUndefined();
+    expect(log.some((l) => l.startsWith("meta"))).toBe(true);
+  });
+});

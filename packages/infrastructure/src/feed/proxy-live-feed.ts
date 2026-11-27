@@ -11,7 +11,13 @@ export interface LiveFeedConfig {
   onClock?: (offsetMs: number) => void;
   /** Segundos que el intermediario puede retener la petición esperando datos nuevos (0 = no usar `/live`). */
   waitSeconds?: number;
+  /** Cada cuántos segundos como mucho se piden los retrasos de los viajes (`tripupdates`, ~7 MB; ~1,7 MB comprimido). Cambia cada
+   *  ~30 s y antes se bajaba entero en cada cambio: ~150 MB por hora por persona, en datos del teléfono y del plan del intermediario.
+   *  Solo aportan la puntualidad (~5 % de los buses) y un respaldo de las llegadas: con 5 min basta. 0 = siempre (como antes). */
+  tripUpdatesEveryS?: number;
 }
+/** Ver `LiveFeedConfig.tripUpdatesEveryS`. */
+export const TRIP_UPDATES_EVERY_S = 300;
 
 /** Decodifica la respuesta de `/live`: 4 bytes de largo + JSON de cabecera + cuerpos concatenados. */
 export function parseLiveFrames(buf: Uint8Array): { at: number; parts: { k: "pos" | "tu" | "al"; sig: string; body: Uint8Array }[] } | null {
@@ -44,6 +50,11 @@ export class ProxyLiveFeed implements LiveFeedPort {
   constructor(private readonly cfg: LiveFeedConfig) {
     this.f = cfg.fetchFn ?? ((...a) => fetch(...a));
   }
+  /** Cuándo se recibieron los últimos retrasos (ms). */
+  private tuAt = 0;
+  /** El intermediario mandó retrasos sin pedirlos: es la versión anterior a `only` (ver `pollBundle`). */
+  private ignoresOnly = false;
+  private tuDue(): boolean { const every = this.cfg.tripUpdatesEveryS ?? TRIP_UPDATES_EVERY_S; return every <= 0 || Date.now() - this.tuAt >= every * 1000; }
 
   /** `clock` = la hora que trae la respuesta es la del servidor en este instante (el intermediario). La copia de respaldo trae la hora en que
    *  se publicó, que puede ser de hace minutos u horas: usarla como reloj atrasaba la hora de la app y dañaba todos los tiempos de llegada. */
@@ -73,7 +84,13 @@ export class ProxyLiveFeed implements LiveFeedPort {
     const wait = this.cfg.waitSeconds ?? 0;
     if (wait <= 0 || this.bundle === false) return undefined;
     try {
-      const q = new URLSearchParams({ pos: known.pos ?? "", tu: known.tu ?? "", al: known.al ?? "", wait: String(wait) });
+      // `only`: lo que se quiere recibir. Los retrasos solo cuando toca
+      const due = this.tuDue(), only = due ? "pos,tu,al" : "pos,al";
+      let tu = known.tu ?? "";
+      // el intermediario publicado antes de `only` lo ignora y manda los retrasos cada vez que cambian: mientras no se actualice, se le
+      // pregunta primero la huella actual (`/meta`, unos bytes) y se le dice que ya la tenemos. Cuesta una petición más, pero ahorra ~1,7 MB
+      if (!due && this.ignoresOnly) { const m = await this.json(`${primary}/meta`); if (m?.tu) tu = m.tu; }
+      const q = new URLSearchParams({ pos: known.pos ?? "", tu, al: known.al ?? "", wait: String(wait), only });
       const r = await this.f(`${primary}/live?${q}`, { cache: "no-store" });
       if (!r.ok) { if (r.status === 404) this.bundle = false; return undefined; }
       const frames = parseLiveFrames(new Uint8Array(await r.arrayBuffer()));
@@ -86,7 +103,7 @@ export class ProxyLiveFeed implements LiveFeedPort {
       for (const p of frames.parts) {
         try {
           if (p.k === "pos") { batch.positions = decodePositions(p.body); signature.pos = p.sig; }
-          else if (p.k === "tu") { batch.tripUpdates = decodeTripUpdates(p.body); signature.tu = p.sig; }
+          else if (p.k === "tu") { if (!due) this.ignoresOnly = true; batch.tripUpdates = decodeTripUpdates(p.body); signature.tu = p.sig; this.tuAt = Date.now(); }
           else { batch.alerts = decodeAlerts(p.body); signature.al = p.sig; }
         } catch (e) { if (p.k === "pos") throw e; }
       }
@@ -123,8 +140,8 @@ export class ProxyLiveFeed implements LiveFeedPort {
       batch.positions = decodePositions(await this.bytes(url("positions", meta.pos)));
       signature.pos = meta.pos;
     }
-    if (meta.tu && meta.tu !== known.tu) {
-      try { batch.tripUpdates = decodeTripUpdates(await this.bytes(url("tripupdates", meta.tu))); signature.tu = meta.tu; } catch { /* opcional */ }
+    if (meta.tu && meta.tu !== known.tu && this.tuDue()) {
+      try { batch.tripUpdates = decodeTripUpdates(await this.bytes(url("tripupdates", meta.tu))); signature.tu = meta.tu; this.tuAt = Date.now(); } catch { /* opcional */ }
     }
     if (meta.al && meta.al !== known.al) {
       try { batch.alerts = decodeAlerts(await this.bytes(url("alerts", meta.al))); signature.al = meta.al; } catch { /* opcional */ }

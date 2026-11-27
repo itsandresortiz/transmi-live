@@ -70,9 +70,12 @@ async function live(url: URL, acceptsGzip: boolean): Promise<Response> {
   const wait = Math.min(MAX_WAIT_S, Math.max(0, Number(url.searchParams.get("wait") ?? 0) || 0));
   const known: Record<string, string> = {};
   for (const k of Object.keys(KEYS)) known[k] = url.searchParams.get(k) ?? "";
+  // `only=pos,al`: lo que el cliente quiere recibir. Los retrasos (tripupdates, ~7 MB) cambian cada ~30 s y las apps los piden cada
+  // 5 min: mandarlos en cada respuesta eran ~150 MB por hora por persona (datos del teléfono y del plan). Sin `only`, todo (como antes).
+  const only = (url.searchParams.get("only") ?? "").split(",").filter((k) => Object.hasOwn(KEYS, k));
+  const names = only.length ? only : Object.keys(KEYS);
   const end = Date.now() + wait * 1000;
   for (;;) {
-    const names = Object.keys(KEYS);
     const res = await Promise.allSettled(names.map((k) => load(KEYS[k]!)));
     const changed: { k: string; e: Entry }[] = [];
     let ok = 0;
