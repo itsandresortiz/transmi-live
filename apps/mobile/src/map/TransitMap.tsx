@@ -1,7 +1,7 @@
 import { type ComponentProps, forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, StyleSheet } from "react-native";
 import * as Location from "expo-location";
-import { Camera, GeoJSONSource, Images, Layer, Map, UserLocation, type CameraRef } from "@maplibre/maplibre-react-native";
+import { Camera, GeoJSONSource, Images, Layer, Map, RasterDEMSource, UserLocation, type CameraRef } from "@maplibre/maplibre-react-native";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { SystemType } from "@transmi/domain";
 import { transit } from "@/composition-root";
@@ -29,10 +29,16 @@ import { virtualRideId } from "@/virtualRide";
  *  los genera `tools/map-styles.py`: no editar los .json a mano. */
 const MAP_STYLE = { light: lightStyle as never, dark: darkStyle as never };
 /** Dónde quedó el mapa la última vez: al cambiar de apariencia el mapa se vuelve a montar (no se cambia el estilo en caliente) y retoma desde ahí. */
-const lastView: { center: [number, number]; zoom: number } = { center: BOGOTA_LL(), zoom: 11.6 };
+const lastView: { center: [number, number]; zoom: number; pitch: number } = { center: BOGOTA_LL(), zoom: 11.6, pitch: 0 };
 function BOGOTA_LL(): [number, number] { return [-74.08, 4.65]; }
 const BOGOTA: [number, number] = [-74.075, 4.65];
 const STOP_ZOOM = 15.2;
+/** Vista 3D: inclinación al encenderla y zoom desde el que salen los edificios con volumen (como en la web). */
+const PITCH_3D = 58, BUILD_MIN_Z = 15;
+/** Relieve: teselas de elevación abiertas «Terrain Tiles» (Mapzen) en AWS, gratis y sin llave (SRTM/NASA, de dominio público).
+ *  MapLibre nativo aún no levanta el terreno en 3D (eso solo lo hace la web): aquí se usa para sombrear las laderas. Mientras la
+ *  capa está oculta no se descarga ninguna tesela. */
+const RELIEF_TILES = ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"];
 
 export interface TransitMapHandle { flyTo(lat: number, lon: number, zoom?: number): void; resetNorth(): void; fit(points: { lat: number; lon: number }[], padding?: number, bottomExtra?: number): void }
 interface Props {
@@ -55,6 +61,8 @@ interface Props {
   showTraffic?: boolean;
   /** Avisa dónde quedó el centro del mapa y su zoom cada vez que termina de moverse. */
   onView?(v: { lat: number; lon: number; zoom: number; bearing: number }): void;
+  /** Vista 3D: cámara inclinada, se puede inclinar con dos dedos, edificios con volumen y sombra de los cerros. */
+  view3d?: boolean;
   /** Mapa pequeño dentro de otra pantalla: sin brújula. */
   compact?: boolean;
   attributionPosition?: ComponentProps<typeof Map>["attributionPosition"];
@@ -69,8 +77,9 @@ interface Props {
 /** TransMiCable en obra (no cambia mientras corre la app). */
 const UPCOMING = upcomingCablesGeo();
 
-export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], trip = null, onlyRoutes = null, active = true, showSignals = true, showStations = true, showTraffic = false, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
+export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMap({ system = null, routeId = null, focusStopId = null, highlightIds = [], trip = null, onlyRoutes = null, active = true, showSignals = true, showStations = true, showTraffic = false, view3d = false, onView, compact = false, calm = false, attributionPosition = { bottom: 100, right: 8 }, onBus, onStop, children }, ref) {
   const c = useColors();
+  const { reduceMotion } = useAccessibility();
   const camera = useRef<CameraRef>(null);
   const lastCenter = useRef<[number, number]>(BOGOTA);      // el centro actual, para girar a norte sin moverse
   const [view, setView] = useState<Viewport | null>(null);
@@ -231,17 +240,36 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     return JSON.stringify({ type: "FeatureCollection", features: st ? [{ type: "Feature", geometry: { type: "Point", coordinates: [st.position.lon, st.position.lat] }, properties: {} }] : [] });
   }, [focusStopId, transit.network]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onRegion = useCallback((e: { nativeEvent: { bounds: [number, number, number, number]; zoom: number; bearing?: number } }) => {
-    const { bounds, zoom, bearing } = e.nativeEvent;
+  const onRegion = useCallback((e: { nativeEvent: { bounds: [number, number, number, number]; zoom: number; bearing?: number; center?: [number, number]; pitch?: number } }) => {
+    const { bounds, zoom, bearing, center, pitch } = e.nativeEvent;
     setView({ west: bounds[0], south: bounds[1], east: bounds[2], north: bounds[3], zoom });
-    lastCenter.current = [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
-    if (!compact) { lastView.center = lastCenter.current; lastView.zoom = zoom; }
-    onView?.({ lat: (bounds[1] + bounds[3]) / 2, lon: (bounds[0] + bounds[2]) / 2, zoom, bearing: bearing ?? 0 });
+    // con el mapa inclinado el recuadro visible se alarga hacia el horizonte: el centro de verdad es el de la cámara
+    lastCenter.current = center && Number.isFinite(center[0]) && Number.isFinite(center[1]) ? [center[0], center[1]] : [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
+    if (!compact) { lastView.center = lastCenter.current; lastView.zoom = zoom; lastView.pitch = pitch ?? 0; }
+    onView?.({ lat: lastCenter.current[1], lon: lastCenter.current[0], zoom, bearing: bearing ?? 0 });
   }, [onView]);
 
+  // 3D: se inclina o se endereza la cámara sin moverla de sitio (el primer render ya sale con la inclinación guardada)
+  const was3d = useRef(view3d);
+  useEffect(() => {
+    if (was3d.current === view3d) return;
+    was3d.current = view3d;
+    camera.current?.easeTo({ center: lastCenter.current, pitch: view3d ? PITCH_3D : 0, duration: reduceMotion ? 0 : 650 });
+  }, [view3d]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <Map key={c.dark ? "oscuro" : "claro"} style={StyleSheet.absoluteFill} mapStyle={c.dark ? MAP_STYLE.dark : MAP_STYLE.light} logo={false} attribution attributionPosition={attributionPosition} compass={false} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
-      <Camera ref={camera} initialViewState={compact ? { center: BOGOTA, zoom: 11.6 } : { center: lastView.center, zoom: lastView.zoom }} minZoom={9} maxZoom={19} />
+    <Map key={c.dark ? "oscuro" : "claro"} style={StyleSheet.absoluteFill} mapStyle={c.dark ? MAP_STYLE.dark : MAP_STYLE.light} logo={false} attribution attributionPosition={attributionPosition} compass={false} touchPitch={view3d} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
+      <Camera ref={camera} initialViewState={compact ? { center: BOGOTA, zoom: 11.6 } : { center: lastView.center, zoom: lastView.zoom, pitch: view3d ? (lastView.pitch > 1 ? lastView.pitch : PITCH_3D) : 0 }} minZoom={9} maxZoom={19} />
+      {/* vista 3D: sombra de los cerros y edificios con volumen. Siempre montadas (no se agregan ni quitan capas en caliente): se
+          muestran u ocultan con `visibility`. Van debajo de los nombres de calles del mapa base y de todo lo de TransMi LIVE. */}
+      <RasterDEMSource id="relieve" tiles={RELIEF_TILES} tileSize={256} maxzoom={14} encoding="terrarium" attribution="Relieve: Terrain Tiles (Mapzen, AWS) · SRTM">
+        <Layer id="relieve-sombra" type="hillshade" beforeId="building" {...sp({ visibility: view3d ? "visible" : "none", hillshadeExaggeration: c.dark ? 0.35 : 0.3, hillshadeShadowColor: c.dark ? "#000000" : "#6b6455", hillshadeHighlightColor: c.dark ? "#2a2e36" : "#ffffff", hillshadeAccentColor: c.dark ? "#000000" : "#8a8270" })} />
+      </RasterDEMSource>
+      <Layer id="edificios-3d" type="fill-extrusion" source="openmaptiles" source-layer="building" minzoom={BUILD_MIN_Z} beforeId={c.dark ? "highway_name_other" : "highway-name-path"} filter={["!=", ["get", "hide_3d"], true] as never}
+        {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: c.dark ? "#353943" : "#dcd7cc",
+          fillExtrusionHeight: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_height"], 6]],
+          fillExtrusionBase: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_min_height"], 0]],
+          fillExtrusionOpacity: c.dark ? 0.8 : 0.72, fillExtrusionVerticalGradient: true })} />
       <Images images={BUS_SPRITES} />
       {/* debajo de tu punto, el haz que muestra hacia dónde apunta el teléfono (como en la web) */}
       <HeadingCone active={active} />

@@ -53,6 +53,13 @@ const sidedIds = (id: string) => [id, ...Array.from({ length: SECTORS }, (_, k) 
 /** Nombres de calles del mapa base, según la apariencia (los juegos claro y oscuro llaman distinto a sus capas). */
 const streetLayers = (scheme: Scheme) => (scheme === "dark" ? ["bd-highway_name_other", "bd-highway_name_motorway", "bd-road_oneway", "bd-road_oneway_opposite"] : ["bl-highway-name-path", "bl-highway-name-minor", "bl-highway-name-major", "bl-highway-shield-non-us"]);
 const BUS_LAYERS = ["bus-dots", "bus-dots-minor"];
+/** Vista 3D: inclinación al encenderla, tope de inclinación con los dedos y zoom desde el que salen los edificios con volumen. */
+const PITCH_3D = 58, MAX_PITCH = 65, BUILD_MIN_Z = 15;
+/** Relieve: teselas de elevación abiertas «Terrain Tiles» (Mapzen) en AWS, formato terrarium, gratis y sin llave (datos SRTM/NASA,
+ *  GMTED2010 y ETOPO1, de dominio público). Se exagera un poco para que los cerros orientales se lean desde la ciudad. */
+const RELIEF_TILES = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+const RELIEF_ATTRIBUTION = "Relieve: Terrain Tiles (Mapzen, AWS) · SRTM";
+const RELIEF_EXAGGERATION = 1.25;
 const BOGOTA: [number, number] = [-74.075, 4.65];
 
 /** Las líneas de todas las rutas van tenues para que se lea la jerarquía de las calles; al elegir una ruta se resalta sola. */
@@ -95,7 +102,8 @@ export class MapController {
         layers: [...baseLayers(baseLight, "bl-", scheme !== "dark"), ...baseLayers(baseDark, "bd-", scheme === "dark")] as never,
       },
       center: BOGOTA, zoom: 11, minZoom: 9, maxZoom: 19.5,
-      attributionControl: false, dragRotate: true, pitchWithRotate: false, maxPitch: 0,
+      // la inclinación se habilita solo en la vista 3D (`set3D`): en 2D el tope es 0 y los gestos de inclinar no hacen nada
+      attributionControl: false, dragRotate: true, pitchWithRotate: true, maxPitch: 0,
       fadeDuration: 0, renderWorldCopies: false,
       // los rangos de tipografía que no incluimos (otros alfabetos) se resuelven en vacío, sin error
       transformRequest: (url, type) =>
@@ -125,6 +133,7 @@ export class MapController {
 
   private addLayers() {
     this.registerChip();
+    this.addBuildings();
     const m = this.map, t = this.theme;
     this.src("localidad-labels"); this.src("troncales");
     this.src("network"); this.src("estaciones"); this.src("stops");
@@ -370,6 +379,76 @@ export class MapController {
     m.on("mousemove", (e) => { m.getCanvas().style.cursor = pick(e.point) ? "pointer" : ""; });
   }
 
+  /* ---------- vista 3D ---------- */
+  /** Edificios con volumen (capa `building` de OpenMapTiles, con `render_height`). Uno por juego de capas del mapa base (claro y
+   *  oscuro), cada uno debajo de los nombres de calles de su juego; ocultos hasta encender el 3D. No llevan el prefijo bl-/bd- para que
+   *  `setScheme` no los encienda. */
+  private addBuildings() {
+    const m = this.map;
+    const height = (k: "render_height" | "render_min_height"): ExpressionSpecification =>
+      ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", k], k === "render_height" ? 6 : 0]] as unknown as ExpressionSpecification;
+    for (const dark of [false, true]) {
+      const before = dark ? "bd-highway_name_other" : "bl-highway-name-path";
+      m.addLayer({
+        id: dark ? "edificios-3d-oscuro" : "edificios-3d-claro", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: BUILD_MIN_Z,
+        filter: ["!=", ["get", "hide_3d"], true], layout: { visibility: "none" },
+        paint: {
+          // colores sobrios, cercanos al de los edificios planos del mapa base, y algo transparentes: no compiten con buses ni estaciones
+          "fill-extrusion-color": dark ? "#353943" : "#dcd7cc",
+          "fill-extrusion-height": height("render_height"), "fill-extrusion-base": height("render_min_height"),
+          "fill-extrusion-opacity": ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, dark ? 0.8 : 0.72],
+          "fill-extrusion-vertical-gradient": true,
+        },
+      } as never, m.getLayer(before) ? before : undefined);
+    }
+  }
+  private relieveAdded = false;
+  /** El relieve (cerros orientales, Monserrate) se agrega la primera vez que alguien enciende el 3D: quien no lo usa no descarga nada. */
+  private addRelief() {
+    if (this.relieveAdded) return;
+    this.relieveAdded = true;
+    const m = this.map;
+    m.addSource("relieve", { type: "raster-dem", tiles: [RELIEF_TILES], tileSize: 256, maxzoom: 14, encoding: "terrarium", attribution: RELIEF_ATTRIBUTION });
+    // sombra suave de las laderas (sin ella el relieve se ve plano); debajo de los edificios planos de cada juego
+    for (const dark of [false, true]) {
+      const before = dark ? "bd-building" : "bl-building";
+      m.addLayer({
+        id: dark ? "relieve-sombra-oscuro" : "relieve-sombra-claro", type: "hillshade", source: "relieve", layout: { visibility: "none" },
+        paint: { "hillshade-exaggeration": dark ? 0.35 : 0.3, "hillshade-shadow-color": dark ? "#000000" : "#6b6455", "hillshade-highlight-color": dark ? "#2a2e36" : "#ffffff", "hillshade-accent-color": dark ? "#000000" : "#8a8270" },
+      } as never, m.getLayer(before) ? before : undefined);
+    }
+  }
+  private on3D = false;
+  /** Enciende o apaga la vista 3D: cámara inclinada, gestos para inclinar, edificios con volumen y relieve. */
+  set3D(on: boolean) {
+    const m = this.map;
+    if (!m.getLayer("troncales-lines") || on === this.on3D) return;
+    this.on3D = on;
+    const quick = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (on) {
+      this.addRelief();
+      m.setMaxPitch(MAX_PITCH);
+      m.setTerrain({ source: "relieve", exaggeration: RELIEF_EXAGGERATION });
+      this.paint3D();
+      m.easeTo({ pitch: PITCH_3D, duration: quick ? 0 : 700 });
+    } else {
+      const done = () => {
+        if (this.on3D) return;                       // se volvió a encender mientras bajaba
+        m.setMaxPitch(0); m.setTerrain(null); this.paint3D();
+      };
+      if (quick || m.getPitch() < 0.5) { m.jumpTo({ pitch: 0 }); done(); }
+      else { m.easeTo({ pitch: 0, duration: 550 }); m.once("moveend", done); }
+    }
+  }
+  get is3D(): boolean { return this.on3D; }
+  /** Muestra los edificios y la sombra del relieve del juego de la apariencia actual (o nada, en 2D). */
+  private paint3D() {
+    const m = this.map, dark = this.scheme === "dark";
+    const vis = (id: string, v: boolean) => { if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", v ? "visible" : "none"); };
+    vis("edificios-3d-claro", this.on3D && !dark); vis("edificios-3d-oscuro", this.on3D && dark);
+    vis("relieve-sombra-claro", this.on3D && !dark); vis("relieve-sombra-oscuro", this.on3D && dark);
+  }
+
   /* ---------- operaciones ---------- */
   setScheme(scheme: Scheme) {
     this.theme = themeOf(scheme); this.scheme = scheme;
@@ -381,6 +460,7 @@ export class MapController {
       else if (l.id.startsWith("bd-")) m.setLayoutProperty(l.id, "visibility", scheme === "dark" ? "visible" : "none");
     }
     if (!this.streetsOn) for (const id of streetLayers(scheme)) if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", "none");
+    this.paint3D();
     m.setPaintProperty("troncales-lines", "line-color", lineMatch(t, t.troncal));
     m.setPaintProperty("localidad-names", "text-color", t.label);
     m.setPaintProperty("localidad-names", "text-halo-color", t.halo);

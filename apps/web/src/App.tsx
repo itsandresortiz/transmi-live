@@ -170,6 +170,7 @@ export function App() {
   /* ---------- estado de la interfaz → mapa ---------- */
   useEffect(() => { document.documentElement.dataset.scheme = scheme; void mc.current?.ready.then(() => { mc.current?.setScheme(scheme); if (transit.network.routes.size) mc.current?.recolorNetwork(transit.network); br.current?.refresh(); }); }, [scheme]);
   useEffect(() => { void mc.current?.ready.then(() => mc.current?.setToggles(ui.layers)); br.current?.refresh(); }, [ui.layers]);
+  useEffect(() => { void mc.current?.ready.then(() => mc.current?.set3D(ui.view3d)); }, [ui.view3d]);
   /* viaje planeado: se dibuja la opción elegida en el mapa y se encuadra */
   const planner = usePlanner();
   const alertCount = useAlertCount();
@@ -428,6 +429,7 @@ export function App() {
             <Bell />{alertCount > 0 && <span className="badge">{alertCount > 99 ? "99+" : alertCount}</span>}
           </button>
           <button className="fab glass" aria-label={headingUp ? "Dejar el mapa fijo" : following ? "Girar el mapa según hacia dónde miro" : "Mi ubicación"} aria-pressed={following} onClick={() => void locate()}><Locate /></button>
+          <button className="fab glass t3d" aria-label={ui.view3d ? "Volver al mapa plano" : "Ver el mapa en 3D"} title={ui.view3d ? "Mapa plano" : "Mapa en 3D"} aria-pressed={ui.view3d} onClick={() => ui.setView3d(!ui.view3d)}>3D</button>
           <button className="fab glass" aria-label="Ajustes del mapa" aria-pressed={ui.settingsOpen} onClick={() => ui.setSettingsOpen(true)}><Sliders /></button>
         </div>
       </header>
