@@ -450,7 +450,9 @@ const BusLayer = memo(function BusLayer({ view, system, routeId, routeIds = null
     }),
     label: sp({
       textField: ["get", "route"], textFont: ["Noto Sans Regular"], textSize: 11, textOffset: [0, -1.5], textColor: dark ? "#f4f4f5" : "#111827",
-      textHaloColor: dark ? "#18181b" : "#ffffff", textHaloWidth: 1.6, textAllowOverlap: false,
+      // siempre puesto, como el bus: si compite por espacio con otros textos, MapLibre lo vuelve a ubicar en cada actualización de los
+      // buses (varias por segundo) y, como el bus se movió, lo trata como uno nuevo y lo hace aparecer desde cero: el número parpadeaba
+      textHaloColor: dark ? "#18181b" : "#ffffff", textHaloWidth: 1.6, textAllowOverlap: true, textIgnorePlacement: true,
     }),
   }), [dark, ringKey, view3d]);   // eslint-disable-line react-hooks/exhaustive-deps
   const press = useCallback((e: { nativeEvent: { features: { properties?: Record<string, unknown> | null }[] } }) => { const id = e.nativeEvent.features[0]?.properties?.id as string | undefined; if (id) onBus?.(id); }, [onBus]);
