@@ -57,6 +57,7 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
         // y si alguien que va en él comparte su posición (opcional y anónimo), donde va según esa persona
         const mine = v.id === ride ? snappedPosition(v.id, rideNow) : shared ? transit.sharedRides.positionOf(transit, v.id, t) : null;
         const g = mine ?? toGeo(motion.step(v, t));
+        if (!Number.isFinite(g.lon) || !Number.isFinite(g.lat)) continue;      // una posición rota no llega al mapa nativo
         if (g.lon < view.west - padX || g.lon > view.east + padX || g.lat < view.south - padY || g.lat > view.north + padY) continue;
         const h = (((mine?.heading ?? motion.heading(v.id) ?? v.bearing ?? 90) % 360) + 360) % 360;
         features.push({ type: "Feature", id: v.id, geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: { id: v.id, color: SYSTEM_COLOR[v.system], sprite: `top-${v.system}-${v.system === "troncal" ? "l" : "s"}`, rot: h, o: !mine && isStaleReport(v, t) ? 0.38 : 1, route: labels ? transit.routeOf(v)?.shortName ?? "" : "", al: warn.has(v.routeId) ? 1 : 0 } });

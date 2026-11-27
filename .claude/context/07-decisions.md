@@ -131,3 +131,9 @@ Contexto: el dueño quiere un 3D «como Apple Maps». No hay modelos abiertos de
 
 ## 2026-11-27 · Buses y árboles modelados en la app: mapa web dentro de la app solo para el 3D
 Contexto: la app dibuja el mapa con MapLibre Native y `@maplibre/maplibre-react-native`, que no deja meter un motor 3D propio (solo capas de estilo: `fill-extrusion` con paredes rectas). Opciones evaluadas con el dueño: (1) cambiar a Mapbox (modelos glTF y estilo con árboles; con costo desde ~25.000 usuarios/mes y llave); (2) capa propia nativa en Swift/Kotlin (sin poder compilar aquí; riesgo de cierres); (3) al encender el 3D, mostrar dentro de la app el mapa de la web (buses y árboles con three.js) en una vista web; (4) un motor 3D flotando encima del mapa (se desfasa; descartado). Elegido **(3)** por ahora: reusa lo de la web, sin costo ni código nativo nuevo salvo la vista web. A futuro, si la app crece, evaluar (1).
+
+## 2026-11-27 · Sin sombra de los cerros en la app
+- **Contexto**: la 1.1.0 se cerraba al abrir. La capa `hillshade` le pasaba un solo color a MapLibre iOS 6.31, que ya espera una lista (Android igual).
+- **Descartado**: arreglarlo pasando listas o parchando la librería. No se puede probar aquí y la sombra aportaba poco (solo se veía con el 3D).
+- **Por qué**: lo primero es que la app abra. Se agregó una prueba que obliga a revisar en las dos plataformas cada capa o propiedad nueva del mapa.
+

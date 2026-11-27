@@ -1,7 +1,7 @@
 import { type ComponentProps, forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, StyleSheet } from "react-native";
 import * as Location from "expo-location";
-import { Camera, GeoJSONSource, Images, Layer, Map, RasterDEMSource, UserLocation, type CameraRef, type MapRef } from "@maplibre/maplibre-react-native";
+import { Camera, GeoJSONSource, Images, Layer, Map, UserLocation, type CameraRef, type MapRef } from "@maplibre/maplibre-react-native";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { SystemType } from "@transmi/domain";
 import { transit } from "@/composition-root";
@@ -36,10 +36,8 @@ const BOGOTA: [number, number] = [-74.075, 4.65];
 const STOP_ZOOM = 15.2;
 /** Vista 3D: inclinación al encenderla y zoom desde el que salen los edificios con volumen (como en la web). */
 const PITCH_3D = 58, BUILD_MIN_Z = 15;
-/** Relieve: teselas de elevación abiertas «Terrain Tiles» (Mapzen) en AWS, gratis y sin llave (SRTM/NASA, de dominio público).
- *  MapLibre nativo aún no levanta el terreno en 3D (eso solo lo hace la web): aquí se usa para sombrear las laderas. Mientras la
- *  capa está oculta no se descarga ninguna tesela. */
-const RELIEF_TILES = ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"];
+/** Sin sombra de los cerros en la app: en MapLibre iPhone 6.31 los colores del sombreado pasaron a ser una lista y la librería de
+ *  React Native aún manda un solo color: la app se cerraba al abrir el mapa (1.1.0, 2026-11-27). En Android pasa lo mismo al revés. */
 
 export interface TransitMapHandle { flyTo(lat: number, lon: number, zoom?: number): void; resetNorth(): void; fit(points: { lat: number; lon: number }[], padding?: number, bottomExtra?: number): void }
 interface Props {
@@ -289,11 +287,8 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   return (
     <Map ref={mapRef} key={c.dark ? "oscuro" : "claro"} style={StyleSheet.absoluteFill} mapStyle={c.dark ? MAP_STYLE.dark : MAP_STYLE.light} logo={false} attribution attributionPosition={attributionPosition} compass={false} touchPitch={view3d} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
       <Camera ref={camera} initialViewState={compact ? { center: BOGOTA, zoom: 11.6 } : { center: lastView.center, zoom: lastView.zoom, pitch: view3d ? (lastView.pitch > 1 ? lastView.pitch : PITCH_3D) : 0 }} minZoom={9} maxZoom={19} />
-      {/* vista 3D: sombra de los cerros y edificios con volumen. Siempre montadas (no se agregan ni quitan capas en caliente): se
+      {/* vista 3D: edificios con volumen. Siempre montadas (no se agregan ni quitan capas en caliente): se
           muestran u ocultan con `visibility`. Van debajo de los nombres de calles del mapa base y de todo lo de TransMi LIVE. */}
-      <RasterDEMSource id="relieve" tiles={RELIEF_TILES} tileSize={256} maxzoom={14} encoding="terrarium" attribution="Relieve: Terrain Tiles (Mapzen, AWS) · SRTM">
-        <Layer id="relieve-sombra" type="hillshade" beforeId="building" {...sp({ visibility: view3d ? "visible" : "none", hillshadeExaggeration: c.dark ? 0.35 : 0.3, hillshadeShadowColor: c.dark ? "#000000" : "#6b6455", hillshadeHighlightColor: c.dark ? "#2a2e36" : "#ffffff", hillshadeAccentColor: c.dark ? "#000000" : "#8a8270" })} />
-      </RasterDEMSource>
       <Layer id="edificios-3d" type="fill-extrusion" source="openmaptiles" source-layer="building" minzoom={BUILD_MIN_Z} beforeId={c.dark ? "highway_name_other" : "highway-name-path"} filter={BUILDINGS_3D_FILTER as never}
         {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: c.dark ? "#353943" : "#dcd7cc",
           fillExtrusionHeight: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_height"], 6]],

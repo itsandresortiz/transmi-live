@@ -168,7 +168,7 @@ export function RideWatcher() {
         const now = nowMs(), fix: PhoneFix = { lat: p.coords.latitude, lon: p.coords.longitude, at: now, accuracy: p.coords.accuracy, speed: p.coords.speed };
         if (isVirtualRide(busId)) {
           // sin bus en los datos: solo se mira que vayas sobre el recorrido (desde la parada en que vienes)
-          const vp = virtualParts(busId), seq = vp ? rideSequence(rideVehicle(busId, now)!) : undefined;
+          const vp = virtualParts(busId), veh = vp ? rideVehicle(busId, now) : undefined, seq = veh ? rideSequence(veh) : undefined;      // (sin `!`: si falta la parada, no hay bus y no se mira)
           const check = vp && seq ? checkOnShape(transit, vp.shape, seq.index, fix, now, prevFix) : null;
           if (vp && seq && check) setRideCheck(busId, vp.shape, seq.index, check, now);
           // «Ayudar a mejorar el mapa» (solo con el permiso encendido en Más): por dónde va este bus, sin nada de la persona
