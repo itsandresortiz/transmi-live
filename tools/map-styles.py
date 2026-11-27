@@ -3,19 +3,19 @@
 para que calles, parques y agua se distingan mejor (el «dark» original es casi negro sobre negro).
 
 Uso: python3 tools/map-styles.py [carpeta con positron.json y dark.json]
-Sin carpeta, los baja de github.com/hyperknot/openfreemap-styles. Escribe apps/mobile/src/map/style-light.json y style-dark.json. No editar esos a mano.
+Sin carpeta, los baja de github.com/hyperknot/openfreemap-styles. Escribe apps/mobile/src/map/style-light.json y style-dark.json y sus
+copias de la web (apps/web/src/map/base-light.json y base-dark.json, iguales byte a byte). No editar esos a mano.
 """
 import json, os, sys, urllib.request
 
 SRC = "https://raw.githubusercontent.com/hyperknot/openfreemap-styles/main/styles/%s/style.json"
 OUT = os.path.join(os.path.dirname(__file__), "..", "apps", "mobile", "src", "map")
+WEB = os.path.join(os.path.dirname(__file__), "..", "apps", "web", "src", "map")
 
 # id de capa -> {propiedad: color}. Lo que no aparezca queda como en el estilo original.
 LIGHT = {
     "background": {"background-color": "#f4f2ec"},
     "landuse_residential": {"fill-color": "#efede6"},
-    "park": {"fill-color": "#cfe8c9"},
-    "landcover_wood": {"fill-color": "#c3e0bd"},
     "water": {"fill-color": "#a6d0ee"},
     "waterway": {"line-color": "#a6d0ee"},
     "building": {"fill-color": "#e7e3da", "fill-outline-color": "#d6d1c6"},
@@ -36,7 +36,6 @@ LIGHT = {
 DARK = {
     "background": {"background-color": "#1d1f24"},
     "landuse_residential": {"fill-color": "#212329"},
-    "landuse_park": {"fill-color": "#1c2d24"}, "landcover_wood": {"fill-color": "#1b2a22"},
     "landcover_ice_shelf": {"fill-color": "#1d1f24"}, "landcover_glacier": {"fill-color": "#1d1f24"},
     "water": {"fill-color": "#10293d"}, "waterway": {"line-color": "#10293d"},
     "water_name": {"text-color": "#6f93b3", "text-halo-color": "#0c1c2a"},
@@ -54,6 +53,61 @@ DARK = {
 }
 for k in ("place_other", "place_suburb", "place_village", "place_town", "place_city", "place_city_large", "place_state", "place_country_other", "place_country_minor", "place_country_major"):
     DARK[k] = {"text-color": "#c3c8d2", "text-halo-color": "rgba(18,20,24,0.85)"}
+
+
+# Zonas verdes «tipo Mapas de Apple»: en Bogotá los parques NO vienen en la capa `park` de OpenMapTiles (esa trae solo reservas, como
+# los cerros orientales) sino en `landcover` (clase grass: subclases park, garden, grass, recreation_ground…; clase wood: bosques).
+# Los estilos originales no pintaban esa hierba, así que el Simón Bolívar o El Virrey se veían del color del fondo. Aquí se pintan con
+# un verde presente pero sobrio (claro: verde suave; oscuro: verde azulado), por debajo de calles, líneas y textos.
+GREEN = {
+    False: {"park": "#c2e4bb", "grass": "#bfe3b8", "wood": "#a9d8a3", "pitch": "#cdeac5", "pitch_line": "#b2d9aa",
+            "label": "#2f6a3c", "halo": "rgba(244,242,236,0.92)"},
+    True: {"park": "#1b3832", "grass": "#1d3d36", "wood": "#1f443b", "pitch": "#1f3f39", "pitch_line": "#2a5048",
+           "label": "#86d1ad", "halo": "rgba(20,24,26,0.9)"},
+}
+GRASS_FILTER = ["all", ["match", ["geometry-type"], ["MultiPolygon", "Polygon"], True, False], ["==", ["get", "class"], "grass"]]
+PITCH_FILTER = ["all", ["match", ["geometry-type"], ["MultiPolygon", "Polygon"], True, False], ["match", ["get", "class"], ["pitch", "playground"], True, False]]
+# nombres de parques y jardines (capa `poi`), de cerca: verde oscuro (claro) / verde claro (oscuro) con halo. Van debajo de los nombres
+# de barrios y de todo lo de TransMi LIVE: MapLibre ubica primero los textos de las capas de arriba, así que las estaciones ganan.
+PARK_LABEL_FILTER = ["all", ["match", ["get", "class"], ["park", "garden"], True, False], ["has", "name"]]
+
+
+def greens(style, dark):
+    """Agrega la hierba, las canchas y los nombres de parques, y repinta bosques y reservas (mismas capas en claro y oscuro)."""
+    g = GREEN[dark]
+    layers = style["layers"]
+    ids = [l["id"] for l in layers]
+
+    def insert_before(before, layer):
+        layers.insert(ids.index(before) if before in ids else len(layers), layer)
+        ids[:] = [l["id"] for l in layers]
+
+    def put(layer, before):
+        if layer["id"] in ids:
+            layers[ids.index(layer["id"])] = layer
+        else:
+            insert_before(before, layer)
+
+    park_op = ["interpolate", ["linear"], ["zoom"], 8, 0.55, 12, 0.85]
+    put({"id": "park", "type": "fill", "source": "openmaptiles", "source-layer": "park",
+         "filter": ["match", ["geometry-type"], ["MultiPolygon", "Polygon"], True, False],
+         "paint": {"fill-color": g["park"], "fill-opacity": park_op}}, "water")
+    wood = next(l for l in layers if l["id"] == "landcover_wood")
+    wood["paint"] = {"fill-color": g["wood"], "fill-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0, 10, 0.7, 13, 0.95]}
+    # la hierba, debajo del bosque y encima de lo residencial
+    put({"id": "landcover_grass", "type": "fill", "source": "openmaptiles", "source-layer": "landcover", "minzoom": 10, "filter": GRASS_FILTER,
+         "paint": {"fill-color": g["grass"], "fill-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 13, 0.95]}}, "landcover_wood")
+    put({"id": "landuse_pitch", "type": "fill", "source": "openmaptiles", "source-layer": "landuse", "minzoom": 13, "filter": PITCH_FILTER,
+         "paint": {"fill-color": g["pitch"], "fill-outline-color": g["pitch_line"], "fill-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0, 14, 1]}}, "waterway")
+    if "landuse_park" in ids:          # en el oscuro original: la clase `park` de `landuse` no existe en OpenMapTiles (no pintaba nada)
+        layers.pop(ids.index("landuse_park")); ids[:] = [l["id"] for l in layers]
+    before = "place_other" if dark else "label_other"
+    put({"id": "poi_park", "type": "symbol", "source": "openmaptiles", "source-layer": "poi", "minzoom": 14, "filter": PARK_LABEL_FILTER,
+         "layout": {"text-field": ["get", "name"], "text-font": ["Noto Sans Regular"],
+                    "text-size": ["interpolate", ["linear"], ["zoom"], 14, 11, 17, 13.5], "text-max-width": 8, "text-padding": 16,
+                    "symbol-sort-key": ["get", "rank"]},
+         "paint": {"text-color": g["label"], "text-halo-color": g["halo"], "text-halo-width": 1.4, "text-halo-blur": 0.4,
+                   "text-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0.85, 15, 1]}}, before)
 
 
 def load(name, folder):
@@ -87,6 +141,7 @@ def build(name, palette, folder):
         paint = layer.setdefault("paint", {})
         for prop, color in changes.items():
             paint[prop] = recolor(paint.get(prop), color)
+    greens(style, name == "dark")
     missing = sorted(set(palette) - seen)
     if missing:
         print(f"  aviso ({name}): estas capas ya no existen en el estilo original: {', '.join(missing)}")
@@ -95,8 +150,9 @@ def build(name, palette, folder):
 
 if __name__ == "__main__":
     folder = sys.argv[1] if len(sys.argv) > 1 else None
-    for name, palette, out in (("positron", LIGHT, "style-light.json"), ("dark", DARK, "style-dark.json")):
+    for name, palette, out, web in (("positron", LIGHT, "style-light.json", "base-light.json"), ("dark", DARK, "style-dark.json", "base-dark.json")):
         style = build(name, palette, folder)
         path = os.path.normpath(os.path.join(OUT, out))
-        json.dump(style, open(path, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+        for p in (path, os.path.normpath(os.path.join(WEB, web))):
+            json.dump(style, open(p, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
         print(f"{out}: {len(style['layers'])} capas, {os.path.getsize(path) // 1024} KB")

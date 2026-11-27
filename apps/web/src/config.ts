@@ -14,6 +14,9 @@ export const CONFIG = {
   signalLearningUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/aprendizaje.json",
   /** Huellas de los semáforos no medidos, sacadas de los buses detenidos (se usan solo si el archivo dice `use: true`). */
   footprintsUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/huellas.json",
+  /** Árboles de verdad para la vista 3D, por celdas (los publica el workflow «Árboles para el mapa 3D», ver tools/arboles.ts). Si la rama
+   *  aún no existe, el mapa siembra árboles dentro de los parques y ya. */
+  treesBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/arboles/",
   /** Posiciones compartidas por quienes van en un bus (archivo público que publica la función de Supabase «viajes»; ver
    *  supabase/LEEME-avisos.md). `null` = apagado (no se pide nada). */
   sharedRidesUrl: null as string | null,

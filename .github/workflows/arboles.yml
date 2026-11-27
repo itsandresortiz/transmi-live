@@ -1,0 +1,29 @@
+name: Árboles para el mapa 3D
+# A mano (y una vez al mes): baja los árboles de Bogotá (OpenStreetMap y, si se configura, el censo del arbolado urbano) y los publica
+# por celdas en la rama `arboles` (ver tools/arboles.ts). La web y la app los piden solo con la vista 3D encendida y de cerca; sin esta
+# rama siembran árboles dentro de los parques del mapa base.
+# Censo: poner la variable del repositorio ARBOLADO_URL (Settings > Variables) con la dirección de descarga, después de confirmar su
+# licencia. Sin ella, solo OpenStreetMap.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 7 3 * *"        # día 3 de cada mes, 2:41 a. m. de Bogotá
+permissions:
+  contents: write
+jobs:
+  arboles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npx --yes tsx tools/arboles.ts dist-arboles
+        env:
+          ARBOLADO_URL: ${{ vars.ARBOLADO_URL }}
+      - name: Publicar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: arboles
+        run: bash scripts/publish.sh dist-arboles
