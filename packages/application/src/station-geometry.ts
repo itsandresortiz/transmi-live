@@ -55,10 +55,12 @@ export interface CorridorLine { l: string; p: readonly [number, number][] }
 
 export function buildStationGeometry(state: TransitState, stations: readonly Station[], corridors: readonly CorridorLine[] = []): StationGeometry {
   const index = new Map<string, RouteShape>();
+  /** Todos los recorridos de troncal y dual que paran en cada parada (para centrar la estación entre sus dos sentidos). */
+  const byStop = new Map<string, Set<RouteShape>>();
   for (const [rid, shapes] of state.network.shapes) {
     const sys = state.network.routes.get(rid)?.system;
     if (sys !== "troncal" && sys !== "dual") continue;
-    for (const sh of shapes) for (const id of sh.stopIds) if (!index.has(id)) index.set(id, sh);
+    for (const sh of shapes) for (const id of sh.stopIds) { if (!index.has(id)) index.set(id, sh); (byStop.get(id) ?? byStop.set(id, new Set()).get(id)!).add(sh); }
   }
   const cache = new Map<RouteShape, RoadPath>();
   // línea de cada parada: la letra que más se repite entre las rutas troncales que se detienen ahí
@@ -164,9 +166,32 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
       else wagons.push({ n: it.n, u: p.u, v: p.v, ids: [it.stop.id], count: 1 });
     }
 
-    // Las coordenadas de las paradas del GTFS suelen quedar pegadas a un carril: la estación se centra lateralmente sobre la línea de su corredor
-    // (la mediana de la avenida), si esa línea está cerca y el ajuste es razonable.
+    // Primero, por donde pasan los buses: los recorridos de las rutas que paran ahí van por los carriles de la troncal, uno a cada lado de
+    // la estación. El centro de la estación es el punto medio entre el más a la izquierda y el más a la derecha (si son uno solo, ese).
+    // Antes se centraba sobre la línea dibujada del corredor, que en algunos tramos va corrida (Rionegro quedaba ~15 m hacia los carriles).
+    let byShapes = false;
     {
+      const vMid0 = wagons.reduce((a, w) => a + w.v, 0) / wagons.length, uMid0 = wagons.reduce((a, w) => a + w.u, 0) / wagons.length;
+      const cw = { x: (uMid0 * axis.ux + vMid0 * nx) * m, y: (uMid0 * axis.uy + vMid0 * ny) * m };
+      const vs: number[] = [];
+      const seen = new Set<RouteShape>();
+      for (const stop of st.stops) for (const sh of byStop.get(stop.id) ?? []) {
+        if (seen.has(sh) || sh.points.length < 2) continue;
+        seen.add(sh);
+        let path = cache.get(sh);
+        if (!path) { path = new Path(sh.points); cache.set(sh, path); }
+        const hit = path.project(cw, 0, 0, 45);
+        if (hit) vs.push(uv(path.pointAt(hit.s)).v);
+      }
+      if (vs.length) {
+        const lo = Math.min(...vs), hi = Math.max(...vs), dv = (lo + hi) / 2 - vMid0;
+        // carriles de un mismo corredor: separados como mucho ~30 m; más, es otra avenida que se cruza
+        if (hi - lo <= 30 && Math.abs(dv) <= 28) { if (Math.abs(dv) >= 1) for (const w of wagons) w.v += dv; byShapes = true; }
+      }
+    }
+    // Si no hay recorridos cerca: la estación se centra lateralmente sobre la línea de su corredor (la mediana de la avenida), si esa
+    // línea está cerca y el ajuste es razonable.
+    if (!byShapes) {
       const vMid0 = wagons.reduce((a, w) => a + w.v, 0) / wagons.length, uMid0 = wagons.reduce((a, w) => a + w.u, 0) / wagons.length;
       const cw = { x: (uMid0 * axis.ux + vMid0 * nx) * m, y: (uMid0 * axis.uy + vMid0 * ny) * m };
       const nm = nearestMedian(cw);
