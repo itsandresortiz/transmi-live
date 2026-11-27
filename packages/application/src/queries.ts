@@ -307,8 +307,9 @@ export function upcomingAtStop(state: TransitState, stopId: string, nowSec: numb
           continue;
         }
         if (k < 0 || k >= j) continue;                       // ya la pasó (o está en ella) o va por otro sentido
-        const etaAt = arrivalOrPassed(state, v, shape, k, j, nowSec * 1000);
-        if (etaAt == null) continue;                         // la cuenta venció hace rato: lo más probable es que ya pasó por esta parada
+        const raw = arrivalOrPassed(state, v, shape, k, j, nowSec * 1000);
+        if (raw == null) continue;                           // la cuenta venció hace rato: lo más probable es que ya pasó por esta parada
+        const etaAt = state.etaHold.smooth(v.id, stopId, raw, nowSec);      // si el bus quedó algo más atrás, la cuenta espera en vez de subir
         buses.push({ vehicle: v, etaAt, official: false, stopsAway: j - k });
       }
       if (waiting) buses.push({ vehicle: waiting.v, etaAt: nowSec, official: false, stopsAway: 0 });
