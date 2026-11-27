@@ -1,0 +1,27 @@
+name: Aprender el orden de paradas
+# Sigue la «última parada» que reporta cada bus y acumula, por ruta, los pasos de una parada a la siguiente (solo conteos) en la rama
+# stop-order. Publica ahí stop-fixes.json con las correcciones al GTFS que tengan evidencia fuerte (muchos buses, varios días); el
+# workflow «GTFS diario» las aplica al armar la red. Ver tools/stoporder.ts.
+on:
+  # Para que acumule días hay que encender el horario (quitar el «#» de las dos líneas). Cada corrida graba ~7 min; unas pocas al día bastan.
+  # schedule:
+  #   - cron: "23 12,17,22 * * *"   # 7:23, 12:23 y 17:23 hora de Bogotá (pico, valle, pico)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: stop-order
+  cancel-in-progress: false
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - name: Grabar ~7 minutos y publicar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx --yes tsx tools/stoporder.ts 420

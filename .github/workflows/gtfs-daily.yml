@@ -29,6 +29,8 @@ jobs:
       - name: Red ya procesada para la app (abre más rápido en teléfonos modestos)
         run: |
           npm ci --no-audit --no-fund
+          # orden de paradas aprendido de los buses (rama stop-order, ver tools/stoporder.ts); si no está, la red sale igual que antes
+          if curl -fsSL --retry 2 -o out/stop-fixes.json "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/stop-order/stop-fixes.json"; then export CORRECCIONES=out/stop-fixes.json; else rm -f out/stop-fixes.json; fi
           npx tsx tools/network-dto.ts out/gtfs-lite.zip out/network.json.gz
           ls -lh out
       - name: Publicar el GTFS reducido en la rama live-data

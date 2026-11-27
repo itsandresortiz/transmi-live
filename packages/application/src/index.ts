@@ -28,3 +28,5 @@ export * from "./signal-footprint";
 export * from "./eta-hold";
 export * from "./route-directions";
 export * from "./signal-report";
+export * from "./returning-buses";
+export * from "./stop-order";

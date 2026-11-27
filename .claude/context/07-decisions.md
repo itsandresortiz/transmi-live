@@ -113,3 +113,9 @@ Contexto: con tu ubicación confirmando el viaje, la siguiente parada se contaba
 
 ## 2026-11-24 · Un viaje con GPS se pasa solo al bus de los datos que coincide
 Contexto: si tu bus no reportaba al subir y elegiste «¿En qué bus vas?», cuando el bus vuelve a reportar quedaba como otro bus. Se enlaza si un bus de la misma ruta y sentido cuadra contigo (≤300 m contando ~7 m/s desde su reporte, reporte ≤2,5 min, no más de 150 m por delante) en **dos reportes distintos** y vas en movimiento. Se descartó preguntar a la persona (molesta en el bus) y enlazar con un solo reporte (en troncales con buses en fila podría tomar el de atrás). Riesgo aceptado: dos buses de la misma ruta pegados pueden confundirse.
+
+## 2026-11-27 · En la cabecera de una ruta se anuncian los buses que vienen por la ruta de regreso
+Contexto: en la primera parada de una ruta casi nunca hay buses «antes» de ella, y TransMilenio publica el regreso como otra ruta con otra letra y el mismo número. Se eligió sumar los buses de esa ruta de regreso (mismo sistema y número, termina a ≤400 m) con 2 min de vuelta supuestos. Alternativa descartada: mostrar solo el horario programado (no dice si de verdad viene un bus). Riesgo: el bus puede quedarse en el portal o salir como otra ruta; por eso no se anuncia a más de 40 min y falta medir la vuelta.
+
+## 2026-11-27 · Las correcciones aprendidas del orden de paradas se aplican al armar la red, no en las apps
+Contexto: se podían aplicar en cada app (como `STOP_PATCHES`) o al publicar la red diaria. Se eligió lo segundo: llega a todas las versiones sin actualizar, y cada corrección exige que las paradas vecinas sigan igual (se apaga sola si TransMilenio corrige el GTFS). Límite: quien arme la red desde `gtfs-lite.zip` (respaldo) no las recibe.

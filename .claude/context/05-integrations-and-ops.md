@@ -90,3 +90,6 @@ Datos reales para validar: `git fetch origin +live-data:refs/remotes/origin/live
 
 ## Informe de semáforos (2026-11-27)
 `deploy-web.yml` corre `tools/informe-semaforos.ts` sobre `apps/web/dist` (con `continue-on-error`: si falla queda la copia de `apps/web/public/`). Lee la rama `signal-stats` y los nombres de `semaforos.json` o de la red semafórica de Movilidad.
+
+## Orden de paradas aprendido (2026-11-27)
+Rama `stop-order` (`stats.json.gz`, `stop-fixes.json`), workflow `stop-order.yml` (horario comentado: encenderlo es decisión del dueño), herramienta `tools/stoporder.ts` (`LOTES=<carpeta>` para solo informe). `gtfs-daily.yml` baja `stop-fixes.json` y `tools/network-dto.ts` lo aplica con `CORRECCIONES=`.

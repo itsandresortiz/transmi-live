@@ -6,10 +6,12 @@
  * Escribe también `network2.json.gz` al lado (formato compacto, ver `compact.ts`): lo leen las apps nuevas; el de siempre queda para las viejas.
  *
  * Uso: npx tsx tools/network-dto.ts <gtfs-lite.zip> <network.json.gz>     (lo corre el workflow «GTFS diario»)
+ *      CORRECCIONES=<stop-fixes.json> …   aplica también el orden de paradas aprendido de los buses (`tools/stoporder.ts`)
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { applyStopPatches, applyTempStopChanges, compactNetwork, parseGtfsLite } from "@transmi/infrastructure";
+import { applyLearnedStopFixes, type LearnedStopFix } from "@transmi/application";
 
 const [src, out] = process.argv.slice(2);
 if (!src || !out) { console.error("Uso: npx tsx tools/network-dto.ts <gtfs-lite.zip> <network.json.gz>"); process.exit(1); }
@@ -19,6 +21,15 @@ void (async () => {
   const dto = await parseGtfsLite(new Uint8Array(readFileSync(src)).buffer as ArrayBuffer);
   // las correcciones y los cierres temporales de hoy van ya aplicados: así les llegan también a las apps publicadas (que traen la lista vieja)
   applyStopPatches(dto);
+  // orden de paradas aprendido de los buses (solo correcciones con evidencia fuerte; cada una se apaga sola si el GTFS ya cambió)
+  const fx = process.env.CORRECCIONES;
+  if (fx && existsSync(fx)) {
+    try {
+      const fixes = (JSON.parse(readFileSync(fx, "utf8")).fixes ?? []) as LearnedStopFix[];
+      const names = new Map(dto.routes.map((r) => [r.id, r.shortName])), known = new Set(dto.stops.map((s) => s.id));
+      for (const f of applyLearnedStopFixes(dto.shapes, (id) => names.get(id), (id) => known.has(id), fixes)) console.log(`orden aprendido: ${f.why}`);
+    } catch (e) { console.log("correcciones aprendidas ilegibles, se ignoran:", (e as Error).message); }
+  }
   for (const c of applyTempStopChanges(dto)) console.log(`cambio temporal: ${c.route} ${c.stop}${c.replaceWith ? ` → ${c.replaceWith}` : " (se salta)"}`);
   for (const s of dto.stops) { s.lat = r5(s.lat); s.lon = r5(s.lon); }
   for (const sh of dto.shapes) sh.pts = sh.pts.map(r5);
