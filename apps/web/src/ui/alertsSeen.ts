@@ -23,7 +23,10 @@ interface Seen { seen: Set<string>; markSeen(alerts: readonly ServiceAlert[]): v
 export const useAlertsSeen = create<Seen>((set, get) => ({
   seen: new Set(load()),
   markSeen: (alerts) => {
-    const keys = alerts.map(alertKey);
+    // sin repetidos: dos avisos con la misma clave (p. ej. el mismo aviso de TransMilenio y de la red) hacían que `keys.length` nunca
+    // igualara al tamaño del conjunto, se guardaba un conjunto nuevo cada vez y, con la lista abierta, la página entraba en un ciclo sin
+    // fin y quedaba en negro (2026-11-27)
+    const keys = [...new Set(alerts.map(alertKey))];
     const cur = get().seen;
     if (keys.length === cur.size && keys.every((k) => cur.has(k))) return;
     const next = new Set(keys);          // se descartan los de avisos que ya vencieron
