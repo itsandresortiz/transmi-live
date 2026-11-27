@@ -99,6 +99,10 @@ def greens(style, dark):
          "paint": {"fill-color": g["grass"], "fill-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 13, 0.95]}}, "landcover_wood")
     put({"id": "landuse_pitch", "type": "fill", "source": "openmaptiles", "source-layer": "landuse", "minzoom": 13, "filter": PITCH_FILTER,
          "paint": {"fill-color": g["pitch"], "fill-outline-color": g["pitch_line"], "fill-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0, 14, 1]}}, "waterway")
+    # el agua va ENCIMA de parques y hierba: los lagos dentro de un parque (el del Simón Bolívar, El Lago) quedaban tapados por el verde
+    if "water" in ids and "waterway" in ids:
+        water = layers.pop(ids.index("water")); ids[:] = [l["id"] for l in layers]
+        insert_before("waterway", water)
     if "landuse_park" in ids:          # en el oscuro original: la clase `park` de `landuse` no existe en OpenMapTiles (no pintaba nada)
         layers.pop(ids.index("landuse_park")); ids[:] = [l["id"] for l in layers]
     before = "place_other" if dark else "label_other"
