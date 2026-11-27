@@ -89,6 +89,8 @@ const STALE_SECONDS = 5;
 /** Por debajo de esto (m/s, medido en ≥28 s) el bus estaba detenido. */
 const STILL_MPS = 0.5;
 const MAX_STEP = 0.25;
+/** Cuánto puede ir el bus dibujado por delante del real esperando a que lo alcance (m). Más que esto es un dato malo u otro trazado. */
+const HOLD_MAX_M = 1500;
 
 /** Calcula, cuadro a cuadro, dónde dibujar cada bus: sigue el trazado de su ruta, nunca retrocede y
  *  corrige los errores acelerando o frenando poco a poco en vez de dar saltos. */
@@ -137,7 +139,11 @@ export class MotionEngine {
       if (!t || nowSec - t.lastT > STALE_SECONDS) {
         const plan = this.hopPlan(v, lock, nowSec);
         const target = this.target(v, nowSec, lock, sp, plan);
-        t = { reportedAt: v.reportedAt, lock, speed: sp, s: target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: target.world.x, y: target.world.y, bx: target.world.x, by: target.world.y, ox: 0, oy: 0, u: target.rate, ux: 0, uy: 0, lastT: nowSec, h: null, plan };
+        // el bus ya se había dibujado más adelante sobre el mismo trazado (se dejó de mirar unos segundos y se vuelve al mapa): se queda
+        // donde estaba y espera a que el bus real llegue ahí. Antes se volvía a poner en el punto calculado, que podía quedar atrás
+        const keep = t && lock && t.lock?.path === lock.path && t.s > target.s && t.s - target.s < HOLD_MAX_M ? t.s : null;
+        const at = keep != null && lock ? lock.path.pointAt(keep) : target.world;
+        t = { reportedAt: v.reportedAt, lock, speed: sp, s: keep ?? target.s, s0: lock ? lock.s : 0, sStop: this.stopS(v, lock), x: at.x, y: at.y, bx: at.x, by: at.y, ox: 0, oy: 0, u: keep != null ? 0 : target.rate, ux: 0, uy: 0, lastT: nowSec, h: t?.h ?? null, plan };
         this.tracks.set(v.id, t);
         t.h = this.targetHeading(t, v);
         return { x: t.x, y: t.y };
@@ -164,14 +170,18 @@ export class MotionEngine {
     if (t.lock) {
       // 2) a lo largo del trazado: velocidad = la del bus + corrección proporcional al error; sin retroceder
       const e = tgt.s - t.s;
-      if (Math.abs(e) > p.snapMeters) {
+      // muy ATRÁS de donde debería ir: se pone al día deslizándose. Muy ADELANTE: nunca se devuelve (se ve como si el bus retrocediera);
+      // espera quieto a que el bus real llegue (abajo). Solo si el reporte quedó absurdamente atrás (otro trazado, un dato malo) se acepta
+      if (e > p.snapMeters || e < -HOLD_MAX_M) {
         const before = t.lock.path.pointAt(t.s);
         t.s = tgt.s; t.u = rate;
         const after = t.lock.path.pointAt(t.s);
         t.ox += before.x - after.x; t.oy += before.y - after.y;      // el salto se absorbe deslizando
       } else {
         const umax = rate * p.maxRush + p.rushMarginMps;
-        const floor = rate > 1 && !(t.sStop !== Infinity && t.s >= t.sStop) ? rate * p.creep : 0;
+        // va al día o atrás: nunca baja de una fracción de su ritmo (no se ve congelado). Va ADELANTADO: frena, y si la diferencia es
+        // grande se detiene del todo hasta que el bus real lo alcance (antes seguía avanzando a medio ritmo y se iba alejando de la realidad)
+        const floor = e >= 0 && rate > 1 && !(t.sStop !== Infinity && t.s >= t.sStop) ? rate * p.creep : 0;
         const want = Math.min(umax, Math.max(floor, rate + p.catchUp * e));
         t.u += (want - t.u) * (1 - Math.exp(-dt / p.speedSmoothing));
         t.s = Math.min(t.lock.path.length, t.s + t.u * dt);

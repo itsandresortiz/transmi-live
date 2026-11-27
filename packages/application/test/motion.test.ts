@@ -161,3 +161,24 @@ describe("adelanto con los tiempos reales de cada tramo", () => {
     expect(drive(st, 1)).toEqual(plain);
   });
 });
+
+describe("un bus dibujado adelantado espera al real (nunca retrocede)", () => {
+  it("si el bus real se detiene, el dibujado frena y se queda quieto en vez de seguir de largo o devolverse", () => {
+    const st = world(), eng = new MotionEngine(st);
+    // va a 12 m/s y de pronto se queda detenido mucho rato (trancón): el dibujado iba por delante de los reportes
+    const reports: Record<number, VehicleReport> = { 0: rep(0, 1000), 10: rep(10, 1120), 20: rep(20, 1240), 30: rep(30, 1250), 40: rep(40, 1250), 50: rep(50, 1250), 60: rep(60, 1250), 70: rep(70, 1250), 80: rep(80, 1250) };
+    const { xs } = run(st, eng, reports, 90);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeGreaterThanOrEqual(-0.01);
+    // al final ya no se mueve (espera): los últimos 10 s avanza menos de 2 m
+    expect(xs[xs.length - 1]! - xs[xs.length - 1 - 300]!).toBeLessThan(2);
+  });
+  it("dejar de mirarlo unos segundos y volver: no aparece más atrás de donde se había dibujado", () => {
+    const st = world(), eng = new MotionEngine(st);
+    run(st, eng, { 0: rep(0, 1000), 10: rep(10, 1120), 20: rep(20, 1240) }, 28);
+    const before = xOf(eng.peek("b")!);
+    // el reporte siguiente lo deja algo más atrás de lo dibujado; se vuelve a mirar 10 s después
+    st.applyPositions([rep(30, 1250)], 30_000);
+    const after = xOf(eng.step(st.fleet.get("b")!, 40));
+    expect(after).toBeGreaterThanOrEqual(before - 0.5);
+  });
+});
