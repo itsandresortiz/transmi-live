@@ -51,8 +51,8 @@ export default function Ride() {
   // la primera vez: hoja de consejo («marca tu parada y te avisamos»)
   const hasBus = !!v;
   useEffect(() => { if (hasBus) void tipOnce("ride", 700); }, [hasBus]);
-  // compartir por dónde va el bus viene encendido: se explica una vez (si la hoja anterior está saliendo, queda para la próxima vez)
-  useEffect(() => { if (hasBus && shareAvailable() && useShareRides.getState().on) void tipOnce("share", 1200); }, [hasBus]);
+  // compartir por dónde va el bus viene encendido: se dice con una línea discreta más abajo (sin ventana), con su «Apagar»
+  const sharing = useShareRides((st) => st.on);
   const virtual = isVirtualRide(id);
   const found = !virtual && rideBus === id && wasLinked(id);
   const r = v ? transit.routeOf(v) : undefined;
@@ -131,6 +131,13 @@ export default function Ride() {
               : virtual ? <Card><Text style={[type.headline, { color: c.text }]}>Te seguimos con tu ubicación</Text><Text style={[type.body, { color: c.muted }]}>Este bus no aparece en los datos de TransMilenio en este momento. Mientras tengas la app abierta, el bus va donde vas tú y las paradas se cuentan desde ahí.</Text></Card> : null}
             {silent ? <Card><Text style={[type.headline, { color: "#d97706" }]}>Perdimos la señal de este bus</Text><Text style={[type.body, { color: c.muted }]}>Hace {Math.round((now - v.reportedAt) / 60)} min que no reporta. Los tiempos son aproximados.</Text></Card> : null}
 
+            {shareAvailable() && sharing && rideBus === id ? (
+              <View style={styles.share}>
+                <SymbolView name="bus.fill" tintColor={c.muted} size={13} />
+                <Text style={[type.caption, { color: c.muted, flexShrink: 1 }]}>Compartes por dónde va este bus, de forma anónima.</Text>
+                <Tap onPress={() => useShareRides.getState().set(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dejar de compartir por dónde va este bus"><Text style={[type.caption, { color: c.accent, fontWeight: "700" }]}>Apagar</Text></Tap>
+              </View>
+            ) : null}
             <View style={[styles.info, { backgroundColor: c.cardAlt }]}>
               <SymbolView name="info.circle.fill" tintColor={c.muted} size={22} />
               <Text style={[type.body, { color: c.text, flex: 1 }]}>
@@ -197,6 +204,7 @@ const styles = StyleSheet.create({
   progressTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   segments: { flexDirection: "row", gap: 5 },
   segment: { flex: 1, height: 26, borderRadius: 7, borderCurve: "continuous" },
+  share: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: -space[2] },
   pillBtn: { minHeight: 50, borderRadius: radius.pill, flexDirection: "row", gap: space[2], alignItems: "center", justifyContent: "center", marginTop: space[1] },
   btn: { minHeight: 54, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: space[2], marginTop: space[2] },
   tl: { flexDirection: "row", gap: space[3], minHeight: 52 },

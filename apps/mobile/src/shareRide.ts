@@ -9,8 +9,8 @@ import { transit } from "./composition-root";
 import { nowMs } from "./clock";
 
 /**
- * «Ayudar a mejorar el mapa» (ENCENDIDO por defecto desde el 2026-11-27, decisión del dueño; se apaga en Más y se explica en la hoja
- * de consejo de «Voy en este bus» y en la política de privacidad): mientras vas en un bus con «Voy en este bus» y tu GPS
+ * «Ayudar a mejorar el mapa» (ENCENDIDO por defecto desde el 2026-11-27, decisión del dueño; se apaga en Más o en la línea
+ * discreta de «Voy en este bus», y se explica en la política de privacidad): mientras vas en un bus con «Voy en este bus» y tu GPS
  * confirma que vas en él, cada ~20 s se manda por dónde va ESE BUS sobre su recorrido: ruta, recorrido, metros desde el inicio, hora,
  * velocidad y el número del bus solo si es uno de los datos de TransMilenio. Nada de ti ni de tu teléfono (ni coordenadas, ni identificador).
  * Con eso todas las apps dibujan ese bus donde va de verdad durante ≤60 s. El servidor lo borra a las 24 h.
