@@ -10,6 +10,7 @@ import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
 import { cableCabinImage, stationChipImage, trafficLightImage } from "./sprites";
 import { type MapTheme, type Scheme, themeOf } from "./theme";
+import { Trees3D } from "./trees3d";
 
 export interface MapEvents {
   onBusClick(id: string): void;
@@ -474,6 +475,7 @@ export class MapController {
           const mm = m as unknown as { _elevationFreeze?: boolean; _finalizeElevation?: () => void; terrain?: unknown };
           if (this.on3D && mm.terrain && mm._elevationFreeze && !m.isMoving()) mm._finalizeElevation?.();
           if (this.on3D) this.loadSignals3D();          // los semáforos con volumen son solo los de la pantalla
+          if (this.on3D) this.syncTrees();              // los árboles salen al acercarse (la capa de three.js se carga ahí)
         });
       }
     } else {
@@ -486,6 +488,14 @@ export class MapController {
     }
   }
   get is3D(): boolean { return this.on3D; }
+  /** Árboles en 3D (de cerca): debajo de los nombres de calles del juego de capas visible, como los edificios. */
+  private trees3d: Trees3D | null = null;
+  private syncTrees() {
+    const dark = this.scheme === "dark";
+    (this.trees3d ??= new Trees3D(this.map)).sync(this.on3D, dark, dark ? "bd-highway_name_other" : "bl-highway-name-path");
+  }
+  /** Para medir (modo de pruebas y capturas): cuántos árboles hay y cuánto tardó armarlos. */
+  get treeStats() { return this.trees3d?.stats ?? null; }
   /** Muestra los edificios y la sombra del relieve del juego de la apariencia actual (o nada, en 2D). */
   private paint3D() {
     const m = this.map, dark = this.scheme === "dark";
@@ -496,6 +506,7 @@ export class MapController {
     // semáforos: en 3D, desde el zoom 16 el poste con su caja reemplaza al ícono plano
     vis("semaforos-3d", this.on3D && this.signalsOn);
     vis("estaciones-3d", this.on3D && this.stopsOn); vis("estaciones-3d-vidrio", this.on3D && this.stopsOn);
+    this.syncTrees();
     if (this.on3D && this.loaded3D) this.load3D();        // cambió la apariencia, las estaciones o las capas con el 3D ya encendido
     if (m.getLayer("semaforos-icons")) m.setLayerZoomRange("semaforos-icons", 15.4, this.on3D ? SIGNAL_3D_MIN_ZOOM : 24);
   }

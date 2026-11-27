@@ -1,7 +1,7 @@
 import { type ComponentProps, forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, StyleSheet } from "react-native";
 import * as Location from "expo-location";
-import { Camera, GeoJSONSource, Images, Layer, Map, RasterDEMSource, UserLocation, type CameraRef } from "@maplibre/maplibre-react-native";
+import { Camera, GeoJSONSource, Images, Layer, Map, RasterDEMSource, UserLocation, type CameraRef, type MapRef } from "@maplibre/maplibre-react-native";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { SystemType } from "@transmi/domain";
 import { transit } from "@/composition-root";
@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { BUILDINGS_3D_FILTER, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { BUILDINGS_3D_FILTER, TREE_3D_MIN_ZOOM, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -19,6 +19,7 @@ import darkStyle from "./style-dark.json";
 import { BUS_SPRITES } from "./sprites";
 import { sp } from "./styleProps";
 import { useBusFeatures, type Viewport } from "./useBuses";
+import { useTrees3d } from "./trees3d";
 import { SYSTEM_COLOR } from "@/ui/theme";
 import { router } from "expo-router";
 import { useRide } from "@/ride";
@@ -81,6 +82,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   const c = useColors();
   const { reduceMotion } = useAccessibility();
   const camera = useRef<CameraRef>(null);
+  const mapRef = useRef<MapRef>(null);
   const lastCenter = useRef<[number, number]>(BOGOTA);      // el centro actual, para girar a norte sin moverse
   const [view, setView] = useState<Viewport | null>(null);
   useTransitVersion();
@@ -230,6 +232,8 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
     const pts = signalPts && view && view.zoom >= SIGNAL_3D_MIN_ZOOM - 0.3 ? signalPts.filter((p) => p.lon > view.west && p.lon < view.east && p.lat > view.south && p.lat < view.north).slice(0, 400) : [];
     return JSON.stringify(signalVolumes(pts));
   }, [signalPts, view]);
+  /** Vista 3D de cerca: árboles con volumen en los parques (y los de verdad, si ya están publicados). */
+  const trees3dJson = useTrees3d(mapRef, view3d, view, lastCenter, c.dark);
   const testsOn = useTestsMode((t) => t.on);
   const liveSignalsJson = useLiveSignals(testsOn && showSignals && active);
   /** El viaje que se está siguiendo, como líneas y puntos. Las capas están siempre montadas: sin viaje, los datos van vacíos. */
@@ -283,7 +287,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   }, [view3d]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Map key={c.dark ? "oscuro" : "claro"} style={StyleSheet.absoluteFill} mapStyle={c.dark ? MAP_STYLE.dark : MAP_STYLE.light} logo={false} attribution attributionPosition={attributionPosition} compass={false} touchPitch={view3d} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
+    <Map ref={mapRef} key={c.dark ? "oscuro" : "claro"} style={StyleSheet.absoluteFill} mapStyle={c.dark ? MAP_STYLE.dark : MAP_STYLE.light} logo={false} attribution attributionPosition={attributionPosition} compass={false} touchPitch={view3d} onRegionDidChange={onRegion} onDidFinishLoadingMap={() => undefined}>
       <Camera ref={camera} initialViewState={compact ? { center: BOGOTA, zoom: 11.6 } : { center: lastView.center, zoom: lastView.zoom, pitch: view3d ? (lastView.pitch > 1 ? lastView.pitch : PITCH_3D) : 0 }} minZoom={9} maxZoom={19} />
       {/* vista 3D: sombra de los cerros y edificios con volumen. Siempre montadas (no se agregan ni quitan capas en caliente): se
           muestran u ocultan con `visibility`. Van debajo de los nombres de calles del mapa base y de todo lo de TransMi LIVE. */}
@@ -295,6 +299,11 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
           fillExtrusionHeight: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_height"], 6]],
           fillExtrusionBase: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_min_height"], 0]],
           fillExtrusionOpacity: c.dark ? 0.8 : 0.72, fillExtrusionVerticalGradient: true })} />
+      {/* árboles (tronco y copa de nube con rebanadas de esferas), con los edificios: debajo de los nombres de calles y de todo lo de TransMi LIVE */}
+      <GeoJSONSource id="arboles-3d" data={trees3dJson}>
+        <Layer id="arboles-3d" type="fill-extrusion" minzoom={TREE_3D_MIN_ZOOM} beforeId={c.dark ? "highway_name_other" : "highway-name-path"}
+          {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: ["get", "c"], fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 1, fillExtrusionVerticalGradient: true })} />
+      </GeoJSONSource>
       <Images images={BUS_SPRITES} />
       {/* debajo de tu punto, el haz que muestra hacia dónde apunta el teléfono (como en la web) */}
       <HeadingCone active={active} />

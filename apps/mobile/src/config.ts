@@ -14,6 +14,9 @@ export const CONFIG = {
   signalLearningUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/aprendizaje.json",
   /** Huellas de los semáforos no medidos, sacadas de los buses detenidos (se usan solo si el archivo dice `use: true`). */
   footprintsUrl: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/signal-stats/huellas.json",
+  /** Árboles de verdad para la vista 3D, por celdas (los publica el workflow «Árboles para el mapa 3D», ver tools/arboles.ts). Si la rama
+   *  aún no existe, el mapa siembra árboles dentro de los parques y ya. */
+  treesBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/arboles/",
   /** Función de Supabase «viajes» (avisos del viaje que se corrigen con la app cerrada y posiciones compartidas). `null` = APAGADO:
    *  los avisos son solo del teléfono, como siempre. Se enciende cuando el dueño la despliegue (ver supabase/LEEME-avisos.md); los avisos
    *  remotos además necesitan compilar con TM_PUSH=1. Ejemplo: "https://<proyecto>.supabase.co/functions/v1/viajes". */
