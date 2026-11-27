@@ -141,7 +141,9 @@ export class BusModelLayer implements CustomLayerInterface {
             return Number.isFinite(e) ? e : 0;
           };
           const zc = at(bus.lon, bus.lat), zf = at(bus.lon + dLon, bus.lat + dLat), zr = at(bus.lon - dLon, bus.lat - dLat);
-          g = { lon: bus.lon, lat: bus.lat, z: Math.max(zc, (zf + zr) / 2) + 0.03, pitch: Math.atan2(zf - zr, 2 * half), t: now, gen: this.groundGen };
+          // lo más alto de los tres puntos y 20 cm de holgura: el relieve que se dibuja se interpola entre teselas y en algunos tramos
+          // queda unos centímetros por encima de lo medido (el bus se veía «enterrado», 2026-11-27)
+          g = { lon: bus.lon, lat: bus.lat, z: Math.max(zc, zf, zr) + 0.2, pitch: Math.atan2(zf - zr, 2 * half), t: now, gen: this.groundGen };
           this.ground.set(bus.id, g);
         }
         z = g.z; pitch = g.pitch;

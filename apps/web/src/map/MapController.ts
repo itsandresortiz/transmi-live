@@ -716,9 +716,23 @@ export class MapController {
       }
   }
 
+  /** OpenStreetMap trae la cubierta de muchas estaciones de la troncal como un «edificio» de ~5 m que abarca vagones y carriles: en 3D
+   *  los buses quedaban metidos dentro de ese bloque gris (se veían enterrados) y tapaba la estación que dibujamos nosotros. Los
+   *  edificios que tocan una estación (a menos de 2 m de su contorno) no se levantan. */
+  private hideStationCovers(g: StationGeometry) {
+    const polys = g.bases.features.map((f) => f.geometry.coordinates);
+    if (!polys.length) return;
+    const geom = { type: "MultiPolygon", coordinates: polys };
+    for (const id of ["edificios-3d-claro", "edificios-3d-oscuro"]) {
+      if (!this.map.getLayer(id)) continue;
+      this.map.setFilter(id, ["all", BUILDINGS_3D_FILTER, [">", ["distance", geom], 2]] as never);
+    }
+  }
+
   /** Dibuja las estaciones de la troncal. */
   setStations(g: StationGeometry) {
     this.stationBase = g;
+    this.hideStationCovers(g);
     this.stationsVersion++;
     this.applyEstaciones();
     (this.map.getSource("station-bases") as GeoJSONSource | undefined)?.setData(g.bases);

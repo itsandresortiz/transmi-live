@@ -182,7 +182,7 @@ export function stationVolumes(
   const add = (geometry: Polygon, id: string, c: string, b: number, h: number, glassy = false) =>
     features.push({ type: "Feature", properties: glassy ? { id, c, b, h, g: 1 } : { id, c, b, h }, geometry });
   // la base (el contorno de toda la estación, más ancho que los vagones) apenas se levanta: si fuera de 0,9 m taparía la estación entera
-  for (const f of g.bases.features) add(f.geometry, String(f.properties?.all ?? ""), base, 0, 0.25);
+  for (const f of g.bases.features) add(f.geometry, String(f.properties?.all ?? ""), base, 0, 0.08);      // casi al ras: los buses pasan por encima (con 25 cm se les hundían las ruedas)
   // el pasillo: vidrio más bajo y techo del color de la línea, aclarado (los vagones, más altos, llevan el color pleno)
   for (const f of g.links.features) {
     const id = String(f.properties?.all ?? ""), line = String(f.properties?.l ?? "");
