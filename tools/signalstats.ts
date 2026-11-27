@@ -30,7 +30,12 @@ const KEEP_DAYS = 7;
 type NearStore = { obs: Record<string, [number, 0 | 1, Heading, number?][]>; goes: Record<string, [number, number, Heading, number?][]> };
 
 const SECONDS = Number(process.argv[2] ?? 270), EVERY_MS = 18_000;
-/** Si las apps suman la espera de los semáforos no medidos (por su huella) a las llegadas. Apagado hasta medir que mejora. */
+/** Si las apps suman la espera de los semáforos no medidos (por su huella) a las llegadas. Apagado: medido el 2026-11-27 con
+ *  `tools/etaprecision.ts` (captura del 2026-11-24 en valle, 70 lotes, 387 semáforos con huella) EMPEORA las llegadas. Donde la huella
+ *  suma espera (6–10 % de los pronósticos, ~27 s de mediana) el error mediano sube de 45/52/64 s a 62/67/79 s a 1/2/3 paradas y el
+ *  sesgo de +1/+13/+16 a +28/+40/+43 s: los buses que la huella dice que llegan en rojo llegan solo ~4 s más tarde que el resto. Los
+ *  tiempos aprendidos por tramo ya traen la espera media del semáforo, y la huella no acierta el momento del rojo. Volver a medir en
+ *  pico (cuando la huella sea por semáforo y no por cruce, o con más días) antes de encenderlo. */
 const HUELLAS_USE = false;
 const REPO = process.env.GITHUB_REPOSITORY ?? "itsandresortiz/transmi-live", TOKEN = process.env.GITHUB_TOKEN ?? "";
 const url = `https://${TOKEN ? `x-access-token:${TOKEN}@` : ""}github.com/${REPO}.git`;

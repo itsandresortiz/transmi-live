@@ -1,5 +1,6 @@
 import { type GeoPoint, type Route, type RouteShape, type Vehicle, bearingDegrees, toGeo, toWorld } from "@transmi/domain";
 import { arrivalAtIndex, estimateTravelSeconds, hav, shapeStops } from "./eta";
+import { rideHoldKey } from "./eta-hold";
 import type { TransitState } from "./transit-state";
 
 /** Una lectura del GPS del teléfono. `at` en ms; `accuracy` y `speed` como las da el sistema (metros, m/s), si las da. */
@@ -126,6 +127,13 @@ export function rideArrival(state: TransitState, v: Vehicle, shape: RouteShape, 
   const ss = shapeStops(state, shape), target = ss?.s[to];
   if (!ss || target == null) return now + snap.toNext / RIDE_CRUISE_MPS + Math.max(0, arrivalAtIndex(state, v, shape, snap.nextIndex, to, nowMs) - arrivalAtIndex(state, v, shape, snap.nextIndex, snap.nextIndex, nowMs));
   return now + ridePaceFactor(state, v, shape, snap, nowMs) * rideModelSeconds(state, v, shape, ss.s, snap.s, Math.max(snap.s, target), nowMs);
+}
+/** La hora a una parada para mostrar en «Voy en este bus»: desde tu GPS si lo confirma (`snap`), si no desde el reporte del bus; si la nueva
+ *  hora es algo más tarde que la mostrada, la cuenta se detiene en vez de subir (ver eta-hold.ts, con su memoria aparte `rideHoldKey`).
+ *  Los avisos programados usan la hora sin detener (`rideArrival` / `arrivalAtIndex`). */
+export function rideShownArrival(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, snap: RideSnap | null, to: number, nowMs: number): number {
+  const at = snap ? rideArrival(state, v, shape, lastIndex, snap, to, nowMs) : arrivalAtIndex(state, v, shape, lastIndex, to, nowMs);
+  return state.etaHold.smooth(rideHoldKey(v.id), shape.stopIds[to] ?? `#${to}`, at, nowMs / 1000);
 }
 /** Velocidad típica de un bus en marcha entre paradas (m/s), para cuando el recorrido no tiene trazado. */
 const RIDE_CRUISE_MPS = 8;

@@ -1,5 +1,5 @@
 import type { RouteShape, Vehicle } from "@transmi/domain";
-import { arrivalAtIndex, displayNextIndex } from "./eta";
+import { displayNextIndex, shownArrival } from "./eta";
 import type { TransitState } from "./transit-state";
 
 /** Un sentido de una ruta tal como lo ve la gente («hacia Portal Norte»), aunque TransMilenio lo publique con otro código de ruta.
@@ -84,7 +84,7 @@ export function directionBuses(state: TransitState, dir: RouteDirection, nowMs: 
     if (!nextId) continue;
     const k = seq.shape === dir.shape ? j - 1 : dir.shape.stopIds.indexOf(nextId) - 1;
     if (k < -1) continue;
-    out.push({ vehicle: v, k, nextStopId: nextId, at: arrivalAtIndex(state, v, seq.shape, seq.index, j, nowMs) });
+    out.push({ vehicle: v, k, nextStopId: nextId, at: shownArrival(state, v, seq.shape, seq.index, j, nowMs) });      // la cuenta se detiene en vez de subir
   }
   return out.sort((a, b) => b.k - a.k);
 }

@@ -1,22 +1,35 @@
 name: Medir precisión de los tiempos de llegada
 # Prueba puntual (se lanza a mano): compara la hora de llegada que muestra la app con la hora en que cada bus cruzó de verdad la parada.
 # El sesgo cambia con la hora: lanzarlo en cada franja (pico de la mañana 6–10, valle 10–16, pico de la tarde 16–20, noche 20–24,
-# hora de Bogotá) y comparar la línea «aprendido + N s» de cada una para ajustar `HOP_EXTRA_BY` (packages/application/src/hop-profile.ts).
+# hora de Bogotá), con la captura entera dentro de la franja, y leer el «RESUMEN» del final: la tabla «primera parada + N s, las demás
+# + L s» dice qué poner en `HOP_SPLIT_NEXT` / `HOP_SPLIT_LATER` (packages/application/src/hop-profile.ts, en la posición de la franja)
+# y las líneas de «huellas» si conviene `HUELLAS_USE` (tools/signalstats.ts). Los lotes quedan como artefacto «lotes-…» para volver
+# a medirlos en local con `LOTES=<carpeta> npx tsx tools/etaprecision.ts`.
 on:
   workflow_dispatch:
     inputs:
       segundos:
-        description: "Segundos de captura (720 = 12 min; hasta 1800)"
-        default: "720"
+        description: "Segundos de captura (1200 = 20 min; hasta 1800)"
+        default: "1200"
 permissions: { contents: read }
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npx --yes tsx tools/etaprecision.ts "$SEGUNDOS" 8
-        env: { SEGUNDOS: "${{ inputs.segundos || '720' }}" }
+      - run: npx --yes tsx tools/etaprecision.ts "$SEGUNDOS" 8 | tee resultado.txt
+        shell: bash
+        env: { SEGUNDOS: "${{ inputs.segundos || '1200' }}", GUARDAR: lotes }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lotes-${{ github.run_id }}
+          path: |
+            lotes
+            resultado.txt
+          retention-days: 14
+          if-no-files-found: ignore

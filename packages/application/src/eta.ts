@@ -63,6 +63,14 @@ export function arrivalAtIndex(state: TransitState, v: Vehicle, shape: RouteShap
   return eta > now + 3 ? eta : now + Math.max(10, 0.3 * remaining);
 }
 
+/** La hora de llegada para una cuenta regresiva en pantalla: `arrivalAtIndex`, pero si la nueva estimación es algo más tarde que lo
+ *  que ya se mostraba, la cuenta se detiene en vez de subir (ver eta-hold.ts). Es la misma memoria de las listas de una parada
+ *  (`upcomingAtStop`): el mismo bus a la misma parada dice lo mismo en la ficha del bus, la de la ruta y la de la parada.
+ *  Los avisos programados deben usar `arrivalAtIndex` (la hora sin detener). */
+export function shownArrival(state: TransitState, v: Vehicle, shape: RouteShape, lastIndex: number, to: number, nowMs = Date.now(), key = v.id): number {
+  return state.etaHold.smooth(key, shape.stopIds[to] ?? `#${to}`, arrivalAtIndex(state, v, shape, lastIndex, to, nowMs), nowMs / 1000);
+}
+
 /** Cuánto tiene que haberse vencido la cuenta a una parada para dar por hecho que el bus ya pasó por ella.
  *  Medido el 2026-11-11 con 73.989 casos de buses a una parada de distancia (el dato llega con ~1 min de edad): si la cuenta no ha vencido,
  *  el bus ya había pasado en el 7 % de los casos; vencida hace 0–30 s, 34 %; 30–60 s, 59 %; 60–120 s, 77 %. Antes se mostraban todos
@@ -92,7 +100,7 @@ export function rawArrival(state: TransitState, v: Vehicle, shape: RouteShape, l
     const f = Math.min(1, Math.max(0, (bus.s - sa) / (sb - sa)));        // fracción del tramo ya recorrida
     remaining -= hop(lastIndex) * f;
     eta = v.reportedAt + remaining;
-    if (state.hopProfile.apply && state.hopProfile.size) eta += state.hopProfile.extraAt(nowMs);      // corrección del sesgo medido, por franja si se sabe (ver HOP_EXTRA_S y HOP_EXTRA_BY)
+    if (state.hopProfile.apply && state.hopProfile.size) eta += state.hopProfile.extraAt(nowMs, to - lastIndex);      // corrección del sesgo medido: aparte la próxima parada, por franja si se sabe (ver HOP_SPLIT_NEXT)
     // semáforos medidos que los buses confirman (ver signal-eta.ts): si llega en rojo, se suma lo que le falta al rojo. Solo a 1–3 paradas,
     // donde la hora a la que llega al semáforo se conoce bien
     const st = info.s[to];

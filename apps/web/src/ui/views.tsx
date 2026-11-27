@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  arrivalAtIndex, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStopGroups, siblingStops,
+  arrivalAtIndex, shownArrival, upcomingAtStop, kpis, listVehicles, normalize, routeDetail, routesAtStop, searchAlerts, searchRoutes, searchStopGroups, siblingStops,
   pickDirection, routeDirections,
 } from "@transmi/application";
 import { useRide } from "./ride";
@@ -362,7 +362,7 @@ export function RouteDetailView({ id, th, act }: { id: string } & Props) {
               const s = transit.stopById(sid);
               const isNext = !!bus && k >= 0 && i === k + 1, passed = !!bus && k >= 0 && i <= k;
               const tag = !bus || k < 0 || i <= k ? null
-                : `${isNext ? "Próxima parada · " : "aprox. "}${etaText(arrivalAtIndex(transit, bus, cur, k, i, nowMs()), nowSec)}`;
+                : `${isNext ? "Próxima parada · " : "aprox. "}${etaText(shownArrival(transit, bus, cur, k, i, nowMs()), nowSec)}`;
               // vista general de la ruta: buses que van hacia esta parada (es la siguiente de cada uno)
               const heading = !bus ? vehicles.filter((v) => { const q = transit.sequenceOf(v); return q?.shape === cur && q.index + 1 === i; }) : [];
               return (

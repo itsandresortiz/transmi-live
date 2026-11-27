@@ -29,8 +29,10 @@ export function busesConfirm(r: LearningRow | undefined): boolean {
 /** Un semáforo no medido con huella de los buses (ver signal-footprint.ts): su plan según el tipo de día, la franja y hacia dónde va el bus. */
 interface Footprinted { lat: number; lon: number; plans: Map<string, SignalModel> }
 const FRANJA = (h: number) => (h < 6 ? 0 : h < 10 ? 1 : h < 16 ? 2 : h < 20 ? 3 : 4);
-const DAY = (tMs: number) => { const w = new Date(tMs).getUTCDay(); return w === 0 ? "su" : w === 6 ? "sa" : "wk"; };      // como signalstats.ts
-const HEAD = (ux: number, uy: number) => { const deg = ((Math.atan2(ux, uy) * 180) / Math.PI + 360) % 360; return (["N", "E", "S", "O"] as const)[Math.round(deg / 90) % 4]!; };
+// como signalstats.ts: el día de Bogotá (antes se tomaba el de UTC y de 7 p. m. a medianoche se usaba el plan del día siguiente)
+const DAY = (tMs: number) => { const w = new Date(tMs - 5 * 3600_000).getUTCDay(); return w === 0 ? "su" : w === 6 ? "sa" : "wk"; };
+// hacia dónde va el bus, como `dirOf` de signalstats.ts: en coordenadas de mundo la «y» crece hacia el SUR (antes salían N y S al revés)
+const HEAD = (ux: number, uy: number) => { const deg = ((Math.atan2(ux, -uy) * 180) / Math.PI + 360) % 360; return (["N", "E", "S", "O"] as const)[Math.round(deg / 90) % 4]!; };
 
 export class SignalWaits {
   private list: Confirmed[] = [];
@@ -74,7 +76,7 @@ export class SignalWaits {
   /** Segundos de espera en los semáforos confirmados entre los metros `fromS` y `toS` del recorrido `path`, si el bus llega a cada uno
    *  en rojo. `arriveAt(s)` dice a qué hora (s desde 1970) pasa el bus por el metro `s`. */
   waitAlong(path: RoadPath, fromS: number, toS: number, arriveAt: (s: number) => number): number {
-    if (!this.list.length || toS <= fromS) return 0;
+    if (!this.size || toS <= fromS) return 0;      // (antes miraba solo los confirmados: sin ninguno, las huellas nunca contaban)
     let wait = 0;
     for (const sig of this.list) {
       const hit = path.projectAfter(toWorld(sig as GeoPoint), Math.max(0, fromS - 40), 30);

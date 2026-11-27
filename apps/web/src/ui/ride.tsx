@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { create } from "zustand";
-import { arrivalAtIndex } from "@transmi/application";
+import { rideShownArrival } from "@transmi/application";
 import { routeTitle } from "@transmi/domain";
 import { transit } from "../composition-root";
 import { nowMs } from "../clock";
@@ -42,7 +42,8 @@ export function RideBar({ th }: { th: MapTheme }) {
   const seq = v ? transit.sequenceOf(v) : undefined;
   const ti = seq && stopId ? seq.shape.stopIds.indexOf(stopId, Math.max(0, seq.index)) : -1;
   const left = seq && ti >= 0 ? ti - seq.index : null;           // paradas por recorrer hasta la tuya (0 = ya llegó)
-  const eta = v && seq && ti >= 0 ? arrivalAtIndex(transit, v, seq.shape, seq.index, ti, nowMs()) : undefined;
+  // la cuenta se detiene en vez de subir de golpe (en la web no hay GPS del viaje: se cuenta desde el bus)
+  const eta = v && seq && ti >= 0 ? rideShownArrival(transit, v, seq.shape, seq.index, null, ti, nowMs()) : undefined;
 
   useEffect(() => {
     if (left == null) return;

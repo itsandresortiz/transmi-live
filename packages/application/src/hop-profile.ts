@@ -21,7 +21,7 @@ export function hopTag(nowMs: number): { day: HopDay; bucket: number } {
 }
 
 /** Formato publicado: `r["ruta|sentido"]["wk|1"] = [segundos0, pasadas0, segundos1, pasadas1, …]` (0, 0 = sin datos de ese tramo). */
-export interface HopProfileData { v: 1; updated: string; /** `false` = publicado solo para medir; la app no lo usa todavía. */ use?: boolean; /** Cuánto pesa el valor fijo (sobrescribe `HOP_PRIOR_N` en apps ya publicadas). */ prior?: number; /** Segundos de más en cada llegada (`HOP_EXTRA_S`). Lo leen las apps viejas; las nuevas prefieren `extraBy`. */ extra?: number; /** Lo mismo por franja (`HOP_BUCKETS`, 5 valores): el sesgo no es igual en hora pico que de noche. */ extraBy?: number[]; r: Record<string, Record<string, number[]>> }
+export interface HopProfileData { v: 1; updated: string; /** `false` = publicado solo para medir; la app no lo usa todavía. */ use?: boolean; /** Cuánto pesa el valor fijo (sobrescribe `HOP_PRIOR_N` en apps ya publicadas). */ prior?: number; /** Segundos de más en cada llegada (`HOP_EXTRA_S`). Lo leen las apps viejas; las nuevas prefieren `extraBy`. */ extra?: number; /** Lo mismo por franja (`HOP_BUCKETS`, 5 valores): el sesgo no es igual en hora pico que de noche. */ extraBy?: number[]; /** Corrección aparte para la próxima parada (`next`) y para las demás (`later`), 5 valores por franja cada una. Las apps que la entienden la prefieren a `extra`/`extraBy`. */ split?: { next: number[]; later: number[] }; r: Record<string, Record<string, number[]>> }
 
 /** Un tramo tiene que haberse recorrido al menos esto (en tramos completos) para usar su tiempo. */
 export const HOP_MIN_N = 3;
@@ -39,6 +39,19 @@ export const HOP_EXTRA_S = 15;
  *  siguientes (−3/−5 s a 2–3 paradas): +15 s las empeora un poco (error 36→40 s a 2 paradas). Medir con el workflow «Medir precisión de
  *  los tiempos de llegada» en pico (6–10 y 16–20) y de noche, y llenar esto solo si alguna franja pide más de ~10 s distinto al valle. */
 export const HOP_EXTRA_BY: readonly number[] | null = null;
+/** Corrección separada para la **próxima parada** (`HOP_SPLIT_NEXT`) y para **las demás** (`HOP_SPLIT_LATER`), por franja (`HOP_BUCKETS`).
+ *  Va en el perfil como `split`; las apps viejas no lo leen y siguen con `extra` (+15 a todas). Por qué: el sesgo está casi todo en la
+ *  próxima parada y sumar lo mismo a las siguientes las empeoraba. Medido el 2026-11-27 con `tools/etaprecision.ts` sobre la captura del
+ *  2026-11-24 en valle (70 lotes de ~5.300 buses, 10:53–11:45; 115.000 / 195.000 / 204.000 pronósticos a 1 / 2 / 3 paradas):
+ *    sin corrección:      sesgo −18 / −4 / +1 s, error mediano 37 / 38 / 50 s, p90 253 / 179 / 218 s
+ *    +15 a todas (antes): sesgo  −3 / +11 / +16 s, error mediano 37 / 42 / 55 s, p90 240 / 173 / 213 s
+ *    +15 y luego +0:      sesgo  −3 / −4 / +1 s,  error mediano 37 / 38 / 50 s, p90 240 / 179 / 218 s
+ *  (+10 a la próxima da 36 s de mediana pero sesgo −8 y p90 244; −5 a las demás gana 1 s de mediana: dentro del ruido.) Cada mitad de
+ *  la captura por separado (34 y 27 lotes) da lo mismo: con +15 y luego +0, sesgo −3/−3/+2 y 0/−2/+1 s.
+ *  Solo el valle (posición 2) está medido; las otras franjas copian el valle hasta medirlas con el workflow «Medir precisión de los
+ *  tiempos de llegada» (su resumen trae la tabla «primera parada + N s, las demás + L s»). */
+export const HOP_SPLIT_NEXT: readonly number[] | null = [15, 15, 15, 15, 15];
+export const HOP_SPLIT_LATER: readonly number[] | null = [0, 0, 0, 0, 0];
 const MIN_S = 8, MAX_S = 900;
 
 export class HopProfile {
@@ -50,6 +63,8 @@ export class HopProfile {
   extra = 0;
   /** Lo mismo por franja (`HOP_BUCKETS`); `null` = el mismo `extra` todo el día. */
   extraBy: number[] | null = null;
+  /** Corrección aparte para la próxima parada y para las demás, por franja (ver `HOP_SPLIT_NEXT`); `null` = la de `extra`/`extraBy`. */
+  split: { next: number[]; later: number[] } | null = null;
   private routes = new Map<string, Record<string, number[]>>();
   private stamp = "";
   private tag = hopTag(0);
@@ -77,12 +92,16 @@ export class HopProfile {
     this.apply = d.use !== false;          // se enciende o apaga desde los datos, sin sacar una versión nueva de la app
     if (typeof d.prior === "number" && d.prior >= 0) this.priorN = d.prior;
     this.extra = okExtra(d.extra) ? d.extra : 0;
-    this.extraBy = Array.isArray(d.extraBy) && d.extraBy.length === HOP_BUCKETS.length && d.extraBy.every(okExtra) ? d.extraBy.slice() : null;
+    this.extraBy = okBy(d.extraBy) ? d.extraBy.slice() : null;
+    const sp = d.split;
+    this.split = sp && okBy(sp.next) && okBy(sp.later) ? { next: sp.next.slice(), later: sp.later.slice() } : null;
     return true;
   }
 
-  /** Segundos que se suman a una llegada calculada a esta hora: el de su franja si el perfil lo trae, si no el general. */
-  extraAt(nowMs: number): number {
+  /** Segundos que se suman a una llegada calculada a esta hora a `away` paradas del bus (1 = la próxima): la corrección aparte de la
+   *  próxima parada y las demás si el perfil la trae; si no, la de su franja; si no, la general. */
+  extraAt(nowMs: number, away = 1): number {
+    if (this.split) return (away <= 1 ? this.split.next : this.split.later)[hopTag(nowMs).bucket]!;
     return this.extraBy ? this.extraBy[hopTag(nowMs).bucket]! : this.extra;
   }
 
@@ -111,6 +130,7 @@ export class HopProfile {
 }
 
 function okExtra(x: unknown): x is number { return typeof x === "number" && Number.isFinite(x) && x >= -120 && x <= 120; }
+function okBy(x: unknown): x is number[] { return Array.isArray(x) && x.length === HOP_BUCKETS.length && x.every(okExtra); }
 
 function pick(arr: number[] | undefined, i: number, minN: number): { s: number; n: number } | null {
   if (!arr) return null;
@@ -120,7 +140,7 @@ function pick(arr: number[] | undefined, i: number, minN: number): { s: number; 
 
 /** Arma el perfil publicado a partir de las sumas que acumula `tools/hopstats.ts` (`ruta|sentido|tramo|día|franja` → pasadas y segundos).
  *  `stopsOf` dice cuántas paradas tiene cada recorrido hoy: si el GTFS cambió y la ruta ya no tiene ese tramo, se descarta. */
-export function buildHopProfile(stats: Record<string, { n: number; sum: number }>, stopsOf: (routeDir: string) => number | undefined, updated: string, minN = HOP_MIN_N, use = true, prior = HOP_PRIOR_N, extra = HOP_EXTRA_S, extraBy: readonly number[] | null = HOP_EXTRA_BY): HopProfileData {
+export function buildHopProfile(stats: Record<string, { n: number; sum: number }>, stopsOf: (routeDir: string) => number | undefined, updated: string, minN = HOP_MIN_N, use = true, prior = HOP_PRIOR_N, extra = HOP_EXTRA_S, extraBy: readonly number[] | null = HOP_EXTRA_BY, split: { next: readonly number[]; later: readonly number[] } | null = HOP_SPLIT_NEXT && HOP_SPLIT_LATER ? { next: HOP_SPLIT_NEXT, later: HOP_SPLIT_LATER } : null): HopProfileData {
   const r: Record<string, Record<string, number[]>> = {};
   for (const [key, a] of Object.entries(stats)) {
     const [route, dir, idx, day, bucket] = key.split("|");
@@ -131,5 +151,5 @@ export function buildHopProfile(stats: Record<string, { n: number; sum: number }
     arr[2 * i] = Math.round(a.sum / a.n);
     arr[2 * i + 1] = Math.min(999, Math.round(a.n));
   }
-  return { v: 1, updated, use, prior, extra, ...(extraBy ? { extraBy: [...extraBy] } : {}), r };
+  return { v: 1, updated, use, prior, extra, ...(extraBy ? { extraBy: [...extraBy] } : {}), ...(split ? { split: { next: [...split.next], later: [...split.later] } } : {}), r };
 }
