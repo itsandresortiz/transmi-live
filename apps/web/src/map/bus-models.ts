@@ -41,6 +41,8 @@ export class BusModelLayer implements CustomLayerInterface {
   /** Punto de referencia (Mercator) del que se miden los buses en metros: así no se pierde precisión con números grandes. */
   private origin = { x: 0, y: 0, lat: 0, set: false };
   private readonly ground = new Map<string, Placed>();
+  /** Altura e inclinación que se están mostrando de cada bus (se acercan suavemente a las medidas en `ground`). */
+  private readonly drawnGround = new Map<string, { z: number; pitch: number; t: number }>();
   /** Sube cuando llegan teselas del relieve: las alturas medidas antes (quizá con una tesela gruesa) se vuelven a medir. */
   private groundGen = 0;
   private readonly proj = new THREE.Matrix4();
@@ -146,7 +148,13 @@ export class BusModelLayer implements CustomLayerInterface {
           g = { lon: bus.lon, lat: bus.lat, z: Math.max(zc, zf, zr) + 0.2, pitch: Math.atan2(zf - zr, 2 * half), t: now, gen: this.groundGen };
           this.ground.set(bus.id, g);
         }
-        z = g.z; pitch = g.pitch;
+        // la altura y la inclinación no saltan: se acercan a lo medido en ~¼ s. Antes, al volver a medir el suelo (cada ~10 m, cada 2 s o
+        // cada vez que llegaba una tesela del relieve más detallada) el bus subía o bajaba de golpe y parecía que brincara
+        let sh = this.drawnGround.get(bus.id);
+        if (!sh || now - sh.t > 1500) sh = { z: g.z, pitch: g.pitch, t: now };
+        else { const k = 1 - Math.exp(-(now - sh.t) / 250); sh.z += (g.z - sh.z) * k; sh.pitch += (g.pitch - sh.pitch) * k; sh.t = now; }
+        this.drawnGround.set(bus.id, sh);
+        z = sh.z; pitch = sh.pitch;
       }
       const x = (toMercX(bus.lon) - ox) * k, y = -(toMercY(bus.lat) - oy) * k;     // metros al este y al norte del punto de referencia
       // gira según el rumbo (adelante = +Y), se inclina con la pendiente y se pone en su sitio
@@ -173,6 +181,7 @@ export class BusModelLayer implements CustomLayerInterface {
     });
     this.shown = counts.reduce((a, v) => a + v, 0);
     if (this.ground.size > 2000) this.ground.clear();
+    if (this.drawnGround.size > 2000) this.drawnGround.clear();
     return changed;
   }
 
@@ -206,7 +215,7 @@ export class BusModelLayer implements CustomLayerInterface {
     const t = (this.map as unknown as { transform?: { getProjectionDataForCustomLayer?: (g?: boolean) => { mainMatrix: ArrayLike<number> } } }).transform;
     const data = t?.getProjectionDataForCustomLayer?.(true);
     if (!data) return null;
-    const m = data.mainMatrix, z = ((this.ground.get(id)?.z ?? 0) + alt) / metersPerMerc(lat), x = toMercX(lon), y = toMercY(lat);
+    const m = data.mainMatrix, z = ((this.drawnGround.get(id)?.z ?? this.ground.get(id)?.z ?? 0) + alt) / metersPerMerc(lat), x = toMercX(lon), y = toMercY(lat);
     const cx = m[0]! * x + m[4]! * y + m[8]! * z + m[12]!, cy = m[1]! * x + m[5]! * y + m[9]! * z + m[13]!, cw = m[3]! * x + m[7]! * y + m[11]! * z + m[15]!;
     if (!(cw > 0)) return null;
     const c = this.map.getCanvas(), w = c.clientWidth, h = c.clientHeight;

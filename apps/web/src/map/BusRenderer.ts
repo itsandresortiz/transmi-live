@@ -1,6 +1,6 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { nowMs as clockNow } from "../clock";
-import { BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, MotionEngine, busVolumes, routeHasAlert, type TransitState } from "@transmi/application";
+import { BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, MotionEngine, separateBuses, busVolumes, routeHasAlert, type TransitState } from "@transmi/application";
 import { type GeoPoint, type SystemType, type WorldPoint, METERS_PER_WORLD_UNIT, distanceMeters, toGeo, toWorld, isStaleReport } from "@transmi/domain";
 import { type BusDraw, BusCanvas } from "./BusCanvas";
 import type { MapController } from "./MapController";
@@ -175,6 +175,9 @@ export class BusRenderer {
       if (!r || (o.system && r.system !== o.system) || (family && !family.has(x.routeId))) continue;
       items.push({ id: x.id, lon: x.lon, lat: x.lat, color: th.system[r.system], left: x.heading > 180, angle: x.heading, long: r.system === "troncal", label: r.shortName });
     }
+    // de cerca, dos buses del mismo carril y sentido no se dibujan uno dentro del otro: el de atrás queda justo detrás (ver bus-spacing.ts).
+    // El corrimiento entra y sale suave (~0,4 s) para que el bus no salte cuando empieza o deja de pisarse con otro
+    if (zoom >= 15) this.applySpacing(items, nowMs);
     this.canvas.haloColor = th.halo; this.canvas.textColor = th.labelStrong;
     this.items = items;
     this.updateSolid(items, t);
@@ -185,6 +188,26 @@ export class BusRenderer {
       this.motion.prune();
       for (const id of this.shown.keys()) if (!this.state.fleet.get(id)) this.shown.delete(id);
     }
+  }
+
+  /** Corrimiento que se está mostrando de cada bus (metros este/norte), para separar los que se pisan. */
+  private readonly spacing = new Map<string, { dx: number; dy: number; t: number }>();
+  private applySpacing(items: BusDraw[], nowMs: number) {
+    // solo los de la pantalla (con 1.500 buses en la lista costaba ~9 ms por cuadro; con los de la pantalla, menos de 1 ms)
+    const b = this.mapc.map.getBounds(), w0 = b.getWest(), w1 = b.getEast(), s0 = b.getSouth(), s1 = b.getNorth();
+    const want = separateBuses(items.filter((x) => x.lon > w0 && x.lon < w1 && x.lat > s0 && x.lat < s1));
+    const kx = 111_320 * Math.cos((4.65 * Math.PI) / 180), ky = 110_540;
+    for (const it of items) {
+      const w = want.get(it.id), tx = w ? (w.lon - it.lon) * kx : 0, ty = w ? (w.lat - it.lat) * ky : 0;
+      let s = this.spacing.get(it.id);
+      if (!s) { if (!w) continue; s = { dx: 0, dy: 0, t: nowMs }; }
+      const k = 1 - Math.exp(-Math.max(0, nowMs - s.t) / 400);
+      s.dx += (tx - s.dx) * k; s.dy += (ty - s.dy) * k; s.t = nowMs;
+      if (!w && Math.abs(s.dx) < 0.05 && Math.abs(s.dy) < 0.05) { this.spacing.delete(it.id); continue; }
+      this.spacing.set(it.id, s);
+      it.lon += s.dx / kx; it.lat += s.dy / ky;
+    }
+    if (this.spacing.size > 3000) this.spacing.clear();
   }
 
   /** Rutas con algún aviso vigente (se recalcula solo cuando cambian los avisos: se pregunta por cada bus en cada cuadro). */

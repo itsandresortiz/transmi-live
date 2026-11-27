@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import { toGeo, type SystemType, type Vehicle, isStaleReport } from "@transmi/domain";
-import { cadenceMs, routeHasAlert } from "@transmi/application";
+import { cadenceMs, routeHasAlert, separateBuses } from "@transmi/application";
 import { transit } from "@/composition-root";
 import { nowSec } from "@/clock";
 import { motion } from "./engine";
@@ -73,6 +73,8 @@ export function useBusFeatures(view: Viewport | null, opts: { system?: SystemTyp
         if (x.lon < view.west - padX || x.lon > view.east + padX || x.lat < view.south - padY || x.lat > view.north + padY) continue;
         features.push({ type: "Feature", id: x.id, geometry: { type: "Point", coordinates: [x.lon, x.lat] }, properties: { id: x.id, color: SYSTEM_COLOR[r.system], sprite: `top-${r.system}-${r.system === "troncal" ? "l" : "s"}`, rot: ((x.heading % 360) + 360) % 360, o: 1, route: labels ? r.shortName : "" } });
       }
+      // de cerca, dos buses del mismo carril y sentido no se dibujan uno dentro del otro (el de atrás queda justo detrás; entra y sale suave)
+      if (view.zoom >= 15) spaceApart(features, t * 1000);
       setData({ type: "FeatureCollection", features });
       return features.length;
     };
@@ -101,4 +103,23 @@ function alertRoutes(): Set<string> {
   for (const id of transit.alertsByRoute.keys()) for (const f of transit.routeFamily(id)) if (routeHasAlert(transit, f)) set.add(f);
   alertCache = { alerts: transit.alerts, set };
   return set;
+}
+
+/** Corrimiento que se está mostrando de cada bus (metros este/norte) para separar los que se pisan (ver `bus-spacing.ts`). */
+const spacing = new Map<string, { dx: number; dy: number; t: number }>();
+function spaceApart(features: Feature<Point>[], nowMs: number) {
+  const list = features.map((f) => { const [lon, lat] = f.geometry.coordinates as [number, number]; const p = f.properties ?? {}; return { id: String(p.id), lon, lat, angle: typeof p.rot === "number" ? p.rot : null, long: String(p.sprite).endsWith("-l") }; });
+  const want = separateBuses(list);
+  const kx = 111_320 * Math.cos((4.65 * Math.PI) / 180), ky = 110_540;
+  for (let i = 0; i < features.length; i++) {
+    const it = list[i]!, w = want.get(it.id), tx = w ? (w.lon - it.lon) * kx : 0, ty = w ? (w.lat - it.lat) * ky : 0;
+    let sp = spacing.get(it.id);
+    if (!sp) { if (!w) continue; sp = { dx: 0, dy: 0, t: nowMs }; }
+    const k = 1 - Math.exp(-Math.max(0, nowMs - sp.t) / 400);
+    sp.dx += (tx - sp.dx) * k; sp.dy += (ty - sp.dy) * k; sp.t = nowMs;
+    if (!w && Math.abs(sp.dx) < 0.05 && Math.abs(sp.dy) < 0.05) { spacing.delete(it.id); continue; }
+    spacing.set(it.id, sp);
+    features[i]!.geometry.coordinates = [it.lon + sp.dx / kx, it.lat + sp.dy / ky];
+  }
+  if (spacing.size > 3000) spacing.clear();
 }
