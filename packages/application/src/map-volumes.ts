@@ -173,7 +173,7 @@ export const STATION_3D_MIN_ZOOM = 15;      // como los edificios: la estación 
 /** Estaciones de la troncal en 3D, con la arquitectura de las de TransMilenio: plataforma elevada (~0,9 m) de concreto, cerramiento de
  *  vidrio a los lados (va en una capa translúcida: `g = 1`), estructura de acero gris con postes y una cubierta plana gris que sobresale
  *  un poco, con el color de su línea en una franja a la altura de las puertas y en el borde de la cubierta. Solo los vagones tienen
- *  techo: el pasillo que los une es un pasadizo gris descubierto con barandas bajas. La base apenas se levanta. `colorOf` da el color de cada línea (A, B, C…) según la apariencia.
+ *  techo: el pasillo que los une es un pasadizo gris descubierto con barandas bajas. `colorOf` da el color de cada línea (A, B, C…) según la apariencia.
  *  Las piezas son cajas de 4 lados (no cápsulas redondeadas): más parecidas a las reales y livianas para el mapa. */
 export function stationVolumes(
   g: { bases: FeatureCollection<Polygon>; capsules: FeatureCollection<Polygon>; links: FeatureCollection<Polygon> },
@@ -182,14 +182,12 @@ export function stationVolumes(
   const features: Feature<Polygon, BusVolumeProps>[] = [];
   const dark = !!opts.dark;
   const C = {
-    base: dark ? "#2e3139" : "#d9dde3",
     platform: dark ? "#555a64" : "#c3c8cf",      // concreto
     steel: dark ? "#8a919c" : "#9aa1ab",        // estructura y postes
     roof: dark ? "#6b717c" : "#e6e8eb",         // cubierta
     glass: dark ? "#8fb0cf" : "#b9d6ec",
   };
-  // la base (el contorno de toda la estación) casi al ras: los buses pasan por encima (con 25 cm se les hundían las ruedas)
-  for (const f of g.bases.features) features.push({ type: "Feature", properties: { id: String(f.properties?.all ?? ""), c: C.base, b: 0, h: 0.08 }, geometry: f.geometry });
+  // sin la base ovalada (el contorno de toda la estación): en 3D sobraba (pedido del dueño). La del mapa plano sigue ahí, invisible, para tocarla
   // alturas: la cubierta va a 5,0–5,3 m porque OpenStreetMap trae la cubierta de muchas estaciones como un edificio de 5 m (fundido con
   // los demás edificios): así la nuestra queda encima y se reconoce
   const PLAT = 0.9, GLASS = 3.3, BAND0 = 2.75, BAND1 = 3.25, ROOF0 = 5.0, ROOF1 = 5.3;

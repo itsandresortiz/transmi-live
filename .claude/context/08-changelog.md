@@ -4,6 +4,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-28 · Estaciones 3D: **sin la base ovalada gris** debajo (dueño). En el mapa plano sigue igual; en 3D queda invisible, solo para poder tocar la estación.
 - 2026-11-28 · Estaciones 3D: **solo los vagones tienen techo** (dueño). El pasillo entre vagones es un pasadizo gris descubierto, con piso a 0,9 m y barandas bajas grises, sin vidrio, techo ni color de línea. Vista previa en la web (La Campiña).
 - 2026-11-28 · **Estaciones 3D como las de TransMilenio** (web y app, pedido del dueño). `stationVolumes` arma cada vagón y el pasillo con cajas rectas en vez de cápsulas redondeadas:
   - plataforma de concreto a 0,9 m;

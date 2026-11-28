@@ -81,7 +81,7 @@ describe("stationVolumes", () => {
     const fc = (props: Record<string, unknown>) => ({ type: "FeatureCollection" as const, features: [{ type: "Feature" as const, properties: props, geometry: cap }] });
     const out = stationVolumes({ bases: fc({ all: "a,b" }), capsules: fc({ ids: "a", l: "B" }), links: { type: "FeatureCollection", features: [] } }, (l) => (l === "B" ? "#00a650" : "#999999"));
     const ps = out.features.map((f) => f.properties);
-    expect(ps.find((p) => p.b === 0)).toMatchObject({ h: 0.08 });                     // base casi al ras
+    expect(ps.some((p) => p.b === 0)).toBe(false);                                    // sin la base ovalada
     expect(ps.find((p) => p.b === 0.25)).toMatchObject({ h: 0.9 });                   // plataforma
     expect(ps.filter((p) => p.g === 1).length).toBe(4);                                // vidrio en lados y puntas
     expect(ps.filter((p) => p.g === 1).every((p) => p.b === 0.9)).toBe(true);
