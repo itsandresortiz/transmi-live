@@ -237,7 +237,16 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
       const twoSides = shapeVs.every((v) => v - lo < 4 || hi - v < 4);
       if (hi - lo >= PLAZA_MIN_LANES_M && twoSides && wagons.every((w) => w.v > lo - 4 && w.v < hi + 4)) {
         plaza = true;
-        for (const w of wagons) w.v = w.v - lo <= hi - w.v ? lo + CAPSULE_WIDTH / 2 + 0.6 : hi - CAPSULE_WIDTH / 2 - 0.6;
+        // un vagón por letra Y por lado: las paradas que dan a cada carril forman su propio vagón junto a él (en Héroes cada letra tiene
+        // puertas hacia los dos carriles: antes se juntaban en uno solo y faltaban vagones)
+        const groups = new Map<string, { n: number; side: number; us: number[]; ids: string[] }>();
+        for (const it of items) {
+          const p = uv(it.w), side = p.v - lo <= hi - p.v ? 0 : 1, key = `${it.n}|${side}`;
+          const g2 = groups.get(key) ?? groups.set(key, { n: it.n, side, us: [], ids: [] }).get(key)!;
+          g2.us.push(p.u); g2.ids.push(it.stop.id);
+        }
+        wagons.length = 0;
+        for (const g2 of groups.values()) wagons.push({ n: g2.n, u: g2.us.reduce((a, x) => a + x, 0) / g2.us.length, v: g2.side === 0 ? lo + CAPSULE_WIDTH / 2 + 0.6 : hi - CAPSULE_WIDTH / 2 - 0.6, ids: g2.ids, count: g2.ids.length });
         const us = wagons.map((w) => w.u), pu0 = Math.min(...us) - CAPSULE_LENGTH / 2, pu1 = Math.max(...us) + CAPSULE_LENGTH / 2;
         const ring = rounded((pu0 + pu1) / 2, (lo + hi) / 2, (pu1 - pu0) / 2, (hi - lo) / 2 - 1.5, 2, axis);
         out.plazas.features.push({ type: "Feature", properties: { title: st.title, all, l: line }, geometry: { type: "Polygon", coordinates: [ring] } });
