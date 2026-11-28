@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { BUILDINGS_3D_FILTER, BUILDINGS_IDECA_MIN_ZOOM, TREE_3D_MIN_ZOOM, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, plazaTrees, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { BUILDINGS_3D_FILTER, BUILDINGS_IDECA_MIN_ZOOM, buildingColorExpression, TREE_3D_MIN_ZOOM, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, plazaTrees, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -312,7 +312,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       {/* edificios de Catastro (Bogotá), con su altura real: reemplazan a los del mapa base cuando están publicados */}
       <GeoJSONSource id="edificios-bogota" data={ideca.json}>
         <Layer id="edificios-bogota" type="fill-extrusion" minzoom={BUILDINGS_IDECA_MIN_ZOOM} beforeId={c.dark ? "highway_name_other" : "highway-name-path"}
-          {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: ["get", "c"], fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 0.85, fillExtrusionVerticalGradient: true })} />
+          {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: buildingColorExpression(c.dark) as never, fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 0.85, fillExtrusionVerticalGradient: true })} />
       </GeoJSONSource>
       {/* árboles (tronco y copa de nube con rebanadas de esferas), con los edificios: debajo de los nombres de calles y de todo lo de TransMi LIVE */}
       <GeoJSONSource id="arboles-3d" data={trees3dJson}>

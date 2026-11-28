@@ -4,6 +4,13 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-28 · **Carga de los edificios 3D optimizada**. Primera publicación: 1.660.592 edificios en 834 celdas (75–120 KB comprimidas cada una); árboles: censo 1.338.463 + OpenStreetMap 57.204, publicados 566.330 (juntando los que quedan a <9 m).
+  - Ya no se rearma ni se manda al mapa en cada movimiento: solo si el centro se corre ~150 m, llegan celdas o cambia la apariencia (`snapCenter`, `buildingsRefreshKey`).
+  - Coordenadas a 6 decimales y sin color ni id por edificio (el color sale de `buildingColorExpression` según la altura).
+  - En la web de celular, 3.500 edificios en 600 m (en computador, 9.000 en 900 m).
+  - En la herramienta, piezas de menos de 12 m² fuera y contornos más simples (25 cm).
+
+  Medido en Chapinero, texto para el mapa: computador 2,86 → 2,27 MB, web de celular 0,90 MB, app 0,82 → 0,65 MB; armar 5–24 ms.
 - 2026-11-28 · **Edificios y árboles reales de Bogotá en 3D** (pedido del dueño; datos abiertos del mapa 3D de Bogotá, IDECA):
   - **Fuente**: `mapas.bogota.gov.co/3d` baja por sector catastral (`data/SCat.json`, 1.170) `data_construcciones/<sector>.json` y `data_arbolado/<sector>.json`. Lector en `tools/ideca.ts`.
   - **Edificios** (Catastro): `tools/edificios.ts` toma contorno y pisos. Base = `ConAltura`×3 m y techo = `ConElevaci`×3 m (`buildingHeights`). Quita piezas de menos de 8 m² y puntos que sobran. Se publican por celdas de 0,01° en la rama `edificios` (`edi_<x>_<y>.json` + `edificios-indice.json`; formato `encodeBuildingCell`).

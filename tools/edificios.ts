@@ -1,6 +1,6 @@
 /**
  * Edificios de Bogotá para la vista 3D: las construcciones de Catastro (datos abiertos de IDECA, ver tools/ideca.ts) con su contorno y
- * sus pisos, por celdas de 0,01° (~1,1 km), en el formato de `encodeBuildingCell`. Se quitan las piezas de menos de 8 m² (casetas,
+ * sus pisos, por celdas de 0,01° (~1,1 km), en el formato de `encodeBuildingCell`. Se quitan las piezas de menos de 12 m² (casetas,
  * tanques) y los puntos que sobran (a menos de 15 cm o en línea recta) para aligerar.
  * Salida (`<carpeta>/`): `edi_<x>_<y>.json` por celda y `edificios-indice.json` (cuántos hay en cada celda). Corre en GitHub (workflow
  * «Árboles y edificios para el mapa 3D»), que lo publica en la rama `edificios`.
@@ -12,7 +12,7 @@ import { buildingCellKey, buildingHeights, encodeBuildingCell, type Building } f
 import { IDECA_ATTRIBUTION_BUILDINGS, forEachSector, idecaSectors } from "./ideca";
 
 const OUT = process.argv[2] ?? "dist-edificios";
-const MIN_AREA_M2 = 8;
+const MIN_AREA_M2 = 12;      // casetas, tanques y pedazos sueltos (no se ven desde la calle y pesan)
 
 /** Anillo limpio (sin el punto repetido del final, sin puntos casi iguales ni en línea recta) y su área en m². */
 export function cleanRing(raw: readonly number[][]): { ring: [number, number][]; area: number } | null {
@@ -23,14 +23,14 @@ export function cleanRing(raw: readonly number[][]): { ring: [number, number][];
   const m = (a: [number, number], b: [number, number]) => Math.hypot((a[0] - b[0]) * kx, (a[1] - b[1]) * ky);
   const out: [number, number][] = [];
   for (const p of pts) if (!out.length || m(out[out.length - 1]!, p) > 0.15) out.push(p);
-  // quita los puntos casi en línea recta con sus vecinos (desvío < 10 cm)
+  // quita los puntos casi en línea recta con sus vecinos (desvío < 25 cm)
   let changed = true;
   while (changed && out.length > 3) {
     changed = false;
     for (let i = 0; i < out.length && out.length > 3; i++) {
       const a = out[(i - 1 + out.length) % out.length]!, b = out[i]!, c = out[(i + 1) % out.length]!;
       const ax = (b[0] - a[0]) * kx, ay = (b[1] - a[1]) * ky, cx = (c[0] - a[0]) * kx, cy = (c[1] - a[1]) * ky, L = Math.hypot(cx, cy);
-      if (L > 0 && Math.abs(ax * cy - ay * cx) / L < 0.1) { out.splice(i, 1); changed = true; i--; }
+      if (L > 0 && Math.abs(ax * cy - ay * cx) / L < 0.25) { out.splice(i, 1); changed = true; i--; }
     }
   }
   if (out.length < 3) return null;

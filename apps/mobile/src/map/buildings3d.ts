@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { BUILDINGS_IDECA_MIN_ZOOM, buildingCellLoader, buildingVolumes, clampBounds } from "@transmi/application";
+import { BUILDINGS_IDECA_MIN_ZOOM, buildingCellLoader, buildingVolumes, buildingsRefreshKey, clampBounds, snapCenter } from "@transmi/application";
 import { CONFIG } from "../config";
 import type { Viewport } from "./useBuses";
 
@@ -22,11 +22,12 @@ export function useBuildings3d(on: boolean, view: Viewport | null, center: RefOb
     const id = setTimeout(async () => {
       try {
         const [lon, lat] = center.current ?? [view.west, view.south];
-        const c = { lon, lat }, bounds = clampBounds(view, c, RADIUS_M);
+        // solo el radio alrededor del centro redondeado (no el borde de la pantalla, que cambia con cada movimiento)
+        const c = snapCenter({ lon, lat }), bounds = clampBounds({ west: -180, south: -90, east: 180, north: 90 }, c, RADIUS_M);
         const list = await cells.inView(bounds, () => { if (!dead) setTick((t) => t + 1); }, 4);
         if (dead) return;
         setReady(cells.ready);
-        const key = `${dark}|${list.length}|${list[0]?.ring[0]?.join()}|${list[list.length - 1]?.ring[0]?.join()}`;
+        const key = buildingsRefreshKey(c, list.length, dark);
         if (key === last.current) return;
         last.current = key;
         setJson(JSON.stringify(buildingVolumes(list, { dark, center: c, max: MAX })));

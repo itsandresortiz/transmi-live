@@ -1,5 +1,4 @@
 import type { Feature, FeatureCollection, Polygon } from "geojson";
-import type { BusVolumeProps } from "./map-volumes";
 import { treeCellKey, treeCellsIn, type Bounds } from "./trees";
 
 /**
@@ -108,6 +107,16 @@ export function buildingCellLoader(base: string, fetchJson: (url: string) => Pro
   };
 }
 
+/** Clave para no rearmar los edificios en cada movimiento: cambia solo si el centro se corre ~150 m, llegan otras celdas o cambia la
+ *  apariencia (rearmar y mandar al mapa 1–3 MB en cada paso del dedo era lo que más costaba). */
+/** El centro redondeado a ~150 m: el recuadro de edificios se arma desde aquí para que no cambie con cada pequeño movimiento. */
+export function snapCenter(c: { lon: number; lat: number }): { lon: number; lat: number } {
+  return { lon: Math.round(c.lon * 700) / 700, lat: Math.round(c.lat * 700) / 700 };
+}
+export function buildingsRefreshKey(center: { lon: number; lat: number }, count: number, dark: boolean): string {
+  return `${dark ? 1 : 0}|${Math.round(center.lon * 700)}|${Math.round(center.lat * 700)}|${count}`;
+}
+
 /** Tonos de los edificios: claros y un poco más oscuros los más altos (como el mapa base), y en la apariencia oscura al revés. */
 export function buildingColor(h: number, dark: boolean): string {
   const t = Math.max(0, Math.min(1, (h - 3) / 45));
@@ -115,17 +124,26 @@ export function buildingColor(h: number, dark: boolean): string {
   return dark ? mix([0x34, 0x38, 0x41], [0x45, 0x4a, 0x55]) : mix([0xe2, 0xde, 0xd5], [0xcd, 0xc8, 0xbd]);
 }
 
+/** El color de los edificios como expresión del mapa (según su altura `h`), igual a `buildingColor`. */
+export function buildingColorExpression(dark: boolean): unknown {
+  return ["interpolate", ["linear"], ["get", "h"], 3, buildingColor(3, dark), 48, buildingColor(48, dark)];
+}
+
 /** Los edificios como volúmenes para `fill-extrusion` (`c` color, `b` base, `h` techo en metros). Los más cercanos a `center`, hasta `max`. */
-export function buildingVolumes(list: readonly Building[], opts: { dark?: boolean; center?: { lon: number; lat: number }; max?: number } = {}): FeatureCollection<Polygon, BusVolumeProps> {
+export function buildingVolumes(list: readonly Building[], opts: { dark?: boolean; center?: { lon: number; lat: number }; max?: number } = {}): FeatureCollection<Polygon, { b: number; h: number }> {
   let items = list;
   if (opts.center && opts.max != null && list.length > opts.max) {
     const c = opts.center, k = Math.cos((c.lat * Math.PI) / 180);
     items = [...list].map((it) => ({ it, d: ((it.ring[0]![0] - c.lon) * k) ** 2 + (it.ring[0]![1] - c.lat) ** 2 })).sort((a, b) => a.d - b.d).slice(0, opts.max).map((x) => x.it);
   }
-  const features: Feature<Polygon, BusVolumeProps>[] = [];
+  const features: Feature<Polygon, { b: number; h: number }>[] = [];
   for (const it of items) {
     if (it.ring.length < 3) continue;
-    features.push({ type: "Feature", properties: { id: "", c: buildingColor(it.h, !!opts.dark), b: it.b, h: it.h }, geometry: { type: "Polygon", coordinates: [[...it.ring, it.ring[0]!]] } });
+    // 6 decimales (~10 cm): sin redondear salían 17 cifras por número y el texto para el mapa pesaba el doble
+    const ring = it.ring.map(([x, y]) => [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6]);
+    ring.push(ring[0]!);
+    // sin color ni id por edificio (el color lo pone el mapa según la altura: `buildingColorExpression`), para aligerar
+    features.push({ type: "Feature", properties: { b: it.b, h: it.h }, geometry: { type: "Polygon", coordinates: [ring] } });
   }
   return { type: "FeatureCollection", features };
 }

@@ -1,12 +1,13 @@
 import type { GeoJSONSource, Map as MLMap } from "maplibre-gl";
-import { BUILDINGS_IDECA_MIN_ZOOM, buildingCellLoader, buildingVolumes, clampBounds } from "@transmi/application";
+import { BUILDINGS_IDECA_MIN_ZOOM, buildingCellLoader, buildingVolumes, buildingsRefreshKey, buildingColorExpression, clampBounds, snapCenter } from "@transmi/application";
 import { CONFIG } from "../config";
 
 /** Edificios reales de Bogotá (Catastro, datos abiertos de IDECA; ver tools/edificios.ts) en la vista 3D, de cerca. Mientras no estén
  *  publicados (o fuera de Bogotá) siguen los del mapa base; cuando llegan, los del mapa base se apagan (no se dibujan dos veces). */
 const ID = "edificios-bogota";
 /** Hasta cuántos edificios (los más cercanos al centro) y en qué radio (m). */
-const MAX = 9000, RADIUS_M = 900;
+const COARSE = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+const MAX = COARSE ? 3500 : 9000, RADIUS_M = COARSE ? 600 : 900;      // en celular, menos (como los árboles)
 
 export class Buildings3D {
   private on = false;
@@ -35,7 +36,7 @@ export class Buildings3D {
       m.addLayer({
         id: ID, type: "fill-extrusion", source: ID, minzoom: BUILDINGS_IDECA_MIN_ZOOM, layout: { visibility: "none" },
         paint: {
-          "fill-extrusion-color": ["get", "c"], "fill-extrusion-base": ["get", "b"],
+          "fill-extrusion-color": buildingColorExpression(false) as never, "fill-extrusion-base": ["get", "b"],
           // suben al acercarse (como los del mapa base), sin aparecer de golpe
           "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], BUILDINGS_IDECA_MIN_ZOOM, ["get", "b"], BUILDINGS_IDECA_MIN_ZOOM + 0.6, ["get", "h"]],
           "fill-extrusion-opacity": 0.85, "fill-extrusion-vertical-gradient": true,
@@ -45,6 +46,7 @@ export class Buildings3D {
     const changed = this.dark !== dark;
     this.on = on3D; this.dark = dark;
     m.setLayoutProperty(ID, "visibility", on3D ? "visible" : "none");
+    m.setPaintProperty(ID, "fill-extrusion-color", buildingColorExpression(dark) as never);
     if (changed) this.key = "";
     if (on3D) void this.refresh();
   }
@@ -52,12 +54,13 @@ export class Buildings3D {
   private async refresh() {
     const m = this.map;
     if (!this.on || m.getZoom() < BUILDINGS_IDECA_MIN_ZOOM - 0.3) return;
-    const c = m.getCenter(), center = { lon: c.lng, lat: c.lat }, vb = m.getBounds();
-    const bounds = clampBounds({ west: vb.getWest(), south: vb.getSouth(), east: vb.getEast(), north: vb.getNorth() }, center, RADIUS_M);
+    const c = m.getCenter(), center = snapCenter({ lon: c.lng, lat: c.lat });
+    // solo el radio alrededor del centro redondeado (no el borde de la pantalla, que cambia con cada movimiento)
+    const bounds = clampBounds({ west: -180, south: -90, east: 180, north: 90 }, center, RADIUS_M);
     const wasReady = this.cells.ready;
     const list = await this.cells.inView(bounds, () => { this.key = ""; void this.refresh(); });
     if (this.cells.ready !== wasReady) this.onReady(this.cells.ready);
-    const key = `${this.dark}|${list.length}|${list[0]?.ring[0]?.join()}|${list[list.length - 1]?.ring[0]?.join()}`;
+    const key = buildingsRefreshKey(center, list.length, this.dark);
     if (key === this.key) return;
     this.key = key;
     (m.getSource(ID) as GeoJSONSource | undefined)?.setData(buildingVolumes(list, { dark: this.dark, center, max: MAX }) as never);
