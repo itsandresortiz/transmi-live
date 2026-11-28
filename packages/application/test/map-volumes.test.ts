@@ -91,4 +91,13 @@ describe("stationVolumes", () => {
     expect(ps.some((p) => p.b === 5 && p.c !== "#00a650")).toBe(true);                 // cubierta gris
     expect(ps.filter((p) => p.b === 0.9 && p.h === 5 && !p.g).length).toBeGreaterThanOrEqual(8);      // postes
   });
+  it("el pasillo entre vagones es un pasadizo gris sin techo ni vidrio", () => {
+    const kx = 111_320 * Math.cos((4.6 * Math.PI) / 180), ky = 110_540;
+    const R = (x: number, y: number) => [-74.07 + x / kx, 4.6 + y / ky];
+    const link = { type: "Polygon" as const, coordinates: [[R(0, 0), R(20, 0), R(20, 4.5), R(0, 4.5), R(0, 0)]] };
+    const out = stationVolumes({ bases: { type: "FeatureCollection", features: [] }, capsules: { type: "FeatureCollection", features: [] }, links: { type: "FeatureCollection", features: [{ type: "Feature", properties: { all: "a", l: "B" }, geometry: link }] } }, () => "#00a650");
+    const ps = out.features.map((f) => f.properties);
+    expect(ps.length).toBe(3);                                         // piso y dos barandas
+    expect(ps.every((p) => p.h <= 2.1 && !p.g && p.c !== "#00a650")).toBe(true);
+  });
 });

@@ -172,8 +172,8 @@ export const STATION_3D_MIN_ZOOM = 15;      // como los edificios: la estación 
 
 /** Estaciones de la troncal en 3D, con la arquitectura de las de TransMilenio: plataforma elevada (~0,9 m) de concreto, cerramiento de
  *  vidrio a los lados (va en una capa translúcida: `g = 1`), estructura de acero gris con postes y una cubierta plana gris que sobresale
- *  un poco, con una franja del color de su línea en el borde (como la letra de la línea en el aviso de la estación). El pasillo que une
- *  los vagones es igual, más angosto. La base apenas se levanta. `colorOf` da el color de cada línea (A, B, C…) según la apariencia.
+ *  un poco, con el color de su línea en una franja a la altura de las puertas y en el borde de la cubierta. Solo los vagones tienen
+ *  techo: el pasillo que los une es un pasadizo gris descubierto con barandas bajas. La base apenas se levanta. `colorOf` da el color de cada línea (A, B, C…) según la apariencia.
  *  Las piezas son cajas de 4 lados (no cápsulas redondeadas): más parecidas a las reales y livianas para el mapa. */
 export function stationVolumes(
   g: { bases: FeatureCollection<Polygon>; capsules: FeatureCollection<Polygon>; links: FeatureCollection<Polygon> },
@@ -193,7 +193,7 @@ export function stationVolumes(
   // alturas: la cubierta va a 5,0–5,3 m porque OpenStreetMap trae la cubierta de muchas estaciones como un edificio de 5 m (fundido con
   // los demás edificios): así la nuestra queda encima y se reconoce
   const PLAT = 0.9, GLASS = 3.3, BAND0 = 2.75, BAND1 = 3.25, ROOF0 = 5.0, ROOF1 = 5.3;
-  const build = (poly: Polygon, id: string, line: string, posts: boolean) => {
+  const build = (poly: Polygon, id: string, line: string) => {
     const ob = orientedBox(poly);
     if (!ob) return;
     const { lon, lat, fe, fn, len, w } = ob;
@@ -208,7 +208,7 @@ export function stationVolumes(
     for (const side of [-1, 1]) box(0, side * (w / 2 - 0.15), len, 0.3, C.glass, PLAT, GLASS, true);
     for (const end of [-1, 1]) box(end * (len / 2 - 0.15), 0, 0.3, w - 0.6, C.glass, PLAT, GLASS, true);
     // postes de la estructura: a cada lado, en las puntas y cada ~7,5 m
-    if (posts) {
+    {
       const n = Math.max(1, Math.round(len / 7.5));
       for (let i = 0; i <= n; i++) {
         const a = -len / 2 + 0.3 + ((len - 0.6) * i) / n;
@@ -224,8 +224,15 @@ export function stationVolumes(
     box(0, 0, len + 1.2, w + 1.4, C.roof, ROOF0, ROOF1);
     for (const side of [-1, 1]) box(0, side * (w / 2 + 0.45), len + 1.2, 0.5, col, ROOF0 - 0.1, ROOF1 + 0.05);
   };
-  for (const f of g.links.features) build(f.geometry, String(f.properties?.all ?? ""), String(f.properties?.l ?? ""), false);
-  for (const f of g.capsules.features) build(f.geometry, String(f.properties?.ids ?? ""), String(f.properties?.l ?? ""), true);
+  // el pasillo entre vagones: pasadizo gris descubierto (sin techo, sin vidrio ni color de línea), con barandas bajas a los lados
+  for (const f of g.links.features) {
+    const ob = orientedBox(f.geometry), id = String(f.properties?.all ?? "");
+    if (!ob) continue;
+    const kx = 1 / (111_320 * Math.cos((ob.lat * Math.PI) / 180)), ky = 1 / 110_540;
+    features.push(boxFeature(id, ob.lon, ob.lat, kx, ky, ob.fe, ob.fn, 0, 0, ob.len, ob.w, 0, C.platform, 0.25, PLAT));
+    for (const side of [-1, 1]) features.push(boxFeature(id, ob.lon, ob.lat, kx, ky, ob.fe, ob.fn, 0, side * (ob.w / 2 - 0.08), ob.len, 0.12, 0, C.steel, PLAT, PLAT + 1.1));
+  }
+  for (const f of g.capsules.features) build(f.geometry, String(f.properties?.ids ?? ""), String(f.properties?.l ?? ""));
   return { type: "FeatureCollection", features };
 }
 
