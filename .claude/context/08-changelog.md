@@ -4,6 +4,14 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-28 · **Estaciones 3D como las de TransMilenio** (web y app, pedido del dueño). `stationVolumes` arma cada vagón y el pasillo con cajas rectas en vez de cápsulas redondeadas:
+  - plataforma de concreto a 0,9 m;
+  - cerramiento de vidrio en lados y puntas (capa translúcida);
+  - postes de acero gris cada ~7,5 m;
+  - cubierta plana gris que sobresale ~0,7 m, a 5,0–5,3 m;
+  - el **color de la línea** como franja horizontal alrededor del vagón, a la altura de lo alto de las puertas (2,75–3,25 m), y en el borde de la cubierta (pedido del dueño).
+
+  Con las 345 estaciones: 9.249 piezas, 2,5 MB, 36 ms (antes 1.551 piezas y 2,0 MB). Vista previa en la web (La Campiña). App sin ver en teléfono. No se copió el arte de TransMilenio: se tomaron los rasgos de las estaciones reales.
 - 2026-11-27 · App: **el bus que sigues o en el que vas ya no lleva el círculo rojo fijo** (dueño). Lleva un halo de su propio color, acostado en el piso: un resplandor suave (`bus-glow`), un aro del color del sistema (`bus-ring`) y un filo blanco (`bus-ring-edge`). Queda debajo de los buses 3D para no taparlos. Propiedades nuevas revisadas en las dos plataformas: `circle-blur` y `circle-pitch-alignment`. Vista previa hecha en la web con los mismos valores; sin ver en teléfono.
 - 2026-11-27 · App: **el bus en el que vas parpadeaba al seguirlo en el mapa** (dueño), con tres causas probables, todas corregidas:
   - (1) `snappedPosition` adelantaba el bus con la velocidad entre lecturas del GPS y, si la lectura nueva llegaba unos metros atrás, lo devolvía varias veces por segundo. Ahora se acerca suave (~0,6 s) y **nunca retrocede**; solo se reinicia con un salto de más de 300 m.

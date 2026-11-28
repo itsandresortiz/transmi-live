@@ -170,35 +170,80 @@ export function signalVolumes(points: readonly SignalVolumeInput[]): FeatureColl
 /** Desde este zoom se levantan las estaciones de la troncal (las mismas formas planas de `buildStationGeometry`). */
 export const STATION_3D_MIN_ZOOM = 15;      // como los edificios: la estación plana se pintaba encima de ellos entre el 15 y el 15,6
 
-/** Estaciones de la troncal en 3D, sobrias y con el mismo dibujo del mapa plano: la base apenas se levanta, cada vagón y el pasillo tienen su plataforma (~0,9 m), cada vagón un
- *  cuerpo de vidrio claro (va en una capa translúcida: `g = 1`) con el techo del color de su línea, y el pasillo un vidrio más bajo con el
- *  techo del mismo color, aclarado. `colorOf` da el color de cada línea (A, B, C…) según la apariencia. */
+/** Estaciones de la troncal en 3D, con la arquitectura de las de TransMilenio: plataforma elevada (~0,9 m) de concreto, cerramiento de
+ *  vidrio a los lados (va en una capa translúcida: `g = 1`), estructura de acero gris con postes y una cubierta plana gris que sobresale
+ *  un poco, con una franja del color de su línea en el borde (como la letra de la línea en el aviso de la estación). El pasillo que une
+ *  los vagones es igual, más angosto. La base apenas se levanta. `colorOf` da el color de cada línea (A, B, C…) según la apariencia.
+ *  Las piezas son cajas de 4 lados (no cápsulas redondeadas): más parecidas a las reales y livianas para el mapa. */
 export function stationVolumes(
   g: { bases: FeatureCollection<Polygon>; capsules: FeatureCollection<Polygon>; links: FeatureCollection<Polygon> },
   colorOf: (line: string) => string, opts: { dark?: boolean } = {},
 ): FeatureCollection<Polygon, BusVolumeProps> {
   const features: Feature<Polygon, BusVolumeProps>[] = [];
-  const base = opts.dark ? "#2e3139" : "#d9dde3", platform = opts.dark ? "#4a4f5a" : "#b9c0ca", glass = opts.dark ? "#8fb0cf" : "#b9d6ec";
-  const add = (geometry: Polygon, id: string, c: string, b: number, h: number, glassy = false) =>
-    features.push({ type: "Feature", properties: glassy ? { id, c, b, h, g: 1 } : { id, c, b, h }, geometry });
-  // la base (el contorno de toda la estación, más ancho que los vagones) apenas se levanta: si fuera de 0,9 m taparía la estación entera
-  for (const f of g.bases.features) add(f.geometry, String(f.properties?.all ?? ""), base, 0, 0.08);      // casi al ras: los buses pasan por encima (con 25 cm se les hundían las ruedas)
-  // el pasillo: vidrio más bajo y techo del color de la línea, aclarado (los vagones, más altos, llevan el color pleno)
-  for (const f of g.links.features) {
-    const id = String(f.properties?.all ?? ""), line = String(f.properties?.l ?? "");
-    add(f.geometry, id, platform, 0.25, 0.9);
-    add(f.geometry, id, glass, 0.9, 4.6, true);
-    add(f.geometry, id, mixHex(colorOf(line), opts.dark ? "#000000" : "#ffffff", 0.35), 4.6, 5.0);
-  }
-  for (const f of g.capsules.features) {
-    const id = String(f.properties?.ids ?? ""), line = String(f.properties?.l ?? "");
-    add(f.geometry, id, platform, 0.25, 0.9);      // plataforma del vagón
-    // el techo va a 5,1–5,7 m: OpenStreetMap trae la cubierta de muchas estaciones como un edificio de 5 m (no se puede separar de los
-    // demás edificios: viene fundido con ellos) y así el techo del color de la línea queda encima y se reconoce la estación
-    add(f.geometry, id, glass, 0.9, 5.1, true);
-    add(f.geometry, id, colorOf(line), 5.1, 5.7);      // techo con la franja del color de la línea
-  }
+  const dark = !!opts.dark;
+  const C = {
+    base: dark ? "#2e3139" : "#d9dde3",
+    platform: dark ? "#555a64" : "#c3c8cf",      // concreto
+    steel: dark ? "#8a919c" : "#9aa1ab",        // estructura y postes
+    roof: dark ? "#6b717c" : "#e6e8eb",         // cubierta
+    glass: dark ? "#8fb0cf" : "#b9d6ec",
+  };
+  // la base (el contorno de toda la estación) casi al ras: los buses pasan por encima (con 25 cm se les hundían las ruedas)
+  for (const f of g.bases.features) features.push({ type: "Feature", properties: { id: String(f.properties?.all ?? ""), c: C.base, b: 0, h: 0.08 }, geometry: f.geometry });
+  // alturas: la cubierta va a 5,0–5,3 m porque OpenStreetMap trae la cubierta de muchas estaciones como un edificio de 5 m (fundido con
+  // los demás edificios): así la nuestra queda encima y se reconoce
+  const PLAT = 0.9, GLASS = 3.3, BAND0 = 2.75, BAND1 = 3.25, ROOF0 = 5.0, ROOF1 = 5.3;
+  const build = (poly: Polygon, id: string, line: string, posts: boolean) => {
+    const ob = orientedBox(poly);
+    if (!ob) return;
+    const { lon, lat, fe, fn, len, w } = ob;
+    const kx = 1 / (111_320 * Math.cos((lat * Math.PI) / 180)), ky = 1 / 110_540;
+    const box = (along: number, across: number, l: number, ww: number, c: string, b: number, h: number, glassy = false) => {
+      const f = boxFeature(id, lon, lat, kx, ky, fe, fn, along, across, l, ww, 0, c, b, h);
+      if (glassy) f.properties.g = 1;
+      features.push(f);
+    };
+    box(0, 0, len, w, C.platform, 0.25, PLAT);                                            // plataforma
+    // cerramiento de vidrio a los dos lados y en las puntas (paneles delgados, se ve el interior)
+    for (const side of [-1, 1]) box(0, side * (w / 2 - 0.15), len, 0.3, C.glass, PLAT, GLASS, true);
+    for (const end of [-1, 1]) box(end * (len / 2 - 0.15), 0, 0.3, w - 0.6, C.glass, PLAT, GLASS, true);
+    // postes de la estructura: a cada lado, en las puntas y cada ~7,5 m
+    if (posts) {
+      const n = Math.max(1, Math.round(len / 7.5));
+      for (let i = 0; i <= n; i++) {
+        const a = -len / 2 + 0.3 + ((len - 0.6) * i) / n;
+        for (const side of [-1, 1]) box(a, side * (w / 2 - 0.2), 0.4, 0.4, C.steel, PLAT, ROOF0);
+      }
+    }
+    const col = colorOf(line);
+    // franja horizontal del color de la línea alrededor del vagón, a la altura de lo alto de las puertas (como en las estaciones reales):
+    // un poco más gruesa que el vidrio para que se vea por fuera
+    for (const side of [-1, 1]) box(0, side * (w / 2 - 0.15), len + 0.04, 0.4, col, BAND0, BAND1);
+    for (const end of [-1, 1]) box(end * (len / 2 - 0.15), 0, 0.4, w - 0.2, col, BAND0, BAND1);
+    // cubierta plana que sobresale ~0,7 m a cada lado, con la franja del color de la línea en los bordes largos
+    box(0, 0, len + 1.2, w + 1.4, C.roof, ROOF0, ROOF1);
+    for (const side of [-1, 1]) box(0, side * (w / 2 + 0.45), len + 1.2, 0.5, col, ROOF0 - 0.1, ROOF1 + 0.05);
+  };
+  for (const f of g.links.features) build(f.geometry, String(f.properties?.all ?? ""), String(f.properties?.l ?? ""), false);
+  for (const f of g.capsules.features) build(f.geometry, String(f.properties?.ids ?? ""), String(f.properties?.l ?? ""), true);
   return { type: "FeatureCollection", features };
+}
+
+/** La caja que contiene una forma alargada (vagón o pasillo): centro, dirección del lado largo (este, norte) y medidas en metros. */
+export function orientedBox(poly: Polygon): { lon: number; lat: number; fe: number; fn: number; len: number; w: number } | null {
+  const ring = poly.coordinates[0];
+  if (!ring || ring.length < 4) return null;
+  const lat0 = ring[0]![1]!, lon0 = ring[0]![0]!, kx = 111_320 * Math.cos((lat0 * Math.PI) / 180), ky = 110_540;
+  const pts = ring.slice(0, -1).map(([x, y]) => [(x! - lon0) * kx, (y! - lat0) * ky] as const);
+  let a = 0, b = 0, far = -1;
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) { const d = (pts[i]![0] - pts[j]![0]) ** 2 + (pts[i]![1] - pts[j]![1]) ** 2; if (d > far) { far = d; a = i; b = j; } }
+  const L = Math.sqrt(far);
+  if (!(L > 0.5)) return null;
+  const fe = (pts[b]![0] - pts[a]![0]) / L, fn = (pts[b]![1] - pts[a]![1]) / L;
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (const [x, y] of pts) { const u = x * fe + y * fn, v = x * fn - y * fe; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+  const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2, cx = cu * fe + cv * fn, cy = cu * fn - cv * fe;
+  return { lon: lon0 + cx / kx, lat: lat0 + cy / ky, fe, fn, len: u1 - u0, w: v1 - v0 };
 }
 
 /** Filtro de los edificios en 3D (capa `building` de OpenMapTiles): fuera las piezas que OpenStreetMap marca como «no levantar» y los

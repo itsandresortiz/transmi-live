@@ -73,16 +73,22 @@ describe("signalVolumes y mixHex", () => {
 });
 
 describe("stationVolumes", () => {
-  it("plataforma, vidrio translúcido y techo del color de la línea", () => {
-    const sq = { type: "Polygon" as const, coordinates: [[[-74.07, 4.6], [-74.0699, 4.6], [-74.0699, 4.6001], [-74.07, 4.6001], [-74.07, 4.6]]] };
-    const fc = (props: Record<string, unknown>) => ({ type: "FeatureCollection" as const, features: [{ type: "Feature" as const, properties: props, geometry: sq }] });
+  it("plataforma, vidrio translúcido, franja y borde del techo del color de la línea, cubierta gris", () => {
+    // un vagón de ~30 × 9 m (alargado hacia el este)
+    const kx = 111_320 * Math.cos((4.6 * Math.PI) / 180), ky = 110_540;
+    const R = (x: number, y: number) => [-74.07 + x / kx, 4.6 + y / ky];
+    const cap = { type: "Polygon" as const, coordinates: [[R(0, 0), R(30, 0), R(30, 9), R(0, 9), R(0, 0)]] };
+    const fc = (props: Record<string, unknown>) => ({ type: "FeatureCollection" as const, features: [{ type: "Feature" as const, properties: props, geometry: cap }] });
     const out = stationVolumes({ bases: fc({ all: "a,b" }), capsules: fc({ ids: "a", l: "B" }), links: { type: "FeatureCollection", features: [] } }, (l) => (l === "B" ? "#00a650" : "#999999"));
-    const by = (b: number) => out.features.find((f) => f.properties.b === b)!.properties;
-    expect(by(0)).toMatchObject({ h: 0.08 });
-    expect(by(0.25)).toMatchObject({ h: 0.9 });
-    expect(by(0.9)).toMatchObject({ h: 5.1, g: 1 });
-    expect(by(5.1)).toMatchObject({ c: "#00a650", h: 5.7 });
-    expect(by(5.1).g).toBeUndefined();
+    const ps = out.features.map((f) => f.properties);
+    expect(ps.find((p) => p.b === 0)).toMatchObject({ h: 0.08 });                     // base casi al ras
+    expect(ps.find((p) => p.b === 0.25)).toMatchObject({ h: 0.9 });                   // plataforma
+    expect(ps.filter((p) => p.g === 1).length).toBe(4);                                // vidrio en lados y puntas
+    expect(ps.filter((p) => p.g === 1).every((p) => p.b === 0.9)).toBe(true);
+    const green = ps.filter((p) => p.c === "#00a650");
+    expect(green.some((p) => p.b > 2 && p.h < 4)).toBe(true);                          // franja a la altura de las puertas
+    expect(green.some((p) => p.h > 5)).toBe(true);                                     // borde del techo
+    expect(ps.some((p) => p.b === 5 && p.c !== "#00a650")).toBe(true);                 // cubierta gris
+    expect(ps.filter((p) => p.b === 0.9 && p.h === 5 && !p.g).length).toBeGreaterThanOrEqual(8);      // postes
   });
 });
-
