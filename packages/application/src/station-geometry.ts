@@ -176,8 +176,8 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
   for (const st of stations) {
     const items = st.stops.map((stop) => ({ stop, w: toWorld(stop.position), n: state.labelOf(stop).wagon!, axis: tangentOf(state, stop.id, cache, index) }));
     const known = items.map((i) => i.axis).filter((a): a is Axis => !!a);
-    const axis = stopsAxis(items.map((i) => i.w), known.length ? meanAxis(known) : { ux: 0, uy: -1 });
-    const nx = -axis.uy, ny = axis.ux;
+    let axis = stopsAxis(items.map((i) => i.w), known.length ? meanAxis(known) : { ux: 0, uy: -1 });
+    let nx = -axis.uy, ny = axis.ux;
     const all = st.stops.map((s) => s.id).join(",");
     const line = lineOf(st.stops.map((s) => s.id));
     // coordenadas de la estación en metros: u a lo largo de la troncal, v a lo ancho
@@ -297,6 +297,16 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
         const b = sxx > 1 ? Math.max(-0.15, Math.min(0.15, sxy / sxx)) : 0;
         const center = (u: number) => (mvL + b * (u - muL) + mvR + b * (u - muR)) / 2;
         for (const w of wagons) w.v = center(w.u);
+        // y la estación entera gira hacia esa dirección (vagones, pasadizos, base): antes los vagones seguían la inclinación pero el
+        // pasadizo se dibujaba derecho y no casaban (Suba - Tv. 91)
+        if (Math.abs(b) > 0.003) {
+          const worlds = wagons.map((w) => ({ x: (w.u * axis.ux + w.v * nx) * m, y: (w.u * axis.uy + w.v * ny) * m }));
+          const ax = axis.ux + b * nx, ay = axis.uy + b * ny, L = Math.hypot(ax, ay);
+          axis = { ux: ax / L, uy: ay / L }; nx = -axis.uy; ny = axis.ux;
+          wagons.forEach((w, i) => { const q = uv(worlds[i]!); w.u = q.u; w.v = q.v; });
+          const vm = wagons.reduce((acc, w) => acc + w.v, 0) / wagons.length;
+          for (const w of wagons) w.v = vm;      // una sola fila recta
+        }
       } else for (const w of wagons) w.v = vC;
     }
     let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;

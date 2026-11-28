@@ -4,6 +4,7 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-28 · Estaciones: **la estación entera gira hacia la dirección de los carriles** (vagones, pasadizos y base), no solo los vagones (Suba - Tv. 91: el pasadizo iba derecho y los vagones inclinados). Medido: 0 vagones fuera de la línea de su pasadizo; 42 de 375 aún tocan un recorrido (avenidas curvas como Islandia: la estación es recta y la vía se curva).
 - 2026-11-28 · Estaciones con plaza: **un vagón por letra y por lado**. En Héroes cada letra (A, B, C) tiene puertas hacia los dos carriles («1 ó 5» y «4 ó 6»); antes se juntaban en un vagón y faltaban. Héroes pasa de 3 a 6 vagones y Tv. 86 de 3 a 4. Captura en la web.
 - 2026-11-28 · **Estaciones rectas, vagones del ancho real y plazas** (web y app, pedidos del dueño: Calle 100, Calle 72 y Granja corridas; vagones encima de los carriles; plazas como la de Tv. 86):
   - (1) **Estaciones rectas**: la parada del archivo marca dónde abre la puerta del bus, a uno u otro lado del vagón. Ya no se corre cada vagón hacia su parada: todos van en una fila centrada entre los dos carriles y siguen su inclinación a lo largo de la estación, porque la avenida no siempre va paralela.
