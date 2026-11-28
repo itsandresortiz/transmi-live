@@ -96,3 +96,14 @@ Rama `stop-order` (`stats.json.gz`, `stop-fixes.json`), workflow `stop-order.yml
 
 ## Relieve del mapa 3D (2026-11-27)
 Teselas de elevación «Terrain Tiles» (Mapzen) del Registro de Datos Abiertos de AWS: `s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png` (formato terrarium, sin llave, CORS abierto). Para Colombia son SRTM de la NASA (dominio público); se cita en los créditos del mapa. Solo se descargan cuando alguien enciende el 3D.
+
+## Mapa 3D de Bogotá (IDECA), desde 2026-11-28
+- **Datos**: los archivos públicos de `mapas.bogota.gov.co/3d`, IDECA (datos abiertos, confirmado por el dueño; licencia exacta **(?)**):
+  - `data/SCat.json`: los sectores catastrales;
+  - `data_construcciones/<sector>.json`: Catastro, contorno y pisos;
+  - `data_arbolado/<sector>.json`: censo del Jardín Botánico, altura y especie.
+- **Herramientas**: `tools/ideca.ts`, `tools/edificios.ts` y `tools/arboles.ts`.
+- **Workflow** «Árboles y edificios para el mapa 3D» (`arboles.yml`): mensual y a mano; publica las ramas `arboles` y `edificios`.
+- **Desde el contenedor**: el host está permitido en el entorno; Node necesita `NODE_USE_ENV_PROXY=1`.
+- **Atribución obligatoria** en el mapa: «Construcciones: Catastro Bogotá (IDECA) · Arbolado: Jardín Botánico de Bogotá».
+

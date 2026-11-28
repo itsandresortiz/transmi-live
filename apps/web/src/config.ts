@@ -17,6 +17,9 @@ export const CONFIG = {
   /** Árboles de verdad para la vista 3D, por celdas (los publica el workflow «Árboles para el mapa 3D», ver tools/arboles.ts). Si la rama
    *  aún no existe, el mapa siembra árboles dentro de los parques y ya. */
   treesBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/arboles/",
+  /** Edificios de Catastro de Bogotá para la vista 3D, por celdas (los publica el workflow «Árboles y edificios para el mapa 3D», ver
+   *  tools/edificios.ts). Si la rama aún no existe, siguen los edificios del mapa base. */
+  buildingsBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/edificios/",
   /** Posiciones compartidas por quienes van en un bus (archivo público que publica la función de Supabase «viajes»; ver
    *  supabase/LEEME-avisos.md). `null` = apagado (no se pide nada). */
   sharedRidesUrl: null as string | null,

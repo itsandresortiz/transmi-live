@@ -13,6 +13,7 @@ import { type MapTheme, type Scheme, themeOf } from "./theme";
 import type { BusModelLayer } from "./bus-models";
 import type { BusDraw } from "./BusCanvas";
 import { Trees3D } from "./trees3d";
+import { Buildings3D } from "./buildings3d";
 
 export interface MapEvents {
   onBusClick(id: string): void;
@@ -114,7 +115,7 @@ export class MapController {
     });
     this.map.on("rotate", () => { if (this.meHeading != null) this.me?.getElement().style.setProperty("--h", `${this.meHeading - this.map.getBearing()}deg`); });
     this.map.touchZoomRotate.enableRotation();      // dos dedos giran el mapa (clic derecho + arrastrar en el computador)
-    this.map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap · TransMilenio · Bogotá" }), "bottom-right");
+    this.map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "© OpenStreetMap · TransMilenio · Bogotá · Construcciones: Catastro Bogotá (IDECA) · Arbolado: Jardín Botánico de Bogotá" }), "bottom-right");
     this.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     this.ready = new Promise((res) => this.map.once("load", () => { this.addLayers(); this.bindEvents(); void this.loadStatic(); res(); }));
   }
@@ -527,6 +528,13 @@ export class MapController {
     }
   }
   get is3D(): boolean { return this.on3D; }
+  /** Edificios de Catastro (Bogotá) en 3D, de cerca: debajo de los nombres de calles, como los del mapa base. */
+  private buildings3d: Buildings3D | null = null;
+  private syncBuildings() {
+    const dark = this.scheme === "dark";
+    if (!this.buildings3d) { this.buildings3d = new Buildings3D(this.map); this.buildings3d.onReady = () => this.paint3D(); }
+    this.buildings3d.sync(this.on3D, dark, dark ? "bd-highway_name_other" : "bl-highway-name-path");
+  }
   /** Árboles en 3D (de cerca): debajo de los nombres de calles del juego de capas visible, como los edificios. */
   private trees3d: Trees3D | null = null;
   private syncTrees() {
@@ -539,7 +547,10 @@ export class MapController {
   private paint3D() {
     const m = this.map, dark = this.scheme === "dark";
     const vis = (id: string, v: boolean) => { if (m.getLayer(id)) m.setLayoutProperty(id, "visibility", v ? "visible" : "none"); };
-    vis("edificios-3d-claro", this.on3D && !dark); vis("edificios-3d-oscuro", this.on3D && dark);
+    // con los edificios de Catastro (Bogotá) publicados, los del mapa base se apagan: no se dibujan dos veces
+    const ideca = this.buildings3d?.ready ?? false;
+    vis("edificios-3d-claro", this.on3D && !dark && !ideca); vis("edificios-3d-oscuro", this.on3D && dark && !ideca);
+    this.syncBuildings();
     vis("relieve-sombra-claro", this.on3D && !dark); vis("relieve-sombra-oscuro", this.on3D && dark);
     // con los buses modelados listos, los volúmenes simples quedan de respaldo (ocultos)
     vis("buses-3d", this.on3D && this.busesOn && this.busModelsState !== "ready");

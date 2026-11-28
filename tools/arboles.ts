@@ -4,6 +4,8 @@
  * Fuentes:
  *   1. OpenStreetMap: nodos `natural=tree` (con `height`, `diameter_crown` o `circumference` cuando los traen). © colaboradores de
  *      OpenStreetMap, licencia ODbL (la misma del mapa base: la atribución «© OpenStreetMap» ya sale en el mapa).
+ *   0. El censo del arbolado urbano del Jardín Botánico de Bogotá, tal como lo publica IDECA en el mapa 3D de Bogotá (datos abiertos;
+ *      ver tools/ideca.ts): cada árbol con su altura. Es la fuente principal (encendida por defecto; IDECA_ARBOLADO=0 la apaga).
  *   2. Opcional: el censo del arbolado urbano (SIGAU, Jardín Botánico de Bogotá, publicado en Datos Abiertos Bogotá), si se da su
  *      dirección en `ARBOLADO_URL` (GeoJSON de puntos o CSV con columnas de latitud y longitud; altura y diámetro de copa si vienen).
  *      **(?) Sin comprobar**: desde el contenedor de Claude no se llega a datosabiertos.bogota.gov.co; hay que confirmar la dirección de
@@ -18,6 +20,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { encodeTreeCell, mergeTrees, treeCellKey, type TreePoint } from "@transmi/application";
+import { IDECA_ATTRIBUTION_TREES, forEachSector, idecaSectors, type IdecaFeature } from "./ideca";
 
 const OUT = process.argv[2] ?? "dist-arboles";
 /** Bogotá urbana y un poco de los cerros (sur, oeste, norte, este). */
@@ -102,6 +105,20 @@ export function fromCensus(text: string): TreePoint[] {
   return out;
 }
 
+/** Árboles del censo de IDECA: altura total (m) y copa estimada por la altura (el censo no trae su diámetro). */
+export function fromIdeca(features: readonly IdecaFeature[]): TreePoint[] {
+  const out: TreePoint[] = [];
+  for (const f of features) {
+    const x = Number(f.geometry.x), y = Number(f.geometry.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const t: TreePoint = { lon: x, lat: y, real: true };
+    const h = Number(f.attributes.Altura_Total);
+    if (Number.isFinite(h) && h >= 0.5 && h < 45) { t.h = Math.max(2, h); t.crown = Math.max(1.6, Math.min(12, h * 0.55)); }
+    out.push(t);
+  }
+  return out;
+}
+
 /** Reparte los árboles en celdas y escribe los archivos. Devuelve el índice. */
 export function writeCells(dir: string, trees: readonly TreePoint[], sources: string[]): { total: number; cells: number } {
   mkdirSync(dir, { recursive: true });
@@ -132,7 +149,14 @@ async function main() {
     sources.push(`Censo del arbolado urbano de Bogotá (${census.length})`);
     console.log("censo:", census.length, "árboles");
   }
-  const osm = fromOsm(await overpass());
+  if (process.env.IDECA_ARBOLADO !== "0") {
+    const keys = await idecaSectors();
+    const before = census.length;
+    await forEachSector("arbolado", keys, (features) => { for (const t of fromIdeca(features)) census.push(t); });
+    sources.push(`${IDECA_ATTRIBUTION_TREES} (${census.length - before})`);
+    console.log("censo de IDECA:", census.length - before, "árboles");
+  }
+  const osm = process.env.ARBOLES_OSM === "0" ? [] : await overpass().then(fromOsm).catch((e) => { console.warn("OpenStreetMap no respondió:", e instanceof Error ? e.message : e); return [] as TreePoint[]; });
   sources.push(`© OpenStreetMap (${osm.length})`);
   console.log("OpenStreetMap:", osm.length, "árboles");
   // el censo manda; de OpenStreetMap solo los que no estén ya en el censo (a menos de 3 m)

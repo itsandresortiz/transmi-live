@@ -169,6 +169,7 @@ export default function Mas() {
           <Row last symbol="hand.raised.fill" tint="#64748b" title="Política de privacidad" onPress={() => void Linking.openURL("https://transmilive.com/privacidad.html")} link />
         </Group>
 
+        <Text style={[type.caption, { color: c.muted, textAlign: "center", marginTop: space[2] }]}>Mapa: © OpenStreetMap · Edificios: Catastro Bogotá (IDECA) · Árboles: Jardín Botánico de Bogotá</Text>
         <Text style={[type.caption, { color: c.muted, textAlign: "center", marginTop: space[2] }]}>TransMi LIVE {Constants.expoConfig?.version} · compilación {Constants.nativeBuildVersion ?? "—"}{"\n"}Con datos abiertos de TransMilenio. No es una app oficial.</Text>
       </ScrollView>
     </SafeAreaView>

@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { BUILDINGS_3D_FILTER, TREE_3D_MIN_ZOOM, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, plazaTrees, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { BUILDINGS_3D_FILTER, BUILDINGS_IDECA_MIN_ZOOM, TREE_3D_MIN_ZOOM, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, plazaTrees, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -20,6 +20,7 @@ import { BUS_SPRITES } from "./sprites";
 import { sp } from "./styleProps";
 import { useBusFeatures, type Viewport } from "./useBuses";
 import { useTrees3d } from "./trees3d";
+import { useBuildings3d } from "./buildings3d";
 import { SYSTEM_COLOR } from "@/ui/theme";
 import { router } from "expo-router";
 import { useRide } from "@/ride";
@@ -244,6 +245,7 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   const flat3d = (normal: number) => (view3d ? ["step", ["zoom"], normal, STATION_3D_MIN_ZOOM, 0] : normal);
   const stationPolys = useMemo(() => geo?.bases.features.map((f) => f.geometry) ?? [], [geo]);
   const stationTrees = useMemo(() => (geo ? plazaTrees(geo.plazas) : []), [geo]);
+  const ideca = useBuildings3d(view3d, view, lastCenter, c.dark), idecaReady = ideca.ready;
   const trees3dJson = useTrees3d(mapRef, view3d, view, lastCenter, c.dark, stationPolys, stationTrees);
   const testsOn = useTestsMode((t) => t.on);
   const liveSignalsJson = useLiveSignals(testsOn && showSignals && active);
@@ -303,10 +305,15 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
       {/* vista 3D: edificios con volumen. Siempre montadas (no se agregan ni quitan capas en caliente): se
           muestran u ocultan con `visibility`. Van debajo de los nombres de calles del mapa base y de todo lo de TransMi LIVE. */}
       <Layer id="edificios-3d" type="fill-extrusion" source="openmaptiles" source-layer="building" minzoom={BUILD_MIN_Z} beforeId={c.dark ? "highway_name_other" : "highway-name-path"} filter={BUILDINGS_3D_FILTER as never}
-        {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: c.dark ? "#353943" : "#dcd7cc",
+        {...sp({ visibility: view3d && !idecaReady ? "visible" : "none", fillExtrusionColor: c.dark ? "#353943" : "#dcd7cc",
           fillExtrusionHeight: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_height"], 6]],
           fillExtrusionBase: ["interpolate", ["linear"], ["zoom"], BUILD_MIN_Z, 0, BUILD_MIN_Z + 0.6, ["coalesce", ["get", "render_min_height"], 0]],
           fillExtrusionOpacity: c.dark ? 0.8 : 0.72, fillExtrusionVerticalGradient: true })} />
+      {/* edificios de Catastro (Bogotá), con su altura real: reemplazan a los del mapa base cuando están publicados */}
+      <GeoJSONSource id="edificios-bogota" data={ideca.json}>
+        <Layer id="edificios-bogota" type="fill-extrusion" minzoom={BUILDINGS_IDECA_MIN_ZOOM} beforeId={c.dark ? "highway_name_other" : "highway-name-path"}
+          {...sp({ visibility: view3d ? "visible" : "none", fillExtrusionColor: ["get", "c"], fillExtrusionBase: ["get", "b"], fillExtrusionHeight: ["get", "h"], fillExtrusionOpacity: 0.85, fillExtrusionVerticalGradient: true })} />
+      </GeoJSONSource>
       {/* árboles (tronco y copa de nube con rebanadas de esferas), con los edificios: debajo de los nombres de calles y de todo lo de TransMi LIVE */}
       <GeoJSONSource id="arboles-3d" data={trees3dJson}>
         <Layer id="arboles-3d" type="fill-extrusion" minzoom={TREE_3D_MIN_ZOOM} beforeId={c.dark ? "highway_name_other" : "highway-name-path"}

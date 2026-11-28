@@ -4,6 +4,15 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-28 · **Edificios y árboles reales de Bogotá en 3D** (pedido del dueño; datos abiertos del mapa 3D de Bogotá, IDECA):
+  - **Fuente**: `mapas.bogota.gov.co/3d` baja por sector catastral (`data/SCat.json`, 1.170) `data_construcciones/<sector>.json` y `data_arbolado/<sector>.json`. Lector en `tools/ideca.ts`.
+  - **Edificios** (Catastro): `tools/edificios.ts` toma contorno y pisos. Base = `ConAltura`×3 m y techo = `ConElevaci`×3 m (`buildingHeights`). Quita piezas de menos de 8 m² y puntos que sobran. Se publican por celdas de 0,01° en la rama `edificios` (`edi_<x>_<y>.json` + `edificios-indice.json`; formato `encodeBuildingCell`).
+  - **Árboles** (censo del Jardín Botánico): con su altura y la copa estimada, son la fuente principal de `tools/arboles.ts`; OpenStreetMap queda de complemento (`IDECA_ARBOLADO=0` o `ARBOLES_OSM=0` para probar).
+  - **Web y app**: `Buildings3D` / `useBuildings3d` piden solo las celdas de la pantalla con el 3D encendido y de cerca (web 900 m y 9.000 edificios; app 500 m y 2.500). Cuando hay edificios de Bogotá publicados se apagan los del mapa base.
+  - **Créditos**: en el mapa web y en Más (app): «Construcciones: Catastro Bogotá (IDECA) · Arbolado: Jardín Botánico de Bogotá».
+  - **Workflow** «Árboles y edificios para el mapa 3D» (`arboles.yml`), mensual.
+
+  Probado aquí con 3 sectores (Calle 72: 3.711 edificios, 0,2 MB; 206 árboles) y capturas en la web. Licencia: el dueño confirmó que son datos abiertos; nombre exacto de la licencia **(?)**. App sin ver en teléfono.
 - 2026-11-28 · Estaciones: **la estación entera gira hacia la dirección de los carriles** (vagones, pasadizos y base), no solo los vagones (Suba - Tv. 91: el pasadizo iba derecho y los vagones inclinados). Medido: 0 vagones fuera de la línea de su pasadizo; 42 de 375 aún tocan un recorrido (avenidas curvas como Islandia: la estación es recta y la vía se curva).
 - 2026-11-28 · Estaciones con plaza: **un vagón por letra y por lado**. En Héroes cada letra (A, B, C) tiene puertas hacia los dos carriles («1 ó 5» y «4 ó 6»); antes se juntaban en un vagón y faltaban. Héroes pasa de 3 a 6 vagones y Tv. 86 de 3 a 4. Captura en la web.
 - 2026-11-28 · **Estaciones rectas, vagones del ancho real y plazas** (web y app, pedidos del dueño: Calle 100, Calle 72 y Granja corridas; vagones encima de los carriles; plazas como la de Tv. 86):

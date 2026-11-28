@@ -17,6 +17,9 @@ export const CONFIG = {
   /** Árboles de verdad para la vista 3D, por celdas (los publica el workflow «Árboles para el mapa 3D», ver tools/arboles.ts). Si la rama
    *  aún no existe, el mapa siembra árboles dentro de los parques y ya. */
   treesBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/arboles/",
+  /** Edificios de Catastro de Bogotá para la vista 3D, por celdas (los publica el workflow «Árboles y edificios para el mapa 3D», ver
+   *  tools/edificios.ts). Si la rama aún no existe, siguen los edificios del mapa base. */
+  buildingsBase: "https://raw.githubusercontent.com/itsandresortiz/transmi-live/edificios/",
   /** Función de Supabase «viajes» (avisos del viaje que se corrigen con la app cerrada y posiciones compartidas). `null` = APAGADO:
    *  los avisos son solo del teléfono, como siempre. Se enciende cuando el dueño la despliegue (ver supabase/LEEME-avisos.md); los avisos
    *  remotos además necesitan compilar con TM_PUSH=1. Ejemplo: "https://<proyecto>.supabase.co/functions/v1/viajes". */
