@@ -9,7 +9,7 @@ import { nowMs } from "@/clock";
 import { useTransitVersion } from "@/hooks";
 import { useColors } from "@/ui/theme";
 import { useAccessibility } from "@/accessibility";
-import { BUILDINGS_3D_FILTER, TREE_3D_MIN_ZOOM, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
+import { BUILDINGS_3D_FILTER, TREE_3D_MIN_ZOOM, BUS_3D_DETAIL_MAX, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, busVolumes, signalVolumes, stationVolumes, plazaTrees, CORRIDORS, PORTALS, type TripGeo, simulatedCabins, upcomingCablesGeo, alertStretch, buildStationGeometry, routeAlertViews, flowDashAt, hav, trafficBand, trafficSegments, trunkStations } from "@transmi/application";
 import { TRUNK_LINES } from "@transmi/domain";
 import { useSemaforos } from "./semaforos";
 import { useTestsMode } from "@/tests";
@@ -243,7 +243,8 @@ export const TransitMap = forwardRef<TransitMapHandle, Props>(function TransitMa
   // árboles); sigue ahí para poder tocarla
   const flat3d = (normal: number) => (view3d ? ["step", ["zoom"], normal, STATION_3D_MIN_ZOOM, 0] : normal);
   const stationPolys = useMemo(() => geo?.bases.features.map((f) => f.geometry) ?? [], [geo]);
-  const trees3dJson = useTrees3d(mapRef, view3d, view, lastCenter, c.dark, stationPolys);
+  const stationTrees = useMemo(() => (geo ? plazaTrees(geo.plazas) : []), [geo]);
+  const trees3dJson = useTrees3d(mapRef, view3d, view, lastCenter, c.dark, stationPolys, stationTrees);
   const testsOn = useTestsMode((t) => t.on);
   const liveSignalsJson = useLiveSignals(testsOn && showSignals && active);
   /** El viaje que se está siguiendo, como líneas y puntos. Las capas están siempre montadas: sin viaje, los datos van vacíos. */

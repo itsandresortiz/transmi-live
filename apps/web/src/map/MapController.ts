@@ -4,7 +4,7 @@ import baseDark from "./base-dark.json";
 import maplibregl, { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap, type Popup } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, Point } from "geojson";
 import type { GeoPoint, RouteShape, SystemType, TransitNetwork } from "@transmi/domain";
-import { type SignalRow, BUILDINGS_3D_FILTER, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, stationVolumes, upcomingCablesGeo, flowDash, signalPoints, signalVolumes, trafficBand } from "@transmi/application";
+import { type SignalRow, BUILDINGS_3D_FILTER, BUS_3D_MIN_ZOOM, SIGNAL_3D_MIN_ZOOM, STATION_3D_MIN_ZOOM, stationVolumes, plazaTrees, upcomingCablesGeo, flowDash, signalPoints, signalVolumes, trafficBand } from "@transmi/application";
 import * as geo from "./geodata";
 import { busSprite } from "./sprites";
 import type { StationGeometry } from "./stations";
@@ -759,7 +759,7 @@ export class MapController {
     (this.map.getSource("station-links") as GeoJSONSource | undefined)?.setData(g.links);
     (this.map.getSource("station-chips") as GeoJSONSource | undefined)?.setData(g.chips);
     this.paintStations();
-    (this.trees3d ??= new Trees3D(this.map)).setStations(g.bases.features.map((f) => f.geometry));      // sin árboles encima de las estaciones
+    (this.trees3d ??= new Trees3D(this.map)).setStations(g.bases.features.map((f) => f.geometry), plazaTrees(g.plazas));      // sin árboles encima de las estaciones
     this.paint3D();
   }
   /** Ilumina los vagones donde se detiene la ruta elegida y marca el vagón de la parada abierta. */

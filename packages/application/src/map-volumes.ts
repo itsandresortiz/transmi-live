@@ -175,8 +175,10 @@ export const STATION_3D_MIN_ZOOM = 15;      // como los edificios: la estación 
  *  un poco, con el color de su línea en una franja a la altura de las puertas y en el borde de la cubierta. Solo los vagones tienen
  *  techo: el pasillo que los une es un pasadizo gris descubierto con barandas bajas. `colorOf` da el color de cada línea (A, B, C…) según la apariencia.
  *  Las piezas son cajas de 4 lados (no cápsulas redondeadas): más parecidas a las reales y livianas para el mapa. */
+/** Ancho real de un vagón en 3D (m). */
+export const WAGON_WIDTH_3D = 4.8;
 export function stationVolumes(
-  g: { bases: FeatureCollection<Polygon>; capsules: FeatureCollection<Polygon>; links: FeatureCollection<Polygon> },
+  g: { bases: FeatureCollection<Polygon>; capsules: FeatureCollection<Polygon>; links: FeatureCollection<Polygon>; plazas?: FeatureCollection<Polygon> },
   colorOf: (line: string) => string, opts: { dark?: boolean } = {},
 ): FeatureCollection<Polygon, BusVolumeProps> {
   const features: Feature<Polygon, BusVolumeProps>[] = [];
@@ -186,6 +188,9 @@ export function stationVolumes(
     steel: dark ? "#8a919c" : "#9aa1ab",        // estructura y postes
     roof: dark ? "#6b717c" : "#e6e8eb",         // cubierta
     glass: dark ? "#8fb0cf" : "#b9d6ec",
+    paving: dark ? "#4a4d55" : "#cfcbc6",      // adoquín de la plaza
+    brick: dark ? "#7a4a3e" : "#b56a50",       // borde de las materas
+    grass: dark ? "#3d5a3a" : "#9bbf6e",
   };
   // sin la base ovalada (el contorno de toda la estación): en 3D sobraba (pedido del dueño). La del mapa plano sigue ahí, invisible, para tocarla
   // alturas: la cubierta va a 5,0–5,3 m porque OpenStreetMap trae la cubierta de muchas estaciones como un edificio de 5 m (fundido con
@@ -194,7 +199,8 @@ export function stationVolumes(
   const build = (poly: Polygon, id: string, line: string) => {
     const ob = orientedBox(poly);
     if (!ob) return;
-    const { lon, lat, fe, fn, len, w } = ob;
+    // ancho real de un vagón (~4,8 m): el dibujo plano lo hace de 9 m para verlo y tocarlo, y en 3D se salía sobre los carriles (Calle 72)
+    const { lon, lat, fe, fn, len } = ob, w = Math.min(ob.w, WAGON_WIDTH_3D);
     const kx = 1 / (111_320 * Math.cos((lat * Math.PI) / 180)), ky = 1 / 110_540;
     const box = (along: number, across: number, l: number, ww: number, c: string, b: number, h: number, glassy = false) => {
       const f = boxFeature(id, lon, lat, kx, ky, fe, fn, along, across, l, ww, 0, c, b, h);
@@ -219,8 +225,8 @@ export function stationVolumes(
     for (const side of [-1, 1]) box(0, side * (w / 2 - 0.15), len + 0.04, 0.4, col, BAND0, BAND1);
     for (const end of [-1, 1]) box(end * (len / 2 - 0.15), 0, 0.4, w - 0.2, col, BAND0, BAND1);
     // cubierta plana que sobresale ~0,7 m a cada lado, con la franja del color de la línea en los bordes largos
-    box(0, 0, len + 1.2, w + 1.4, C.roof, ROOF0, ROOF1);
-    for (const side of [-1, 1]) box(0, side * (w / 2 + 0.45), len + 1.2, 0.5, col, ROOF0 - 0.1, ROOF1 + 0.05);
+    box(0, 0, len + 1.2, w + 0.9, C.roof, ROOF0, ROOF1);
+    for (const side of [-1, 1]) box(0, side * (w / 2 + 0.3), len + 1.2, 0.4, col, ROOF0 - 0.1, ROOF1 + 0.05);
   };
   // el pasillo entre vagones: pasadizo gris descubierto (sin techo, sin vidrio ni color de línea), con barandas bajas a los lados
   for (const f of g.links.features) {
@@ -230,8 +236,42 @@ export function stationVolumes(
     features.push(boxFeature(id, ob.lon, ob.lat, kx, ky, ob.fe, ob.fn, 0, 0, ob.len, ob.w, 0, C.platform, 0.25, PLAT));
     for (const side of [-1, 1]) features.push(boxFeature(id, ob.lon, ob.lat, kx, ky, ob.fe, ob.fn, 0, side * (ob.w / 2 - 0.08), ob.len, 0.12, 0, C.steel, PLAT, PLAT + 1.1));
   }
+  // plaza de las estaciones grandes (Tv. 86, Héroes…): adoquín y materas con borde de ladrillo y pasto (los árboles los pone `plazaTrees`)
+  for (const f of g.plazas?.features ?? []) {
+    const ob = orientedBox(f.geometry), id = String(f.properties?.all ?? "");
+    if (!ob) continue;
+    const kx = 1 / (111_320 * Math.cos((ob.lat * Math.PI) / 180)), ky = 1 / 110_540;
+    const at = (along: number, across: number, l: number, ww: number, c: string, b: number, h: number) => features.push(boxFeature(id, ob.lon, ob.lat, kx, ky, ob.fe, ob.fn, along, across, l, ww, 0, c, b, h));
+    at(0, 0, ob.len, ob.w, C.paving, 0, 0.12);
+    for (const p of plazaPlanters(ob.len, ob.w)) {
+      at(p.along, p.across, p.l, p.w, C.brick, 0.12, 0.6);
+      at(p.along, p.across, p.l - 0.6, p.w - 0.6, C.grass, 0.12, 0.62);
+    }
+  }
   for (const f of g.capsules.features) build(f.geometry, String(f.properties?.ids ?? ""), String(f.properties?.l ?? ""));
   return { type: "FeatureCollection", features };
+}
+
+/** Materas de una plaza de `len` × `w` m (en metros desde su centro): en fila por el medio, de ~14 m con 6 m de paso entre ellas,
+ *  dejando ~4 m libres junto a cada fila de vagones. */
+export function plazaPlanters(len: number, w: number): { along: number; across: number; l: number; w: number }[] {
+  const pw = Math.min(10, w - 8);
+  if (pw < 3 || len < 20) return [];
+  const pl = 14, gap = 6, n = Math.max(1, Math.floor((len - 6 + gap) / (pl + gap)));
+  const total = n * pl + (n - 1) * gap, out: { along: number; across: number; l: number; w: number }[] = [];
+  for (let i = 0; i < n; i++) out.push({ along: -total / 2 + pl / 2 + i * (pl + gap), across: 0, l: pl, w: pw });
+  return out;
+}
+/** Árboles de las plazas: uno por matera, en su centro (se suman a los demás árboles del 3D). */
+export function plazaTrees(plazas: FeatureCollection<Polygon>): { lon: number; lat: number; h: number; crown: number }[] {
+  const out: { lon: number; lat: number; h: number; crown: number }[] = [];
+  for (const f of plazas.features) {
+    const ob = orientedBox(f.geometry);
+    if (!ob) continue;
+    const kx = 1 / (111_320 * Math.cos((ob.lat * Math.PI) / 180)), ky = 1 / 110_540;
+    for (const p of plazaPlanters(ob.len, ob.w)) out.push({ lon: ob.lon + p.along * ob.fe * kx, lat: ob.lat + p.along * ob.fn * ky, h: 8, crown: 6 });
+  }
+  return out;
 }
 
 /** La caja que contiene una forma alargada (vagón o pasillo): centro, dirección del lado largo (este, norte) y medidas en metros. */
@@ -240,13 +280,24 @@ export function orientedBox(poly: Polygon): { lon: number; lat: number; fe: numb
   if (!ring || ring.length < 4) return null;
   const lat0 = ring[0]![1]!, lon0 = ring[0]![0]!, kx = 111_320 * Math.cos((lat0 * Math.PI) / 180), ky = 110_540;
   const pts = ring.slice(0, -1).map(([x, y]) => [(x! - lon0) * kx, (y! - lat0) * ky] as const);
-  let a = 0, b = 0, far = -1;
-  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) { const d = (pts[i]![0] - pts[j]![0]) ** 2 + (pts[i]![1] - pts[j]![1]) ** 2; if (d > far) { far = d; a = i; b = j; } }
-  const L = Math.sqrt(far);
-  if (!(L > 0.5)) return null;
-  const fe = (pts[b]![0] - pts[a]![0]) / L, fn = (pts[b]![1] - pts[a]![1]) / L;
-  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
-  for (const [x, y] of pts) { const u = x * fe + y * fn, v = x * fn - y * fe; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+  // la caja más chica que la contiene, probando la dirección de cada lado (antes se tomaba la diagonal entre los dos puntos más lejanos:
+  // en una forma ancha, como la plaza de Tv. 86, las materas salían giradas)
+  let best = Infinity, fe = 1, fn = 0, u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i]![0] - pts[i - 1]![0], dy = pts[i]![1] - pts[i - 1]![1], L = Math.hypot(dx, dy);
+    if (L < 0.2) continue;
+    const ex = dx / L, ey = dy / L;
+    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+    for (const [x, y] of pts) { const u = x * ex + y * ey, v = x * ey - y * ex; a0 = Math.min(a0, u); a1 = Math.max(a1, u); b0 = Math.min(b0, v); b1 = Math.max(b1, v); }
+    const area = (a1 - a0) * (b1 - b0);
+    if (area < best - 1e-6) {
+      best = area;
+      // el lado largo manda
+      if (a1 - a0 >= b1 - b0) { fe = ex; fn = ey; u0 = a0; u1 = a1; v0 = b0; v1 = b1; }
+      else { fe = -ey; fn = ex; u0 = -b1; u1 = -b0; v0 = a0; v1 = a1; }
+    }
+  }
+  if (!Number.isFinite(best) || u1 - u0 < 0.5) return null;
   const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2, cx = cu * fe + cv * fn, cy = cu * fn - cv * fe;
   return { lon: lon0 + cx / kx, lat: lat0 + cy / ky, fe, fn, len: u1 - u0, w: v1 - v0 };
 }

@@ -4,6 +4,13 @@ Más nuevo arriba. Cada línea: `commit` · área · qué cambió. Se generó de
 Áreas: **app** (apps/mobile), **web** (apps/web), **núcleo** (packages/*: dominio, aplicación, infraestructura), **datos/ops** (workflows, scripts, tools, supabase), **tests**, **docs**.
 
 ## Sin commit (pendiente de decisión del dueño)
+- 2026-11-28 · **Estaciones rectas, vagones del ancho real y plazas** (web y app, pedidos del dueño: Calle 100, Calle 72 y Granja corridas; vagones encima de los carriles; plazas como la de Tv. 86):
+  - (1) **Estaciones rectas**: la parada del archivo marca dónde abre la puerta del bus, a uno u otro lado del vagón. Ya no se corre cada vagón hacia su parada: todos van en una fila centrada entre los dos carriles y siguen su inclinación a lo largo de la estación, porque la avenida no siempre va paralela.
+  - (2) **Vagones 3D de 4,8 m de ancho** (`WAGON_WIDTH_3D`), el real; el plano sigue de 9 m para verlo y tocarlo. Si la fila toca un carril, se corre entera lo mínimo (≤7 m, `WAGON_CLEAR_M` 3,8).
+  - (3) **Plazas** (`plazas` en `StationGeometry`, `PLAZA_MIN_LANES_M` 22): si los carriles pasan a ≥22 m y los vagones quedan entre ellos, cada vagón se pega a su carril y en medio hay una plaza con adoquín, materas de ladrillo con pasto y un árbol por matera (`plazaPlanters`, `plazaTrees`). Son 17: Héroes, Tv. 86, Mandalay, Marsella, Av. Américas-Boyacá, Pradera, Distrito Grafiti, Modelia, Normandía, Av. Rojas, El Tiempo, Gobernación, Castellana, NQS-Calle 75, Av. Chile, Guatoque y Parque.
+  - (4) `orientedBox` usa la caja más chica, no la diagonal (las materas salían giradas).
+
+  Medido con la red real, vagones 3D con un recorrido de bus encima: 277 → 38 de 345. Capturas en la web: Calle 72, Calle 100, Tv. 86, Héroes y Granja. App sin ver en teléfono.
 - 2026-11-28 · Estaciones 3D: **sin la base ovalada gris** debajo (dueño). En el mapa plano sigue igual; en 3D queda invisible, solo para poder tocar la estación.
 - 2026-11-28 · Estaciones 3D: **solo los vagones tienen techo** (dueño). El pasillo entre vagones es un pasadizo gris descubierto, con piso a 0,9 m y barandas bajas grises, sin vidrio, techo ni color de línea. Vista previa en la web (La Campiña).
 - 2026-11-28 · **Estaciones 3D como las de TransMilenio** (web y app, pedido del dueño). `stationVolumes` arma cada vagón y el pasillo con cajas rectas en vez de cápsulas redondeadas:

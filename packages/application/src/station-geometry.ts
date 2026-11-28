@@ -7,6 +7,10 @@ import type { TransitState } from "./transit-state";
 const CAPSULE_LENGTH = 30, CAPSULE_WIDTH = 9;
 /** La base abraza a los vagones sin pasarse hacia las calzadas de las avenidas (la estación va en el separador). */
 const BASE_MARGIN_ALONG = 7, BASE_MARGIN_ACROSS = 1.6, BASE_RADIUS = 6;
+/** Distancia mínima (m) del eje de un vagón a un carril de bus: medio vagón real (2,4) + medio bus (1,3) + un poco. */
+export const WAGON_CLEAR_M = 3.8;
+/** Una estación tiene plaza si los carriles de la troncal pasan a cada lado separados al menos esto (m), con los vagones entre ellos. */
+export const PLAZA_MIN_LANES_M = 22;
 /** Pasillo que une los vagones de una misma estación. */
 const LINK_WIDTH = 4.5;
 /** Una estación se centra sobre la línea de su corredor si esta queda a lo sumo a estos metros. */
@@ -27,6 +31,8 @@ export interface StationGeometry {
   links: FeatureCollection<Polygon>;
   /** Una etiqueta con el nombre sobre cada estación. */
   chips: FeatureCollection<Point>;
+  /** Plaza peatonal de las estaciones grandes (vagones en dos filas con un espacio sin buses en medio, como Tv. 86): adoquín, materas y árboles en 3D. */
+  plazas: FeatureCollection<Polygon>;
 }
 
 interface Axis { ux: number; uy: number }
@@ -145,7 +151,7 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
   };
   const m = 1 / METERS_PER_WORLD_UNIT;
   const empty = <G extends Polygon | LineString | Point>(): FeatureCollection<G> => ({ type: "FeatureCollection", features: [] });
-  const out: StationGeometry = { bases: empty(), capsules: empty(), doors: empty(), labels: empty(), links: empty(), chips: empty() };
+  const out: StationGeometry = { bases: empty(), capsules: empty(), doors: empty(), labels: empty(), links: empty(), chips: empty(), plazas: empty() };
 
   /** Rectángulo redondeado en coordenadas de la estación (u a lo largo, v a lo ancho), llevado a longitud/latitud. */
   const rounded = (cu: number, cv: number, hl: number, hw: number, r: number, ax: Axis): number[][] => {
@@ -190,6 +196,7 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
     // la estación. El centro de la estación es el punto medio entre el más a la izquierda y el más a la derecha (si son uno solo, ese).
     // Antes se centraba sobre la línea dibujada del corredor, que en algunos tramos va corrida (Rionegro quedaba ~15 m hacia los carriles).
     let byShapes = false;
+    let shapeVs: number[] = [];      // dónde pasan (a lo ancho) los recorridos de las rutas que paran ahí, para la plaza
     {
       const vMid0 = wagons.reduce((a, w) => a + w.v, 0) / wagons.length, uMid0 = wagons.reduce((a, w) => a + w.u, 0) / wagons.length;
       const cw = { x: (uMid0 * axis.ux + vMid0 * nx) * m, y: (uMid0 * axis.uy + vMid0 * ny) * m };
@@ -203,6 +210,7 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
         const hit = path.project(cw, 0, 0, 45);
         if (hit) vs.push(uv(path.pointAt(hit.s)).v);
       }
+      shapeVs = vs;
       if (vs.length) {
         const lo = Math.min(...vs), hi = Math.max(...vs), dv = (lo + hi) / 2 - vMid0;
         // carriles de un mismo corredor: separados como mucho ~30 m; más, es otra avenida que se cruza
@@ -220,6 +228,68 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
         if (Math.abs(dv) >= 1.5 && Math.abs(dv) <= 28) for (const w of wagons) w.v += dv;
       }
     }
+    // Estaciones grandes con plaza (Tv. 86, Mandalay…): los carriles de la troncal pasan por fuera, separados ≥ `PLAZA_MIN_LANES_M`, y
+    // todos los vagones quedan entre ellos. Ahí cada vagón se pega a su carril (las paradas del archivo caen a veces en medio) y el
+    // espacio entre los dos carriles es la plaza peatonal. Solo si se sabe por dónde pasan los buses.
+    let plaza = false;
+    if (wagons.length >= 2 && shapeVs.length >= 2) {
+      const lo = Math.min(...shapeVs), hi = Math.max(...shapeVs);
+      const twoSides = shapeVs.every((v) => v - lo < 4 || hi - v < 4);
+      if (hi - lo >= PLAZA_MIN_LANES_M && twoSides && wagons.every((w) => w.v > lo - 4 && w.v < hi + 4)) {
+        plaza = true;
+        for (const w of wagons) w.v = w.v - lo <= hi - w.v ? lo + CAPSULE_WIDTH / 2 + 0.6 : hi - CAPSULE_WIDTH / 2 - 0.6;
+        const us = wagons.map((w) => w.u), pu0 = Math.min(...us) - CAPSULE_LENGTH / 2, pu1 = Math.max(...us) + CAPSULE_LENGTH / 2;
+        const ring = rounded((pu0 + pu1) / 2, (lo + hi) / 2, (pu1 - pu0) / 2, (hi - lo) / 2 - 1.5, 2, axis);
+        out.plazas.features.push({ type: "Feature", properties: { title: st.title, all, l: line }, geometry: { type: "Polygon", coordinates: [ring] } });
+      }
+    }
+    // Las estaciones son rectas: lo que cambia entre paradas es de qué lado del vagón abre la puerta (el archivo pone cada parada donde
+    // se detiene el bus, a veces sobre el carril mismo, a un lado o al otro del vagón). Antes cada vagón se corría hacia su puerta y la
+    // estación salía torcida o con vagones sobre los carriles (Calle 72, Calle 100, Granja). Ahora todos los vagones van en una sola fila,
+    // centrada entre los dos carriles si se conocen; las paradas solo dicen dónde va cada vagón a lo largo. Si aun así la fila toca un
+    // carril (a menos de `WAGON_CLEAR_M` de su eje), se corre entera lo mínimo (≤ 7 m). Las estaciones con plaza (dos filas) ya quedaron.
+    if (!plaza) {
+      const lo = shapeVs.length ? Math.min(...shapeVs) : NaN, hi = shapeVs.length ? Math.max(...shapeVs) : NaN;
+      const twoSides = shapeVs.length >= 2 && hi - lo >= 2 * WAGON_CLEAR_M && hi - lo <= 30 && shapeVs.every((v) => v - lo < 4 || hi - v < 4);
+      let vC = twoSides ? (lo + hi) / 2 : wagons.reduce((acc, w) => acc + w.v, 0) / wagons.length;
+      // los carriles a lo largo de toda la estación (pueden ir en diagonal o abrirse): centro y puntas de cada vagón
+      const paths: RoadPath[] = [];
+      const seenP = new Set<RouteShape>();
+      for (const stop of st.stops) for (const sh of byStop.get(stop.id) ?? []) {
+        if (seenP.has(sh) || sh.points.length < 2) continue;
+        seenP.add(sh);
+        let path = cache.get(sh);
+        if (!path) { path = new Path(sh.points); cache.set(sh, path); }
+        paths.push(path);
+      }
+      const lanes: number[] = [], laneUV: [number, number][] = [];
+      for (const w of wagons) {
+        const cw = { x: (w.u * axis.ux + vC * nx) * m, y: (w.u * axis.uy + vC * ny) * m };
+        for (const path of paths) {
+          const hit = path.project(cw, 0, 0, 14);
+          if (!hit) continue;
+          for (const ds of [-12, 0, 12]) { const q = uv(path.pointAt(Math.max(0, Math.min(path.length, hit.s + ds)))); if (Math.abs(q.u - w.u) < CAPSULE_LENGTH / 2 + 2) { lanes.push(q.v); laneUV.push([q.u, q.v]); } }
+        }
+      }
+      const ok = (v: number) => lanes.every((l) => Math.abs(l - v) >= WAGON_CLEAR_M);
+      if (lanes.length && !ok(vC)) {
+        const cands = lanes.flatMap((l) => [l + WAGON_CLEAR_M, l - WAGON_CLEAR_M]).filter((v) => Math.abs(v - vC) <= 7 && ok(v)).sort((x, y) => Math.abs(x - vC) - Math.abs(y - vC));
+        if (cands.length) vC = cands[0]!;
+      }
+      // la avenida no siempre va paralela a la estación (en una estación de 200–400 m los carriles se corren 10–20 m de lado): con los
+      // dos carriles a los lados, la fila sigue la línea que va justo entre ellos, con su inclinación
+      const left = laneUV.filter(([, v]) => v < vC), right = laneUV.filter(([, v]) => v >= vC);
+      if (twoSides && left.length >= 2 && right.length >= 2) {
+        const mean = (xs: [number, number][], i: 0 | 1) => xs.reduce((acc, p) => acc + p[i], 0) / xs.length;
+        const muL = mean(left, 0), mvL = mean(left, 1), muR = mean(right, 0), mvR = mean(right, 1);
+        let sxy = 0, sxx = 0;
+        for (const [u, v] of left) { sxy += (u - muL) * (v - mvL); sxx += (u - muL) ** 2; }
+        for (const [u, v] of right) { sxy += (u - muR) * (v - mvR); sxx += (u - muR) ** 2; }
+        const b = sxx > 1 ? Math.max(-0.15, Math.min(0.15, sxy / sxx)) : 0;
+        const center = (u: number) => (mvL + b * (u - muL) + mvR + b * (u - muR)) / 2;
+        for (const w of wagons) w.v = center(w.u);
+      } else for (const w of wagons) w.v = vC;
+    }
     let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
     for (const w of wagons) {
       u0 = Math.min(u0, w.u); u1 = Math.max(u1, w.u); v0 = Math.min(v0, w.v); v1 = Math.max(v1, w.v);
@@ -233,7 +303,7 @@ export function buildStationGeometry(state: TransitState, stations: readonly Sta
         out.doors.features.push({ type: "Feature", properties: { ids: w.ids.join(","), l: line }, geometry: { type: "LineString", coordinates: [point(w.u + du, w.v - dv, nx, ny, axis), point(w.u + du, w.v + dv, nx, ny, axis)] } });
       }
     }
-    if (wagons.length > 1) {
+    if (wagons.length > 1 && !plaza) {
       // pasillo continuo de un vagón al otro, por el centro de la estación
       const vMid = (v0 + v1) / 2;
       out.links.features.push({ type: "Feature", properties: { all, l: line }, geometry: { type: "Polygon", coordinates: [rounded((u0 + u1) / 2, vMid, (u1 - u0) / 2, LINK_WIDTH / 2, LINK_WIDTH / 2, axis)] } });

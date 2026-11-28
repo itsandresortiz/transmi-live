@@ -72,6 +72,7 @@ Estado al 2026-11-10 (último commit de código: `5f6a0fa`). Marcar con ✅ y mo
 - **Bus que vas siguiendo, sin parpadeo** (2026-11-27, sin ver en teléfono): con «Voy en este bus» y «Seguir en el mapa», el bus debe avanzar suave, sin brincos ni retrocesos, y la cámara deslizarse; si se pierde el GPS, el bus no debe volver atrás.
 - **Halo del bus seguido** (2026-11-27, sin ver en teléfono): en claro y oscuro, y en 3D (debe quedar en el suelo, bajo el bus); ¿se distingue en troncales sobre la línea roja?
 - **Estaciones 3D nuevas** (2026-11-28, app sin ver en teléfono): vidrio, postes, cubierta gris y franja del color de la línea; revisar en claro y oscuro, que no se trabe al encender el 3D (ahora son ~9.200 piezas) y si los postes sobran en la app.
+- **Estaciones rectas y plazas** (2026-11-28): revisar con el dueño las 17 plazas (¿todas lo son de verdad? Calle 26 y NQS tienen dudas **(?)**) y los 38 vagones que aún tocan un recorrido (Islandia, Toberín, Cra. 47, Castellana, Danubio, Tibanica…).
 - **1.1.0 corregida** (2026-11-27, sin ver en teléfono): compilar de nuevo y confirmar que abre; luego encender el 3D de cerca (edificios, buses, estaciones, semáforos, árboles) en iPhone y Android. Si vuelve a cerrarse, mandar el `.ips`.
 
 - **En curso (2026-11-27)**: buses modelados con three.js en la web; zonas verdes más visibles, nombres de parques y árboles 3D (web con three.js, app con volúmenes); después, **3D de la app con el mapa web dentro de una vista web** (ver `07-decisions`).

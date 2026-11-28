@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { MapRef } from "@maplibre/maplibre-react-native";
 import type { Feature, LineString, MultiLineString, MultiPolygon, Polygon } from "geojson";
-import { TREE_3D_MIN_ZOOM, clampBounds, greenKeep, mergeTrees, nearestFirst, plantTrees, treeCellLoader, treesOutside, treeVolumes, type GreenArea } from "@transmi/application";
+import { TREE_3D_MIN_ZOOM, clampBounds, greenKeep, mergeTrees, nearestFirst, plantTrees, treeCellLoader, treesOutside, treeVolumes, type GreenArea, type TreePoint } from "@transmi/application";
 import { CONFIG } from "../config";
 import type { Viewport } from "./useBuses";
 
@@ -24,9 +24,9 @@ const isArea = (g: { type: string } | null | undefined): g is Polygon | MultiPol
 const isLine = (g: { type: string } | null | undefined): g is LineString | MultiLineString => g?.type === "LineString" || g?.type === "MultiLineString";
 
 /** Las piezas de los árboles de la pantalla, como texto GeoJSON (vacío fuera del 3D o de lejos: la capa queda montada igual). */
-export function useTrees3d(map: RefObject<MapRef | null>, on: boolean, view: Viewport | null, center: RefObject<[number, number]>, dark: boolean, stations?: Polygon[]): string {
-  const stationsRef = useRef<Polygon[]>([]);
-  stationsRef.current = stations ?? [];
+export function useTrees3d(map: RefObject<MapRef | null>, on: boolean, view: Viewport | null, center: RefObject<[number, number]>, dark: boolean, stations?: Polygon[], plazaTrees?: TreePoint[]): string {
+  const stationsRef = useRef<Polygon[]>([]), plazaRef = useRef<TreePoint[]>([]);
+  stationsRef.current = stations ?? []; plazaRef.current = plazaTrees ?? [];
   const [json, setJson] = useState(EMPTY_TREES);
   const [tick, setTick] = useState(0);
   const last = useRef("");
@@ -53,7 +53,8 @@ export function useTrees3d(map: RefObject<MapRef | null>, on: boolean, view: Vie
           roads: roadF.map((f) => f.geometry).filter(isLine), roadClear: 6,
         }) : [];
         const real = await cells.inView(bounds, () => { if (!dead) setTick((t) => t + 1); });
-        const trees = nearestFirst(treesOutside(mergeTrees(real, planted), stationsRef.current), c).slice(0, TREE_MAX);      // ninguno encima de una estación
+        const inPlazas = plazaRef.current.filter((t) => t.lon > bounds.west && t.lon < bounds.east && t.lat > bounds.south && t.lat < bounds.north);
+        const trees = nearestFirst([...treesOutside(mergeTrees(real, planted), stationsRef.current), ...inPlazas], c).slice(0, TREE_MAX);      // ninguno sobre una estación, salvo los de sus plazas
         const key = `${dark}|${trees.length}|${trees[0]?.lon.toFixed(6)}|${trees[trees.length - 1]?.lat.toFixed(6)}`;
         if (dead || key === last.current) return;
         last.current = key;

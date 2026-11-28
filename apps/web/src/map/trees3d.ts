@@ -1,6 +1,6 @@
 import type { Map as MLMap } from "maplibre-gl";
 import type { LineString, MultiLineString, MultiPolygon, Polygon } from "geojson";
-import { TREE_3D_MIN_ZOOM, capNearest, clampBounds, greenKeep, mergeTrees, plantTrees, treeCellLoader, treesOutside, type GreenArea } from "@transmi/application";
+import { TREE_3D_MIN_ZOOM, capNearest, clampBounds, greenKeep, mergeTrees, plantTrees, treeCellLoader, treesOutside, type GreenArea, type TreePoint } from "@transmi/application";
 import { CONFIG } from "../config";
 import type { TreeLayer } from "./TreeLayer";
 
@@ -34,7 +34,9 @@ export class Trees3D {
   private groundDirty = false;
   /** Las bases de las estaciones de la troncal: ahí no va ningún árbol. */
   private stations: Polygon[] = [];
-  setStations(bases: readonly Polygon[]) { this.stations = [...bases]; this.key = ""; }
+  /** Árboles de las materas de las plazas de las estaciones grandes (se ponen aparte: los demás no van sobre estaciones). */
+  private plazaTrees: TreePoint[] = [];
+  setStations(bases: readonly Polygon[], plazaTrees: readonly TreePoint[] = []) { this.stations = [...bases]; this.plazaTrees = [...plazaTrees]; this.key = ""; }
 
   constructor(private readonly map: MLMap) {
     // al terminar de moverse y cuando llegan teselas (zonas verdes o relieve) se recalculan los árboles de la pantalla, medio segundo después
@@ -105,7 +107,8 @@ export class Trees3D {
     }
     const planted = plantTrees({ areas, avoidAreas: avoid, avoidLines: paths, clear: 2.5, roads, roadClear: 6, bounds, center, max: MAX * 2 });
     const real = await cells.inView(bounds, () => { this.key = ""; void this.refresh(); });
-    const trees = capNearest(treesOutside(mergeTrees(real, planted), this.stations), MAX, center);      // ninguno encima de una estación
+    const inPlazas = this.plazaTrees.filter((t) => t.lon > bounds.west && t.lon < bounds.east && t.lat > bounds.south && t.lat < bounds.north);
+    const trees = capNearest([...treesOutside(mergeTrees(real, planted), this.stations), ...inPlazas], MAX, center);      // ninguno encima de una estación, salvo los de sus plazas
     const key = `${this.dark}|${trees.length}|${trees[0]?.lon.toFixed(6)}|${trees[trees.length - 1]?.lat.toFixed(6)}`;
     this.stats.plantMs = Math.round(performance.now() - t0); this.stats.areas = areas.length; this.stats.planted = planted.length;
     if (key === this.key && !this.groundDirty) return;
